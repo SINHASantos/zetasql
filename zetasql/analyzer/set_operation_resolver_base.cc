@@ -23,6 +23,7 @@
 #include <vector>
 
 #include "zetasql/analyzer/input_argument_type_resolver_helper.h"
+#include "zetasql/analyzer/resolver_util.h"
 #include "zetasql/parser/parse_tree.h"
 #include "zetasql/parser/parse_tree_errors.h"
 #include "zetasql/public/analyzer_options.h"
@@ -135,7 +136,8 @@ SetOperationResolverBase::GetSuperTypesOfSetOperation(
       return MakeSqlErrorAt(error_location)
              << "Column " << column_identifier_in_error_string(i) << " in "
              << GetSQLForOperation(op_type) << " has incompatible types: "
-             << InputArgumentType::ArgumentsToString(column_type_lists[i]);
+             << InputArgumentType::ArgumentsToString(column_type_lists[i])
+             << GetTypeCompatibilityExplanation(column_type_lists[i]);
     }
 
     std::string no_grouping_type;

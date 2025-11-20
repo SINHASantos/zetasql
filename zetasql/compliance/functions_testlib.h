@@ -266,7 +266,7 @@ std::vector<FunctionTestCall> GetFunctionTestsRegexp();
 std::vector<FunctionTestCall> GetFunctionTestsRegexp2(bool include_feature_set);
 std::vector<FunctionTestCall> GetFunctionTestsRegexpExtractGroups();
 std::vector<FunctionTestCall>
-GetFunctionTestsRegexpExtractGroupsWithoutAutoCasting();
+GetFunctionTestsRegexpExtractGroupsWithAutoCasting(bool autocast_enabled);
 std::vector<FunctionTestCall> GetFunctionTestsRegexpInstr();
 std::vector<FunctionTestCall> GetFunctionTestsFormat();
 std::vector<FunctionTestCall> GetFunctionTestsArray();

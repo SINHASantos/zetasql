@@ -7,21 +7,21 @@ select 'a' LIKE {{ANY|SOME|ALL}} ('a', 'b', 'c');
 --
 ALTERNATION GROUP: ANY
 --
-ERROR: LIKE ANY is not supported [at 1:17]
+ERROR: LIKE ANY is not supported [at 1:12]
 select 'a' LIKE ANY ('a', 'b', 'c');
-                ^
+           ^
 --
 ALTERNATION GROUP: SOME
 --
-ERROR: LIKE SOME is not supported [at 1:17]
+ERROR: LIKE SOME is not supported [at 1:12]
 select 'a' LIKE SOME ('a', 'b', 'c');
-                ^
+           ^
 --
 ALTERNATION GROUP: ALL
 --
-ERROR: LIKE ALL is not supported [at 1:17]
+ERROR: LIKE ALL is not supported [at 1:12]
 select 'a' LIKE ALL ('a', 'b', 'c');
-                ^
+           ^
 --
 ALTERNATION GROUPS:
     +LIKE_ANY_SOME_ALL,ANY
@@ -1670,19 +1670,19 @@ select 'a' LIKE {{ANY|SOME|ALL}} (select 'a')
 --
 ALTERNATION GROUP: ANY
 --
-ERROR: The LIKE ANY|SOME|ALL operator does not support subquery expression as patterns. Patterns must be string or bytes; did you mean LIKE ANY|SOME|ALL (pattern1, pattern2, ...)? [at 1:21]
+ERROR: The LIKE ANY|SOME|ALL operator does not support subquery expression as patterns. Patterns must be string or bytes; did you mean LIKE ANY (pattern1, pattern2, ...)? [at 1:21]
 select 'a' LIKE ANY (select 'a')
                     ^
 --
 ALTERNATION GROUP: SOME
 --
-ERROR: The LIKE ANY|SOME|ALL operator does not support subquery expression as patterns. Patterns must be string or bytes; did you mean LIKE ANY|SOME|ALL (pattern1, pattern2, ...)? [at 1:22]
+ERROR: The LIKE ANY|SOME|ALL operator does not support subquery expression as patterns. Patterns must be string or bytes; did you mean LIKE SOME (pattern1, pattern2, ...)? [at 1:22]
 select 'a' LIKE SOME (select 'a')
                      ^
 --
 ALTERNATION GROUP: ALL
 --
-ERROR: The LIKE ANY|SOME|ALL operator does not support subquery expression as patterns. Patterns must be string or bytes; did you mean LIKE ANY|SOME|ALL (pattern1, pattern2, ...)? [at 1:21]
+ERROR: The LIKE ANY|SOME|ALL operator does not support subquery expression as patterns. Patterns must be string or bytes; did you mean LIKE ALL (pattern1, pattern2, ...)? [at 1:21]
 select 'a' LIKE ALL (select 'a')
                     ^
 ==

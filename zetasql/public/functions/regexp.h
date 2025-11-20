@@ -21,6 +21,7 @@
 #include <memory>
 #include <string>
 #include <utility>
+#include <vector>
 
 #include "zetasql/base/logging.h"
 #include "zetasql/public/types/type.h"
@@ -173,18 +174,59 @@ class RegExp {
   ExtractAllIterator CreateExtractAllIterator(absl::string_view str,
                                               int64_t offset = 0) const;
 
-  // Used by the analyzer to support `REGEXP_EXTRACT_GROUPS`.
+  // The following are the functions and data structures used to implement
+  // REGEXP_EXTRACT_GROUPS.
+  //
+  // - CapturingGroupInfo: Struct containing information about a single
+  //        capturing group.
+  // - ParseCapturingGroups: Function to extract information about capturing
+  //        groups in a regular expression.
+  // - ExtractGroupsResultStruct: Function to create the struct type that would
+  //        be returned by REGEXP_EXTRACT_GROUPS for a regular expression.
+  // - ExtractGroups: Function to extract matches for capturing groups
+  //        in a regular expression.
+  //
+  // In most cases, engines only need to use ExtractGroupsResultStruct and
+  // ExtractGroups. Some engines may need to use ParseCapturingGroups if they
+  // need a custom implementation of REGEXP_EXTRACT_GROUPS.
+
+  // Information about a capturing group in a regular expression. In general,
+  // engines don't need this struct directly, unless they need to implement
+  // REGEXP_EXTRACT_GROUPS themselves.
+  struct CapturingGroupInfo {
+    // The name of the capturing group. If the capturing group is unnamed, the
+    // string value is empty.
+    std::string group_name;
+
+    // The name of the field in the result struct. This name is derived by
+    // stripping the type name suffix from the capturing group name, if it
+    // exists. E.g. if name is `PERSON_AGE__INT64`, the field name will be
+    // `PERSON_AGE`.
+    absl::string_view field_name;
+
+    // Suffix of the group name indicating the type of the field. This type is
+    // used to determine the type of the field in the result struct for
+    // `REGEXP_EXTRACT_GROUPS`. The type suffix may be empty. The resolver
+    // validates that the type suffixes are valid and adds a CAST to convert
+    // the field to the corresponding type.
+    // E.g. if name is `PERSON_AGE__INT64`, the type suffix will be `INT64`.
+    absl::string_view type_suffix;
+  };
+
+  // Information about the capturing groups in a regular expression.
+  using ParsedCapturingGroups = std::vector<CapturingGroupInfo>;
+
+  // Parses the capturing groups in the regular expression and returns the
+  // information about the groups.
+  absl::StatusOr<ParsedCapturingGroups> ParseCapturingGroups() const;
+
   // Returns a struct type with a field for each capturing group in the regular
   // expression. This type is used as the `result_type` in ExtractGroups().
-  // If `derive_field_types` is true, the type suffixes are used to determine
-  // the types of the fields in the result struct. Otherwise, the type suffixes
-  // are ignored and the field types in the result struct are set to the source
-  // type. The `language_options` are used only when `derive_field_types` is
-  // true to identify valid type and casts.
-  //
-  // A REGEXP_EXTRACT_GROUPS() call is represented in the resolved AST as a
-  // a ResolvedFunctionCall with ResolvedCast around it to support auto-casting
-  // of the field types. For example, given the call:
+  // Each field in the struct is of type STRING or BYTES, depending on the
+  // regular expression encoding type.
+
+  // Auto-casting of the field types based on type suffixes is implemented by
+  // the analyzer by adding a CAST. For example, given the call:
   // `REGEXP_EXTRACT_GROUPS("id: 123", r"(.*): (?<val__INT64>\d*)")`
   // the resolved AST looks like the following. Note that the type of the `val`
   // field in the two structs is different.
@@ -195,28 +237,14 @@ class RegExp {
   //     +-Literal(type=STRING, value="id: 123")
   //     +-Literal(type=STRING, value="(.*): (?<val__INT64>\\d*)")
   //
-  // The Analyzer calls `ExtractGroupsResultStruct()` with `derive_field_types`
-  // as false to get the result struct type for the ResolvedFunctionCall,
-  // and with `derive_field_types` as true to get the result struct type for
-  // the ResolvedCast.
   absl::StatusOr<const Type*> ExtractGroupsResultStruct(
-      TypeFactory* type_factory, const LanguageOptions& language_options,
-      bool derive_field_types) const;
+      TypeFactory* type_factory) const;
 
-  // REGEXP_EXTRACT_GROUPS
   // Extracts matches for multiple capturing groups in the regular expression.
   // It returns a struct value containing a field for each capturing group in
   // the regular expression. The fields are all of the same type, either STRING
-  // or BYTES, depending on the regular expression encoding type.
-  absl::StatusOr<Value> ExtractGroups(absl::string_view str,
-                                      TypeFactory* type_factory) const;
-
-  // REGEXP_EXTRACT_GROUPS
-  // Alternative version of ExtractGroups() that can be used when the result
-  // type is available from the ResolvedFunctionCall node. All the fields in the
-  // result struct will be of type STRING or BYTES, depending on the regex
-  // encoding type. If the result type is not known, use the other
-  // `ExtractGroups()` method that takes TypeFactory as input.
+  // or BYTES, depending on the regular expression encoding type. The
+  // result_type should be obtained from ExtractGroupsResultStruct().
   absl::StatusOr<Value> ExtractGroups(absl::string_view str,
                                       const Type* result_type) const;
 

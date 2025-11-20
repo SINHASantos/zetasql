@@ -1,4 +1,4 @@
-[default language_features=NONE,+DIFFERENTIAL_PRIVACY,+QUALIFY,+ANALYTIC_FUNCTIONS,+NAMED_ARGUMENTS,+NUMERIC_TYPE]
+[default language_features=NONE,+DIFFERENTIAL_PRIVACY,+QUALIFY,+ANALYTIC_FUNCTIONS,+NAMED_ARGUMENTS,+NUMERIC_TYPE,+PIPE_AGGREGATE_WITH_DIFFERENTIAL_PRIVACY]
 
 # Specify WITH DIFFERENTIAL_PRIVACY but no FROM clause
 select with differential_privacy sum();
@@ -84,7 +84,7 @@ select with differential_privacy @_p0_INT64
 from SimpleTypes
 qualify sum(int64) > rank() OVER (ORDER BY @_p1_STRING);
 
-Rewrite ERROR: A SELECT WITH DIFFERENTIAL_PRIVACY query must query data with a specified privacy unit column [at 1:1]
+Rewrite ERROR: A DIFFERENTIAL_PRIVACY query must query data with a specified privacy unit column [at 1:1]
 select with differential_privacy 1
 ^
 ==
@@ -463,7 +463,7 @@ QueryStmt
 select with differential_privacy count(*, contribution_bounds_per_group => @_p0_STRUCT)
 from SimpleTypes;
 
-Rewrite ERROR: A SELECT WITH DIFFERENTIAL_PRIVACY query must query data with a specified privacy unit column [at 1:1]
+Rewrite ERROR: A DIFFERENTIAL_PRIVACY query must query data with a specified privacy unit column [at 1:1]
 select with differential_privacy count(*, contribution_bounds_per_group => (0...
 ^
 ==
@@ -889,7 +889,7 @@ select with differential_privacy count(string, contribution_bounds_per_group ...
 # language feature DIFFERENTIAL_PRIVACY_REPORT_FUNCTIONS is enabled.
 # The differing error messages are not ideal, but what's important is that extra
 # parameter is rejected in both cases.
-[language_features=NONE,+DIFFERENTIAL_PRIVACY,+NAMED_ARGUMENTS,+DIFFERENTIAL_PRIVACY_REPORT_FUNCTIONS]
+[language_features=NONE,+DIFFERENTIAL_PRIVACY,+NAMED_ARGUMENTS,+DIFFERENTIAL_PRIVACY_REPORT_FUNCTIONS,+PIPE_AGGREGATE_WITH_DIFFERENTIAL_PRIVACY]
 select with differential_privacy count(string, contribution_bounds_per_group => (0,100), @test_param_double)
 from SimpleTypesWithAnonymizationUid;
 --
@@ -1178,7 +1178,7 @@ QueryStmt
 ==
 
 # Reject AnalyticScan
-[language_features=NONE,+DIFFERENTIAL_PRIVACY,+NAMED_ARGUMENTS,+ANALYTIC_FUNCTIONS]
+[language_features=NONE,+DIFFERENTIAL_PRIVACY,+NAMED_ARGUMENTS,+ANALYTIC_FUNCTIONS,+PIPE_AGGREGATE_WITH_DIFFERENTIAL_PRIVACY]
 [enabled_ast_rewrites=DEFAULTS,+ANONYMIZATION]
 [parse_location_record_type=PARSE_LOCATION_RECORD_CODE_SEARCH]
 select with differential_privacy count(*, contribution_bounds_per_group => (0,100))
@@ -3730,7 +3730,7 @@ QueryStmt
           +-ColumnRef(type=INT64, column=$differential_privacy.$group_selection_threshold_col#25)
 ==
 
-[language_features=NONE,+DIFFERENTIAL_PRIVACY,+NAMED_ARGUMENTS,+NUMERIC_TYPE,+GROUP_BY_ROLLUP]
+[language_features=NONE,+DIFFERENTIAL_PRIVACY,+NAMED_ARGUMENTS,+NUMERIC_TYPE,+GROUP_BY_ROLLUP,+PIPE_AGGREGATE_WITH_DIFFERENTIAL_PRIVACY]
 [enabled_ast_rewrites=DEFAULTS,+ANONYMIZATION]
 SELECT WITH DIFFERENTIAL_PRIVACY int64, double, SUM(int32)
     FROM SimpleTypesWithAnonymizationUid
@@ -3741,7 +3741,7 @@ ERROR: GROUP BY ROLLUP is not supported in anonymization queries [at 3:14]
              ^
 ==
 
-[language_features=NONE,+DIFFERENTIAL_PRIVACY,+NAMED_ARGUMENTS,+NUMERIC_TYPE,+GROUPING_SETS]
+[language_features=NONE,+DIFFERENTIAL_PRIVACY,+NAMED_ARGUMENTS,+NUMERIC_TYPE,+GROUPING_SETS,+PIPE_AGGREGATE_WITH_DIFFERENTIAL_PRIVACY]
 [enabled_ast_rewrites=DEFAULTS,+ANONYMIZATION]
 SELECT WITH DIFFERENTIAL_PRIVACY int64, double, SUM(int32)
     FROM SimpleTypesWithAnonymizationUid
@@ -3752,7 +3752,7 @@ ERROR: GROUP BY CUBE is not supported in anonymization queries [at 3:14]
              ^
 ==
 
-[language_features=NONE,+DIFFERENTIAL_PRIVACY,+NAMED_ARGUMENTS,+NUMERIC_TYPE,+GROUPING_SETS]
+[language_features=NONE,+DIFFERENTIAL_PRIVACY,+NAMED_ARGUMENTS,+NUMERIC_TYPE,+GROUPING_SETS,+PIPE_AGGREGATE_WITH_DIFFERENTIAL_PRIVACY]
 [enabled_ast_rewrites=DEFAULTS,+ANONYMIZATION]
 SELECT WITH DIFFERENTIAL_PRIVACY int64, double, SUM(int32)
     FROM SimpleTypesWithAnonymizationUid
@@ -3905,7 +3905,7 @@ ERROR: Argument 'contribution_bounds_per_group' to SUM must be a literal or quer
 ==
 
 # Union ANONYMIZATION and DIFFERENTIAL_PRIVACY
-[language_features=NONE,+ANONYMIZATION,+DIFFERENTIAL_PRIVACY,+NAMED_ARGUMENTS,+NUMERIC_TYPE]
+[language_features=NONE,+ANONYMIZATION,+DIFFERENTIAL_PRIVACY,+NAMED_ARGUMENTS,+NUMERIC_TYPE,+PIPE_AGGREGATE_WITH_DIFFERENTIAL_PRIVACY]
 [enabled_ast_rewrites=DEFAULTS,+ANONYMIZATION]
 select with DIFFERENTIAL_PRIVACY
   COUNT(*) from SimpleTypesWithAnonymizationUid
@@ -4016,7 +4016,7 @@ QueryStmt
 ==
 
 # ANONYMIZATION nested in DIFFERENTIAL_PRIVACY
-[language_features=NONE,+ANONYMIZATION,+DIFFERENTIAL_PRIVACY,+NAMED_ARGUMENTS,+NUMERIC_TYPE]
+[language_features=NONE,+ANONYMIZATION,+DIFFERENTIAL_PRIVACY,+NAMED_ARGUMENTS,+NUMERIC_TYPE,+PIPE_AGGREGATE_WITH_DIFFERENTIAL_PRIVACY]
 [enabled_ast_rewrites=DEFAULTS,+ANONYMIZATION]
 select with DIFFERENTIAL_PRIVACY
   COUNT(*) from SimpleTypesWithAnonymizationUid CROSS JOIN
@@ -4058,7 +4058,7 @@ Rewrite ERROR: Subqueries of differential_privacy queries must explicitly SELECT
 ==
 
 # DIFFERENTIAL_PRIVACY nested in ANONYMIZATION
-[ language_features=NONE,+ANONYMIZATION,+DIFFERENTIAL_PRIVACY,+NAMED_ARGUMENTS,+NUMERIC_TYPE]
+[language_features=NONE,+ANONYMIZATION,+DIFFERENTIAL_PRIVACY,+NAMED_ARGUMENTS,+NUMERIC_TYPE,+PIPE_AGGREGATE_WITH_DIFFERENTIAL_PRIVACY]
 [enabled_ast_rewrites=DEFAULTS,+ANONYMIZATION]
 select with ANONYMIZATION
   ANON_COUNT(*) from SimpleTypesWithAnonymizationUid CROSS JOIN
@@ -4454,7 +4454,7 @@ QueryStmt
 
 # Regresssion: b/282900415, non-subquery select expr in select list
 # Disable array_filter rewrite due to b/290669074
-[language_features=NONE,+DIFFERENTIAL_PRIVACY,+NAMED_ARGUMENTS,+NUMERIC_TYPE,+INLINE_LAMBDA_ARGUMENT]
+[language_features=NONE,+DIFFERENTIAL_PRIVACY,+NAMED_ARGUMENTS,+NUMERIC_TYPE,+INLINE_LAMBDA_ARGUMENT,+PIPE_AGGREGATE_WITH_DIFFERENTIAL_PRIVACY]
 [enabled_ast_rewrites=NONE,+ANONYMIZATION]
 SELECT WITH DIFFERENTIAL_PRIVACY
   int32,
@@ -4556,7 +4556,7 @@ QueryStmt
 
 # Regresssion: b/282900415, non-subquery, not selected, select expr in select list
 # Disable array_filter rewrite due to b/290669074
-[language_features=NONE,+DIFFERENTIAL_PRIVACY,+NAMED_ARGUMENTS,+NUMERIC_TYPE,+INLINE_LAMBDA_ARGUMENT]
+[language_features=NONE,+DIFFERENTIAL_PRIVACY,+NAMED_ARGUMENTS,+NUMERIC_TYPE,+INLINE_LAMBDA_ARGUMENT,+PIPE_AGGREGATE_WITH_DIFFERENTIAL_PRIVACY]
 [enabled_ast_rewrites=NONE,+ANONYMIZATION]
 [parse_location_record_type=PARSE_LOCATION_RECORD_CODE_SEARCH]
 SELECT WITH DIFFERENTIAL_PRIVACY
@@ -4816,7 +4816,7 @@ QueryStmt
 
 # Regression test for b/298246782
 [enabled_ast_rewrites=DEFAULTS,+ANONYMIZATION]
-[language_features=NONE,+DIFFERENTIAL_PRIVACY,+NAMED_ARGUMENTS,+TABLESAMPLE,+STRATIFIED_RESERVOIR_TABLESAMPLE]
+[language_features=NONE,+DIFFERENTIAL_PRIVACY,+NAMED_ARGUMENTS,+TABLESAMPLE,+STRATIFIED_RESERVOIR_TABLESAMPLE,+PIPE_AGGREGATE_WITH_DIFFERENTIAL_PRIVACY]
 [parse_location_record_type=PARSE_LOCATION_RECORD_CODE_SEARCH]
 SELECT
   WITH DIFFERENTIAL_PRIVACY
@@ -4945,7 +4945,7 @@ QueryStmt
 
 # Regresssion test for b/298246782
 [enabled_ast_rewrites=DEFAULTS,+ANONYMIZATION]
-[language_features=NONE,+DIFFERENTIAL_PRIVACY,+NAMED_ARGUMENTS,+TABLESAMPLE,+STRATIFIED_RESERVOIR_TABLESAMPLE]
+[language_features=NONE,+DIFFERENTIAL_PRIVACY,+NAMED_ARGUMENTS,+TABLESAMPLE,+STRATIFIED_RESERVOIR_TABLESAMPLE,+PIPE_AGGREGATE_WITH_DIFFERENTIAL_PRIVACY]
 [parse_location_record_type=PARSE_LOCATION_RECORD_CODE_SEARCH]
 SELECT
   WITH DIFFERENTIAL_PRIVACY
@@ -5028,7 +5028,7 @@ Rewrite ERROR: Reading the table SimpleTypesWithAnonymizationUid containing user
 ==
 
 # GROUPING function is unsupported in with DP clause.
-[language_features=NONE,+DIFFERENTIAL_PRIVACY,+NAMED_ARGUMENTS,+NUMERIC_TYPE,+GROUPING_BUILTIN]
+[language_features=NONE,+DIFFERENTIAL_PRIVACY,+NAMED_ARGUMENTS,+NUMERIC_TYPE,+GROUPING_BUILTIN,+PIPE_AGGREGATE_WITH_DIFFERENTIAL_PRIVACY]
 [enabled_ast_rewrites=DEFAULTS,+ANONYMIZATION]
 SELECT WITH DIFFERENTIAL_PRIVACY GROUPING(int64), int64
 FROM SimpleTypesWithAnonymizationUid
@@ -5040,7 +5040,7 @@ SELECT WITH DIFFERENTIAL_PRIVACY GROUPING(int64), int64
 ==
 
 # GROUPING function is unsupported in the same select list with DP functions.
-[language_features=NONE,+DIFFERENTIAL_PRIVACY,+NAMED_ARGUMENTS,+NUMERIC_TYPE,+GROUPING_BUILTIN]
+[language_features=NONE,+DIFFERENTIAL_PRIVACY,+NAMED_ARGUMENTS,+NUMERIC_TYPE,+GROUPING_BUILTIN,+PIPE_AGGREGATE_WITH_DIFFERENTIAL_PRIVACY]
 [enabled_ast_rewrites=DEFAULTS,+ANONYMIZATION]
 SELECT WITH DIFFERENTIAL_PRIVACY int64, GROUPING(int64)
 FROM SimpleTypesWithAnonymizationUid
@@ -5052,7 +5052,7 @@ SELECT WITH DIFFERENTIAL_PRIVACY int64, GROUPING(int64)
 ==
 
 # GROUPING function is unsupported in the same query with the DP query.
-[language_features=NONE,+DIFFERENTIAL_PRIVACY,+NAMED_ARGUMENTS,+NUMERIC_TYPE,+GROUPING_BUILTIN]
+[language_features=NONE,+DIFFERENTIAL_PRIVACY,+NAMED_ARGUMENTS,+NUMERIC_TYPE,+GROUPING_BUILTIN,+PIPE_AGGREGATE_WITH_DIFFERENTIAL_PRIVACY]
 [enabled_ast_rewrites=DEFAULTS,+ANONYMIZATION]
 SELECT WITH DIFFERENTIAL_PRIVACY int64
 FROM SimpleTypesWithAnonymizationUid
@@ -5064,7 +5064,7 @@ GROUP BY int64, double HAVING GROUPING(int64) = 0;
 ==
 
 # GROUPING function should be allowed in a subquery.
-[language_features=NONE,+DIFFERENTIAL_PRIVACY,+NAMED_ARGUMENTS,+NUMERIC_TYPE,+GROUPING_BUILTIN]
+[language_features=NONE,+DIFFERENTIAL_PRIVACY,+NAMED_ARGUMENTS,+NUMERIC_TYPE,+GROUPING_BUILTIN,+PIPE_AGGREGATE_WITH_DIFFERENTIAL_PRIVACY]
 [enabled_ast_rewrites=DEFAULTS,+ANONYMIZATION]
 SELECT
   WITH DIFFERENTIAL_PRIVACY int64,
@@ -5161,7 +5161,7 @@ QueryStmt
 ==
 
 # GROUPING function should be allowed in the with clause.
-[language_features=NONE,+DIFFERENTIAL_PRIVACY,+NAMED_ARGUMENTS,+NUMERIC_TYPE,+GROUPING_BUILTIN]
+[language_features=NONE,+DIFFERENTIAL_PRIVACY,+NAMED_ARGUMENTS,+NUMERIC_TYPE,+GROUPING_BUILTIN,+PIPE_AGGREGATE_WITH_DIFFERENTIAL_PRIVACY]
 [enabled_ast_rewrites=DEFAULTS,+ANONYMIZATION]
 WITH T AS (
   SELECT uid, int64, GROUPING(int64) AS grp
@@ -5759,4 +5759,3 @@ QueryStmt
         | +-ColumnRef(type=INT64, column=$differential_privacy.$group_selection_threshold_col#36)
         +-option_list=
           +-max_groups_contributed := Literal(type=INT64, value=1)
-==

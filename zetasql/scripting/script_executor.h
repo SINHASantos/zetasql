@@ -482,6 +482,42 @@ class StatementEvaluator {
     return absl::UnimplementedError("LoadProcedure is not supported");
   }
 
+  // Performs any engine-specific additional actions when the procedure is
+  // entered.
+  //
+  // This function is called whenever a procedure frame is pushed onto the
+  // call stack. This can be due to a CALL statement, or due to EXECUTE
+  // IMMEDIATE.
+  //
+  // This function is NOT called:
+  // - If ShouldExecuteProcedureAsStatement() returns true for the procedure.
+  // - In dry-run mode.
+  virtual absl::Status OnProcedureEntered(
+      const ScriptExecutor& executor,
+      const absl::Span<const std::string>& path) {
+    // By default no additional work is needed.
+    return absl::OkStatus();
+  }
+
+  // Performs any engine-specific cleanup when the procedure is exited.
+  //
+  // This function is called whenever a procedure frame is popped off the
+  // call stack, either via normal exit, or via stack unwinding due to an
+  // exception that is handled in a calling procedure.
+  // If a procedure terminates due to an unhandled exception, script
+  // execution aborts, and this function will NOT be called.
+  //
+  // This function is NOT called when OnProcedureEntered() is not called,
+  // specifically:
+  // - If ShouldExecuteProcedureAsStatement() returns true for the procedure.
+  // - In dry-run mode.
+  virtual absl::Status OnProcedureExited(
+      const ScriptExecutor& executor,
+      const absl::Span<const std::string>& path) {
+    // By default no additional work is needed.
+    return absl::OkStatus();
+  }
+
   // Assigns a system variable to a value.
   //
   // This function should be implemented by engines which define their own

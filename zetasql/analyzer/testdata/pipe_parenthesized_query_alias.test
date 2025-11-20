@@ -28,7 +28,7 @@ QueryStmt
     |   |   |       Key -> INT64 (KeyValue.Key#1) (implicit)
     |   |   |       Value -> STRING (KeyValue.Value#2) (implicit)
     |   |   |     Range variables:
-    |   |   |       kv -> RANGE_VARIABLE<Key,Value>
+    |   |   |       kv -> RANGE_VARIABLE<Key#1,Value#2>
     |   |   |   """
     |   |   +-input_scan=
     |   |     +-ProjectScan
@@ -63,7 +63,7 @@ QueryStmt
     |       Key -> INT64 (KeyValue.Key#1) (implicit)
     |       Value -> STRING (KeyValue.Value#2) (implicit)
     |     Range variables:
-    |       kv -> RANGE_VARIABLE<Key,Value>
+    |       kv -> RANGE_VARIABLE<Key#1,Value#2>
     |   """
     +-input_scan=
       +-TableScan(column_list=KeyValue.[Key#1, Value#2], table=KeyValue, column_index_list=[0, 1])
@@ -92,7 +92,7 @@ QueryStmt
     |   |     Names:
     |   |       x -> INT64 ($union_all.x#3)
     |   |     Range variables:
-    |   |       t -> RANGE_VARIABLE<x>
+    |   |       t -> RANGE_VARIABLE<x#3>
     |   |   """
     |   +-input_scan=
     |     +-SetOperationScan
@@ -152,7 +152,7 @@ QueryStmt
     |       Key -> INT64 (KeyValue.Key#1) (implicit)
     |       Value -> STRING (KeyValue.Value#2) (implicit)
     |     Range variables:
-    |       qq -> RANGE_VARIABLE<Key,Value>
+    |       qq -> RANGE_VARIABLE<Key#1,Value#2>
     |
     |   Result is ordered.
     |   """
@@ -197,7 +197,7 @@ QueryStmt
     |       Filename -> STRING (TestExtraValueTable.Filename#2) (implicit) (pseudo-column)
     |       RowId -> BYTES (TestExtraValueTable.RowId#3) (implicit) (pseudo-column)
     |     Range variables:
-    |       vt -> RANGE_VARIABLE<$value>
+    |       vt -> RANGE_VARIABLE<value#1, pseudo_columns: Filename#2,RowId#3> (value table)
     |     Value table columns:
     |       TestExtraValueTable.value#1
     |   """
@@ -239,7 +239,7 @@ QueryStmt
         |   |       TestEnum -> zetasql_test__.TestEnum (EnumTable.TestEnum#2) (implicit)
         |   |       key -> INT32 (EnumTable.key#1) (implicit)
         |   |     Range variables:
-        |   |       t -> RANGE_VARIABLE<key,TestEnum,AnotherTestEnum>
+        |   |       t -> RANGE_VARIABLE<key#1,TestEnum#2,AnotherTestEnum#3, pseudo_columns: Filename#4,RowId#5>
         |   |   """
         |   +-input_scan=
         |     +-TableScan(column_list=EnumTable.[key#1, TestEnum#2, AnotherTestEnum#3, RowId#5], table=EnumTable, column_index_list=[0, 1, 2, 4])
@@ -273,7 +273,7 @@ QueryStmt
         |       x -> INT64 (t.x#1)
         |       y -> INT64 (t.y#2)
         |     Range variables:
-        |       t -> RANGE_VARIABLE<x,y>
+        |       t -> RANGE_VARIABLE<x#1,y#2>
         |   """
         +-input_scan=
           +-ProjectScan
@@ -312,7 +312,7 @@ QueryStmt
         |       x -> INT64 (t1.x#1)
         |       y -> INT64 (t1.y#2)
         |     Range variables:
-        |       t3 -> RANGE_VARIABLE<x,y>
+        |       t3 -> RANGE_VARIABLE<x#1,y#2>
         |   """
         +-input_scan=
           +-ProjectScan
@@ -364,7 +364,7 @@ QueryStmt
         |       Value -> ambiguous
         |       key -> INT64 (KeyValue.Key#1)
         |     Range variables:
-        |       t -> RANGE_VARIABLE<key,Value,Value>
+        |       t -> RANGE_VARIABLE<Key#1 AS key,Value#2,Value#4>
         |   """
         +-input_scan=
           +-JoinScan
@@ -436,8 +436,8 @@ QueryStmt
         |       y -> INT64 (t1.y#2)
         |       z -> INT64 (t2.z#4)
         |     Range variables:
-        |       t1 -> RANGE_VARIABLE<x,y>
-        |       t2 -> RANGE_VARIABLE<x,z>
+        |       t1 -> RANGE_VARIABLE<x#1,y#2>
+        |       t2 -> RANGE_VARIABLE<x#3,z#4>
         |   """
         +-input_scan=
           +-JoinScan
@@ -492,7 +492,7 @@ QueryStmt
         |       x -> INT64 (q.x#1)
         |       y -> INT64 (q.y#2)
         |     Range variables:
-        |       q -> RANGE_VARIABLE<x,y>
+        |       q -> RANGE_VARIABLE<x#1,y#2>
         |   """
         +-input_scan=
           +-LimitOffsetScan

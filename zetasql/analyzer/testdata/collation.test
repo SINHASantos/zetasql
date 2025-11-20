@@ -10184,16 +10184,16 @@ CreateTableAsSelectStmt
 |   |             +-Literal(type=STRING, value="binary")
 |   +-column=t.col_struct#1
 +-output_column_list=
-| +-$create_as_cast.$col1#3<_,{Collation:"und:ci"},<{Collation:"und:ci"}>> AS col_struct [STRUCT<DOUBLE, STRING, ARRAY<STRING>>]
+| +-$create_as_cast.$col1#3<_,{Collation:"binary"},<{Collation:"binary"}>> AS col_struct [STRUCT<DOUBLE, STRING, ARRAY<STRING>>]
 +-query=
   +-ProjectScan
-    +-column_list=[$create_as_cast.$col1#3<_,{Collation:"und:ci"},<{Collation:"und:ci"}>>]
+    +-column_list=[$create_as_cast.$col1#3<_,{Collation:"binary"},<{Collation:"binary"}>>]
     +-expr_list=
     | +-$col1#3 :=
     |   +-Cast(STRUCT<INT64, STRING, ARRAY<STRING>> -> STRUCT<DOUBLE, STRING, ARRAY<STRING>>)
-    |     +-type_annotation_map=<_,{Collation:"und:ci"},<{Collation:"und:ci"}>>
+    |     +-type_annotation_map=<_,{Collation:"binary"},<{Collation:"binary"}>>
     |     +-ColumnRef(type=STRUCT<INT64, STRING, ARRAY<STRING>>, type_annotation_map=<_,{Collation:"und:ci"},<{Collation:"und:ci"}>>, column=$create_as.$col1#2<_,{Collation:"und:ci"},<{Collation:"und:ci"}>>)
-    |     +-type_modifiers=collation:[_,und:ci,[und:ci]]
+    |     +-type_modifiers=collation:[_,binary,[binary]]
     +-input_scan=
       +-ProjectScan
         +-column_list=[$create_as.$col1#2<_,{Collation:"und:ci"},<{Collation:"und:ci"}>>]
@@ -10233,13 +10233,13 @@ InsertStmt
 +-insert_column_list=[ComplexCollatedTable.struct_of_double_and_string_ci_and_array_ci#6<_,{Collation:"und:ci"},<{Collation:"und:ci"}>>]
 +-query=
 | +-ProjectScan
-|   +-column_list=[$insert_cast.$col1#8<_,{Collation:"binary"},<{Collation:"binary"}>>]
+|   +-column_list=[$insert_cast.$col1#8<_,{Collation:"und:ci"},<{Collation:"und:ci"}>>]
 |   +-expr_list=
 |   | +-$col1#8 :=
 |   |   +-Cast(STRUCT<INT64, STRING, ARRAY<STRING>> -> STRUCT<a DOUBLE, b STRING, c ARRAY<STRING>>)
-|   |     +-type_annotation_map=<_,{Collation:"binary"},<{Collation:"binary"}>>
+|   |     +-type_annotation_map=<_,{Collation:"und:ci"},<{Collation:"und:ci"}>>
 |   |     +-ColumnRef(type=STRUCT<INT64, STRING, ARRAY<STRING>>, type_annotation_map=<_,{Collation:"binary"},<{Collation:"binary"}>>, column=$insert.$col1#7<_,{Collation:"binary"},<{Collation:"binary"}>>)
-|   |     +-type_modifiers=collation:[_,binary,[binary]]
+|   |     +-type_modifiers=collation:[_,und:ci,[und:ci]]
 |   +-input_scan=
 |     +-ProjectScan
 |       +-column_list=[$insert.$col1#7<_,{Collation:"binary"},<{Collation:"binary"}>>]
@@ -10262,7 +10262,7 @@ InsertStmt
 |       |           +-Literal(type=STRING, value="binary", preserve_in_literal_remover=TRUE)
 |       +-input_scan=
 |         +-SingleRowScan
-+-query_output_column_list=[$insert_cast.$col1#8<_,{Collation:"binary"},<{Collation:"binary"}>>]
++-query_output_column_list=[$insert_cast.$col1#8<_,{Collation:"und:ci"},<{Collation:"und:ci"}>>]
 +-column_access_list=WRITE
 ==
 

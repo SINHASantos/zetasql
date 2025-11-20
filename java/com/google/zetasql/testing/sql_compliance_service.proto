@@ -14,7 +14,7 @@
 // limitations under the License.
 //
 
-syntax = "proto3";
+edition = "2023";
 
 package zetasql.testing;
 
@@ -22,6 +22,7 @@ import "google/protobuf/empty.proto";
 import "zetasql/compliance/test_driver.proto";
 import "zetasql/proto/options.proto";
 
+option features.field_presence = IMPLICIT;
 option java_package = "com.google.zetasql.testing";
 option java_multiple_files = true;
 
@@ -45,6 +46,7 @@ service SqlComplianceService {
 
 message CreateDatabaseRequest {
   zetasql.TestDatabaseProto test_database = 1;
+
   // TODO: Also send proto/enum data here, if necessary?
 }
 

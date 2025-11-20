@@ -356,8 +356,8 @@ static absl::Status AddOneJoinColumn(
 // const_cast isn't required on all the callers.
 static absl::Status AddJoinColumn(const Table* table1_const,
                                   const Table* table2_const,
-                                  const std::vector<std::string>& column_names1,
-                                  const std::vector<std::string>& column_names2,
+                                  absl::Span<const std::string> column_names1,
+                                  absl::Span<const std::string> column_names2,
                                   bool is_multi1, bool is_multi2,
                                   TypeFactory* type_factory) {
   // These became `const Table*` when passed through the Catalog, but we know

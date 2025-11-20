@@ -5649,6 +5649,24 @@ class Resolver {
       std::vector<std::unique_ptr<const ResolvedTableAndColumnInfo>>*
           resolved_table_and_column_info_list);
 
+  // Resolves a TABLE clause such as TABLE name into a ResolvedScan.
+  //
+  // `name` can resolve to a WITH clause alias, a table in catalog, or if
+  // resolving inside a function, a table-valued argument to that function.
+  //
+  // For name collision between a table-valued argument and a catalog table,
+  // resolution order is controlled by `resolve_argument_first` along with
+  // language feature FEATURE_TABLE_SYNTAX_RESOLVE_ARGUMENT_LAST. If
+  // `resolve_argument_first` is true, table-valued arguments are looked up
+  // before catalog tables. If false, catalog tables are looked up first, and
+  // table-valued arguments are only considered if no catalog table is found.
+  absl::Status ResolveTableClause(
+      const ASTTableClause* ast_table_clause, const NameScope* external_scope,
+      bool resolve_argument_first,
+      const std::string& read_as_row_type_error_kind,
+      std::unique_ptr<const ResolvedScan>* output_scan,
+      std::shared_ptr<const NameList>* output_name_list);
+
   // Resolve <options_list> and add the options onto <resolved_options>.
   // Requires valid anonymization or differential_privacy option names and types
   // specified in AllowedHintsAndOptions. Validates option expression types and

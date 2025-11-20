@@ -72,9 +72,11 @@ ComponentSignatureArgumentKindsMap() {
           {ARG_ENUM_ANY, {}},
           {ARG_PROTO_ANY, {}},
 
-          // PROTO_MAP_ANY is related to PROTO_MAP_KEY_ANY and
-          // PROTO_MAP_VALUE_ANY.
-          {ARG_PROTO_MAP_ANY, {ARG_PROTO_MAP_KEY_ANY, ARG_PROTO_MAP_VALUE_ANY}},
+          // Even though PROTO_MAP_ANY is related to PROTO_MAP_KEY_ANY and
+          // PROTO_MAP_VALUE_ANY, the type itself is not modeled as a
+          // composite type in the ZetaSQL type system proper (e.g., its
+          // AnnotationMap will not have components.)
+          {ARG_PROTO_MAP_ANY, {}},
           // Those, however, act just like ANY_i, and have no further component
           // themselves.
           {ARG_PROTO_MAP_KEY_ANY, {}},

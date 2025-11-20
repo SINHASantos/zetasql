@@ -226,6 +226,7 @@ cc_library(
         ":lambda_util",
         ":name_scope",
         ":path_expression_span",
+        ":resolver_util",
         ":set_operation_resolver_base",
         "//zetasql/analyzer/rewriters:rewrite_subpipeline",
         "//zetasql/base",
@@ -347,6 +348,7 @@ cc_library(
     ],
     deps = [
         ":input_argument_type_resolver_helper",
+        ":resolver_util",
         "//zetasql/base:ret_check",
         "//zetasql/base:status",
         "//zetasql/base:stl_util",
@@ -425,12 +427,14 @@ cc_library(
         "//zetasql/analyzer/rewriters:pipe_if_rewriter",
         "//zetasql/analyzer/rewriters:pivot_rewriter",
         "//zetasql/analyzer/rewriters:registration",
+        "//zetasql/analyzer/rewriters:row_type_rewriter",
         "//zetasql/analyzer/rewriters:sql_function_inliner",
         "//zetasql/analyzer/rewriters:sql_view_inliner",
         "//zetasql/analyzer/rewriters:subpipeline_stmt_rewriter",
         "//zetasql/analyzer/rewriters:typeof_function_rewriter",
         "//zetasql/analyzer/rewriters:unpivot_rewriter",
         "//zetasql/analyzer/rewriters:update_constructor_rewriter",
+        "//zetasql/analyzer/rewriters:variadic_function_signature_expander",
         "//zetasql/analyzer/rewriters:with_expr_rewriter",
         "//zetasql/public:options_cc_proto",
         "@com_google_absl//absl/base",
@@ -1039,5 +1043,17 @@ bzl_library(
     srcs = ["builddefs.bzl"],
     deps = [
         "@rules_cc//cc:core_rules",
+    ],
+)
+
+cc_library(
+    name = "resolver_util",
+    srcs = ["resolver_util.cc"],
+    hdrs = ["resolver_util.h"],
+    deps = [
+        "//zetasql/public:function_headers",
+        "//zetasql/public/types:type",
+        "@com_google_absl//absl/algorithm:container",
+        "@com_google_absl//absl/types:span",
     ],
 )

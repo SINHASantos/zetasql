@@ -112,7 +112,7 @@ class AnalyzerOptionsTest : public ::testing::Test {
   }
   AnalyzerOptionsTest(const AnalyzerOptionsTest&) = delete;
   AnalyzerOptionsTest& operator=(const AnalyzerOptionsTest&) = delete;
-  ~AnalyzerOptionsTest() override {}
+  ~AnalyzerOptionsTest() override = default;
 
   SimpleCatalog* catalog() {
     return sample_catalog_->catalog();
@@ -1292,7 +1292,7 @@ TEST_F(AnalyzerOptionsTest, ResolvedASTRewrites) {
 class MultiFileErrorCollector
     : public google::protobuf::compiler::MultiFileErrorCollector {
  public:
-  MultiFileErrorCollector() {}
+  MultiFileErrorCollector() = default;
   MultiFileErrorCollector(const MultiFileErrorCollector&) = delete;
   MultiFileErrorCollector& operator=(const MultiFileErrorCollector&) = delete;
   void RecordError(absl::string_view filename, int line, int column,
@@ -1320,16 +1320,17 @@ TEST_F(AnalyzerOptionsTest, Deserialize) {
       CreateProtoSourceTree();
   MultiFileErrorCollector error_collector;
 
-  std::unique_ptr<google::protobuf::compiler::Importer> proto_importer(
-      new google::protobuf::compiler::Importer(source_tree.get(), &error_collector));
+  std::unique_ptr<google::protobuf::compiler::Importer> proto_importer =
+      std::make_unique<google::protobuf::compiler::Importer>(source_tree.get(),
+                                                   &error_collector);
 
   for (const std::string& test_file : test_files) {
     ABSL_CHECK(proto_importer->Import(test_file) != nullptr)
         << "Error importing " << test_file << ": "
         << error_collector.GetError();
   }
-  std::unique_ptr<google::protobuf::DescriptorPool> external_pool(
-      new google::protobuf::DescriptorPool(proto_importer->pool()));
+  std::unique_ptr<google::protobuf::DescriptorPool> external_pool =
+      std::make_unique<google::protobuf::DescriptorPool>(proto_importer->pool());
 
   const EnumType* generated_enum_type;
   ZETASQL_CHECK_OK(factory.MakeEnumType(TypeKind_descriptor(), &generated_enum_type));
@@ -1552,16 +1553,17 @@ TEST_F(AnalyzerOptionsTest, AllowedHintsAndOptionsSerializeAndDeserialize) {
       CreateProtoSourceTree();
   MultiFileErrorCollector error_collector;
 
-  std::unique_ptr<google::protobuf::compiler::Importer> proto_importer(
-      new google::protobuf::compiler::Importer(source_tree.get(), &error_collector));
+  std::unique_ptr<google::protobuf::compiler::Importer> proto_importer =
+      std::make_unique<google::protobuf::compiler::Importer>(source_tree.get(),
+                                                   &error_collector);
 
   for (const std::string& test_file : test_files) {
     ABSL_CHECK(proto_importer->Import(test_file) != nullptr)
         << "Error importing " << test_file << ": "
         << error_collector.GetError();
   }
-  std::unique_ptr<google::protobuf::DescriptorPool> external_pool(
-      new google::protobuf::DescriptorPool(proto_importer->pool()));
+  std::unique_ptr<google::protobuf::DescriptorPool> external_pool =
+      std::make_unique<google::protobuf::DescriptorPool>(proto_importer->pool());
 
   const EnumType* generated_enum_type;
   ZETASQL_CHECK_OK(factory.MakeEnumType(TypeKind_descriptor(), &generated_enum_type));
@@ -1851,16 +1853,17 @@ TEST(AnalyzerTest, ExternalExtension) {
       CreateProtoSourceTree();
 
   MultiFileErrorCollector error_collector;
-  std::unique_ptr<google::protobuf::compiler::Importer> proto_importer(
-      new google::protobuf::compiler::Importer(source_tree.get(), &error_collector));
+  std::unique_ptr<google::protobuf::compiler::Importer> proto_importer =
+      std::make_unique<google::protobuf::compiler::Importer>(source_tree.get(),
+                                                   &error_collector);
 
   for (const std::string& test_file : test_files) {
     ABSL_CHECK(proto_importer->Import(test_file) != nullptr)
         << "Error importing " << test_file << ": "
         << error_collector.GetError();
   }
-  std::unique_ptr<google::protobuf::DescriptorPool> external_pool(
-      new google::protobuf::DescriptorPool(proto_importer->pool()));
+  std::unique_ptr<google::protobuf::DescriptorPool> external_pool =
+      std::make_unique<google::protobuf::DescriptorPool>(proto_importer->pool());
   const std::string external_extension_name =
       "zetasql_test__.ExternalExtension";
   const google::protobuf::Descriptor* external_extension =
@@ -1923,9 +1926,8 @@ static void ExpectStatementHasAnonymization(
       sql, options, catalog.catalog(), &type_factory, &output);
   if (expect_analyzer_success) {
     ZETASQL_EXPECT_OK(status);
-    EXPECT_EQ(
-        output->analyzer_output_properties().IsRelevant(REWRITE_ANONYMIZATION),
-        expect_anonymization);
+    EXPECT_EQ(output->analyzer_output_properties().has_anonymization,
+              expect_anonymization);
   } else {
     // Note that if the analyzer failed, then there is no AnalyzerOutput.
     EXPECT_FALSE(status.ok());
@@ -1970,9 +1972,8 @@ static void ExpectExpressionHasAnonymization(absl::string_view sql,
   absl::Status status = AnalyzeExpression(
       sql, options, catalog.catalog(), &type_factory, &output);
   ZETASQL_ASSERT_OK(status);
-  EXPECT_EQ(
-      output->analyzer_output_properties().IsRelevant(REWRITE_ANONYMIZATION),
-      expect_anonymization);
+  EXPECT_EQ(output->analyzer_output_properties().has_anonymization,
+            expect_anonymization);
 }
 
 TEST(AnalyzerTest, TestExpressionHasAnonymization) {

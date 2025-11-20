@@ -593,7 +593,7 @@ QueryStmt
     |   |       c2 -> INT64 ($query.abc#1)
     |   |       xyz -> STRING ($pipe_select.xyz#2)
     |   |     Range variables:
-    |   |       t -> RANGE_VARIABLE<c1,c2,xyz,$col4>
+    |   |       t -> RANGE_VARIABLE<abc#1 AS c1,abc#1 AS c2,xyz#2,$col4#3>
     |   |   """
     |   +-input_scan=
     |     +-ProjectScan

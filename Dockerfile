@@ -41,7 +41,7 @@ RUN chown -R zetasql:zetasql /zetasql
 USER zetasql
 
 ENV HOME=/home/zetasql
-RUN mkdir -p $HOME/bin
+RUN mkdir -p $HOME/bin $HOME/release
 
 # Supported MODE:
 # - `build` (default): Builds all ZetaSQL targets.
@@ -76,11 +76,12 @@ ENV PATH=$PATH:$HOME/bin
 WORKDIR /zetasql
 
 # Copy only the final artifacts from the 'builder' stage.
-COPY --from=builder --chown=zetasql:zetasql $HOME/bin/execute_query /zetasql/execute_query
+COPY --from=builder --chown=zetasql:zetasql $HOME/bin/execute_query_release /zetasql/execute_query_release
+COPY --from=builder --chown=zetasql:zetasql $HOME/release/execute_query_release.tar.gz /zetasql/execute_query_release.tar.gz
 
 # Use the non-root user for running the container
 USER zetasql
 
 # Command to run the final application
-ENTRYPOINT ["/zetasql/execute_query"]
+ENTRYPOINT ["/zetasql/execute_query_release/execute_query"]
 CMD ["--help"]

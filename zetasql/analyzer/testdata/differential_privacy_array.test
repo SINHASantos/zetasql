@@ -1,5 +1,5 @@
 # Tests for DIFFERENTIAL_PRIVACY in conjunction with ARRAY types and UNNEST.
-[default language_features=NONE,+DIFFERENTIAL_PRIVACY,+NAMED_ARGUMENTS]
+[default language_features=NONE,+DIFFERENTIAL_PRIVACY,+NAMED_ARGUMENTS,+PIPE_AGGREGATE_WITH_DIFFERENTIAL_PRIVACY]
 
 [enabled_ast_rewrites=DEFAULTS,+ANONYMIZATION]
 # Support ArrayScan

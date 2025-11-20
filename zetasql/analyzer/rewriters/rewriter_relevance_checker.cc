@@ -214,6 +214,19 @@ class RewriteApplicabilityChecker : public ResolvedASTVisitor {
       case FN_BYTE_ARRAY_NOT_LIKE_ALL:
         applicable_rewrites_->insert(REWRITE_LIKE_ANY_ALL);
         break;
+      case FN_MAP_INSERT:
+      case FN_MAP_INSERT_OR_REPLACE:
+      case FN_MAP_REPLACE_KV_PAIRS:
+      case FN_MAP_REPLACE_K_REPEATED_V_LAMBDA:
+      case FN_MAP_DELETE:
+        // If rewrite_options are present, this function call has already been
+        // rewritten by this rewriter, so don't call it again to avoid an
+        // infinite loop.
+        if (!node->signature().options().rewrite_options().has_value()) {
+          applicable_rewrites_->insert(
+              REWRITE_VARIADIC_FUNCTION_SIGNATURE_EXPANDER);
+        }
+        break;
       default:
         break;
     }
@@ -239,6 +252,15 @@ class RewriteApplicabilityChecker : public ResolvedASTVisitor {
       applicable_rewrites_->insert(
           ResolvedASTRewrite::REWRITE_INLINE_SQL_VIEWS);
     }
+    if (node->read_as_row_type()) {
+      applicable_rewrites_->insert(REWRITE_ROW_TYPE);
+    }
+    return DefaultVisit(node);
+  }
+
+  absl::Status VisitResolvedGetRowField(
+      const ResolvedGetRowField* node) override {
+    applicable_rewrites_->insert(REWRITE_ROW_TYPE);
     return DefaultVisit(node);
   }
 
@@ -289,6 +311,11 @@ class RewriteApplicabilityChecker : public ResolvedASTVisitor {
   absl::Status VisitResolvedArrayScan(const ResolvedArrayScan* node) override {
     if (node->array_expr_list_size() > 1) {
       applicable_rewrites_->insert(REWRITE_MULTIWAY_UNNEST);
+    }
+    for (const auto& array_expr : node->array_expr_list()) {
+      if (array_expr->type()->IsRow()) {
+        applicable_rewrites_->insert(REWRITE_ROW_TYPE);
+      }
     }
     return DefaultVisit(node);
   }

@@ -18,10 +18,17 @@ load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 
 def _http_archive_deps_impl(_):
     http_archive(
+        name = "com_google_differential_privacy",
+        sha256 = "1a8612290740bd0bacc7052df7accb4f3368e2c2cb3de8eb608f58522c2e1891",
+        strip_prefix = "differential-privacy-4.0.0",
+        url = "https://github.com/google/differential-privacy/archive/refs/tags/v4.0.0.tar.gz",
+    )
+
+    http_archive(
         name = "com_google_cc_differential_privacy",
-        sha256 = "6e6e1cd7a819695caae408f4fa938129ab7a86e83fe2410137c85e50131abbe0",
-        strip_prefix = "differential-privacy-3.0.0/cc",
-        url = "https://github.com/google/differential-privacy/archive/refs/tags/v3.0.0.tar.gz",
+        sha256 = "1a8612290740bd0bacc7052df7accb4f3368e2c2cb3de8eb608f58522c2e1891",
+        strip_prefix = "differential-privacy-4.0.0/cc",
+        url = "https://github.com/google/differential-privacy/archive/refs/tags/v4.0.0.tar.gz",
     )
 
     http_archive(
@@ -47,13 +54,6 @@ def _http_archive_deps_impl(_):
         sha256 = "b564acb6f083ce6e91fc2734bdad259cc4edf1a95766f93750a16784ff86218a",
         strip_prefix = "file-based-test-driver-fd7661b168f640f68da39f97dad26e426eb6c339",
         url = "https://github.com/google/file-based-test-driver/archive/fd7661b168f640f68da39f97dad26e426eb6c339.tar.gz",
-    )
-
-    http_archive(
-        name = "com_google_differential_privacy",
-        sha256 = "6e6e1cd7a819695caae408f4fa938129ab7a86e83fe2410137c85e50131abbe0",
-        strip_prefix = "differential-privacy-3.0.0",
-        url = "https://github.com/google/differential-privacy/archive/refs/tags/v3.0.0.tar.gz",
     )
 
     http_archive(

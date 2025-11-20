@@ -1028,7 +1028,7 @@ class Table {
   // For not-found cases, this can return a nullptr or a NotFound error.
   // NotFound errors can include a customized error message.
   absl::StatusOr<const Column*> FindLazyColumn(
-      const std::string& column_name, LazyColumnsTableScanContext* context,
+      absl::string_view column_name, LazyColumnsTableScanContext* context,
       const Catalog::FindOptions& options = Catalog::FindOptions()) const;
 };
 

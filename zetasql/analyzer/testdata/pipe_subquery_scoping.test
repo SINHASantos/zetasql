@@ -64,7 +64,7 @@ QueryStmt
     |       TestEnum -> zetasql_test__.TestEnum (EnumTable.TestEnum#2) (implicit)
     |       key -> INT32 (EnumTable.key#1) (implicit)
     |     Range variables:
-    |       t -> RANGE_VARIABLE<key,TestEnum,AnotherTestEnum>
+    |       t -> RANGE_VARIABLE<key#1,TestEnum#2,AnotherTestEnum#3, pseudo_columns: Filename#4,RowId#5>
     |   """
     +-input_scan=
       +-TableScan(column_list=EnumTable.[key#1, TestEnum#2, AnotherTestEnum#3], table=EnumTable, column_index_list=[0, 1, 2], alias="t")
@@ -97,7 +97,7 @@ QueryStmt
     |       TestEnum -> zetasql_test__.TestEnum (EnumTable.TestEnum#2) (implicit)
     |       key -> INT32 (EnumTable.key#1) (implicit)
     |     Range variables:
-    |       row -> RANGE_VARIABLE<key,TestEnum,AnotherTestEnum>
+    |       row -> RANGE_VARIABLE<key#1,TestEnum#2,AnotherTestEnum#3, pseudo_columns: Filename#4,RowId#5>
     |   """
     +-input_scan=
       +-TableScan(column_list=EnumTable.[key#1, TestEnum#2, AnotherTestEnum#3], table=EnumTable, column_index_list=[0, 1, 2], alias="t")
@@ -126,7 +126,7 @@ QueryStmt
     |       TestEnum -> zetasql_test__.TestEnum (EnumTable.TestEnum#2) (implicit)
     |       key -> INT32 (EnumTable.key#1) (implicit)
     |     Range variables:
-    |       t -> RANGE_VARIABLE<key,TestEnum,AnotherTestEnum>
+    |       t -> RANGE_VARIABLE<key#1,TestEnum#2,AnotherTestEnum#3, pseudo_columns: Filename#4,RowId#5>
     |   """
     +-input_scan=
       +-TableScan(column_list=EnumTable.[key#1, TestEnum#2, AnotherTestEnum#3], table=EnumTable, column_index_list=[0, 1, 2], alias="t")
@@ -259,7 +259,7 @@ QueryStmt
     |       Filename -> STRING (TestExtraValueTable.Filename#2) (implicit) (pseudo-column)
     |       RowId -> BYTES (TestExtraValueTable.RowId#3) (implicit) (pseudo-column)
     |     Range variables:
-    |       t -> RANGE_VARIABLE<$value>
+    |       t -> RANGE_VARIABLE<value#1, pseudo_columns: Filename#2,RowId#3> (value table)
     |     Value table columns:
     |       TestExtraValueTable.value#1
     |   """
@@ -288,7 +288,7 @@ QueryStmt
     |       Filename -> STRING (TestExtraValueTable.Filename#2) (implicit) (pseudo-column)
     |       RowId -> BYTES (TestExtraValueTable.RowId#3) (implicit) (pseudo-column)
     |     Range variables:
-    |       t -> RANGE_VARIABLE<$value>
+    |       t -> RANGE_VARIABLE<value#1, pseudo_columns: Filename#2,RowId#3> (value table)
     |     Value table columns:
     |       TestExtraValueTable.value#1
     |   """
@@ -313,7 +313,7 @@ QueryStmt
     |       Filename -> STRING (TestExtraValueTable.Filename#2) (implicit) (pseudo-column)
     |       RowId -> BYTES (TestExtraValueTable.RowId#3) (implicit) (pseudo-column)
     |     Range variables:
-    |       row -> RANGE_VARIABLE<$value>
+    |       row -> RANGE_VARIABLE<value#1, pseudo_columns: Filename#2,RowId#3> (value table)
     |     Value table columns:
     |       TestExtraValueTable.value#1
     |   """
@@ -507,8 +507,8 @@ QueryStmt
     |       Value -> STRING (KeyValue.Value#7) (implicit)
     |       key -> ambiguous
     |     Range variables:
-    |       kv -> RANGE_VARIABLE<Key,Value>
-    |       t -> RANGE_VARIABLE<key,TestEnum,AnotherTestEnum>
+    |       kv -> RANGE_VARIABLE<Key#6,Value#7>
+    |       t -> RANGE_VARIABLE<key#1,TestEnum#2,AnotherTestEnum#3, pseudo_columns: Filename#4,RowId#5>
     |   """
     +-input_scan=
       +-JoinScan
@@ -551,8 +551,8 @@ QueryStmt
     |       Value -> STRING (KeyValue.Value#7) (implicit)
     |       key -> ambiguous
     |     Range variables:
-    |       kv -> RANGE_VARIABLE<Key,Value>
-    |       t -> RANGE_VARIABLE<key,TestEnum,AnotherTestEnum>
+    |       kv -> RANGE_VARIABLE<Key#6,Value#7>
+    |       t -> RANGE_VARIABLE<key#1,TestEnum#2,AnotherTestEnum#3, pseudo_columns: Filename#4,RowId#5>
     |   """
     +-input_scan=
       +-JoinScan
@@ -591,7 +591,7 @@ QueryStmt
     |       Value -> STRING (KeyValue.Value#7) (implicit)
     |       key -> ambiguous
     |     Range variables:
-    |       row -> RANGE_VARIABLE<key,TestEnum,AnotherTestEnum,Key,Value>
+    |       row -> RANGE_VARIABLE<key#1,TestEnum#2,AnotherTestEnum#3,Key#6,Value#7, pseudo_columns: Filename#4,RowId#5>
     |   """
     +-input_scan=
       +-JoinScan
@@ -799,8 +799,8 @@ QueryStmt
     |       TestEnum -> zetasql_test__.TestEnum (EnumTable.TestEnum#2) (implicit)
     |       key -> INT32 (EnumTable.key#1) (implicit)
     |     Range variables:
-    |       t -> RANGE_VARIABLE<key,TestEnum,AnotherTestEnum>
-    |       vt -> RANGE_VARIABLE<$value>
+    |       t -> RANGE_VARIABLE<key#1,TestEnum#2,AnotherTestEnum#3, pseudo_columns: Filename#4,RowId#5>
+    |       vt -> RANGE_VARIABLE<value#6, pseudo_columns: Filename#7,RowId#8> (value table)
     |     Value table columns:
     |       TestExtraValueTable.value#6
     |   """
@@ -842,8 +842,8 @@ QueryStmt
     |       TestEnum -> zetasql_test__.TestEnum (EnumTable.TestEnum#2) (implicit)
     |       key -> INT32 (EnumTable.key#1) (implicit)
     |     Range variables:
-    |       t -> RANGE_VARIABLE<key,TestEnum,AnotherTestEnum>
-    |       vt -> RANGE_VARIABLE<$value>
+    |       t -> RANGE_VARIABLE<key#1,TestEnum#2,AnotherTestEnum#3, pseudo_columns: Filename#4,RowId#5>
+    |       vt -> RANGE_VARIABLE<value#6, pseudo_columns: Filename#7,RowId#8> (value table)
     |     Value table columns:
     |       TestExtraValueTable.value#6
     |   """
@@ -882,7 +882,7 @@ QueryStmt
     |       key -> INT32 (EnumTable.key#1) (implicit)
     |       vt -> zetasql_test__.TestExtraPB (TestExtraValueTable.value#6)
     |     Range variables:
-    |       row -> RANGE_VARIABLE<key,TestEnum,AnotherTestEnum,vt>
+    |       row -> RANGE_VARIABLE<key#1,TestEnum#2,AnotherTestEnum#3,value#6 AS vt>
     |   """
     +-input_scan=
       +-JoinScan
@@ -1242,7 +1242,7 @@ QueryStmt
     |       col -> INT64 ($pipe_extend.col#6)
     |       key -> ambiguous
     |     Range variables:
-    |       t -> RANGE_VARIABLE<key,TestEnum,AnotherTestEnum>
+    |       t -> RANGE_VARIABLE<key#1,TestEnum#2,AnotherTestEnum#3, pseudo_columns: Filename#4,RowId#5>
     |   """
     +-input_scan=
       +-ProjectScan
@@ -1286,7 +1286,7 @@ QueryStmt
     |       col -> INT64 ($pipe_extend.col#6)
     |       key -> ambiguous
     |     Range variables:
-    |       t -> RANGE_VARIABLE<key,TestEnum,AnotherTestEnum>
+    |       t -> RANGE_VARIABLE<key#1,TestEnum#2,AnotherTestEnum#3, pseudo_columns: Filename#4,RowId#5>
     |   """
     +-input_scan=
       +-ProjectScan
@@ -1326,7 +1326,7 @@ QueryStmt
     |       col -> INT64 ($pipe_extend.col#6)
     |       key -> ambiguous
     |     Range variables:
-    |       row -> RANGE_VARIABLE<key,TestEnum,AnotherTestEnum,col,key>
+    |       row -> RANGE_VARIABLE<key#1,TestEnum#2,AnotherTestEnum#3,col#6,key#7, pseudo_columns: Filename#4,RowId#5>
     |   """
     +-input_scan=
       +-ProjectScan
@@ -1467,7 +1467,7 @@ QueryStmt
     |       col -> INT64 ($pipe_extend.col#4)
     |       str_value -> INT64 ($pipe_extend.str_value#5)
     |     Range variables:
-    |       vt -> RANGE_VARIABLE<$value>
+    |       vt -> RANGE_VARIABLE<value#1, pseudo_columns: Filename#2,RowId#3> (value table)
     |     Value table columns:
     |       TestExtraValueTable.value#1
     |   """
@@ -1507,7 +1507,7 @@ QueryStmt
     |       col -> INT64 ($pipe_extend.col#4)
     |       str_value -> INT64 ($pipe_extend.str_value#5)
     |     Range variables:
-    |       vt -> RANGE_VARIABLE<$value>
+    |       vt -> RANGE_VARIABLE<value#1, pseudo_columns: Filename#2,RowId#3> (value table)
     |     Value table columns:
     |       TestExtraValueTable.value#1
     |   """
@@ -1544,7 +1544,7 @@ QueryStmt
     |       str_value -> INT64 ($pipe_extend.str_value#5)
     |       vt -> zetasql_test__.TestExtraPB (TestExtraValueTable.value#1)
     |     Range variables:
-    |       row -> RANGE_VARIABLE<vt,col,str_value>
+    |       row -> RANGE_VARIABLE<value#1 AS vt,col#4,str_value#5, pseudo_columns: Filename#2,RowId#3>
     |   """
     +-input_scan=
       +-ProjectScan
@@ -1803,7 +1803,7 @@ QueryStmt
         |       key -> INT32 (q.key#9) (implicit)
         |       vt -> zetasql_test__.TestExtraPB (q.vt#12) (implicit)
         |     Range variables:
-        |       q -> RANGE_VARIABLE<key,TestEnum,AnotherTestEnum,vt>
+        |       q -> RANGE_VARIABLE<key#9,TestEnum#10,AnotherTestEnum#11,vt#12>
         |
         |   **Common table expressions**:
         |   Name  Columns
@@ -1977,7 +1977,7 @@ QueryStmt
     |       vt -> zetasql_test__.TestExtraPB (TestExtraValueTable.value#1)
     |       x -> INT64 ($array.x#4)
     |     Range variables:
-    |       row -> RANGE_VARIABLE<vt,x>
+    |       row -> RANGE_VARIABLE<value#1 AS vt,x#4, pseudo_columns: Filename#2,RowId#3>
     |   """
     +-input_scan=
       +-ArrayScan

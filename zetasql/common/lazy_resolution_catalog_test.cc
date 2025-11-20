@@ -338,7 +338,7 @@ TEST_F(LazyResolutionCatalogTest, parsed_templated_sql_function_test) {
             /* function_status=*/absl::OkStatus(),
             ErrorMessageOptions{
                 .mode = ErrorMessageMode::ERROR_MESSAGE_MULTI_LINE_WITH_CARET},
-            Function::SCALAR));
+            Function::SCALAR, ModuleDetails::CreateEmpty()));
     ZETASQL_ASSERT_OK(catalog()->AddLazyResolutionFunction(std::move(function)));
   }
 

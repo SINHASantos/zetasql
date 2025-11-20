@@ -27,7 +27,7 @@ expressions of a given data type, (for example, a
 column), but
 literals and parameters can also be coerced. See
 [literal coercion][con-rules-link-to-literal-coercion] and
-[parameter coercion][con-rules-link-to-parameter-coercion] for details.
+[query parameter coercion][con-rules-link-to-parameter-coercion] for details.
 
 <table>
   <thead>
@@ -354,9 +354,10 @@ input literal can't be converted successfully to the target type.
 
 Note: String literals don't coerce to numeric types.
 
-#### Parameter coercion
+#### Query parameter coercion 
+<a id="parameter_coercion"></a>
 
-ZetaSQL supports the following parameter coercions:
+ZetaSQL supports the following query parameter coercions:
 
 <table>
   <thead>

@@ -17,8 +17,7 @@
 #ifndef ZETASQL_PUBLIC_INPUT_ARGUMENT_TYPE_H_
 #define ZETASQL_PUBLIC_INPUT_ARGUMENT_TYPE_H_
 
-#include <stddef.h>
-
+#include <cstddef>
 #include <memory>
 #include <optional>
 #include <string>
@@ -31,6 +30,7 @@
 #include "zetasql/public/value.h"
 #include "absl/container/flat_hash_set.h"
 #include "absl/hash/hash.h"
+#include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
 #include "absl/types/span.h"
 
@@ -46,6 +46,11 @@ class TVFRelation;
 // This is mainly an internal class used while resolving function calls.
 // This is exposed publicly because some of the FunctionOptions callbacks
 // use it to customize resolution for particular Functions.
+//
+// To optimize size, some less frequently used fields are stored in an internal
+// heap-allocated struct (`Data`).
+//
+// This class is copyable and assignable.
 class InputArgumentType {
  public:
   // Same as InputArgumentType::UntypedNull(). Consider using the latter.
@@ -77,7 +82,9 @@ class InputArgumentType {
   // non-literal fields, then the previous constructors can be used.
   InputArgumentType(const StructType* type,
                     const std::vector<InputArgumentType>& field_types)
-      : type_(type), field_types_(field_types), category_(kTypedExpression) {}
+      : type_(type), category_(kTypedExpression) {
+    EnsureData().field_types = field_types;
+  }
 
   // Constructor for analysis time constant expressions.
   // It takes a StatusOr<Value> because the constant evaluator that produces the
@@ -87,21 +94,22 @@ class InputArgumentType {
   // kResourceExhausted) or runtime error (kOutOfRange).
   explicit InputArgumentType(absl::StatusOr<Value> constant_value);
 
+  InputArgumentType(const InputArgumentType& other);
+  InputArgumentType& operator=(const InputArgumentType& other);
+
   ~InputArgumentType() = default;
 
   // This may return nullptr (such as for lambda).
   const Type* type() const { return type_; }
 
-  const std::vector<InputArgumentType>& field_types() const {
-    return field_types_;
-  }
-  size_t field_types_size() const { return field_types_.size(); }
-  const InputArgumentType& field_type(int i) const {
-    return field_types_.at(i);
-  }
+  const std::vector<InputArgumentType>& field_types() const;
+  size_t field_types_size() const;
+  const InputArgumentType& field_type(int i) const;
 
   // Returns true if the argument is an analysis time constant.
-  bool is_analysis_time_constant() const { return constant_value_.has_value(); }
+  bool is_analysis_time_constant() const {
+    return ReadOnlyData().constant_value.has_value();
+  }
 
   // Returns the analysis time constant value.
   // REQUIRES: is_analysis_time_constant() returns true.
@@ -111,7 +119,9 @@ class InputArgumentType {
   // WARNING: Untyped literals ("NULL" or "[]") are not included here.
   // They must be checked for separately using is_untyped() methods.
   const Value* literal_value() const {
-    return literal_value_.has_value() ? &literal_value_.value() : nullptr;
+    return ReadOnlyData().literal_value.has_value()
+               ? &ReadOnlyData().literal_value.value()
+               : nullptr;
   }
   // Returns true if the argument was a ResolvedLiteral with
   // `has_explicit_type` set to false.
@@ -119,17 +129,18 @@ class InputArgumentType {
   // ResolvedLiterals such as those of the form DATE `2024-01-01`.
   // Other explicitly typed literals of this form could include but are not
   // limited to JSON, FLOAT, NUMERIC, TIMESTAMP, and RANGE literals.
-  bool is_literal() const { return literal_value_.has_value(); }
+  bool is_literal() const { return ReadOnlyData().literal_value.has_value(); }
   // Returns true if the argument was a ResolvedLiteral. This can produce
   // different results compared with `is_literal` above as it does not require
   // that a Value was supplied to InputArgumentType::literal_value_.
   bool is_literal_for_constness() const { return is_literal_for_constness_; }
   bool is_literal_null() const {
-    return literal_value_.has_value() && literal_value_.value().is_null();
+    return ReadOnlyData().literal_value.has_value() &&
+           ReadOnlyData().literal_value.value().is_null();
   }
   bool is_literal_empty_array() const {
-    return literal_value_.has_value() &&
-           literal_value_.value().is_empty_array();
+    return ReadOnlyData().literal_value.has_value() &&
+           ReadOnlyData().literal_value.value().is_empty_array();
   }
 
   // Check for an untyped literal value ("NULL" or "[]").
@@ -171,10 +182,12 @@ class InputArgumentType {
 
   bool is_default_argument_value() const { return is_default_argument_value_; }
 
-  std::optional<IdString> argument_alias() const { return argument_alias_; }
+  std::optional<IdString> argument_alias() const {
+    return ReadOnlyData().argument_alias;
+  }
 
   void set_argument_alias(IdString argument_alias) {
-    argument_alias_ = argument_alias;
+    EnsureData().argument_alias = argument_alias;
   }
 
   // Argument type name to be used in user facing text (i.e. error messages).
@@ -259,11 +272,11 @@ class InputArgumentType {
   static InputArgumentType SequenceInputArgumentType();
 
   bool has_relation_input_schema() const {
-    return relation_input_schema_ != nullptr;
+    return ReadOnlyData().relation_input_schema != nullptr;
   }
   const TVFRelation& relation_input_schema() const {
     ABSL_DCHECK(has_relation_input_schema());
-    return *relation_input_schema_;
+    return *ReadOnlyData().relation_input_schema;
   }
   bool is_pipe_input_table() const { return is_pipe_input_table_; }
 
@@ -281,7 +294,7 @@ class InputArgumentType {
   bool operator==(const InputArgumentType& type) const;
 
  private:
-  enum Category {
+  enum Category : uint8_t {
     kTypedExpression,  // non-literal, non-parameter
     kTypedLiteral,
     kTypedParameter,
@@ -300,67 +313,84 @@ class InputArgumentType {
   explicit InputArgumentType(Category category, const Type* type)
       : type_(type), category_(category) {}
 
+  struct Data {
+    // TODO: b/277365877 - Deprecate this in favor of `constant_value`.
+    std::optional<Value> literal_value;  // only set for kTypedLiteral.
+
+    // Analysis time constant value.
+    // When this is set for kTypedExpression, it means that this is a named
+    // constant.
+    std::optional<absl::StatusOr<Value>> constant_value;
+
+    // Populated only for STRUCT type arguments. Stores the InputArgumentType
+    // of the struct fields (in the same order). We need this for STRUCT
+    // coercion where we need to check field-by-field whether 'from_struct'
+    // field is castable/coercible to the corresponding 'to_struct' field
+    // type.
+    std::vector<InputArgumentType> field_types;
+
+    // This is only non-NULL for table-valued functions. It holds a list of
+    // provided column names and types for a relation argument. This is a
+    // shared pointer only because the InputArgumentType is copyable and there
+    // is only need for one TVFRelation instance to exist.
+    std::shared_ptr<const TVFRelation> relation_input_schema;
+
+    // This is only non-NULL for table-valued functions. It holds the model
+    // argument. This is a shared pointer only because the InputArgumentType
+    // is copyable and there is only need for one TVFModelArgument instance to
+    // exist.
+    std::shared_ptr<const TVFModelArgument> model_arg;
+
+    // This is only non-NULL for table-valued functions. It holds the
+    // connection argument. This is a shared pointer only because the
+    // InputArgumentType is copyable and there is only need for one
+    // TVFConnectionArgument instance to exist.
+    std::shared_ptr<const TVFConnectionArgument> connection_arg;
+
+    // The alias of the argument this InputArgumentType corresponds to. If the
+    // argument does not support aliases, `argument_alias` = std::nullopt.
+    std::optional<IdString> argument_alias;
+  };
+
+  // Mutating functions must use this function to ensure that `data_` is
+  // initialized.
+  Data& EnsureData() {
+    if (!data_) {
+      data_ = std::make_unique<Data>();
+    }
+    return *data_;
+  }
+
+  // Returns a reference to the Data struct if it has been initialized,
+  // otherwise returns a reference to a default Data struct.
+  const Data& ReadOnlyData() const;
+
   // Note: type_ is filled in by use of the default constructor under
   // factory methods for categories that shouldn't have types.
   // This would ideally be fixed but some function resolving code
   // currently looks at types and fails if they aren't present.
   const Type* type_ = nullptr;
 
-  // TODO: b/277365877 - Deprecate this in favor of `constant_value_`.
-  std::optional<Value> literal_value_;  // only set for kTypedLiteral.
+  std::unique_ptr<Data> data_;
 
-  // Analysis time constant value.
-  // When this is set for kTypedExpression, it means that this is a named
-  // constant.
-  std::optional<absl::StatusOr<Value>> constant_value_;
-
-  // Populated only for STRUCT type arguments. Stores the InputArgumentType of
-  // the struct fields (in the same order). We need this for STRUCT coercion
-  // where we need to check field-by-field whether 'from_struct' field is
-  // castable/coercible to the corresponding 'to_struct' field type.
-  std::vector<InputArgumentType> field_types_;
-
-  // This is only non-NULL for table-valued functions. It holds a list of
-  // provided column names and types for a relation argument. This is a shared
-  // pointer only because the InputArgumentType is copyable and there is only
-  // need for one TVFRelation instance to exist.
-  std::shared_ptr<const TVFRelation> relation_input_schema_;
-
-  Category category_ = kUntypedNull;
+  Category category_;
 
   // True if this InputArgumentType was constructed from a default function
   // argument value.
-  bool is_default_argument_value_ = false;
+  bool is_default_argument_value_ : 1 = false;
 
   // Indicates a TVF argument that came from the pipe input in pipe CALL.
   // This is currently used only for error messages.
-  bool is_pipe_input_table_ = false;
+  bool is_pipe_input_table_ : 1 = false;
 
   // Indicates this argument is the base expression for a chained function call.
   // This is currently used only for error messages.
-  bool is_chained_function_call_input_ = false;
+  bool is_chained_function_call_input_ : 1 = false;
 
   // True if the InputArgumentType was constructed from a ResolvedLiteral.
   // This assessment is independent of whether or not
   // `literal_value_` has a value.
-  bool is_literal_for_constness_ = false;
-
-  // This is only non-NULL for table-valued functions. It holds the model
-  // argument. This is a shared pointer only because the InputArgumentType is
-  // copyable and there is only need for one TVFModelArgument instance to exist.
-  std::shared_ptr<const TVFModelArgument> model_arg_;
-
-  // This is only non-NULL for table-valued functions. It holds the connection
-  // argument. This is a shared pointer only because the InputArgumentType is
-  // copyable and there is only need for one TVFConnectionArgument instance to
-  // exist.
-  std::shared_ptr<const TVFConnectionArgument> connection_arg_;
-
-  // The alias of the argument this InputArgumentType corresponds to. If the
-  // argument does not support aliases, `argument_alias_` = std::nullopt.
-  std::optional<IdString> argument_alias_;
-
-  // Copyable.
+  bool is_literal_for_constness_ : 1 = false;
 };
 
 // Only hashes the type kind, not the type itself (so two different enums will

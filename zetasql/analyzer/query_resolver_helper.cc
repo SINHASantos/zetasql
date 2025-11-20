@@ -505,7 +505,7 @@ QueryResolutionInfo::QueryResolutionInfo(Resolver* resolver,
 }
 
 // Keep destructor impl in .cc to resolve circular deps.
-QueryResolutionInfo::~QueryResolutionInfo() {}
+QueryResolutionInfo::~QueryResolutionInfo() = default;
 
 const ResolvedComputedColumn*
 QueryResolutionInfo::AddGroupByComputedColumnIfNeeded(

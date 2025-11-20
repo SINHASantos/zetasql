@@ -1,4 +1,4 @@
-[default language_features=MAXIMUM,+MULTILEVEL_AGGREGATION,+WITH_GROUP_ROWS,+ORDER_BY_IN_AGGREGATE,+LIMIT_IN_AGGREGATE,+HAVING_IN_AGGREGATE,+NULL_HANDLING_MODIFIER_IN_AGGREGATE,+ANALYTIC_FUNCTIONS,+QUALIFY,+GROUPING_BUILTIN,+GROUP_BY_STRUCT,+ENFORCE_CONDITIONAL_EVALUATION,+PIVOT]
+[default language_features=MAXIMUM,+MULTILEVEL_AGGREGATION,+ORDER_BY_IN_AGGREGATE,+LIMIT_IN_AGGREGATE,+HAVING_IN_AGGREGATE,+NULL_HANDLING_MODIFIER_IN_AGGREGATE,+ANALYTIC_FUNCTIONS,+QUALIFY,+GROUPING_BUILTIN,+GROUP_BY_STRUCT,+ENFORCE_CONDITIONAL_EVALUATION,+PIVOT]
 [default show_sqlbuilder_output]
 
 # Test file for multi-level aggregate queries that fail because corresponding
@@ -184,6 +184,19 @@ from SimpleTypesWithAnonymizationUid;
 --
 ERROR: COUNT Anonymization / Differential Privacy Function does not support GROUP BY modifiers [at 2:3]
   COUNT(int64 GROUP BY int64)
+  ^
+==
+
+# Multi-level aggregation does not work with differential privacy in pipes.
+[language_features=NONE,+MULTILEVEL_AGGREGATION,+DIFFERENTIAL_PRIVACY,+NAMED_ARGUMENTS,+PIPES,+PIPE_AGGREGATE_WITH_DIFFERENTIAL_PRIVACY]
+[enabled_ast_rewrites=DEFAULTS,+ANONYMIZATION]
+[no_expect_error_location]
+FROM SimpleTypesWithAnonymizationUid
+|> AGGREGATE WITH DIFFERENTIAL_PRIVACY
+  COUNT(int64 GROUP BY int64);
+--
+ERROR: COUNT Anonymization / Differential Privacy Function does not support GROUP BY modifiers [at 3:3]
+  COUNT(int64 GROUP BY int64);
   ^
 ==
 

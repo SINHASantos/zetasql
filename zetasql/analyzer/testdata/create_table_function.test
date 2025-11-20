@@ -3808,14 +3808,30 @@ create table function f(x int64) returns table<string> as select ?;
                                                                  ^
 ==
 
-# The TABLE clause refers to an argument of the current CREATE TABLE FUNCTION
-# statement. This does not work outside the context of a nested TVF call.
+[language_features=NONE,+TABLE_VALUED_FUNCTIONS,+CREATE_TABLE_FUNCTION,{{|+TOP_LEVEL_TABLE_STATEMENTS}}]
+# The TABLE clause creates top-level TABLE statement from an argument of the
+# current CREATE TABLE FUNCTION statement.
 create table function f(t table<col int64>)
 as table t;
 --
-ERROR: TABLE statements are not supported [at 2:4]
+ALTERNATION GROUP: <empty>
+--
+ERROR: TABLE statements are not supported [at 4:4]
 as table t;
    ^
+--
+ALTERNATION GROUP: +TOP_LEVEL_TABLE_STATEMENTS
+--
+CreateTableFunctionStmt
++-name_path=f
++-argument_name_list=[t]
++-signature=(TABLE<col INT64> t) -> TABLE<col INT64>
++-language="SQL"
++-code="table t"
++-query=
+| +-RelationArgumentScan(column_list=[t.col#1], name="t")
++-output_column_list=
+  +-t.col#1 AS col [INT64]
 ==
 
 # The TABLE clause refers to an argument of the current CREATE TABLE FUNCTION

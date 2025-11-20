@@ -24,6 +24,7 @@
 #include "zetasql/public/catalog.h"
 #include "zetasql/public/options.pb.h"
 #include "zetasql/public/rewriter_interface.h"
+#include "zetasql/public/types/annotation.h"
 #include "zetasql/public/types/array_type.h"
 #include "zetasql/public/types/type.h"
 #include "zetasql/public/types/type_factory.h"
@@ -141,6 +142,8 @@ absl::Status FlattenRewriterVisitor::VisitResolvedArrayScan(
     std::unique_ptr<ResolvedSubqueryExpr> subquery = MakeResolvedSubqueryExpr(
         flatten->type(), ResolvedSubqueryExpr::ARRAY, std::move(column_refs),
         /*in_expr=*/nullptr, std::move(scan));
+    subquery->set_type_annotation_map(flatten->type_annotation_map());
+
     ZETASQL_ASSIGN_OR_RETURN(std::unique_ptr<ResolvedColumnHolder> offset_column,
                      ProcessNode(node->array_offset_column()));
     std::vector<std::unique_ptr<const ResolvedExpr>> array_expr_list;
@@ -166,10 +169,8 @@ absl::Status FlattenRewriterVisitor::VisitResolvedArrayScan(
   // Project the flatten result back to the expected output column.
   std::vector<std::unique_ptr<const ResolvedComputedColumn>> expr_list;
   expr_list.push_back(MakeResolvedComputedColumn(
-      node->element_column(),
-      MakeResolvedColumnRef(scan->column_list().back().type(),
-                            scan->column_list().back(),
-                            /*is_correlated=*/false)));
+      node->element_column(), MakeResolvedColumnRef(scan->column_list().back(),
+                                                    /*is_correlated=*/false)));
   PushNodeToStack(MakeResolvedProjectScan(
       node->column_list(), std::move(expr_list), std::move(scan)));
   return absl::OkStatus();
@@ -181,7 +182,7 @@ absl::Status FlattenRewriterVisitor::VisitResolvedFlatten(
   // the input value referenced both by null checking and flattening, so we use
   // a column to ensure it is only evaluated once.
   ResolvedColumn flatten_expr_column = column_factory_->MakeCol(
-      "$flatten_input", "injected", node->expr()->type());
+      "$flatten_input", "injected", node->expr()->annotated_type());
 
   // To avoid returning an empty array if the input is NULL, we rewrite to
   // explicitly return NULL in that case. The flatten rewrite would return an
@@ -191,33 +192,45 @@ absl::Status FlattenRewriterVisitor::VisitResolvedFlatten(
 
   // Check if the input expression is NULL.
   std::unique_ptr<ResolvedExpr> input_col =
-      MakeResolvedColumnRef(flatten_expr_column.type(), flatten_expr_column,
+      MakeResolvedColumnRef(flatten_expr_column,
                             /*is_correlated=*/false);
   ZETASQL_ASSIGN_OR_RETURN(std::unique_ptr<ResolvedExpr> if_condition,
                    fn_builder_.IsNull(std::move(input_col)));
   // If so, we return NULL.
   std::unique_ptr<ResolvedExpr> if_then =
       MakeResolvedLiteral(Value::Null(node->type()));
+  if_then->set_type_annotation_map(node->type_annotation_map());
+
   // Otherwise, return the flattened result.
   std::vector<std::unique_ptr<const ResolvedColumnRef>> column_refs;
-  column_refs.push_back(MakeResolvedColumnRef(flatten_expr_column.type(),
-                                              flatten_expr_column,
+  column_refs.push_back(MakeResolvedColumnRef(flatten_expr_column,
                                               /*is_correlated=*/false));
+  // RowTypes are like joins and scanning them does not preserve order.
+  // TODO: If we step through single-row ROWs, and had other arrays
+  // before or after, maybe we should preserve order from the arrays?
+  bool order_results = !node->expr()->type()->IsRow();
   for (const auto& get_field : node->get_field_list()) {
     ZETASQL_RETURN_IF_ERROR(CollectColumnRefs(*get_field, &column_refs));
+    if (get_field->type()->IsRow()) {
+      // TODO: Add a test for this.  We can't current reach this
+      // because we can't have ROW types in structs or returned from functions,
+      // so there's always a ROW type on the outside, so order_results is
+      // already false.
+      order_results = false;
+    }
   }
   // Clean up any duplicated parameters.
   SortUniqueColumnRefs(column_refs);
   ZETASQL_ASSIGN_OR_RETURN(
       std::unique_ptr<ResolvedScan> rewritten_flatten,
-      FlattenToScan(
-          MakeResolvedColumnRef(flatten_expr_column.type(), flatten_expr_column,
-                                /*is_correlated=*/true),
-          node->get_field_list(), /*input_scan=*/nullptr,
-          /*order_results=*/true, /*in_subquery=*/true));
+      FlattenToScan(MakeResolvedColumnRef(flatten_expr_column,
+                                          /*is_correlated=*/true),
+                    node->get_field_list(), /*input_scan=*/nullptr,
+                    /*order_results=*/order_results, /*in_subquery=*/true));
   std::unique_ptr<ResolvedExpr> if_else = MakeResolvedSubqueryExpr(
       node->type(), ResolvedSubqueryExpr::ARRAY, std::move(column_refs),
       /*in_expr=*/nullptr, std::move(rewritten_flatten));
+  if_else->set_type_annotation_map(node->type_annotation_map());
 
   ZETASQL_ASSIGN_OR_RETURN(auto resolved_if,
                    fn_builder_.If(std::move(if_condition), std::move(if_then),
@@ -229,8 +242,8 @@ absl::Status FlattenRewriterVisitor::VisitResolvedFlatten(
   std::vector<std::unique_ptr<const ResolvedComputedColumn>> let_assignments;
   let_assignments.push_back(
       MakeResolvedComputedColumn(flatten_expr_column, std::move(flatten_expr)));
-  PushNodeToStack(MakeResolvedWithExpr(node->type(), std::move(let_assignments),
-                                       std::move(resolved_if)));
+  PushNodeToStack(
+      MakeResolvedWithExpr(std::move(let_assignments), std::move(resolved_if)));
   return absl::OkStatus();
 }
 
@@ -242,8 +255,16 @@ FlattenRewriterVisitor::FlattenToScan(
     bool in_subquery) {
   std::vector<ResolvedColumn> column_list;
   if (input_scan != nullptr) column_list = input_scan->column_list();
+  ZETASQL_RET_CHECK(flatten_expr->type()->IsArrayLike());
+  ZETASQL_ASSIGN_OR_RETURN(const Type* element_type,
+                   flatten_expr->type()->GetElementType());
+  const AnnotationMap* element_annotation_map = nullptr;
+  if (flatten_expr->type_annotation_map() != nullptr) {
+    element_annotation_map =
+        flatten_expr->type_annotation_map()->AsStructMap()->field(0);
+  }
   ResolvedColumn column = column_factory_->MakeCol(
-      "$flatten", "injected", flatten_expr->type()->AsArray()->element_type());
+      "$flatten", "injected", {element_type, element_annotation_map});
   column_list.push_back(column);
 
   std::vector<ResolvedColumn> offset_columns;
@@ -276,10 +297,10 @@ FlattenRewriterVisitor::FlattenToScan(
     // Change the input from the FlattenedArg to instead be a ColumnRef or the
     // built-up non-array expression.
     if (input == nullptr) {
-      input = MakeResolvedColumnRef(column.type(), column,
-                                    /*is_correlated=*/false);
+      input = MakeResolvedColumnRef(column, /*is_correlated=*/false);
     }
     ResolvedExpr* to_set_input = get_field.get();
+    // ResolvedFunctionCalls show up here for $array_at_offset.
     if (get_field->Is<ResolvedFunctionCall>()) {
       if (in_subquery) {
         ZETASQL_ASSIGN_OR_RETURN(get_field, CorrelateColumnRefs(*get_field));
@@ -298,18 +319,27 @@ FlattenRewriterVisitor::FlattenToScan(
     } else if (to_set_input->Is<ResolvedGraphGetElementProperty>()) {
       to_set_input->GetAs<ResolvedGraphGetElementProperty>()->set_expr(
           std::move(input));
+    } else if (to_set_input->Is<ResolvedGetRowField>()) {
+      to_set_input->GetAs<ResolvedGetRowField>()->set_expr(std::move(input));
     } else {
       ZETASQL_RET_CHECK_FAIL() << "Unsupported node: " << to_set_input->DebugString();
     }
     input = nullptr;  // already null, but avoids ClangTidy "use after free"
 
-    if (!get_field->type()->IsArray()) {
-      // Not an array so can't turn it into an ArrayScan.
+    if (!get_field->type()->IsArrayLike()) {
+      // Not array-like so can't turn it into an ArrayScan.
       // Collect as input for next array.
       input = std::move(get_field);
     } else {
+      const AnnotationMap* element_annotation_map = nullptr;
+      if (get_field->type_annotation_map() != nullptr) {
+        element_annotation_map =
+            get_field->type_annotation_map()->AsStructMap()->field(0);
+      }
+      ZETASQL_ASSIGN_OR_RETURN(const Type* field_element_type,
+                       get_field->type()->GetElementType());
       column = column_factory_->MakeCol(
-          "$flatten", "injected", get_field->type()->AsArray()->element_type());
+          "$flatten", "injected", {field_element_type, element_annotation_map});
       column_list.push_back(column);
 
       if (order_results) {
@@ -335,8 +365,8 @@ FlattenRewriterVisitor::FlattenToScan(
   if (input != nullptr) {
     // We have leftover "gets" that resulted in non-arrays.
     // Use a ProjectScan to resolve them to the expected column.
-    column = column_factory_->MakeCol("$flatten", "injected", input->type());
-    // node->type()->AsArray()->element_type());
+    column = column_factory_->MakeCol("$flatten", "injected",
+                                      input->annotated_type());
     column_list.push_back(column);
     std::vector<std::unique_ptr<const ResolvedComputedColumn>> expr_list;
     expr_list.push_back(MakeResolvedComputedColumn(column, std::move(input)));
@@ -349,13 +379,21 @@ FlattenRewriterVisitor::FlattenToScan(
     order_by.reserve(offset_columns.size());
     for (const ResolvedColumn& c : offset_columns) {
       order_by.push_back(MakeResolvedOrderByItem(
-          MakeResolvedColumnRef(c.type(), c, /*is_correlated=*/false),
+          MakeResolvedColumnRef(c, /*is_correlated=*/false),
           /*collation_name=*/nullptr, /*is_descending=*/false,
           ResolvedOrderByItemEnums::ORDER_UNSPECIFIED));
     }
     scan =
         MakeResolvedOrderByScan({column}, std::move(scan), std::move(order_by));
     scan->set_is_ordered(true);
+  }
+
+  if (in_subquery) {
+    // When in an expression subquery, we need to project down to just the
+    // single output column for the subquery.
+    // For all Scan types we might have here, we can just prune the column_list
+    // without adding a ResolvedProjectScan.
+    scan->set_column_list({column});
   }
   return scan;
 }

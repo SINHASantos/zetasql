@@ -1099,6 +1099,17 @@ class Validator {
   absl::Status ValidateResolvedCreateSequenceStmt(
       const ResolvedCreateSequenceStmt* stmt);
 
+  // Validates that the type of a column and the corresponding resolved_column
+  // are 'equivalent'.
+  //
+  // Note for measure types (and potentially other function types), the
+  // equivalence in this context does not refer to the behavior described by the
+  // zetasql::type::Equivalent method, but a notion of equivalence specific
+  // to the type. See the implementation of this method for details.
+  absl::Status ValidateTableColumnTypeEquality(
+      const Column& column, const ResolvedColumn& resolved_column,
+      absl::string_view table_name, absl::string_view column_name);
+
   // Replacement for ::zetasql_base::InternalErrorBuilder(), which also records the
   // context of the error for use in the tree dump.
   zetasql_base::StatusBuilder InternalErrorBuilder() {

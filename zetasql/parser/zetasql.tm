@@ -450,7 +450,6 @@ SENTINEL_LB_TOKEN_END:
 // though, they are produced by disambiguation transformations after the main
 // lexer.
 
-KW_WITH_STARTING_WITH_GROUP_ROWS:
 KW_WITH_STARTING_WITH_EXPRESSION:
 KW_EXCEPT_IN_SET_OP:
 KW_FOR_BEFORE_LOCK_MODE:
@@ -8833,15 +8832,8 @@ parenthesized_anysomeall_list_in_rhs {ASTNode*}:
           $query->set_parenthesized(false);
           auto* sub_query = MakeNode<ASTExpressionSubquery>(@query, $query);
           $$ = MakeNode<ASTInList>(@$, sub_query);
-        } else if (!language_options.LanguageFeatureEnabled(
-            FEATURE_LIKE_ANY_SOME_ALL_SUBQUERY)) {
-          // Case 1: A subquery, but the feature is disabled.
-          return MakeSyntaxError(@query, "The LIKE ANY|SOME|ALL operator does "
-            "not support subquery expression as patterns. "
-            "Patterns must be string or bytes; "
-            "did you mean LIKE ANY|SOME|ALL (pattern1, pattern2, ...)?");
         } else {
-          // Case 1: A subquery, and the feature is enabled.
+          // Case 1: A subquery.
           $$ = MakeNode<ASTQuery>(@query, $query);
         }
       }
@@ -8995,34 +8987,19 @@ import_type {ImportType}:
 any_some_all {ASTNode*}:
     "ANY"
     {
-      if (!language_options.LanguageFeatureEnabled(
-                FEATURE_LIKE_ANY_SOME_ALL)) {
-        return MakeSyntaxError(@1, "LIKE ANY is not supported");
-      }
-      auto* op =
-          MakeNode<ASTAnySomeAllOp>(@$);
+      auto* op = MakeNode<ASTAnySomeAllOp>(@$);
       op->set_op(ASTAnySomeAllOp::kAny);
       $$ = op;
     }
   | "SOME"
     {
-      if (!language_options.LanguageFeatureEnabled(
-                FEATURE_LIKE_ANY_SOME_ALL)) {
-        return MakeSyntaxError(@1, "LIKE SOME is not supported");
-      }
-      auto* op =
-          MakeNode<ASTAnySomeAllOp>(@$);
+      auto* op = MakeNode<ASTAnySomeAllOp>(@$);
       op->set_op(ASTAnySomeAllOp::kSome);
       $$ = op;
     }
   | "ALL"
     {
-      if (!language_options.LanguageFeatureEnabled(
-                FEATURE_LIKE_ANY_SOME_ALL)) {
-        return MakeSyntaxError(@1, "LIKE ALL is not supported");
-      }
-      auto* op =
-          MakeNode<ASTAnySomeAllOp>(@$);
+      auto* op = MakeNode<ASTAnySomeAllOp>(@$);
       op->set_op(ASTAnySomeAllOp::kAll);
       $$ = op;
     }
@@ -11179,16 +11156,9 @@ window_specification {ASTNode*}:
 ;
 
 function_call_expression_with_clauses {ASTExpression*}:
-    function_call_expression[call] hint? with_group_rows? over_clause?
+    function_call_expression[call] hint? over_clause?
     {
       ASTExpression* current_expression = ExtendNodeRight($call, $hint);
-      if ($with_group_rows.has_value()) {
-        if (!language_options.LanguageFeatureEnabled(FEATURE_WITH_GROUP_ROWS)) {
-          return MakeSyntaxError(*@with_group_rows, "WITH GROUP ROWS is not supported");
-        }
-        auto* with_group_rows = MakeNode<ASTWithGroupRows>(@$, $3);
-        ExtendNodeRight(current_expression, with_group_rows);
-      }
       if ($over_clause.has_value()) {
         current_expression = MakeNode<ASTAnalyticFunctionCall>(@$,
             current_expression, $over_clause);
@@ -11198,13 +11168,6 @@ function_call_expression_with_clauses {ASTExpression*}:
   | function_call_expression braced_constructor
     {
       $$ = MakeNode<ASTUpdateConstructor>(@$, $1, $2);
-    }
-;
-
-with_group_rows {ASTNode*}:
-    KW_WITH_STARTING_WITH_GROUP_ROWS "GROUP" "ROWS" parenthesized_query[query]
-    {
-      $$ = $query;
     }
 ;
 

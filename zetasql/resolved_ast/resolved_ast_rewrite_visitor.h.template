@@ -39,8 +39,8 @@ namespace zetasql {
 // A visitor used to perform a deep transform of a resolved AST in place.
 //
 // The key feature of this visitor is that it operates on
-// unique_ptr<const ResolvedNode>. So, each operatation is given ownership of
-// the input object, and require to return ownership of another object. The
+// unique_ptr<const ResolvedNode>. So, each operation is given ownership of
+// the input object, and is required to return ownership of another object. The
 // "no-op" case is therefore to just return the input.
 //
 // Each concrete node ResolvedNodeX has an associated PreVisit and PostVisit
@@ -66,7 +66,7 @@ namespace zetasql {
 //
 // class MyVisitor : public ResolvedASTRewriteVisitor {
 //   absl::StatusOr<std::unique_ptr<const ResolvedNode>>
-//   VisitResolvedX(std::unique_ptr<const ResolvedNodeX> node) override {
+//   PostVisitResolvedX(std::unique_ptr<const ResolvedNodeX> node) override {
 //     ResolvedXBuilder builder = ToBuilder(std::move(node));
 //     // Take ownership of a child ...
 //     ResolvedChildBuilder child_a = ToBuilder(builder.release_child_a());

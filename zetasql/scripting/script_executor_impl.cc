@@ -70,6 +70,7 @@
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_join.h"
 #include "absl/strings/str_replace.h"
+#include "absl/strings/str_split.h"
 #include "absl/strings/string_view.h"
 #include "absl/strings/substitute.h"
 #include "absl/time/time.h"
@@ -387,6 +388,9 @@ absl::Status ScriptExecutorImpl::ExitForLoop() {
 absl::StatusOr<const ASTStatement*> ScriptExecutorImpl::ExitProcedure(
     bool normal_return) {
   if (callstack_.size() > 1) {
+    ZETASQL_RETURN_IF_ERROR(evaluator_->OnProcedureExited(
+        *this, (std::vector<std::string>)absl::StrSplit(
+                   CurrentProcedure()->name(), ".")));
     ZETASQL_RETURN_IF_ERROR(ExitFromProcedure(*CurrentProcedure(), &callstack_.back(),
                                       GetMutableParentStackFrame(),
                                       normal_return));
@@ -1467,6 +1471,8 @@ absl::Status ScriptExecutorImpl::ExecuteCallStatement() {
     // start of the procedure, we just move on to the next statement.
     ZETASQL_RETURN_IF_ERROR(AdvancePastCurrentStatement(absl::OkStatus()));
   } else {
+    ZETASQL_RETURN_IF_ERROR(
+        evaluator_->OnProcedureEntered(*this, path_node->ToIdentifierVector()));
     callstack_.emplace_back(StackFrameImpl(
         std::move(parsed_script), start_node, std::move(variables),
         std::move(variable_sizes), {}, std::move(procedure_definition),
@@ -1802,6 +1808,8 @@ absl::Status ScriptExecutorImpl::ExecuteDynamicStatement() {
   } else {
     // Variable_sizes must be included to update the stack frame memory with
     // query parameter variable sizes.
+    ZETASQL_RETURN_IF_ERROR(
+        evaluator_->OnProcedureEntered(*this, {"execute_immediate"}));
     callstack_.emplace_back(StackFrameImpl(
         std::move(parsed_script), start_node, {}, std::move(variable_sizes), {},
         std::move(procedure_definition), std::move(id_string_pool),

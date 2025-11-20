@@ -1,5 +1,5 @@
 [load_proto_files=zetasql/testdata/test_schema.proto,zetasql/testdata/test_proto3.proto]
-[load_proto_names=zetasql_test__.NullableDate,zetasql_test__.NullableInt,zetasql_test__.NullableEnum,zetasql_test__.PackedRepeatablePB,zetasql_test__.KitchenSinkPB,zetasql_test__.Proto3KitchenSink]
+[load_proto_names=zetasql_test__.NullableDate,zetasql_test__.NullableInt,zetasql_test__.NullableEnum,zetasql_test__.PackedRepeatablePB,zetasql_test__.KitchenSinkPB,zetasql_test__.Proto3KitchenSink,zetasql_test__.MessageWithMapField]
 [prepare_database]
 CREATE TABLE TableAllTypes AS
 SELECT CAST(1 AS int64) as row_id,
@@ -1640,3 +1640,16 @@ SELECT my_struct.a as result FROM
 (SELECT CAST(x AS STRUCT<a INT64>) as my_struct FROM (SELECT STRUCT(1 as b) AS x))
 --
 ARRAY<STRUCT<result INT64>>[{1}]
+==
+
+[required_features=RANGE_TYPE,PARAMETERIZED_TYPES,TIMESTAMP_PRECISION]
+[name=cast_range_with_truncation]
+SELECT CAST(x AS RANGE<TIMESTAMP(0)>)
+FROM (SELECT RANGE<TIMESTAMP> '[1970-01-01 00:00:00.123456+00, 2025-01-01 00:00:00.123456+00)' AS x)
+--
+ARRAY<STRUCT<RANGE<TIMESTAMP>>>[
+  {[
+     1970-01-01 00:00:00+00,
+     2025-01-01 00:00:00+00
+   )}
+]

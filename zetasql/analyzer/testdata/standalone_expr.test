@@ -1394,67 +1394,6 @@ TestConstant64
 ^
 ==
 
-[language_features=NONE,+WITH_GROUP_ROWS]
-sum(x) with group rows(select x from group_rows())
---
-ERROR: Aggregate function SUM not allowed in standalone expression [at 1:1]
-sum(x) with group rows(select x from group_rows())
-^
-==
-
-[language_features=NONE,+WITH_GROUP_ROWS]
-(select sum(x) with group rows(select x from group_rows()) from (select 1 x))
---
-SubqueryExpr
-+-parse_location=0-77
-+-type=INT64
-+-subquery_type=SCALAR
-+-subquery=
-  +-ProjectScan
-    +-parse_location=1-76
-    +-column_list=[$aggregate.$agg1#3]
-    +-input_scan=
-      +-AggregateScan
-        +-column_list=[$aggregate.$agg1#3]
-        +-input_scan=
-        | +-ProjectScan
-        |   +-parse_location=65-75
-        |   +-column_list=[$subquery1.x#1]
-        |   +-expr_list=
-        |   | +-x#1 := Literal(parse_location=72-73, type=INT64, value=1)
-        |   +-input_scan=
-        |     +-SingleRowScan
-        +-aggregate_list=
-          +-$agg1#3 :=
-            +-AggregateFunctionCall(ZetaSQL:sum(INT64) -> INT64)
-              +-parse_location=8-58
-              +-ColumnRef(parse_location=12-13, type=INT64, column=$subquery1.x#2)
-              +-with_group_rows_subquery=
-                +-ProjectScan
-                  +-parse_location=31-57
-                  +-column_list=[$subquery1.x#2]
-                  +-input_scan=
-                    +-GroupRowsScan
-                      +-column_list=[$subquery1.x#2]
-                      +-input_column_list=
-                        +-x#2 := ColumnRef(type=INT64, column=$subquery1.x#1)
-==
-
-group_rows()
---
-ERROR: Function not found: group_rows [at 1:1]
-group_rows()
-^
-==
-
-[language_features=NONE,+TABLE_VALUED_FUNCTIONS]
-(select x from group_rows())
---
-ERROR: Table-valued function not found: group_rows [at 1:16]
-(select x from group_rows())
-               ^
-==
-
 [language_features=NONE,+MULTILEVEL_AGGREGATION]
 [allow_aggregate_standalone_expression]
 [in_scope_expression_column_name=value]

@@ -42,6 +42,7 @@
 #include "zetasql/public/type.h"
 #include "zetasql/public/type.pb.h"
 #include "zetasql/public/types/array_type.h"
+#include "zetasql/public/types/measure_type.h"
 #include "zetasql/public/types/struct_type.h"
 #include "zetasql/public/types/type.h"
 #include "zetasql/public/types/type_factory.h"
@@ -173,6 +174,22 @@ absl::Status TableAsArrayExpr::SetSchemasForEvaluation(
   return absl::OkStatus();
 }
 
+// Reconstructs a measure value with to be of the new measure type
+// `measure_type`.
+//
+// This function is needed because a MeasureType is created per measure-typed
+// ResolvedColumn creation, so it is different from the type in the catalog.
+static absl::StatusOr<Value> ReconstructMeasureValue(
+    const Value& measure_value, const MeasureType* new_measure_type,
+    const LanguageOptions& language_options) {
+  ZETASQL_ASSIGN_OR_RETURN(Value captured_values_as_struct,
+                   InternalValue::GetMeasureAsStructValue(measure_value));
+  ZETASQL_ASSIGN_OR_RETURN(std::vector<int> key_indices,
+                   InternalValue::GetMeasureGrainLockingIndices(measure_value));
+  return InternalValue::MakeMeasure(new_measure_type, captured_values_as_struct,
+                                    key_indices, language_options);
+}
+
 // Populates `output_array_of_structs_value` with a subset of the fields in
 // `array_of_structs_value`. The subset is specified by `column_index_list`,
 // and the chosen fields must match the fields in `output_type`.
@@ -182,7 +199,8 @@ absl::Status TableAsArrayExpr::SetSchemasForEvaluation(
 static bool MakeSubsetStructValue(
     const Type* output_type, const Value& array_of_structs_value,
     const std::optional<std::vector<int>>& column_index_list,
-    Value& output_array_of_structs_value) {
+    Value& output_array_of_structs_value,
+    const LanguageOptions& language_options) {
   if (!output_type->IsArray() ||
       !output_type->AsArray()->element_type()->IsStruct() ||
       !array_of_structs_value.type()->IsArray() ||
@@ -213,7 +231,17 @@ static bool MakeSubsetStructValue(
     const Type* output_field_type = output_row_struct_type->field(i).type;
     const Type* table_field_type =
         table_row_struct_type->field(column_index).type;
-    if (!output_field_type->Equals(table_field_type)) {
+    if (output_field_type->IsMeasureType() &&
+        table_field_type->IsMeasureType()) {
+      // TODO b/460223066: A MeasureType is created per measure-typed
+      // ResolvedColumn creation, so it is different from the type in the
+      // catalog. Remove this special case once we have a formal spec for
+      // MeasureType.
+      if (!output_field_type->AsMeasure()->result_type()->Equals(
+              table_field_type->AsMeasure()->result_type())) {
+        return false;
+      }
+    } else if (!output_field_type->Equals(table_field_type)) {
       return false;
     }
   }
@@ -223,8 +251,25 @@ static bool MakeSubsetStructValue(
   for (const Value& table_row_value : array_of_structs_value.elements()) {
     std::vector<Value> values_in_struct;
     values_in_struct.reserve(column_index_list_values.size());
-    for (int column_index : column_index_list_values) {
-      values_in_struct.push_back(table_row_value.field(column_index));
+    for (int i = 0; i < column_index_list_values.size(); ++i) {
+      int column_index = column_index_list_values[i];
+      const Type* table_field_type =
+          table_row_struct_type->field(column_index).type;
+      const Type* output_field_type = output_row_struct_type->field(i).type;
+      if (table_field_type->IsMeasureType()) {
+        ABSL_DCHECK(output_field_type->IsMeasureType());
+        // We need to reconstruct the measure value because the MeasureType
+        // of the ResolvedColumn is different from the type in the catalog.
+        absl::StatusOr<Value> new_measure_value = ReconstructMeasureValue(
+            table_row_value.field(column_index), output_field_type->AsMeasure(),
+            language_options);
+        if (!new_measure_value.ok()) {
+          return false;
+        }
+        values_in_struct.push_back(*new_measure_value);
+      } else {
+        values_in_struct.push_back(table_row_value.field(column_index));
+      }
     }
     auto output_row_struct_value =
         Value::MakeStruct(output_row_struct_type, std::move(values_in_struct));
@@ -269,7 +314,8 @@ bool TableAsArrayExpr::Eval(absl::Span<const TupleData* const> /* params */,
   // that the supplied `column_index_list_` is valid.
   Value subset_row_struct_value;
   if (MakeSubsetStructValue(output_type(), array, column_index_list_,
-                            subset_row_struct_value)) {
+                            subset_row_struct_value,
+                            context->GetLanguageOptions())) {
     result->SetValue(subset_row_struct_value);
     return true;
   }

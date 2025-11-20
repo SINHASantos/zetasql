@@ -3299,26 +3299,11 @@ void Unparser::visitASTAnalyticFunctionCall(const ASTAnalyticFunctionCall* node,
   PrintOpenParenIfNeeded(node);
   if (node->function() != nullptr) {
     node->function()->Accept(this, data);
-  } else {
-    node->function_with_group_rows()->Accept(this, data);
   }
   print("OVER (");
   {
     Formatter::Indenter indenter(&formatter_);
     node->window_spec()->Accept(this, data);
-  }
-  print(")");
-  PrintCloseParenIfNeeded(node);
-}
-
-void Unparser::visitASTFunctionCallWithGroupRows(
-    const ASTFunctionCallWithGroupRows* node, void* data) {
-  PrintOpenParenIfNeeded(node);
-  node->function()->Accept(this, data);
-  print("WITH GROUP ROWS (");
-  {
-    Formatter::Indenter indenter(&formatter_);
-    node->subquery()->Accept(this, data);
   }
   print(")");
   PrintCloseParenIfNeeded(node);

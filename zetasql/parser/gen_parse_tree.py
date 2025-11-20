@@ -819,7 +819,10 @@ class TreeGenerator(object):
 
     # This can be used to find node names in a string
     # and turn them into relative links inside the doc.
-    linkify_re = re.compile(r'\b(AST[A-Z][a-zA-Z]*)\b')
+    linkify_node_name_re = re.compile(r'\b(AST[A-Z][a-zA-Z]*)\b')
+
+    # This finds links starting with 'http://'.
+    linkify_http_re = re.compile(r'\b((https?://)[a-zA-Z0-9_\-/:]*)\b')
 
     # {{items|sort_by_tag_id}} can be used to sort a list of objects by tag.
     def SortByTagId(items):
@@ -829,23 +832,29 @@ class TreeGenerator(object):
     def SortByName(items):
       return sorted(items, key=operator.itemgetter('name'))
 
-    # {{items|linkify_node_names}} can be used to link AST node names
+    # {{items|linkify}} can be used to link AST node names
     # in text to the node documentation.
-    def LinkifyNodeNames(text):
-      def LinkSafe(match):
-        # The replacement string is explicitly marked as safe HTML
-        return markupsafe.Markup(
-            f'<a href="#{match.group(1)}">{match.group(1)}</a>'
-        )
+    def Linkify(text):
+      # Return a substitution lambda that makes links with `prefix`,
+      # which could be '#' or 'http://', for example.
+      def LinkSafe(prefix):
+        def Lambda(match):
+          # The replacement string is explicitly marked as safe HTML
+          return markupsafe.Markup(
+              f'<a href="{prefix}{match.group(1)}">{match.group(1)}</a>'
+          )
+        return Lambda
 
       text = markupsafe.escape(text)
-      text = linkify_re.sub(LinkSafe, text)
+      # Linkify patterns that look like links.
+      text = linkify_http_re.sub(LinkSafe(''), text)
+      text = linkify_node_name_re.sub(LinkSafe('#'), text)
       text = markupsafe.Markup(text)
       return text
 
     jinja_env.filters['sort_by_tag_id'] = SortByTagId
     jinja_env.filters['sort_by_name'] = SortByName
-    jinja_env.filters['linkify_node_names'] = LinkifyNodeNames
+    jinja_env.filters['linkify'] = Linkify
     jinja_env.filters['lower_camel_case'] = LowerCamelCase
     jinja_env.filters['upper_camel_case'] = UpperCamelCase
     self._ComputeHierarchy()
@@ -5601,6 +5610,7 @@ def main(argv):
               field_loader=FieldLoaderMethod.REQUIRED),
       ])
 
+  # TODO: b/430036320 - Clean up deprecated group rows syntax
   gen.AddNode(
       name='ASTWithGroupRows',
       tag_id=141,
@@ -5646,18 +5656,12 @@ def main(argv):
       parent='ASTExpression',
       fields=[
           Field(
-              'expression',
-              'ASTExpression',
+              'function',
+              'ASTFunctionCall',
               tag_id=2,
               field_loader=FieldLoaderMethod.REQUIRED,
-              gen_setters_and_getters=False,
               private_comment="""
               Required, never NULL.
-              The expression is has to be either an ASTFunctionCall or an
-              ASTFunctionCallWithGroupRows.
-
-              TODO As of April 2025, it appears
-              ASTFunctionCallWithGroupRows never occurs.  Simplify this?
               """,
           ),
           Field(
@@ -5670,47 +5674,7 @@ def main(argv):
               """,
           ),
       ],
-      extra_public_defs="""
-  // Exactly one of function() or function_with_group_rows() will be non-null.
-  //
-  // In the normal case, function() is non-null.
-  //
-  // The function_with_group_rows() case can only happen if
-  // FEATURE_WITH_GROUP_ROWS is enabled and one function call has both
-  // WITH GROUP ROWS and an OVER clause.
-  //
-  // TODO As of April 2025, it appears
-  // ASTFunctionCallWithGroupRows never occurs.  Simplify this?
-  const ASTFunctionCall* function() const;
-  const ASTFunctionCallWithGroupRows* function_with_group_rows() const;
-      """,
   )
-
-  # TODO As of April 2025, it appears this node is never used.
-  # It looks like this should be deleted, and ASTAnalyticFunctionCall should
-  # go back to always containing an ASTFunctionCall.
-  gen.AddNode(
-      name='ASTFunctionCallWithGroupRows',
-      tag_id=144,
-      parent='ASTExpression',
-      fields=[
-          Field(
-              'function',
-              'ASTFunctionCall',
-              tag_id=2,
-              field_loader=FieldLoaderMethod.REQUIRED,
-              private_comment="""
-              Required, never NULL.
-              """),
-          Field(
-              'subquery',
-              'ASTQuery',
-              tag_id=3,
-              field_loader=FieldLoaderMethod.REQUIRED,
-              private_comment="""
-              Required, never NULL.
-              """),
-      ])
 
   gen.AddNode(
       name='ASTClusterBy',

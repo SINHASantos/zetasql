@@ -1101,9 +1101,6 @@ class TreeGenerator(object):
 
     # This finds links starting with 'http://'.
     linkify_http_re = re.compile(r'\b((https?://)[a-zA-Z0-9_\-/:]*)\b')
-    # This finds links starting with '(broken link)' or 'b/'.
-    # This uses negative look-behind for / to avoid matching 'http://' links.
-    linkify_other_re = re.compile(r'(?<!/)\b(((broken link)|b/)[a-zA-Z0-9_\-/:]*)\b')
 
     # These do the corresponding change on a node name.
     unplural_re1 = re.compile(r'ies$')
@@ -1126,7 +1123,6 @@ class TreeGenerator(object):
 
       # Linkify patterns that look like links.
       text = linkify_http_re.sub(LinkSafe(''), text)
-      text = linkify_other_re.sub(LinkSafe('http://'), text)
 
       # Linkify node names, and apply required fixups.
       text = linkify_node_re.sub(LinkSafe('#'), text)

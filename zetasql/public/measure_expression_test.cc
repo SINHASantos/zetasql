@@ -310,24 +310,6 @@ static void TableContainsMeasure(const SimpleTable& table,
       measure_node_kind);
 }
 
-// TODO: support measure with grain-lock on repeated field.
-TEST_F(MeasureExpressionTest, MeasureExpressionOnRepeatedField) {
-  const std::string measure_name = "total_value";
-  std::string measure_expr = R"sql(SUM(v) WITH GROUP ROWS(
-                                    SELECT DISTINCT v
-                                    FROM GROUP_ROWS(), UNNEST(values) AS v
-                             ))sql";
-  const Type* array_type = nullptr;
-  ZETASQL_ASSERT_OK(
-      type_factory_.MakeArrayType(type_factory_.get_int64(), &array_type));
-  EXPECT_THAT(
-      AnalyzeMeasureExpressionForTable(
-          "table", {{"key", type_factory_.get_int64()}, {"values", array_type}},
-          measure_name, measure_expr),
-      StatusIs(absl::StatusCode::kInvalidArgument,
-               HasSubstr("WITH GROUP ROWS is not supported")));
-}
-
 TEST_F(MeasureExpressionTest, InvalidMeasureReferencingMeasure) {
   ZETASQL_ASSERT_OK_AND_ASSIGN(
       const Type* measure_type,

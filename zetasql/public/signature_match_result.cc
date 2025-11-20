@@ -28,44 +28,44 @@ namespace zetasql {
 
 bool SignatureMatchResult::IsCloserMatchThan(
     const SignatureMatchResult& other_result) const {
-  if (non_literals_coerced_ != other_result.non_literals_coerced_) {
-    return non_literals_coerced_ < other_result.non_literals_coerced_;
+  if (non_literals_coerced() != other_result.non_literals_coerced()) {
+    return non_literals_coerced() < other_result.non_literals_coerced();
   }
-  if (non_literals_distance_ != other_result.non_literals_distance_) {
-    return non_literals_distance_ < other_result.non_literals_distance_;
+  if (non_literals_distance() != other_result.non_literals_distance()) {
+    return non_literals_distance() < other_result.non_literals_distance();
   }
-  if (literals_coerced_ != other_result.literals_coerced_) {
-    return literals_coerced_ < other_result.literals_coerced_;
+  if (literals_coerced() != other_result.literals_coerced()) {
+    return literals_coerced() < other_result.literals_coerced();
   }
-  return literals_distance_ < other_result.literals_distance_;
+  return literals_distance() < other_result.literals_distance();
 }
-
 
 void SignatureMatchResult::UpdateFromResult(
     const SignatureMatchResult& other_result) {
-  non_matched_arguments_ += other_result.non_matched_arguments_;
-  non_literals_coerced_ += other_result.non_literals_coerced_;
-  non_literals_distance_ += other_result.non_literals_distance_;
-  literals_coerced_ += other_result.literals_coerced_;
-  literals_distance_ += other_result.literals_distance_;
-  mismatch_message_ = other_result.mismatch_message();
-  bad_argument_index_ = other_result.bad_argument_index();
-  tvf_relation_coercion_map_ = other_result.tvf_relation_coercion_map_;
+  data_->non_matched_arguments += other_result.non_matched_arguments();
+  data_->non_literals_coerced += other_result.non_literals_coerced();
+  data_->non_literals_distance += other_result.non_literals_distance();
+  data_->literals_coerced += other_result.literals_coerced();
+  data_->literals_distance += other_result.literals_distance();
+  data_->mismatch_message = other_result.mismatch_message();
+  data_->bad_argument_index = other_result.bad_argument_index();
+  data_->tvf_relation_coercion_map = other_result.tvf_relation_coercion_map();
 }
 
 std::string SignatureMatchResult::DebugString() const {
   std::string result =
-      absl::StrCat("non-matched arguments: ", non_matched_arguments_,
-                   ", non-literals coerced: ", non_literals_coerced_,
-                   ", non-literals distance: ", non_literals_distance_,
-                   ", literals coerced: ", literals_coerced_,
-                   ", literals distance: ", literals_distance_);
-  if (!mismatch_message_.empty()) {
-    absl::StrAppend(&result, ", mismatch message: \"", mismatch_message_, "\"");
+      absl::StrCat("non-matched arguments: ", non_matched_arguments(),
+                   ", non-literals coerced: ", non_literals_coerced(),
+                   ", non-literals distance: ", non_literals_distance(),
+                   ", literals coerced: ", literals_coerced(),
+                   ", literals distance: ", literals_distance());
+  if (!mismatch_message().empty()) {
+    absl::StrAppend(&result, ", mismatch message: \"", mismatch_message(),
+                    "\"");
   }
-  if (!tvf_relation_coercion_map_.empty()) {
+  if (!tvf_relation_coercion_map().empty()) {
     std::vector<std::string> entries;
-    for (const auto& [key, value] : tvf_relation_coercion_map_) {
+    for (const auto& [key, value] : tvf_relation_coercion_map()) {
       entries.push_back(absl::StrCat("(arg: ", key.argument_index,
                                      ", col: ", key.column_index, ")->",
                                      value->DebugString(true)));

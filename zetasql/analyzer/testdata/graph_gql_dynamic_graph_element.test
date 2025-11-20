@@ -5614,19 +5614,232 @@ RETURN n.dynamic_property1, COUNT(*) AS total
 --
 ALTERNATION GROUPS:
     (n:DynamicLabel1),
-    -[n:DynamicLabel1]->,
+    (n:DynamicLabel1),GROUP BY n.dynamic_property1
 --
-ERROR: Column `dynamic_property1`, which is included in the grouping list by GROUP BY ALL, has type JSON which cannot be used in a grouping key [at 3:8]
-RETURN n.dynamic_property1, COUNT(*) AS total
-       ^
+QueryStmt
++-output_column_list=
+| +-$graph_table.dynamic_property1#3 AS dynamic_property1 [JSON]
+| +-$graph_table.total#2 AS total [INT64]
++-query=
+  +-GraphTableScan
+    +-column_list=$graph_table.[dynamic_property1#3, total#2]
+    +-property_graph=aml_dynamic
+    +-input_scan=
+      +-GraphLinearScan
+        +-column_list=$graph_table.[dynamic_property1#3, total#2]
+        +-scan_list=
+          +-GraphLinearScan
+            +-column_list=$graph_table.[dynamic_property1#3, total#2]
+            +-scan_list=
+              +-GraphScan
+              | +-column_list=[$element_table.n#1]
+              | +-input_scan_list=
+              | | +-GraphPathScan
+              | |   +-column_list=[$element_table.n#1]
+              | |   +-input_scan_list=
+              | |   | +-GraphNodeScan
+              | |   |   +-column_list=[$element_table.n#1]
+              | |   |   +-label_expr=
+              | |   |   | +-GraphLabel
+              | |   |   |   +-label_name=
+              | |   |   |     +-Literal(type=STRING, value="DynamicLabel1", has_explicit_type=TRUE)
+              | |   |   +-target_element_table_list=[aml_dynamic.DynamicGraphNode]
+              | |   +-head=$element_table.n#1
+              | |   +-tail=$element_table.n#1
+              | +-input_scan=
+              |   +-SingleRowScan
+              +-ProjectScan
+                +-column_list=$graph_table.[dynamic_property1#3, total#2]
+                +-input_scan=
+                  +-AggregateScan
+                    +-column_list=$graph_table.[dynamic_property1#3, total#2]
+                    +-input_scan=
+                    | +-GraphRefScan(column_list=[$element_table.n#1])
+                    +-group_by_list=
+                    | +-dynamic_property1#3 :=
+                    |   +-GraphGetElementProperty
+                    |     +-type=JSON
+                    |     +-expr=
+                    |     | +-ColumnRef(type=GRAPH_NODE(aml_dynamic)<code INT64, id INT64, nodeJsonProp JSON, nodeLabelCol STRING, DYNAMIC>, column=$element_table.n#1)
+                    |     +-property_name=
+                    |       +-Literal(type=STRING, value="dynamic_property1", has_explicit_type=TRUE)
+                    +-aggregate_list=
+                      +-total#2 := AggregateFunctionCall(ZetaSQL:$count_star() -> INT64)
+
+[SQLBUILDER_TARGET_SYNTAX_MODE standard]
+[SQLBUILDER_OUTPUT]
+SELECT
+  graphtablescan_5.a_3 AS dynamic_property1,
+  graphtablescan_5.a_4 AS total
+FROM
+  (
+    SELECT
+      aml_dynamic_1.a_4 AS a_4,
+      aml_dynamic_1.a_3 AS a_3
+    FROM
+      GRAPH_TABLE(
+        aml_dynamic
+        MATCH
+          (a_2
+          IS DynamicLabel1)
+        RETURN
+          a_2.dynamic_property1 AS a_3,
+          COUNT(*) AS a_4
+        GROUP BY a_3
+      ) AS aml_dynamic_1
+  ) AS graphtablescan_5;
+
+[SQLBUILDER_TARGET_SYNTAX_MODE pipe]
+[SQLBUILDER_OUTPUT]
+FROM
+  GRAPH_TABLE(
+    aml_dynamic
+    MATCH
+      (a_2
+      IS DynamicLabel1)
+    RETURN
+      a_2.dynamic_property1 AS a_3,
+      COUNT(*) AS a_4
+    GROUP BY a_3
+  ) AS aml_dynamic_1
+|> SELECT
+     aml_dynamic_1.a_4 AS a_4,
+     aml_dynamic_1.a_3 AS a_3
+|> AS graphtablescan_5
+|> SELECT
+     graphtablescan_5.a_3 AS dynamic_property1,
+     graphtablescan_5.a_4 AS total;
 --
 ALTERNATION GROUPS:
-    (n:DynamicLabel1),GROUP BY n.dynamic_property1
+    -[n:DynamicLabel1]->,
     -[n:DynamicLabel1]->,GROUP BY n.dynamic_property1
 --
-ERROR: Grouping by expressions of type JSON is not allowed [at 4:10]
-GROUP BY n.dynamic_property1
-         ^
+QueryStmt
++-output_column_list=
+| +-$graph_table.dynamic_property1#5 AS dynamic_property1 [JSON]
+| +-$graph_table.total#4 AS total [INT64]
++-query=
+  +-GraphTableScan
+    +-column_list=$graph_table.[dynamic_property1#5, total#4]
+    +-property_graph=aml_dynamic
+    +-input_scan=
+      +-GraphLinearScan
+        +-column_list=$graph_table.[dynamic_property1#5, total#4]
+        +-scan_list=
+          +-GraphLinearScan
+            +-column_list=$graph_table.[dynamic_property1#5, total#4]
+            +-scan_list=
+              +-GraphScan
+              | +-column_list=$element_table.[$element1#1, n#2, $element2#3]
+              | +-input_scan_list=
+              | | +-GraphPathScan
+              | |   +-column_list=$element_table.[$element1#1, n#2, $element2#3]
+              | |   +-input_scan_list=
+              | |   | +-GraphNodeScan
+              | |   | | +-column_list=[$element_table.$element1#1]
+              | |   | | +-label_expr=
+              | |   | | | +-GraphLabelNaryExpr
+              | |   | | |   +-op=OR
+              | |   | | |   +-operand_list=
+              | |   | | |     +-GraphWildCardLabel
+              | |   | | |     +-GraphLabelNaryExpr
+              | |   | | |       +-op=NOT
+              | |   | | |       +-operand_list=
+              | |   | | |         +-GraphWildCardLabel
+              | |   | | +-target_element_table_list=[aml_dynamic.DynamicGraphNode]
+              | |   | +-GraphEdgeScan
+              | |   | | +-column_list=[$element_table.n#2]
+              | |   | | +-label_expr=
+              | |   | | | +-GraphLabel
+              | |   | | |   +-label_name=
+              | |   | | |     +-Literal(type=STRING, value="DynamicLabel1", has_explicit_type=TRUE)
+              | |   | | +-target_element_table_list=[aml_dynamic.DynamicGraphEdge]
+              | |   | | +-orientation=RIGHT
+              | |   | +-GraphNodeScan
+              | |   |   +-column_list=[$element_table.$element2#3]
+              | |   |   +-label_expr=
+              | |   |   | +-GraphLabelNaryExpr
+              | |   |   |   +-op=OR
+              | |   |   |   +-operand_list=
+              | |   |   |     +-GraphWildCardLabel
+              | |   |   |     +-GraphLabelNaryExpr
+              | |   |   |       +-op=NOT
+              | |   |   |       +-operand_list=
+              | |   |   |         +-GraphWildCardLabel
+              | |   |   +-target_element_table_list=[aml_dynamic.DynamicGraphNode]
+              | |   +-head=$element_table.$element1#1
+              | |   +-tail=$element_table.$element2#3
+              | +-input_scan=
+              |   +-SingleRowScan
+              +-ProjectScan
+                +-column_list=$graph_table.[dynamic_property1#5, total#4]
+                +-input_scan=
+                  +-AggregateScan
+                    +-column_list=$graph_table.[dynamic_property1#5, total#4]
+                    +-input_scan=
+                    | +-GraphRefScan(column_list=$element_table.[$element1#1, n#2, $element2#3])
+                    +-group_by_list=
+                    | +-dynamic_property1#5 :=
+                    |   +-GraphGetElementProperty
+                    |     +-type=JSON
+                    |     +-expr=
+                    |     | +-ColumnRef(type=GRAPH_EDGE(aml_dynamic)<category STRING, dst_id INT64, edgeJsonProp JSON, edgeLabelCol STRING, id INT64, DYNAMIC>, column=$element_table.n#2)
+                    |     +-property_name=
+                    |       +-Literal(type=STRING, value="dynamic_property1", has_explicit_type=TRUE)
+                    +-aggregate_list=
+                      +-total#4 := AggregateFunctionCall(ZetaSQL:$count_star() -> INT64)
+
+[SQLBUILDER_TARGET_SYNTAX_MODE standard]
+[SQLBUILDER_OUTPUT]
+SELECT
+  graphtablescan_7.a_5 AS dynamic_property1,
+  graphtablescan_7.a_6 AS total
+FROM
+  (
+    SELECT
+      aml_dynamic_1.a_6 AS a_6,
+      aml_dynamic_1.a_5 AS a_5
+    FROM
+      GRAPH_TABLE(
+        aml_dynamic
+        MATCH
+          (a_2
+          IS (% | ! %))
+          -[a_3
+          IS DynamicLabel1]->
+          (a_4
+          IS (% | ! %))
+        RETURN
+          a_3.dynamic_property1 AS a_5,
+          COUNT(*) AS a_6
+        GROUP BY a_5
+      ) AS aml_dynamic_1
+  ) AS graphtablescan_7;
+
+[SQLBUILDER_TARGET_SYNTAX_MODE pipe]
+[SQLBUILDER_OUTPUT]
+FROM
+  GRAPH_TABLE(
+    aml_dynamic
+    MATCH
+      (a_2
+      IS (% | ! %))
+      -[a_3
+      IS DynamicLabel1]->
+      (a_4
+      IS (% | ! %))
+    RETURN
+      a_3.dynamic_property1 AS a_5,
+      COUNT(*) AS a_6
+    GROUP BY a_5
+  ) AS aml_dynamic_1
+|> SELECT
+     aml_dynamic_1.a_6 AS a_6,
+     aml_dynamic_1.a_5 AS a_5
+|> AS graphtablescan_7
+|> SELECT
+     graphtablescan_7.a_5 AS dynamic_property1,
+     graphtablescan_7.a_6 AS total;
 ==
 
 # Order by dynamic property. Regression test for b/408015891.
@@ -5636,21 +5849,451 @@ RETURN n.dynamic_property1
 {{|GROUP BY n.dynamic_property1}}
 ORDER BY n.dynamic_property1
 --
-ALTERNATION GROUPS:
-    (n:DynamicLabel1),
-    -[n:DynamicLabel1]->,
+ALTERNATION GROUP: (n:DynamicLabel1),
 --
-ERROR: ORDER BY does not support expressions of type JSON [at 5:10]
-ORDER BY n.dynamic_property1
-         ^
+QueryStmt
++-output_column_list=
+| +-$graph_table.dynamic_property1#2 AS dynamic_property1 [JSON]
++-query=
+  +-GraphTableScan
+    +-column_list=[$graph_table.dynamic_property1#2]
+    +-property_graph=aml_dynamic
+    +-input_scan=
+      +-GraphLinearScan
+        +-column_list=[$graph_table.dynamic_property1#2]
+        +-scan_list=
+          +-GraphLinearScan
+            +-column_list=[$graph_table.dynamic_property1#2]
+            +-scan_list=
+              +-GraphScan
+              | +-column_list=[$element_table.n#1]
+              | +-input_scan_list=
+              | | +-GraphPathScan
+              | |   +-column_list=[$element_table.n#1]
+              | |   +-input_scan_list=
+              | |   | +-GraphNodeScan
+              | |   |   +-column_list=[$element_table.n#1]
+              | |   |   +-label_expr=
+              | |   |   | +-GraphLabel
+              | |   |   |   +-label_name=
+              | |   |   |     +-Literal(type=STRING, value="DynamicLabel1", has_explicit_type=TRUE)
+              | |   |   +-target_element_table_list=[aml_dynamic.DynamicGraphNode]
+              | |   +-head=$element_table.n#1
+              | |   +-tail=$element_table.n#1
+              | +-input_scan=
+              |   +-SingleRowScan
+              +-OrderByScan
+                +-column_list=[$graph_table.dynamic_property1#2]
+                +-is_ordered=TRUE
+                +-input_scan=
+                | +-ProjectScan
+                |   +-column_list=[$element_table.n#1, $graph_table.dynamic_property1#2, $orderby.$orderbycol1#3]
+                |   +-expr_list=
+                |   | +-$orderbycol1#3 :=
+                |   |   +-GraphGetElementProperty
+                |   |     +-type=JSON
+                |   |     +-expr=
+                |   |     | +-ColumnRef(type=GRAPH_NODE(aml_dynamic)<code INT64, id INT64, nodeJsonProp JSON, nodeLabelCol STRING, DYNAMIC>, column=$element_table.n#1)
+                |   |     +-property_name=
+                |   |       +-Literal(type=STRING, value="dynamic_property1", has_explicit_type=TRUE)
+                |   +-input_scan=
+                |     +-ProjectScan
+                |       +-column_list=[$element_table.n#1, $graph_table.dynamic_property1#2]
+                |       +-expr_list=
+                |       | +-dynamic_property1#2 :=
+                |       |   +-GraphGetElementProperty
+                |       |     +-type=JSON
+                |       |     +-expr=
+                |       |     | +-ColumnRef(type=GRAPH_NODE(aml_dynamic)<code INT64, id INT64, nodeJsonProp JSON, nodeLabelCol STRING, DYNAMIC>, column=$element_table.n#1)
+                |       |     +-property_name=
+                |       |       +-Literal(type=STRING, value="dynamic_property1", has_explicit_type=TRUE)
+                |       +-input_scan=
+                |         +-GraphRefScan(column_list=[$element_table.n#1])
+                +-order_by_item_list=
+                  +-OrderByItem
+                    +-column_ref=
+                      +-ColumnRef(type=JSON, column=$orderby.$orderbycol1#3)
+
+[SQLBUILDER_TARGET_SYNTAX_MODE standard]
+[SQLBUILDER_OUTPUT]
+SELECT
+  aml_dynamic_1.a_3 AS dynamic_property1
+FROM
+  GRAPH_TABLE(
+    aml_dynamic
+    MATCH
+      (a_2
+      IS DynamicLabel1)
+    RETURN
+      a_2.dynamic_property1 AS a_3
+    ORDER BY a_2.dynamic_property1
+  ) AS aml_dynamic_1;
+
+[SQLBUILDER_TARGET_SYNTAX_MODE pipe]
+[SQLBUILDER_OUTPUT]
+FROM
+  GRAPH_TABLE(
+    aml_dynamic
+    MATCH
+      (a_2
+      IS DynamicLabel1)
+    RETURN
+      a_2.dynamic_property1 AS a_3
+    ORDER BY a_2.dynamic_property1
+  ) AS aml_dynamic_1
+|> SELECT
+     aml_dynamic_1.a_3 AS dynamic_property1;
 --
-ALTERNATION GROUPS:
-    (n:DynamicLabel1),GROUP BY n.dynamic_property1
-    -[n:DynamicLabel1]->,GROUP BY n.dynamic_property1
+ALTERNATION GROUP: (n:DynamicLabel1),GROUP BY n.dynamic_property1
 --
-ERROR: Grouping by expressions of type JSON is not allowed [at 4:10]
-GROUP BY n.dynamic_property1
-         ^
+QueryStmt
++-output_column_list=
+| +-$graph_table.dynamic_property1#3 AS dynamic_property1 [JSON]
++-query=
+  +-GraphTableScan
+    +-column_list=[$graph_table.dynamic_property1#3]
+    +-property_graph=aml_dynamic
+    +-input_scan=
+      +-GraphLinearScan
+        +-column_list=[$graph_table.dynamic_property1#3]
+        +-scan_list=
+          +-GraphLinearScan
+            +-column_list=[$graph_table.dynamic_property1#3]
+            +-scan_list=
+              +-GraphScan
+              | +-column_list=[$element_table.n#1]
+              | +-input_scan_list=
+              | | +-GraphPathScan
+              | |   +-column_list=[$element_table.n#1]
+              | |   +-input_scan_list=
+              | |   | +-GraphNodeScan
+              | |   |   +-column_list=[$element_table.n#1]
+              | |   |   +-label_expr=
+              | |   |   | +-GraphLabel
+              | |   |   |   +-label_name=
+              | |   |   |     +-Literal(type=STRING, value="DynamicLabel1", has_explicit_type=TRUE)
+              | |   |   +-target_element_table_list=[aml_dynamic.DynamicGraphNode]
+              | |   +-head=$element_table.n#1
+              | |   +-tail=$element_table.n#1
+              | +-input_scan=
+              |   +-SingleRowScan
+              +-OrderByScan
+                +-column_list=[$graph_table.dynamic_property1#3]
+                +-is_ordered=TRUE
+                +-input_scan=
+                | +-AggregateScan
+                |   +-column_list=[$graph_table.dynamic_property1#3]
+                |   +-input_scan=
+                |   | +-ProjectScan
+                |   |   +-column_list=[$element_table.n#1, $pre_groupby.dynamic_property1#2]
+                |   |   +-expr_list=
+                |   |   | +-dynamic_property1#2 :=
+                |   |   |   +-GraphGetElementProperty
+                |   |   |     +-type=JSON
+                |   |   |     +-expr=
+                |   |   |     | +-ColumnRef(type=GRAPH_NODE(aml_dynamic)<code INT64, id INT64, nodeJsonProp JSON, nodeLabelCol STRING, DYNAMIC>, column=$element_table.n#1)
+                |   |   |     +-property_name=
+                |   |   |       +-Literal(type=STRING, value="dynamic_property1", has_explicit_type=TRUE)
+                |   |   +-input_scan=
+                |   |     +-GraphRefScan(column_list=[$element_table.n#1])
+                |   +-group_by_list=
+                |     +-dynamic_property1#3 :=
+                |       +-GraphGetElementProperty
+                |         +-type=JSON
+                |         +-expr=
+                |         | +-ColumnRef(type=GRAPH_NODE(aml_dynamic)<code INT64, id INT64, nodeJsonProp JSON, nodeLabelCol STRING, DYNAMIC>, column=$element_table.n#1)
+                |         +-property_name=
+                |           +-Literal(type=STRING, value="dynamic_property1", has_explicit_type=TRUE)
+                +-order_by_item_list=
+                  +-OrderByItem
+                    +-column_ref=
+                      +-ColumnRef(type=JSON, column=$graph_table.dynamic_property1#3)
+
+[SQLBUILDER_TARGET_SYNTAX_MODE standard]
+[SQLBUILDER_OUTPUT]
+SELECT
+  aml_dynamic_1.a_3 AS dynamic_property1
+FROM
+  GRAPH_TABLE(
+    aml_dynamic
+    MATCH
+      (a_2
+      IS DynamicLabel1)
+    RETURN DISTINCT
+      a_2.dynamic_property1 AS a_3
+    ORDER BY a_3
+  ) AS aml_dynamic_1;
+
+[SQLBUILDER_TARGET_SYNTAX_MODE pipe]
+[SQLBUILDER_OUTPUT]
+FROM
+  GRAPH_TABLE(
+    aml_dynamic
+    MATCH
+      (a_2
+      IS DynamicLabel1)
+    RETURN DISTINCT
+      a_2.dynamic_property1 AS a_3
+    ORDER BY a_3
+  ) AS aml_dynamic_1
+|> SELECT
+     aml_dynamic_1.a_3 AS dynamic_property1;
+--
+ALTERNATION GROUP: -[n:DynamicLabel1]->,
+--
+QueryStmt
++-output_column_list=
+| +-$graph_table.dynamic_property1#4 AS dynamic_property1 [JSON]
++-query=
+  +-GraphTableScan
+    +-column_list=[$graph_table.dynamic_property1#4]
+    +-property_graph=aml_dynamic
+    +-input_scan=
+      +-GraphLinearScan
+        +-column_list=[$graph_table.dynamic_property1#4]
+        +-scan_list=
+          +-GraphLinearScan
+            +-column_list=[$graph_table.dynamic_property1#4]
+            +-scan_list=
+              +-GraphScan
+              | +-column_list=$element_table.[$element1#1, n#2, $element2#3]
+              | +-input_scan_list=
+              | | +-GraphPathScan
+              | |   +-column_list=$element_table.[$element1#1, n#2, $element2#3]
+              | |   +-input_scan_list=
+              | |   | +-GraphNodeScan
+              | |   | | +-column_list=[$element_table.$element1#1]
+              | |   | | +-label_expr=
+              | |   | | | +-GraphLabelNaryExpr
+              | |   | | |   +-op=OR
+              | |   | | |   +-operand_list=
+              | |   | | |     +-GraphWildCardLabel
+              | |   | | |     +-GraphLabelNaryExpr
+              | |   | | |       +-op=NOT
+              | |   | | |       +-operand_list=
+              | |   | | |         +-GraphWildCardLabel
+              | |   | | +-target_element_table_list=[aml_dynamic.DynamicGraphNode]
+              | |   | +-GraphEdgeScan
+              | |   | | +-column_list=[$element_table.n#2]
+              | |   | | +-label_expr=
+              | |   | | | +-GraphLabel
+              | |   | | |   +-label_name=
+              | |   | | |     +-Literal(type=STRING, value="DynamicLabel1", has_explicit_type=TRUE)
+              | |   | | +-target_element_table_list=[aml_dynamic.DynamicGraphEdge]
+              | |   | | +-orientation=RIGHT
+              | |   | +-GraphNodeScan
+              | |   |   +-column_list=[$element_table.$element2#3]
+              | |   |   +-label_expr=
+              | |   |   | +-GraphLabelNaryExpr
+              | |   |   |   +-op=OR
+              | |   |   |   +-operand_list=
+              | |   |   |     +-GraphWildCardLabel
+              | |   |   |     +-GraphLabelNaryExpr
+              | |   |   |       +-op=NOT
+              | |   |   |       +-operand_list=
+              | |   |   |         +-GraphWildCardLabel
+              | |   |   +-target_element_table_list=[aml_dynamic.DynamicGraphNode]
+              | |   +-head=$element_table.$element1#1
+              | |   +-tail=$element_table.$element2#3
+              | +-input_scan=
+              |   +-SingleRowScan
+              +-OrderByScan
+                +-column_list=[$graph_table.dynamic_property1#4]
+                +-is_ordered=TRUE
+                +-input_scan=
+                | +-ProjectScan
+                |   +-column_list=[$element_table.$element1#1, $element_table.n#2, $element_table.$element2#3, $graph_table.dynamic_property1#4, $orderby.$orderbycol1#5]
+                |   +-expr_list=
+                |   | +-$orderbycol1#5 :=
+                |   |   +-GraphGetElementProperty
+                |   |     +-type=JSON
+                |   |     +-expr=
+                |   |     | +-ColumnRef(type=GRAPH_EDGE(aml_dynamic)<category STRING, dst_id INT64, edgeJsonProp JSON, edgeLabelCol STRING, id INT64, DYNAMIC>, column=$element_table.n#2)
+                |   |     +-property_name=
+                |   |       +-Literal(type=STRING, value="dynamic_property1", has_explicit_type=TRUE)
+                |   +-input_scan=
+                |     +-ProjectScan
+                |       +-column_list=[$element_table.$element1#1, $element_table.n#2, $element_table.$element2#3, $graph_table.dynamic_property1#4]
+                |       +-expr_list=
+                |       | +-dynamic_property1#4 :=
+                |       |   +-GraphGetElementProperty
+                |       |     +-type=JSON
+                |       |     +-expr=
+                |       |     | +-ColumnRef(type=GRAPH_EDGE(aml_dynamic)<category STRING, dst_id INT64, edgeJsonProp JSON, edgeLabelCol STRING, id INT64, DYNAMIC>, column=$element_table.n#2)
+                |       |     +-property_name=
+                |       |       +-Literal(type=STRING, value="dynamic_property1", has_explicit_type=TRUE)
+                |       +-input_scan=
+                |         +-GraphRefScan(column_list=$element_table.[$element1#1, n#2, $element2#3])
+                +-order_by_item_list=
+                  +-OrderByItem
+                    +-column_ref=
+                      +-ColumnRef(type=JSON, column=$orderby.$orderbycol1#5)
+
+[SQLBUILDER_TARGET_SYNTAX_MODE standard]
+[SQLBUILDER_OUTPUT]
+SELECT
+  aml_dynamic_1.a_5 AS dynamic_property1
+FROM
+  GRAPH_TABLE(
+    aml_dynamic
+    MATCH
+      (a_2
+      IS (% | ! %))
+      -[a_3
+      IS DynamicLabel1]->
+      (a_4
+      IS (% | ! %))
+    RETURN
+      a_3.dynamic_property1 AS a_5
+    ORDER BY a_3.dynamic_property1
+  ) AS aml_dynamic_1;
+
+[SQLBUILDER_TARGET_SYNTAX_MODE pipe]
+[SQLBUILDER_OUTPUT]
+FROM
+  GRAPH_TABLE(
+    aml_dynamic
+    MATCH
+      (a_2
+      IS (% | ! %))
+      -[a_3
+      IS DynamicLabel1]->
+      (a_4
+      IS (% | ! %))
+    RETURN
+      a_3.dynamic_property1 AS a_5
+    ORDER BY a_3.dynamic_property1
+  ) AS aml_dynamic_1
+|> SELECT
+     aml_dynamic_1.a_5 AS dynamic_property1;
+--
+ALTERNATION GROUP: -[n:DynamicLabel1]->,GROUP BY n.dynamic_property1
+--
+QueryStmt
++-output_column_list=
+| +-$graph_table.dynamic_property1#5 AS dynamic_property1 [JSON]
++-query=
+  +-GraphTableScan
+    +-column_list=[$graph_table.dynamic_property1#5]
+    +-property_graph=aml_dynamic
+    +-input_scan=
+      +-GraphLinearScan
+        +-column_list=[$graph_table.dynamic_property1#5]
+        +-scan_list=
+          +-GraphLinearScan
+            +-column_list=[$graph_table.dynamic_property1#5]
+            +-scan_list=
+              +-GraphScan
+              | +-column_list=$element_table.[$element1#1, n#2, $element2#3]
+              | +-input_scan_list=
+              | | +-GraphPathScan
+              | |   +-column_list=$element_table.[$element1#1, n#2, $element2#3]
+              | |   +-input_scan_list=
+              | |   | +-GraphNodeScan
+              | |   | | +-column_list=[$element_table.$element1#1]
+              | |   | | +-label_expr=
+              | |   | | | +-GraphLabelNaryExpr
+              | |   | | |   +-op=OR
+              | |   | | |   +-operand_list=
+              | |   | | |     +-GraphWildCardLabel
+              | |   | | |     +-GraphLabelNaryExpr
+              | |   | | |       +-op=NOT
+              | |   | | |       +-operand_list=
+              | |   | | |         +-GraphWildCardLabel
+              | |   | | +-target_element_table_list=[aml_dynamic.DynamicGraphNode]
+              | |   | +-GraphEdgeScan
+              | |   | | +-column_list=[$element_table.n#2]
+              | |   | | +-label_expr=
+              | |   | | | +-GraphLabel
+              | |   | | |   +-label_name=
+              | |   | | |     +-Literal(type=STRING, value="DynamicLabel1", has_explicit_type=TRUE)
+              | |   | | +-target_element_table_list=[aml_dynamic.DynamicGraphEdge]
+              | |   | | +-orientation=RIGHT
+              | |   | +-GraphNodeScan
+              | |   |   +-column_list=[$element_table.$element2#3]
+              | |   |   +-label_expr=
+              | |   |   | +-GraphLabelNaryExpr
+              | |   |   |   +-op=OR
+              | |   |   |   +-operand_list=
+              | |   |   |     +-GraphWildCardLabel
+              | |   |   |     +-GraphLabelNaryExpr
+              | |   |   |       +-op=NOT
+              | |   |   |       +-operand_list=
+              | |   |   |         +-GraphWildCardLabel
+              | |   |   +-target_element_table_list=[aml_dynamic.DynamicGraphNode]
+              | |   +-head=$element_table.$element1#1
+              | |   +-tail=$element_table.$element2#3
+              | +-input_scan=
+              |   +-SingleRowScan
+              +-OrderByScan
+                +-column_list=[$graph_table.dynamic_property1#5]
+                +-is_ordered=TRUE
+                +-input_scan=
+                | +-AggregateScan
+                |   +-column_list=[$graph_table.dynamic_property1#5]
+                |   +-input_scan=
+                |   | +-ProjectScan
+                |   |   +-column_list=[$element_table.$element1#1, $element_table.n#2, $element_table.$element2#3, $pre_groupby.dynamic_property1#4]
+                |   |   +-expr_list=
+                |   |   | +-dynamic_property1#4 :=
+                |   |   |   +-GraphGetElementProperty
+                |   |   |     +-type=JSON
+                |   |   |     +-expr=
+                |   |   |     | +-ColumnRef(type=GRAPH_EDGE(aml_dynamic)<category STRING, dst_id INT64, edgeJsonProp JSON, edgeLabelCol STRING, id INT64, DYNAMIC>, column=$element_table.n#2)
+                |   |   |     +-property_name=
+                |   |   |       +-Literal(type=STRING, value="dynamic_property1", has_explicit_type=TRUE)
+                |   |   +-input_scan=
+                |   |     +-GraphRefScan(column_list=$element_table.[$element1#1, n#2, $element2#3])
+                |   +-group_by_list=
+                |     +-dynamic_property1#5 :=
+                |       +-GraphGetElementProperty
+                |         +-type=JSON
+                |         +-expr=
+                |         | +-ColumnRef(type=GRAPH_EDGE(aml_dynamic)<category STRING, dst_id INT64, edgeJsonProp JSON, edgeLabelCol STRING, id INT64, DYNAMIC>, column=$element_table.n#2)
+                |         +-property_name=
+                |           +-Literal(type=STRING, value="dynamic_property1", has_explicit_type=TRUE)
+                +-order_by_item_list=
+                  +-OrderByItem
+                    +-column_ref=
+                      +-ColumnRef(type=JSON, column=$graph_table.dynamic_property1#5)
+
+[SQLBUILDER_TARGET_SYNTAX_MODE standard]
+[SQLBUILDER_OUTPUT]
+SELECT
+  aml_dynamic_1.a_5 AS dynamic_property1
+FROM
+  GRAPH_TABLE(
+    aml_dynamic
+    MATCH
+      (a_2
+      IS (% | ! %))
+      -[a_3
+      IS DynamicLabel1]->
+      (a_4
+      IS (% | ! %))
+    RETURN DISTINCT
+      a_3.dynamic_property1 AS a_5
+    ORDER BY a_5
+  ) AS aml_dynamic_1;
+
+[SQLBUILDER_TARGET_SYNTAX_MODE pipe]
+[SQLBUILDER_OUTPUT]
+FROM
+  GRAPH_TABLE(
+    aml_dynamic
+    MATCH
+      (a_2
+      IS (% | ! %))
+      -[a_3
+      IS DynamicLabel1]->
+      (a_4
+      IS (% | ! %))
+    RETURN DISTINCT
+      a_3.dynamic_property1 AS a_5
+    ORDER BY a_5
+  ) AS aml_dynamic_1
+|> SELECT
+     aml_dynamic_1.a_5 AS dynamic_property1;
 ==
 
 # Dynamic property specification in a dynamic element table with an unexpected
@@ -8808,9 +9451,123 @@ SELECT gt.* FROM GRAPH_TABLE(
 ) gt
 --
 
-ERROR: Column dynamic_property of type JSON cannot be used in RETURN DISTINCT [at 4:19]
-  RETURN DISTINCT n.dynamic_property
-                  ^
+QueryStmt
++-output_column_list=
+| +-$graph_table.dynamic_property#5 AS dynamic_property [JSON]
++-query=
+  +-ProjectScan
+    +-column_list=[$graph_table.dynamic_property#5]
+    +-input_scan=
+      +-GraphTableScan
+        +-column_list=[$graph_table.dynamic_property#5]
+        +-property_graph=aml_dynamic
+        +-input_scan=
+          +-GraphLinearScan
+            +-column_list=[$graph_table.dynamic_property#5]
+            +-scan_list=
+              +-GraphLinearScan
+                +-column_list=[$graph_table.dynamic_property#5]
+                +-scan_list=
+                  +-GraphScan
+                  | +-column_list=$element_table.[n#1, e#2, $element1#3]
+                  | +-input_scan_list=
+                  | | +-GraphPathScan
+                  | |   +-column_list=$element_table.[n#1, e#2, $element1#3]
+                  | |   +-input_scan_list=
+                  | |   | +-GraphNodeScan
+                  | |   | | +-column_list=[$element_table.n#1]
+                  | |   | | +-label_expr=
+                  | |   | | | +-GraphLabelNaryExpr
+                  | |   | | |   +-op=OR
+                  | |   | | |   +-operand_list=
+                  | |   | | |     +-GraphWildCardLabel
+                  | |   | | |     +-GraphLabelNaryExpr
+                  | |   | | |       +-op=NOT
+                  | |   | | |       +-operand_list=
+                  | |   | | |         +-GraphWildCardLabel
+                  | |   | | +-target_element_table_list=[aml_dynamic.DynamicGraphNode]
+                  | |   | +-GraphEdgeScan
+                  | |   | | +-column_list=[$element_table.e#2]
+                  | |   | | +-label_expr=
+                  | |   | | | +-GraphLabelNaryExpr
+                  | |   | | |   +-op=OR
+                  | |   | | |   +-operand_list=
+                  | |   | | |     +-GraphWildCardLabel
+                  | |   | | |     +-GraphLabelNaryExpr
+                  | |   | | |       +-op=NOT
+                  | |   | | |       +-operand_list=
+                  | |   | | |         +-GraphWildCardLabel
+                  | |   | | +-target_element_table_list=[aml_dynamic.DynamicGraphEdge]
+                  | |   | | +-orientation=RIGHT
+                  | |   | +-GraphNodeScan
+                  | |   |   +-column_list=[$element_table.$element1#3]
+                  | |   |   +-label_expr=
+                  | |   |   | +-GraphLabelNaryExpr
+                  | |   |   |   +-op=OR
+                  | |   |   |   +-operand_list=
+                  | |   |   |     +-GraphWildCardLabel
+                  | |   |   |     +-GraphLabelNaryExpr
+                  | |   |   |       +-op=NOT
+                  | |   |   |       +-operand_list=
+                  | |   |   |         +-GraphWildCardLabel
+                  | |   |   +-target_element_table_list=[aml_dynamic.DynamicGraphNode]
+                  | |   +-head=$element_table.n#1
+                  | |   +-tail=$element_table.$element1#3
+                  | +-input_scan=
+                  |   +-SingleRowScan
+                  +-AggregateScan
+                    +-column_list=[$graph_table.dynamic_property#5]
+                    +-input_scan=
+                    | +-ProjectScan
+                    |   +-column_list=[$element_table.n#1, $element_table.e#2, $element_table.$element1#3, $graph_table.dynamic_property#4]
+                    |   +-expr_list=
+                    |   | +-dynamic_property#4 :=
+                    |   |   +-GraphGetElementProperty
+                    |   |     +-type=JSON
+                    |   |     +-expr=
+                    |   |     | +-ColumnRef(type=GRAPH_NODE(aml_dynamic)<code INT64, id INT64, nodeJsonProp JSON, nodeLabelCol STRING, DYNAMIC>, column=$element_table.n#1)
+                    |   |     +-property_name=
+                    |   |       +-Literal(type=STRING, value="dynamic_property", has_explicit_type=TRUE)
+                    |   +-input_scan=
+                    |     +-GraphRefScan(column_list=$element_table.[n#1, e#2, $element1#3])
+                    +-group_by_list=
+                      +-dynamic_property#5 := ColumnRef(type=JSON, column=$graph_table.dynamic_property#4)
+
+[SQLBUILDER_TARGET_SYNTAX_MODE standard]
+[SQLBUILDER_OUTPUT]
+SELECT
+  aml_dynamic_1.a_5 AS dynamic_property
+FROM
+  GRAPH_TABLE(
+    aml_dynamic
+    MATCH
+      (a_2
+      IS (% | ! %))
+      -[a_3
+      IS (% | ! %)]->
+      (a_4
+      IS (% | ! %))
+    RETURN DISTINCT
+      a_2.dynamic_property AS a_5
+  ) AS aml_dynamic_1;
+
+[SQLBUILDER_TARGET_SYNTAX_MODE pipe]
+[SQLBUILDER_OUTPUT]
+FROM
+  GRAPH_TABLE(
+    aml_dynamic
+    MATCH
+      (a_2
+      IS (% | ! %))
+      -[a_3
+      IS (% | ! %)]->
+      (a_4
+      IS (% | ! %))
+    RETURN DISTINCT
+      a_2.dynamic_property AS a_5
+  ) AS aml_dynamic_1
+|> SELECT
+     aml_dynamic_1.a_5 AS dynamic_property;
 ==
 
 [language_features=NONE,+SQL_GRAPH,+SQL_GRAPH_ADVANCED_QUERY,+SQL_GRAPH_DYNAMIC_ELEMENT_TYPE,+SQL_GRAPH_DYNAMIC_LABEL_PROPERTIES_IN_DDL,+SQL_GRAPH_RETURN_EXTENSIONS]

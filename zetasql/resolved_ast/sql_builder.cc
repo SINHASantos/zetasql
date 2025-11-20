@@ -326,7 +326,6 @@ bool IsScanUnsupportedInPipeSyntax(const ResolvedScan* node) {
   switch (node->node_kind()) {
     case RESOLVED_ANONYMIZED_AGGREGATE_SCAN:
     case RESOLVED_AGGREGATION_THRESHOLD_AGGREGATE_SCAN:
-    case RESOLVED_DIFFERENTIAL_PRIVACY_AGGREGATE_SCAN:
       return true;
     case RESOLVED_AGGREGATE_SCAN: {
       // Since Pipe SQL syntax does not support SELECT WITH GROUP ROWS, if the
@@ -3192,7 +3191,7 @@ bool SQLBuilder::IsDegenerateProjectScan(
   // Otherwise, the select list is overwritten with the output columns, and that
   // causes a bad query to be output if there are duplicate column names.
   if (IsPipeSyntaxTargetMode() &&
-      node->input_scan()->node_kind() == RESOLVED_AGGREGATE_SCAN &&
+      node->input_scan()->Is<ResolvedAggregateScanBase>() &&
       query_expression->HasAnyGroupByColumn()) {
     return false;
   }
@@ -3263,7 +3262,7 @@ absl::Status SQLBuilder::VisitResolvedProjectScan(
   // `select count(*) from table`, the following condition become true, and we
   // capture that information in the query_expression so that it can be used
   // to output correct SQL in Pipe syntax mode.
-  if (node->input_scan()->node_kind() == RESOLVED_AGGREGATE_SCAN &&
+  if (node->input_scan()->Is<ResolvedAggregateScanBase>() &&
       scans_to_collapse_.contains(node->input_scan()) && !has_group_by_clause &&
       query_expression->HasSelectClause()) {
     ZETASQL_RETURN_IF_ERROR(query_expression->SetGroupByOnlyAggregateColumns(true));
@@ -3378,6 +3377,11 @@ absl::StatusOr<std::string> SQLBuilder::ProcessResolvedTVFScan(
       ZETASQL_RET_CHECK(!seen_first_graph_arg)
           << "There can only be one implicit graph argument.";
       seen_first_graph_arg = true;
+      // This is unused but we need to have an argument for later argument
+      // handling.
+      const std::string graph_alias =
+          ToIdentifierLiteral(argument->graph()->Name());
+      argument_list.push_back(absl::StrCat("GRAPH ", graph_alias));
       continue;
     }
 
@@ -3523,6 +3527,12 @@ absl::StatusOr<std::string> SQLBuilder::ProcessResolvedTVFScan(
     absl::AsciiStrToUpper(&name);
   }
 
+  if (!argument_list.empty() && build_mode == TVFBuildMode::kGqlExplicit &&
+      node->argument_list(0)->graph() != nullptr) {
+    // For GQL CALL, the first argument is the implicit graph argument, which we
+    // don't print.
+    argument_list.erase(argument_list.begin());
+  }
   if (IsPipeSyntaxTargetMode() && !argument_list.empty() &&
       is_first_arg_query && build_mode == TVFBuildMode::kSql) {
     std::string first_arg = std::move(argument_list[0]);

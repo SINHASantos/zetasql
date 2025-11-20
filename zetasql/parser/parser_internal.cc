@@ -343,7 +343,6 @@ static absl::Status GenerateImprovedBisonSyntaxError(
   auto normalize_token = [](Token token) {
     static const auto* const kNormalized =
         new absl::flat_hash_map<Token, Token>{
-            {Token::KW_WITH_STARTING_WITH_GROUP_ROWS, Token::KW_WITH},
             {Token::KW_WITH_STARTING_WITH_EXPRESSION, Token::KW_WITH},
             {Token::KW_EXCEPT_IN_SET_OP, Token::KW_EXCEPT},
             {Token::KW_FOR_BEFORE_LOCK_MODE, Token::KW_FOR},

@@ -82,7 +82,7 @@ QueryStmt
     |       a -> INT64 ($unpivot.a#3)
     |       b -> STRING ($unpivot.b#4)
     |     Range variables:
-    |       unpivot -> RANGE_VARIABLE<Value,a,b>
+    |       unpivot -> RANGE_VARIABLE<Value#5,a#3,b#4>
     |   """
     +-input_scan=
       +-UnpivotScan

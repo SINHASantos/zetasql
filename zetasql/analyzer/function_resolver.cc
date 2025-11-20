@@ -1005,7 +1005,7 @@ FunctionResolver::FindMatchingSignature(
     if ((best_result_signature == nullptr) ||
         (signature_match_result.IsCloserMatchThan(best_result))) {
       best_result_signature = std::move(result_concrete_signature);
-      best_result = signature_match_result;
+      best_result = std::move(signature_match_result);
       if (!sig_arg_overrides.empty()) {
         ZETASQL_RET_CHECK(arg_overrides != nullptr)
             << "Function call has lambdas but nowhere to put them";
@@ -2093,8 +2093,8 @@ absl::Status FunctionResolver::ResolveGeneralFunctionCall(
         result_type.status(), ast_location, include_leftmost_child));
     ZETASQL_RET_CHECK(result_type.value() != nullptr);
 
-    std::unique_ptr<FunctionSignature> new_signature(
-        new FunctionSignature(*result_signature));
+    std::unique_ptr<FunctionSignature> new_signature =
+        std::make_unique<FunctionSignature>(*result_signature);
     new_signature->SetConcreteResultType(result_type.value(),
                                          original_result_kind);
 
@@ -2131,8 +2131,8 @@ absl::Status FunctionResolver::ResolveGeneralFunctionCall(
           ast_location, absl::StrCat("Invalid function ", sql_function->Name()),
           resolve_status, analyzer_options.error_message_mode());
     }
-    std::unique_ptr<FunctionSignature> new_signature(
-        new FunctionSignature(*result_signature));
+    std::unique_ptr<FunctionSignature> new_signature =
+        std::make_unique<FunctionSignature>(*result_signature);
     new_signature->SetConcreteResultType(
         function_call_info->GetAs<TemplatedSQLFunctionCall>()->expr()->type(),
         original_result_kind);

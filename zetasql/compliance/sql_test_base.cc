@@ -1167,7 +1167,7 @@ SQLTestBase::Returns(absl::string_view result) {
 }
 
 ::testing::Matcher<const SQLTestBase::TestResults&> SQLTestBase::ToStringIs(
-    const std::string& result) {
+    absl::string_view result) {
   return ::testing::MakeMatcher(new KnownErrorFilter<TestResults>(
       this, absl::OkStatus(), IsTestResultsToString(result)));
 }

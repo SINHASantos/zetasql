@@ -499,14 +499,15 @@ class LazyResolutionFunction {
   // <templated_expression_resume_location> indicates the UDF's SQL function
   // body that gets resolved every time the function is called (because the
   // arguments can be different on each call, the expression must be resolved
-  // for each call).
+  // for each call). <module_details> contains details about the module that
+  // owns this function.
   static absl::StatusOr<std::unique_ptr<LazyResolutionFunction>>
   CreateTemplatedFunction(
       const ParseResumeLocation& parse_resume_location,
       const ParseResumeLocation& templated_expression_resume_location,
       std::unique_ptr<ParserOutput> parser_output, absl::Status function_status,
       ErrorMessageOptions error_message_options,
-      FunctionEnums::Mode function_mode);
+      FunctionEnums::Mode function_mode, ModuleDetails module_details);
 
   LazyResolutionFunction(const LazyResolutionFunction&) = delete;
   LazyResolutionFunction& operator=(const LazyResolutionFunction&) = delete;

@@ -19,8 +19,10 @@
 #include <cstdint>
 #include <limits>
 #include <string>
+#include <utility>
 #include <vector>
 
+#include "zetasql/common/internal_value.h"
 #include "zetasql/public/functions/string.h"
 #include "zetasql/public/numeric_value.h"
 #include "zetasql/public/options.pb.h"
@@ -223,7 +225,20 @@ absl::Status ApplyConstraints(const TypeParameters& type_params,
             ApplyConstraints(type_params.child(0), mode, new_element_value));
         new_elements.push_back(new_element_value);
       }
-      value = Value::Array(value.type()->AsArray(), new_elements);
+      // Preserve orderedness (or lack thereof) of the array.
+      value = InternalValue::ArrayNotChecked(value.type()->AsArray(),
+                                             InternalValue::GetOrderKind(value),
+                                             std::move(new_elements));
+      return absl::OkStatus();
+    }
+    case TYPE_RANGE: {
+      Value new_start_value = value.start();
+      ZETASQL_RETURN_IF_ERROR(
+          ApplyConstraints(type_params.child(0), mode, new_start_value));
+      Value new_end_value = value.end();
+      ZETASQL_RETURN_IF_ERROR(
+          ApplyConstraints(type_params.child(0), mode, new_end_value));
+      ZETASQL_ASSIGN_OR_RETURN(value, Value::MakeRange(new_start_value, new_end_value));
       return absl::OkStatus();
     }
     default:

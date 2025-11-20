@@ -17,6 +17,7 @@
 #include "zetasql/public/input_argument_type.h"
 
 #include <algorithm>
+#include <cstddef>
 #include <memory>
 #include <string>
 #include <utility>
@@ -29,6 +30,7 @@
 #include "zetasql/public/types/type.h"
 #include "zetasql/public/types/type_factory.h"
 #include "zetasql/public/value.h"
+#include "absl/base/no_destructor.h"
 #include "absl/status/status.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_join.h"
@@ -92,9 +94,9 @@ bool InputArgumentType::operator==(const InputArgumentType& rhs) const {
 InputArgumentType::InputArgumentType(const Value& literal_value,
                                      bool is_default_argument_value)
     : type_(literal_value.type()),
-      literal_value_(literal_value),
       category_(kTypedLiteral),
       is_default_argument_value_(is_default_argument_value) {
+  EnsureData().literal_value = literal_value;
   is_literal_for_constness_ = true;
   if (literal_value.type()->IsStruct()) {
     if (literal_value.is_null()) {
@@ -102,11 +104,12 @@ InputArgumentType::InputArgumentType(const Value& literal_value,
       // struct's field types.
       for (const StructType::StructField& struct_field :
            literal_value.type()->AsStruct()->fields()) {
-        field_types_.push_back(InputArgumentType(struct_field.type));
+        EnsureData().field_types.push_back(
+            InputArgumentType(struct_field.type));
       }
     } else {
       for (const Value& field_value : literal_value.fields()) {
-        field_types_.push_back(InputArgumentType(field_value));
+        EnsureData().field_types.push_back(InputArgumentType(field_value));
       }
     }
   }
@@ -123,7 +126,7 @@ InputArgumentType::InputArgumentType(const Type* type, bool is_query_parameter,
          type->AsStruct()->fields()) {
       // The struct itself might be a parameter, but its fields should not
       // coerce like parameters.
-      field_types_.push_back(
+      EnsureData().field_types.push_back(
           InputArgumentType(struct_field.type, false /* is_query_parameter */));
     }
   }
@@ -138,13 +141,57 @@ InputArgumentType::InputArgumentType(absl::StatusOr<Value> constant_value)
     type_ = types::Int64Type();
   } else {
     type_ = constant_value->type();
-    constant_value_ = std::move(constant_value);
+    EnsureData().constant_value = std::move(constant_value);
   }
 }
 
+InputArgumentType::InputArgumentType(const InputArgumentType& other)
+    : type_(other.type_),
+      category_(other.category_),
+      is_default_argument_value_(other.is_default_argument_value_),
+      is_pipe_input_table_(other.is_pipe_input_table_),
+      is_chained_function_call_input_(other.is_chained_function_call_input_),
+      is_literal_for_constness_(other.is_literal_for_constness_) {
+  if (other.data_) {
+    data_ = std::make_unique<Data>(*other.data_);
+  }
+}
+
+InputArgumentType& InputArgumentType::operator=(
+    const InputArgumentType& other) {
+  if (this != &other) {
+    type_ = other.type_;
+    category_ = other.category_;
+    is_default_argument_value_ = other.is_default_argument_value_;
+    is_pipe_input_table_ = other.is_pipe_input_table_;
+    is_chained_function_call_input_ = other.is_chained_function_call_input_;
+    is_literal_for_constness_ = other.is_literal_for_constness_;
+    if (other.data_) {
+      data_ = std::make_unique<Data>(*other.data_);
+    } else {
+      data_.reset();
+    }
+  }
+  return *this;
+}
+
+const std::vector<InputArgumentType>& InputArgumentType::field_types() const {
+  return ReadOnlyData().field_types;
+}
+
+size_t InputArgumentType::field_types_size() const {
+  return ReadOnlyData().field_types.size();
+}
+
+const InputArgumentType& InputArgumentType::field_type(int i) const {
+  ABSL_DCHECK(data_ != nullptr && data_->field_types.size() > i);
+  return ReadOnlyData().field_types.at(i);
+}
+
 absl::StatusOr<Value> InputArgumentType::GetAnalysisTimeConstantValue() const {
-  ZETASQL_RET_CHECK(constant_value_.has_value()) << "constant value is not set";
-  return *constant_value_;
+  ZETASQL_RET_CHECK(ReadOnlyData().constant_value.has_value())
+      << "constant value is not set";
+  return *ReadOnlyData().constant_value;
 }
 
 std::string InputArgumentType::UserFacingName(ProductMode product_mode) const {
@@ -210,8 +257,8 @@ std::string InputArgumentType::DebugString(bool verbose) const {
   }
 
   std::string prefix;
-  if (literal_value_.has_value()) {
-    if (literal_value_.value().is_null()) {
+  if (ReadOnlyData().literal_value.has_value()) {
+    if (ReadOnlyData().literal_value.value().is_null()) {
       absl::StrAppend(&prefix, "null ");
     } else if (type()->IsSimpleType()) {
       absl::StrAppend(&prefix, "literal ");
@@ -272,7 +319,8 @@ InputArgumentType InputArgumentType::RelationInputArgumentType(
     const TVFRelation& relation_input_schema, bool is_pipe_input_table) {
   InputArgumentType type;
   type.category_ = kRelation;
-  type.relation_input_schema_.reset(new TVFRelation(relation_input_schema));
+  type.EnsureData().relation_input_schema.reset(
+      new TVFRelation(relation_input_schema));
   type.is_pipe_input_table_ = is_pipe_input_table;
   return type;
 }
@@ -281,7 +329,7 @@ InputArgumentType InputArgumentType::ModelInputArgumentType(
     const TVFModelArgument& model_arg) {
   InputArgumentType type;
   type.category_ = kModel;
-  type.model_arg_.reset(new TVFModelArgument(model_arg));
+  type.EnsureData().model_arg.reset(new TVFModelArgument(model_arg));
   return type;
 }
 
@@ -289,7 +337,8 @@ InputArgumentType InputArgumentType::ConnectionInputArgumentType(
     const TVFConnectionArgument& connection_arg) {
   InputArgumentType type;
   type.category_ = kConnection;
-  type.connection_arg_.reset(new TVFConnectionArgument(connection_arg));
+  type.EnsureData().connection_arg.reset(
+      new TVFConnectionArgument(connection_arg));
   return type;
 }
 
@@ -317,6 +366,11 @@ InputArgumentType InputArgumentType::SequenceInputArgumentType() {
   type.category_ = kSequence;
   type.type_ = nullptr;
   return type;
+}
+
+const InputArgumentType::Data& InputArgumentType::ReadOnlyData() const {
+  static const absl::NoDestructor<Data> kEmptyData;
+  return data_ ? *data_ : *kEmptyData;
 }
 
 bool InputArgumentTypeSet::Insert(const InputArgumentType& argument,

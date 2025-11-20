@@ -241,7 +241,7 @@ SELECT 1 FROM (
   SELECT measure_sum_quantity FROM MeasureTable_SingleKey
 )
 --
-ERROR: Column measure_sum_quantity of type MEASURE<INT64> cannot propagate through UNION_ALL [at 2:3]
+ERROR: Column 1 in UNION ALL has incompatible types: MEASURE<INT64>, MEASURE<INT64>; each MEASURE type is unique and does not coerce to other MEASURE types [at 4:3]
   SELECT measure_sum_quantity FROM MeasureTable_SingleKey
   ^
 ==
@@ -271,8 +271,8 @@ SELECT 1 FROM (
   SELECT measure_sum_quantity FROM MeasureTable_SingleKey
 )
 --
-ERROR: Column at position 1 of type MEASURE<INT64> cannot propagate through UNION_ALL [at 2:3]
-  SELECT (SELECT measure_sum_quantity FROM MeasureTable_SingleKey LIMIT 1)
+ERROR: Column 1 in UNION ALL has incompatible types: MEASURE<INT64>, MEASURE<INT64>; each MEASURE type is unique and does not coerce to other MEASURE types [at 4:3]
+  SELECT measure_sum_quantity FROM MeasureTable_SingleKey
   ^
 ==
 
@@ -282,8 +282,8 @@ SELECT 1 FROM (
   SELECT 3, 4, measure_sum_quantity, 20 FROM MeasureTable_SingleKey
 )
 --
-ERROR: Column at position 3 of type MEASURE<INT64> cannot propagate through UNION_ALL [at 2:3]
-  SELECT 1, 2, (SELECT measure_sum_quantity FROM MeasureTable_SingleKey LIMIT...
+ERROR: Column 3 in UNION ALL has incompatible types: MEASURE<INT64>, MEASURE<INT64>; each MEASURE type is unique and does not coerce to other MEASURE types [at 4:3]
+  SELECT 3, 4, measure_sum_quantity, 20 FROM MeasureTable_SingleKey
   ^
 ==
 
@@ -485,16 +485,6 @@ SELECT AGG(measure_sum_quantity LIMIT 1) FROM MeasureTable_SingleKey;
 ERROR: Aggregate function AGG does not support LIMIT in arguments [at 1:33]
 SELECT AGG(measure_sum_quantity LIMIT 1) FROM MeasureTable_SingleKey;
                                 ^
-==
-
-[language_features=NONE,+ENABLE_MEASURES,+WITH_GROUP_ROWS]
-SELECT AGG(alias) WITH GROUP ROWS (
-  SELECT measure_sum_quantity AS alias FROM GROUP_ROWS()
-) FROM MeasureTable_SingleKey;
---
-ERROR: Column measure_count_star of type MEASURE<INT64> cannot propagate through GROUP ROWS [at 2:45]
-  SELECT measure_sum_quantity AS alias FROM GROUP_ROWS()
-                                            ^
 ==
 
 [language_features=NONE,+ENABLE_MEASURES,+ANALYTIC_FUNCTIONS]
@@ -763,16 +753,6 @@ ERROR: Aggregation Threshold Aggregation does not support the AGG function [at 4
   ^
 ==
 
-# Measures cannot yet propagate through GroupRowsScan
-[language_features=NONE,+WITH_GROUP_ROWS,+ENABLE_MEASURES]
-
-select count(*) with group rows(select x from group_rows()) from (select T1.measure_sum_quantity as x from MeasureTable_SingleKey as T1)
---
-ERROR: Column x of type MEASURE<INT64> cannot propagate through GROUP ROWS [at 1:47]
-select count(*) with group rows(select x from group_rows()) from (select T1.m...
-                                              ^
-==
-
 # ExecuteAsRoleScan is a product of the inlining rewriter for definer rights
 # TVFs/VIEWs. Here, we confirm that TVFs and VIEWs cannot return measures
 # regardless of the SQL SECURITY settings.
@@ -860,7 +840,7 @@ UNION ALL
 SELECT rv FROM MeasureTable_SingleKey AS rv
 )
 --
-ERROR: Column rv of type STRUCT<key INT64, country STRING, quantity INT64, ...> cannot propagate through UNION_ALL because it contains a MEASURE type [at 2:1]
+ERROR: Column 1 in UNION ALL has incompatible types: STRUCT<key INT64, country STRING, quantity INT64, ...>, STRUCT<key INT64, country STRING, quantity INT64, ...> [at 4:1]
 SELECT rv FROM MeasureTable_SingleKey AS rv
 ^
 ==
@@ -872,7 +852,7 @@ UNION ALL
 SELECT rv.measure_count_star FROM MeasureTable_SingleKey AS rv
 )
 --
-ERROR: Column measure_count_star of type MEASURE<INT64> cannot propagate through UNION_ALL [at 2:1]
+ERROR: Column 1 in UNION ALL has incompatible types: MEASURE<INT64>, MEASURE<INT64>; each MEASURE type is unique and does not coerce to other MEASURE types [at 4:1]
 SELECT rv.measure_count_star FROM MeasureTable_SingleKey AS rv
 ^
 ==
@@ -884,7 +864,7 @@ UNION ALL
 SELECT rv.* FROM MeasureTable_SingleKey AS rv
 )
 --
-ERROR: Column measure_count_star of type MEASURE<INT64> cannot propagate through UNION_ALL [at 2:1]
+ERROR: Column 5 in UNION ALL has incompatible types: MEASURE<INT64>, MEASURE<INT64>; each MEASURE type is unique and does not coerce to other MEASURE types [at 4:1]
 SELECT rv.* FROM MeasureTable_SingleKey AS rv
 ^
 ==
@@ -935,10 +915,7 @@ ERROR: Pseudo-column measure_count_star of type MEASURE<INT64> cannot propagate 
 # Measure in map type
 SELECT MAP_FROM_ARRAY([(select measure_sum_quantity from MeasureTable_SingleKey limit 1), (select measure_sum_quantity from MeasureTable_SingleKey limit 1)]);
 --
-ERROR: No matching signature for operator ARRAY[...]
-  Argument types: MEASURE<INT64>, MEASURE<INT64>
-  Signature: [T1, ...][]
-    Argument 1: expected T1, found MEASURE<INT64>: which is not allowed for ANY arguments [at 2:23]
+ERROR: Array elements of types {MEASURE<INT64>, MEASURE<INT64>} do not have a common supertype; each MEASURE type is unique and does not coerce to other MEASURE types [at 2:23]
 SELECT MAP_FROM_ARRAY([(select measure_sum_quantity from MeasureTable_SingleK...
                       ^
 ==

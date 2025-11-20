@@ -419,19 +419,19 @@ absl::Status ValidateTopLevelPathPattern(
 }
 
 static bool ContainsSelectiveSearchPrefix(
-    const ASTGraphPathPattern* ast_path_pattern) {
-  return ast_path_pattern->search_prefix() != nullptr &&
-         ast_path_pattern->search_prefix()->type() !=
+    const ASTGraphPathPattern& ast_path_pattern) {
+  return ast_path_pattern.search_prefix() != nullptr &&
+         ast_path_pattern.search_prefix()->type() !=
              ASTGraphPathSearchPrefix::PATH_SEARCH_PREFIX_TYPE_UNSPECIFIED &&
-         ast_path_pattern->search_prefix()->type() !=
+         ast_path_pattern.search_prefix()->type() !=
              ASTGraphPathSearchPrefix::ALL;
 }
 
 static bool ContainsRestrictivePathMode(
-    const ASTGraphPathPattern* ast_path_pattern) {
-  return ast_path_pattern->path_mode() != nullptr &&
-         ast_path_pattern->path_mode()->path_mode() != ASTGraphPathMode::WALK &&
-         ast_path_pattern->path_mode()->path_mode() !=
+    const ASTGraphPathPattern& ast_path_pattern) {
+  return ast_path_pattern.path_mode() != nullptr &&
+         ast_path_pattern.path_mode()->path_mode() != ASTGraphPathMode::WALK &&
+         ast_path_pattern.path_mode()->path_mode() !=
              ASTGraphPathMode::PATH_MODE_UNSPECIFIED;
 }
 
@@ -448,10 +448,17 @@ absl::Status GraphTableQueryResolver::ValidatePathPattern(
     bool in_cheapest = ast_path_pattern->search_prefix() != nullptr &&
                        ast_path_pattern->search_prefix()->type() ==
                            ASTGraphPathSearchPrefix::CHEAPEST;
-    ZETASQL_ASSIGN_OR_RETURN(
-        auto path_rule_result,
-        ValidatePathPatternInternal(ast_path_pattern, scope, ast_path_bases,
-                                    var_has_cost_map, in_cheapest));
+    // Unbounded quantified path patterns must be used within a parent path
+    // containing a selective search prefix or a restrictive path mode. So we
+    // need to propagate this information into the child path pattern
+    // validation.
+    ZETASQL_ASSIGN_OR_RETURN(auto path_rule_result,
+                     ValidatePathPatternInternal(
+                         ast_path_pattern, scope, ast_path_bases,
+                         var_has_cost_map, in_cheapest,
+                         /*parent_has_selective_search_prefix=*/false,
+                         /*parent_has_restrictive_path_mode=*/false));
+
     // Minimum node count must be checked on the entire path.
     if (path_rule_result.min_node_count == 0) {
       return MakeSqlErrorAt(ast_path_pattern)
@@ -462,16 +469,6 @@ absl::Status GraphTableQueryResolver::ValidatePathPattern(
              << "CHEAPEST search prefix must include at least one edge cost "
                 "expression";
     }
-    bool has_selective_search_prefix =
-        ContainsSelectiveSearchPrefix(ast_path_pattern);
-    bool has_restrictive_path_mode =
-        ContainsRestrictivePathMode(ast_path_pattern);
-    if (path_rule_result.child_is_unbounded_quantified &&
-        !has_selective_search_prefix && !has_restrictive_path_mode) {
-      return MakeSqlErrorAt(ast_path_pattern)
-             << "Unbounded quantified path pattern is not allowed without a "
-                "selective search prefix or a restrictive path mode";
-    }
   }
   return absl::OkStatus();
 }
@@ -480,7 +477,9 @@ absl::StatusOr<GraphTableQueryResolver::PathInfo>
 GraphTableQueryResolver::ValidatePathPatternInternal(
     const ASTGraphPathPattern* ast_path_pattern, const NameScope* scope,
     const std::vector<const ASTGraphPathBase*>& ast_path_bases,
-    IdStringHashMapCase<bool>& var_has_cost_map, bool in_cheapest) {
+    IdStringHashMapCase<bool>& var_has_cost_map, bool in_cheapest,
+    bool parent_has_selective_search_prefix,
+    bool parent_has_restrictive_path_mode) {
   PathInfo path_stats;
 
   for (const auto* ast_path_base : ast_path_bases) {
@@ -490,20 +489,27 @@ GraphTableQueryResolver::ValidatePathPatternInternal(
       // both quantified-edges and quantified-paths.
       case AST_GRAPH_PATH_PATTERN: {
         ZETASQL_RET_CHECK(ast_path_base->Is<ASTGraphPathPattern>());
+        const auto* subpath_pattern =
+            ast_path_base->GetAsOrDie<ASTGraphPathPattern>();
         ZETASQL_ASSIGN_OR_RETURN(std::vector<const ASTGraphPathBase*> ast_subpath_bases,
-                         CanonicalizePathPattern(
-                             *ast_path_base->GetAs<ASTGraphPathPattern>()));
-        ZETASQL_ASSIGN_OR_RETURN(auto subpath_rule_info,
-                         ValidatePathPatternInternal(
-                             ast_path_base->GetAs<ASTGraphPathPattern>(), scope,
-                             ast_subpath_bases, var_has_cost_map, in_cheapest));
+                         CanonicalizePathPattern(*subpath_pattern));
+        bool has_selective_search_prefix =
+            ContainsSelectiveSearchPrefix(*ast_path_pattern) ||
+            parent_has_selective_search_prefix;
+        bool has_restrictive_path_mode =
+            ContainsRestrictivePathMode(*ast_path_pattern) ||
+            parent_has_restrictive_path_mode;
+        ZETASQL_ASSIGN_OR_RETURN(
+            auto subpath_rule_info,
+            ValidatePathPatternInternal(
+                subpath_pattern, scope, ast_subpath_bases, var_has_cost_map,
+                in_cheapest, has_selective_search_prefix,
+                has_restrictive_path_mode));
 
         path_stats.min_node_count += subpath_rule_info.min_node_count;
         path_stats.min_path_length += subpath_rule_info.min_path_length;
         path_stats.child_is_quantified |= subpath_rule_info.child_is_quantified;
         path_stats.has_edge_cost |= subpath_rule_info.has_edge_cost;
-        path_stats.child_is_unbounded_quantified |=
-            subpath_rule_info.child_is_unbounded_quantified;
         break;
       }
       case AST_GRAPH_NODE_PATTERN:
@@ -566,11 +572,18 @@ GraphTableQueryResolver::ValidatePathPatternInternal(
                          scope, ast_path_pattern->quantifier()));
     bool is_unbounded_quantifier =
         resolved_quantifier->upper_bound() == nullptr;
-    if (is_unbounded_quantifier &&
-        !resolver_->language().LanguageFeatureEnabled(
-            FEATURE_SQL_GRAPH_UNBOUNDED_PATH_QUANTIFICATION)) {
-      return MakeSqlErrorAt(ast_path_pattern->quantifier())
-             << "Unbounded quantifier is not supported";
+    if (is_unbounded_quantifier) {
+      if (!resolver_->language().LanguageFeatureEnabled(
+              FEATURE_SQL_GRAPH_UNBOUNDED_PATH_QUANTIFICATION)) {
+        return MakeSqlErrorAt(ast_path_pattern->quantifier())
+               << "Unbounded quantifier is not supported";
+      }
+      if (!parent_has_selective_search_prefix &&
+          !parent_has_restrictive_path_mode) {
+        return MakeSqlErrorAt(ast_path_pattern->quantifier())
+               << "Unbounded quantified path pattern is not allowed without a "
+                  "selective search prefix or a restrictive path mode";
+      }
     }
     const auto* lower_bound_expr = resolved_quantifier->lower_bound();
     int64_t lower_bound = 0;
@@ -587,7 +600,6 @@ GraphTableQueryResolver::ValidatePathPatternInternal(
     path_stats.min_node_count *= lower_bound;
     path_stats.min_path_length *= lower_bound;
     path_stats.child_is_quantified = true;
-    path_stats.child_is_unbounded_quantified = is_unbounded_quantifier;
   }
   if (in_cheapest && IsQuantified(ast_path_pattern) &&
       !path_stats.has_edge_cost) {
@@ -2958,8 +2970,10 @@ GraphTableQueryResolver::GraphSetOperationResolver::ValidateGqlSetOperation(
         << "Gql set operation does not support column match mode";
     if (!graph_resolver_->resolver_->language().LanguageFeatureEnabled(
             FEATURE_SQL_GRAPH_SET_OPERATION_PROPAGATION_MODE)) {
-      ZETASQL_RET_CHECK_EQ(metadata->column_propagation_mode(), nullptr)
-          << "Gql set operation does not support column propagation mode";
+      if (metadata->column_propagation_mode() != nullptr) {
+        return MakeSqlErrorAtLocalNode(metadata)
+               << "Gql set operation does not support column propagation mode";
+      }
     }
     ZETASQL_RET_CHECK_EQ(metadata->corresponding_by_column_list(), nullptr)
         << "Gql set operation does not support corresponding by";

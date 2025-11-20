@@ -29,6 +29,7 @@
 #include <utility>
 #include <vector>
 
+#include "zetasql/public/simple_token_list.h"
 #include "zetasql/public/civil_time.h"
 #include "zetasql/public/interval_value.h"
 #include "zetasql/public/json_value.h"
@@ -45,8 +46,11 @@
 #include "zetasql/public/uuid_value.h"
 #include "zetasql/public/value.pb.h"
 #include "zetasql/public/value_content.h"
+#include "gtest/gtest_prod.h"
 #include "absl/base/attributes.h"
 #include "absl/base/macros.h"
+#include "absl/base/port.h"
+#include "zetasql/base/check.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/cord.h"
@@ -54,6 +58,7 @@
 #include "absl/time/civil_time.h"
 #include "absl/time/time.h"
 #include "absl/types/span.h"
+#include "google/protobuf/dynamic_message.h"
 #include "zetasql/base/map_view.h"
 
 namespace zetasql {

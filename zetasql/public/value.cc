@@ -178,9 +178,8 @@ absl::StatusOr<Value> GetRangeIntersection(absl::Span<const Value> ranges) {
 
 // Validates that `graph_elements` are valid for creating a graph path
 // with the specified `graph_path_type`.
-absl::Status ValidateGraphPathElements(
-    const GraphPathType* graph_path_type,
-    const std::vector<Value>& graph_elements) {
+absl::Status ValidateGraphPathElements(const GraphPathType* graph_path_type,
+                                       absl::Span<const Value> graph_elements) {
   ZETASQL_RET_CHECK_EQ(graph_elements.size() % 2, 1)
       << "Path must have an odd number of graph elements, but got "
       << graph_elements.size() << " graph elements";

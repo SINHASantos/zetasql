@@ -5726,6 +5726,12 @@ absl::StatusOr<bool> ShouldKeepPath(const GraphPath& path,
   return true;
 }
 
+bool IsRestrictivePathMode(ResolvedGraphPathMode::PathMode path_mode) {
+  return path_mode == ResolvedGraphPathMode::SIMPLE ||
+         path_mode == ResolvedGraphPathMode::ACYCLIC ||
+         path_mode == ResolvedGraphPathMode::TRAIL;
+}
+
 // Tuple iterator for a GraphPathOp, which represents a path.
 // It takes left tuples, right tuples, and an arbitrary join predicate, and
 // produces the joined tuples that match the join predicate. Then, it filters
@@ -6119,6 +6125,8 @@ QuantifiedGraphPathOp::Create(std::unique_ptr<RelationalOp> path_primary_op,
 
   if (upper_bound != nullptr) {
     ZETASQL_RET_CHECK(upper_bound->output_type()->IsInt64());
+  } else {
+    ZETASQL_RET_CHECK(IsRestrictivePathMode(path_mode));
   }
   return absl::WrapUnique(new QuantifiedGraphPathOp(
       std::move(path_primary_op), std::move(variables), std::move(lower_bound),
@@ -6599,10 +6607,6 @@ QuantifiedGraphPathOp::CreateIterator(absl::Span<const TupleData* const> params,
       return absl::Status(absl::StatusCode::kOutOfRange,
                           "Upper bound must be greater than lower bound.");
     }
-  } else {
-    // TODO: b/435017307 - Support unbounded path quantification.
-    return absl::UnimplementedError(
-        "QuantifiedGraphPathOp without an upper bound is not yet implemented.");
   }
   ZETASQL_ASSIGN_OR_RETURN(
       std::unique_ptr<TupleIterator> path_primary_iterator,

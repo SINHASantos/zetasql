@@ -938,10 +938,11 @@ absl::StatusOr<Table::FindLazyColumnsResult> Table::FindLazyColumns(
 }
 
 absl::StatusOr<const Column*> Table::FindLazyColumn(
-    const std::string& column_name, LazyColumnsTableScanContext* context,
+    absl::string_view column_name, LazyColumnsTableScanContext* context,
     const Catalog::FindOptions& options) const {
-  ZETASQL_ASSIGN_OR_RETURN(FindLazyColumnsResult result,
-                   FindLazyColumns({column_name}, context, options));
+  ZETASQL_ASSIGN_OR_RETURN(
+      FindLazyColumnsResult result,
+      FindLazyColumns({std::string(column_name)}, context, options));
   ZETASQL_RET_CHECK_EQ(result.size(), 1);
   return result[0];
 }

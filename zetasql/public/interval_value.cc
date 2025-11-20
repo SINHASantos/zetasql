@@ -387,7 +387,7 @@ absl::StatusOr<IntervalValue> IntervalValue::DeserializeFromBytes(
   return interval;
 }
 
-absl::int128 IntervalValue::SerializeAsInt128() {
+absl::int128 IntervalValue::SerializeAsInt128() const {
   return absl::MakeInt128(micros_,
                           (static_cast<uint64_t>(days_) << 32) | months_nanos_);
 }

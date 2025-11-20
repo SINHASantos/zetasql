@@ -526,14 +526,14 @@ SELECT FORMAT_TIMESTAMP("%b %Y", TIMESTAMP "2050-12-25 15:30:55+00")
 ```
 
 ```zetasql
-SELECT FORMAT_TIMESTAMP("%Y-%m-%dT%H:%M:%SZ", TIMESTAMP "2050-12-25 15:30:55", "UTC")
+SELECT FORMAT_TIMESTAMP("%Y-%m-%dT%H:%M:%S%Z", TIMESTAMP "2050-12-25 15:30:55", "UTC")
   AS formatted;
 
-/*+---------------------+
- |      formatted       |
- +----------------------+
- | 2050-12-25T15:30:55Z |
- +----------------------*/
+/*+-----------------------+
+ |       formatted        |
+ +------------------------+
+ | 2050-12-25T15:30:55UTC |
+ +------------------------*/
 ```
 
 [timestamp-format-elements]: https://github.com/google/zetasql/blob/master/docs/format-elements.md#format_elements_date_time

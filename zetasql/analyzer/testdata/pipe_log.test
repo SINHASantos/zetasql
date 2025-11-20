@@ -180,7 +180,7 @@ QueryStmt
     |   |       Key -> INT64 (KeyValue.Key#1) (implicit)
     |   |       Value -> STRING (KeyValue.Value#2) (implicit)
     |   |     Range variables:
-    |   |       KeyValue -> RANGE_VARIABLE<Key,Value>
+    |   |       KeyValue -> RANGE_VARIABLE<Key#1,Value#2>
     |   |   """
     |   +-input_scan=
     |     +-LogScan
@@ -198,7 +198,7 @@ QueryStmt
     |       |   |       Key -> INT64 (KeyValue.Key#1) (implicit)
     |       |   |       Value -> STRING (KeyValue.Value#2) (implicit)
     |       |   |     Range variables:
-    |       |   |       KeyValue -> RANGE_VARIABLE<Key,Value>
+    |       |   |       KeyValue -> RANGE_VARIABLE<Key#1,Value#2>
     |       |   |   """
     |       |   +-input_scan=
     |       |     +-TableScan(column_list=KeyValue.[Key#1, Value#2], table=KeyValue, column_index_list=[0, 1])

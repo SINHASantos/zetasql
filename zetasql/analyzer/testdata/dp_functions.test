@@ -1,7 +1,6 @@
 # Valid function calls
+[DEFAULT language_features=NONE,+DIFFERENTIAL_PRIVACY,+NAMED_ARGUMENTS,+PIPE_AGGREGATE_WITH_DIFFERENTIAL_PRIVACY]
 
-[default language_features=MAXIMUM]
-[language_features=NONE,+DIFFERENTIAL_PRIVACY,+NAMED_ARGUMENTS]
 select with differential_privacy COUNT(string, contribution_bounds_per_group => (0, 1)), COUNT(*, contribution_bounds_per_group => (0, 1)) from SimpleTypes
 --
 QueryStmt
@@ -27,7 +26,6 @@ QueryStmt
 ==
 
 # Invalid function call with extra argument
-[language_features=NONE,+DIFFERENTIAL_PRIVACY,+NAMED_ARGUMENTS]
 select with differential_privacy COUNT(string, 1.0, contribution_bounds_per_group => (0, 1)), COUNT(*, 1.0, contribution_bounds_per_group => (0, 1)) from SimpleTypes
 --
 
@@ -40,7 +38,6 @@ select with differential_privacy COUNT(string, 1.0, contribution_bounds_per_g...
 ==
 
 # Invalid function call with extra arguments
-[language_features=NONE,+DIFFERENTIAL_PRIVACY,+NAMED_ARGUMENTS]
 select with differential_privacy COUNT(string, 1.0, string, contriubtion_bounds_per_group => (0, 1)), COUNT(*, 1.0, string, contribution_bounds_per_group => (0, 1)) from SimpleTypes
 --
 
@@ -52,7 +49,6 @@ select with differential_privacy COUNT(string, 1.0, string, contriubtion_boun...
 ==
 
 # contriubtion_bounds_per_group is mandatory
-[language_features=NONE,+DIFFERENTIAL_PRIVACY,+NAMED_ARGUMENTS]
 select with differential_privacy COUNT(string, (0, 1)) from SimpleTypes
 --
 
@@ -64,7 +60,6 @@ select with differential_privacy COUNT(string, (0, 1)) from SimpleTypes
 ==
 
 # Reject COUNT() with no arguments
-[language_features=NONE,+DIFFERENTIAL_PRIVACY,+NAMED_ARGUMENTS]
 select with differential_privacy COUNT() from SimpleTypes
 --
 
@@ -86,7 +81,7 @@ select with differential_privacy COUNT(DISTINCT string, contribution_bounds_p...
 ==
 
 # Calling COUNT(*) without any optional arguments works.
-[language_features=NONE,+DISALLOW_GROUP_BY_FLOAT,+DIFFERENTIAL_PRIVACY,+NAMED_ARGUMENTS]
+[language_features=NONE,+DISALLOW_GROUP_BY_FLOAT,+DIFFERENTIAL_PRIVACY,+NAMED_ARGUMENTS,+PIPE_AGGREGATE_WITH_DIFFERENTIAL_PRIVACY]
 select with differential_privacy COUNT(*) from SimpleTypes
 --
 QueryStmt
@@ -107,7 +102,7 @@ QueryStmt
 ==
 
 # Specify a non-constant expression for clamped bounds
-[language_features=NONE,+DIFFERENTIAL_PRIVACY,+NAMED_ARGUMENTS]
+[language_features=NONE,+DIFFERENTIAL_PRIVACY,+NAMED_ARGUMENTS,+PIPE_AGGREGATE_WITH_DIFFERENTIAL_PRIVACY]
 select with differential_privacy COUNT(string, contribution_bounds_per_group => ({{0|int64}}, {{1|int64}})) from SimpleTypes
 --
 ALTERNATION GROUP: 0,1
@@ -148,7 +143,6 @@ select with differential_privacy COUNT(string, contribution_bounds_per_group ...
 ==
 
 # Non-INT64 argument for clamp bounds.
-[language_features=NONE,+DIFFERENTIAL_PRIVACY,+NAMED_ARGUMENTS]
 select with differential_privacy COUNT(*, contribution_bounds_per_group => ({{0|"abc"}}, {{1|"def"}})) from SimpleTypes
 --
 ALTERNATION GROUP: 0,1
@@ -199,7 +193,6 @@ select with differential_privacy COUNT(*, contribution_bounds_per_group => ("...
 ==
 
 # Accept const parameter bounds
-[language_features=NONE,+DIFFERENTIAL_PRIVACY,+NAMED_ARGUMENTS]
 select with differential_privacy COUNT(*, contribution_bounds_per_group => (@test_param_int64, 6)) from SimpleTypes
 --
 ERROR: Argument 'contribution_bounds_per_group' to COUNT(*) must be a literal or query parameter [at 1:43]
@@ -208,7 +201,6 @@ select with differential_privacy COUNT(*, contribution_bounds_per_group => (@...
 ==
 
 # Accept const parameter bounds
-[language_features=NONE,+DIFFERENTIAL_PRIVACY,+NAMED_ARGUMENTS]
 select with differential_privacy COUNT(*, contribution_bounds_per_group => @test_param_struct_two_int64) from SimpleTypes
 --
 QueryStmt
@@ -229,7 +221,6 @@ QueryStmt
 ==
 
 # Support GROUP BY
-[language_features=NONE,+DIFFERENTIAL_PRIVACY,+NAMED_ARGUMENTS]
 select with differential_privacy COUNT(string, contribution_bounds_per_group => (0, 1)), COUNT(*, contribution_bounds_per_group => (0, 1)) from SimpleTypes
 group by int64
 --
@@ -258,7 +249,6 @@ QueryStmt
 ==
 
 # SUM should reject exprs other than int64, uint64, double & numeric
-[language_features=NONE,+DIFFERENTIAL_PRIVACY,+NAMED_ARGUMENTS]
 select with differential_privacy SUM(string, contribution_bounds_per_group => (0, 1)) from SimpleTypes
 --
 ERROR: No matching signature for aggregate operator SUM in DIFFERENTIAL_PRIVACY context for argument types: STRING, STRUCT<INT64, INT64>
@@ -284,7 +274,6 @@ select with differential_privacy AVG(string, contribution_bounds_per_group =>...
 ==
 
 # Valid SUM function call
-[language_features=NONE,+DIFFERENTIAL_PRIVACY,+NAMED_ARGUMENTS]
 select with differential_privacy SUM(int64, contribution_bounds_per_group => (0, 1)), SUM(uint64, contribution_bounds_per_group => (0, 1)), SUM(double, contribution_bounds_per_group => (0, 1)),
 SUM(numeric, contribution_bounds_per_group => (0, 1)) from SimpleTypes
 --
@@ -323,7 +312,6 @@ QueryStmt
 ==
 
 # Valid AVG function call
-[language_features=NONE,+DIFFERENTIAL_PRIVACY,+NAMED_ARGUMENTS]
 select with differential_privacy AVG(int64, contribution_bounds_per_group => (0, 1)), AVG(uint64, contribution_bounds_per_group => (0, 1)), AVG(double, contribution_bounds_per_group => (0, 1)),
 AVG(numeric, contribution_bounds_per_group => (0, 1)) from SimpleTypes
 --
@@ -388,7 +376,7 @@ ERROR: Syntax error: Expected ")" but got "," [at 1:56]
 ==
 
 # Valid safe SUM function call
-[language_features=NONE,+DIFFERENTIAL_PRIVACY,+NAMED_ARGUMENTS,+SAFE_FUNCTION_CALL]
+[language_features=NONE,+DIFFERENTIAL_PRIVACY,+NAMED_ARGUMENTS,+SAFE_FUNCTION_CALL,+PIPE_AGGREGATE_WITH_DIFFERENTIAL_PRIVACY]
 select WITH DIFFERENTIAL_PRIVACY safe.SUM(int64, contribution_bounds_per_group => (0, 1))
 from SimpleTypes
 --
@@ -419,7 +407,7 @@ select with differential_privacy SUM(DISTINCT int32, contribution_bounds_per_...
                                  ^
 ==
 
-[language_features=NONE,+DIFFERENTIAL_PRIVACY,+NAMED_ARGUMENTS,+NUMERIC_TYPE,+SAFE_FUNCTION_CALL]
+[language_features=NONE,+DIFFERENTIAL_PRIVACY,+NAMED_ARGUMENTS,+NUMERIC_TYPE,+SAFE_FUNCTION_CALL,+PIPE_AGGREGATE_WITH_DIFFERENTIAL_PRIVACY]
 select WITH DIFFERENTIAL_PRIVACY
 SUM(numeric, contribution_bounds_per_group => (1.9, 3.5))
 FROM SimpleTypes
@@ -442,7 +430,7 @@ QueryStmt
               +-Literal(type=STRUCT<NUMERIC, NUMERIC>, value={1.9, 3.5})
 ==
 
-[language_features=NONE,+DIFFERENTIAL_PRIVACY,+NAMED_ARGUMENTS,+NUMERIC_TYPE,+SAFE_FUNCTION_CALL]
+[language_features=NONE,+DIFFERENTIAL_PRIVACY,+NAMED_ARGUMENTS,+NUMERIC_TYPE,+SAFE_FUNCTION_CALL,+PIPE_AGGREGATE_WITH_DIFFERENTIAL_PRIVACY]
 select WITH DIFFERENTIAL_PRIVACY
 SUM(numeric, contribution_bounds_per_group => (0.999999999, 1.000000001))
 FROM SimpleTypes
@@ -466,7 +454,7 @@ QueryStmt
 ==
 
 # Valid safe AVG function call
-[language_features=NONE,+DIFFERENTIAL_PRIVACY,+NAMED_ARGUMENTS,+SAFE_FUNCTION_CALL]
+[language_features=NONE,+DIFFERENTIAL_PRIVACY,+NAMED_ARGUMENTS,+SAFE_FUNCTION_CALL,+PIPE_AGGREGATE_WITH_DIFFERENTIAL_PRIVACY]
 select WITH DIFFERENTIAL_PRIVACY safe.AVG(int64, contribution_bounds_per_group => (0, 1))
 from SimpleTypes
 --
@@ -498,7 +486,7 @@ select with differential_privacy AVG(DISTINCT int32, contribution_bounds_per_...
                                  ^
 ==
 
-[language_features=NONE,+DIFFERENTIAL_PRIVACY,+NAMED_ARGUMENTS,+NUMERIC_TYPE,+SAFE_FUNCTION_CALL]
+[language_features=NONE,+DIFFERENTIAL_PRIVACY,+NAMED_ARGUMENTS,+NUMERIC_TYPE,+SAFE_FUNCTION_CALL,+PIPE_AGGREGATE_WITH_DIFFERENTIAL_PRIVACY]
 select WITH DIFFERENTIAL_PRIVACY
 AVG(numeric,  contribution_bounds_per_group => (0.999999999, 1.000000001))
 FROM SimpleTypes
@@ -823,7 +811,7 @@ ERROR: No matching signature for aggregate operator APPROX_QUANTILES in DIFFEREN
     ^
 ==
 
-[language_features=NONE,+DIFFERENTIAL_PRIVACY,+DIFFERENTIAL_PRIVACY_REPORT_FUNCTIONS,+NAMED_ARGUMENTS,+JSON_TYPE]
+[language_features=NONE,+DIFFERENTIAL_PRIVACY,+DIFFERENTIAL_PRIVACY_REPORT_FUNCTIONS,+NAMED_ARGUMENTS,+JSON_TYPE,+PIPE_AGGREGATE_WITH_DIFFERENTIAL_PRIVACY]
 [no_enable_literal_replacement]
 select with differential_privacy
     SUM(int64, report_format => "JSON") as s

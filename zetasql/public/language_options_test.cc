@@ -268,7 +268,7 @@ TEST(LanguageOptions, LanguageFeaturesVersionTagRangeIntegrity) {
           // Two features were in development when V 1.3 was "frozen".
           // TODO: Remove once features are not in development.
           bool in_development_exception =
-              tag_number == 13027 || tag_number == 13038;
+              tag_number == 13027 || tag_number == 13038 || tag_number == 13021;
           EXPECT_TRUE(!in_development || in_development_exception) << name;
         }
         if (found_version && ideally_enabled && !in_development) {

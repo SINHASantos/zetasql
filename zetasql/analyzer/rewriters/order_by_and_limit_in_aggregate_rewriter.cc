@@ -731,16 +731,19 @@ OrderByAndLimitInAggregateRewriterVisitor::HandleAggregateFunctionCall(
   }
 
   const Type* const result_type = aggregate_function_call->type();
+  ResolvedNonScalarFunctionCallBase::NullHandlingModifier
+      null_handling_modifier = ResolvedNonScalarFunctionCallBase::IGNORE_NULLS;
   switch (agg_function) {
     case AggFunction::kStringAgg:
     case AggFunction::kArrayConcatAgg:
       // STRING_AGG and ARRAY_CONCAT_AGG don't accept a null handling modifier
       // but implicitly ignore nulls.
-      aggregate_function_call->set_null_handling_modifier(
-          ResolvedNonScalarFunctionCallBase::IGNORE_NULLS);
       break;
-    case AggFunction::kArrayAgg:
+    case AggFunction::kArrayAgg: {
+      null_handling_modifier =
+          aggregate_function_call->null_handling_modifier();
       break;
+    }
   }
 
   std::vector<std::unique_ptr<const ResolvedExpr>> args =
@@ -802,11 +805,9 @@ OrderByAndLimitInAggregateRewriterVisitor::HandleAggregateFunctionCall(
   ZETASQL_ASSIGN_OR_RETURN(std::unique_ptr<const ResolvedScan> input_scan,
                    ProjectColumnsFromStructAndComputeArg(
                        state, array_column, std::move(arg1), column_map));
-  ZETASQL_ASSIGN_OR_RETURN(
-      input_scan,
-      HandleNullHandlingModifier(
-          state, std::move(input_scan),
-          aggregate_function_call->null_handling_modifier(), column_map));
+  ZETASQL_ASSIGN_OR_RETURN(input_scan, HandleNullHandlingModifier(
+                                   state, std::move(input_scan),
+                                   null_handling_modifier, column_map));
   ZETASQL_ASSIGN_OR_RETURN(
       input_scan,
       HandleDistinct(state, std::move(input_scan),

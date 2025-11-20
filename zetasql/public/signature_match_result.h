@@ -18,9 +18,9 @@
 #define ZETASQL_PUBLIC_SIGNATURE_MATCH_RESULT_H_
 
 #include <map>
+#include <memory>
 #include <string>
 #include <tuple>
-#include <utility>
 
 #include "zetasql/base/logging.h"
 #include "absl/strings/string_view.h"
@@ -41,53 +41,56 @@ class Type;
 // of the types.
 class SignatureMatchResult {
  public:
-  SignatureMatchResult()
-      : non_matched_arguments_(0), non_literals_coerced_(0),
-        non_literals_distance_(0), literals_coerced_(0),
-        literals_distance_(0) {}
+  SignatureMatchResult() : data_(std::make_unique<Data>()) {}
   ~SignatureMatchResult() = default;
 
-  int non_matched_arguments() const { return non_matched_arguments_; }
-  void incr_non_matched_arguments() { non_matched_arguments_++; }
+  // Move only
+  SignatureMatchResult(const SignatureMatchResult&) = delete;
+  SignatureMatchResult& operator=(const SignatureMatchResult&) = delete;
+  SignatureMatchResult(SignatureMatchResult&&) = default;
+  SignatureMatchResult& operator=(SignatureMatchResult&&) = default;
 
-  int non_literals_coerced() const { return non_literals_coerced_; }
-  void incr_non_literals_coerced() { non_literals_coerced_++; }
+  int non_matched_arguments() const { return data_->non_matched_arguments; }
+  void incr_non_matched_arguments() { data_->non_matched_arguments++; }
 
-  int non_literals_distance() const { return non_literals_distance_; }
+  int non_literals_coerced() const { return data_->non_literals_coerced; }
+  void incr_non_literals_coerced() { data_->non_literals_coerced++; }
+
+  int non_literals_distance() const { return data_->non_literals_distance; }
   void incr_non_literals_distance(int distance = 1) {
-    non_literals_distance_ += distance;
+    data_->non_literals_distance += distance;
   }
 
-  int literals_coerced() const { return literals_coerced_; }
-  void incr_literals_coerced() { literals_coerced_++; }
+  int literals_coerced() const { return data_->literals_coerced; }
+  void incr_literals_coerced() { data_->literals_coerced++; }
 
-  int literals_distance() const { return literals_distance_; }
+  int literals_distance() const { return data_->literals_distance; }
   void incr_literals_distance(int distance = 1) {
-    literals_distance_ += distance;
+    data_->literals_distance += distance;
   }
 
   // Returns if the signature matcher is allowed to set mismatch message.
   // This is for sanity check that we only generate and set mismatch message
   // when detailed mismatch error message is enabled.
-  bool allow_mismatch_message() const { return allow_mismatch_message_; }
+  bool allow_mismatch_message() const { return data_->allow_mismatch_message; }
   void set_allow_mismatch_message(bool allow) {
-    allow_mismatch_message_ = allow;
+    data_->allow_mismatch_message = allow;
   }
 
   // The message about why the signature doesn't match the function call.
-  std::string mismatch_message() const { return mismatch_message_; }
+  std::string mismatch_message() const { return data_->mismatch_message; }
   void set_mismatch_message(absl::string_view message) {
-    ABSL_DCHECK(allow_mismatch_message_) << message;
-    ABSL_DCHECK(mismatch_message_.empty()) << mismatch_message_;
-    mismatch_message_ = message;
+    ABSL_DCHECK(data_->allow_mismatch_message) << message;
+    ABSL_DCHECK(data_->mismatch_message.empty()) << data_->mismatch_message;
+    data_->mismatch_message = message;
   }
 
   // Index of argument that causes the signature to mismatch, or -1 if unknown.
   // For now, it's only set when resolving TVFs.
   // TODO: set this for other mismatch cases for precise error
   // cursor for functions with a single signature.
-  int bad_argument_index() const { return bad_argument_index_; }
-  void set_bad_argument_index(int index) { bad_argument_index_ = index; }
+  int bad_argument_index() const { return data_->bad_argument_index; }
+  void set_bad_argument_index(int index) { data_->bad_argument_index = index; }
 
   struct ArgumentColumnPair {
     int argument_index = 0;
@@ -105,11 +108,11 @@ class SignatureMatchResult {
       std::map<ArgumentColumnPair, const Type* /* coerce-to type */>;
 
   const TVFRelationCoercionMap& tvf_relation_coercion_map() const {
-    return tvf_relation_coercion_map_;
+    return data_->tvf_relation_coercion_map;
   }
   void AddTVFRelationCoercionEntry(int argument_index, int column_index,
                                    const Type* coerce_type) {
-    tvf_relation_coercion_map_.emplace(
+    data_->tvf_relation_coercion_map.emplace(
         ArgumentColumnPair{argument_index, column_index}, coerce_type);
   }
 
@@ -126,27 +129,30 @@ class SignatureMatchResult {
   std::string DebugString() const;
 
  private:
-  int non_matched_arguments_;  // Number of non-matched arguments for function.
-  int non_literals_coerced_;   // Number of non-literal coercions.
-  int non_literals_distance_;  // How far non-literals were coerced.
-  int literals_coerced_;       // Number of literal coercions.
-  int literals_distance_;      // How far literals were coerced.
+  struct Data {
+    int non_matched_arguments = 0;  // Number of non-matched args for function.
+    int non_literals_coerced = 0;   // Number of non-literal coercions.
+    int non_literals_distance = 0;  // How far non-literals were coerced.
+    int literals_coerced = 0;       // Number of literal coercions.
+    int literals_distance = 0;      // How far literals were coerced.
 
-  // If the function call was invalid because of a particular argument, this
-  // zero-based index is updated to indicate which argument was invalid.
-  int bad_argument_index_ = -1;
+    // If the function call was invalid because of a particular argument, this
+    // zero-based index is updated to indicate which argument was invalid.
+    int bad_argument_index = -1;
 
-  bool allow_mismatch_message_ = false;
+    bool allow_mismatch_message = false;
 
-  std::string mismatch_message_;
+    std::string mismatch_message;
 
-  // If the TVF call was valid, this stores type coercions necessary for
-  // relation arguments. The key is (argument index, column index) where the
-  // argument index indicates which TVF argument contains the relation, and the
-  // column index indicates which column within the relation (defined as the
-  // offset in the column_list in that input scan). Both are zero-based. The map
-  // value is the result type to coerce to.
-  TVFRelationCoercionMap tvf_relation_coercion_map_;
+    // If the TVF call was valid, this stores type coercions necessary for
+    // relation arguments. The key is (argument index, column index) where the
+    // argument index indicates which TVF argument contains the relation, and
+    // the column index indicates which column within the relation (defined as
+    // the offset in the column_list in that input scan). Both are zero-based.
+    // The map value is the result type to coerce to.
+    TVFRelationCoercionMap tvf_relation_coercion_map;
+  };
+  std::unique_ptr<Data> data_;
 };
 
 }  // namespace zetasql

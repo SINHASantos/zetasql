@@ -62,7 +62,7 @@ QueryStmt
         |   |     vt zetasql_test__.TestExtraPB $union_all.vt#7 (value table)
         |   |   NameScope:
         |   |     Range variables:
-        |   |       vt -> RANGE_VARIABLE<$value>
+        |   |       vt -> RANGE_VARIABLE<vt#7> (value table)
         |   |     Value table columns:
         |   |       $union_all.vt#7
         |   |   """
@@ -122,7 +122,7 @@ QueryStmt
     |   |     vt zetasql_test__.TestExtraPB $union_all.vt#7 (value table)
     |   |   NameScope:
     |   |     Range variables:
-    |   |       vt -> RANGE_VARIABLE<$value>
+    |   |       vt -> RANGE_VARIABLE<vt#7> (value table)
     |   |     Value table columns:
     |   |       $union_all.vt#7
     |   |   """
@@ -181,7 +181,7 @@ QueryStmt
     |   |   |     input STRUCT<a INT64, b INT64> $intersect_all.$struct#7 (value table)
     |   |   |   NameScope:
     |   |   |     Range variables:
-    |   |   |       input -> RANGE_VARIABLE<$value>
+    |   |   |       input -> RANGE_VARIABLE<$struct#7> (value table)
     |   |   |     Value table columns:
     |   |   |       $intersect_all.$struct#7
     |   |   |   """
@@ -309,7 +309,7 @@ QueryStmt
         |   |     TestExtraValueTable zetasql_test__.TestExtraPB $union_all.TestExtraValueTable#7 (value table)
         |   |   NameScope:
         |   |     Range variables:
-        |   |       TestExtraValueTable -> RANGE_VARIABLE<$value>
+        |   |       TestExtraValueTable -> RANGE_VARIABLE<TestExtraValueTable#7> (value table)
         |   |     Value table columns:
         |   |       $union_all.TestExtraValueTable#7
         |   |   """
@@ -400,7 +400,7 @@ QueryStmt
         |   |     vt zetasql_test__.TestExtraPB $union_all.vt#7 (value table)
         |   |   NameScope:
         |   |     Range variables:
-        |   |       vt -> RANGE_VARIABLE<$value>
+        |   |       vt -> RANGE_VARIABLE<vt#7> (value table)
         |   |     Value table columns:
         |   |       $union_all.vt#7
         |   |   """
@@ -459,7 +459,7 @@ QueryStmt
     |   |     vt zetasql_test__.TestExtraPB $union_all.vt#7 (value table)
     |   |   NameScope:
     |   |     Range variables:
-    |   |       vt -> RANGE_VARIABLE<$value>
+    |   |       vt -> RANGE_VARIABLE<vt#7> (value table)
     |   |     Value table columns:
     |   |       $union_all.vt#7
     |   |   """
@@ -516,7 +516,7 @@ QueryStmt
     |   |   |     input STRUCT<a INT64, b INT64> $intersect_all.$struct#7 (value table)
     |   |   |   NameScope:
     |   |   |     Range variables:
-    |   |   |       input -> RANGE_VARIABLE<$value>
+    |   |   |       input -> RANGE_VARIABLE<$struct#7> (value table)
     |   |   |     Value table columns:
     |   |   |       $intersect_all.$struct#7
     |   |   |   """
@@ -643,7 +643,7 @@ QueryStmt
         |   |     TestExtraValueTable zetasql_test__.TestExtraPB $union_all.TestExtraValueTable#7 (value table)
         |   |   NameScope:
         |   |     Range variables:
-        |   |       TestExtraValueTable -> RANGE_VARIABLE<$value>
+        |   |       TestExtraValueTable -> RANGE_VARIABLE<TestExtraValueTable#7> (value table)
         |   |     Value table columns:
         |   |       $union_all.TestExtraValueTable#7
         |   |   """
@@ -2056,7 +2056,7 @@ QueryStmt
     |     vt1 INT64 $union_all.vt1#3 (value table)
     |   NameScope:
     |     Range variables:
-    |       vt1 -> RANGE_VARIABLE<$value>
+    |       vt1 -> RANGE_VARIABLE<vt1#3> (value table)
     |     Value table columns:
     |       $union_all.vt1#3
     |   """
@@ -2218,7 +2218,7 @@ QueryStmt
     |     Int64ValueTable INT64 $union_all.Int64ValueTable#3 (value table)
     |   NameScope:
     |     Range variables:
-    |       Int64ValueTable -> RANGE_VARIABLE<$value>
+    |       Int64ValueTable -> RANGE_VARIABLE<Int64ValueTable#3> (value table)
     |     Value table columns:
     |       $union_all.Int64ValueTable#3
     |   """
@@ -2297,7 +2297,7 @@ QueryStmt
     |     Int64ValueTable INT64 $union_all.Int64ValueTable#3 (value table)
     |   NameScope:
     |     Range variables:
-    |       Int64ValueTable -> RANGE_VARIABLE<$value>
+    |       Int64ValueTable -> RANGE_VARIABLE<Int64ValueTable#3> (value table)
     |     Value table columns:
     |       $union_all.Int64ValueTable#3
     |   """

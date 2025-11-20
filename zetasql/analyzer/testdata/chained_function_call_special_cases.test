@@ -1043,25 +1043,6 @@ FROM
   ) AS analyticscan_4;
 ==
 
-# Aggregation modifiers that don't work in chained calls
-[language_features=NONE,+CHAINED_FUNCTION_CALLS{{|,+WITH_GROUP_ROWS}}]
-select count(key)    WITH GROUP ROWS (select key from group_rows()),
-       (key).count() WITH GROUP ROWS (select key from group_rows())
-from KeyValue;
---
-ALTERNATION GROUP: <empty>
---
-ERROR: WITH GROUP ROWS is not supported [at 1:22]
-select count(key)    WITH GROUP ROWS (select key from group_rows()),
-                     ^
---
-ALTERNATION GROUP: ,+WITH_GROUP_ROWS
---
-ERROR: Chained function call cannot use WITH GROUP ROWS [at 2:14]
-       (key).count() WITH GROUP ROWS (select key from group_rows())
-             ^
-==
-
 [language_features=NONE,+CHAINED_FUNCTION_CALLS{{|,+MULTILEVEL_AGGREGATION}}]
 SELECT
   SUM(any_value(key) GROUP BY value),

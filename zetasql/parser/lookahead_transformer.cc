@@ -691,9 +691,6 @@ Token LookaheadTransformer::ApplyTokenDisambiguation(
       break;
     }
     case Token::KW_WITH: {
-      if (Lookahead1() == Token::KW_GROUP) {
-        return Token::KW_WITH_STARTING_WITH_GROUP_ROWS;
-      }
       // The WITH expression uses a function-call like syntax and is followed by
       // the open parenthesis and at least one variable definition consisting
       // of an identifier followed by KW_AS.

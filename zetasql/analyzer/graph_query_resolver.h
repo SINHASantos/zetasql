@@ -770,8 +770,6 @@ class GraphTableQueryResolver {
     // entire path pattern, as well as at least one for every descendant
     // quantified edge or subpath pattern.
     bool has_edge_cost = false;
-    // `true` if there is an unbounded quantified subpath.
-    bool child_is_unbounded_quantified = false;
   };
   absl::Status ValidatePathPattern(const ASTGraphPattern* ast_graph_pattern,
                                    const NameScope* scope);
@@ -779,7 +777,9 @@ class GraphTableQueryResolver {
   absl::StatusOr<PathInfo> ValidatePathPatternInternal(
       const ASTGraphPathPattern* ast_path_pattern, const NameScope* scope,
       const std::vector<const ASTGraphPathBase*>& ast_path_bases,
-      IdStringHashMapCase<bool>& var_has_cost_map, bool in_cheapest = false);
+      IdStringHashMapCase<bool>& var_has_cost_map, bool in_cheapest,
+      bool parent_has_selective_search_prefix,
+      bool parent_has_restrictive_path_mode);
 
   // Helper class used to resolve Graph set operation, aka. composite query
   // statement.

@@ -55,6 +55,7 @@
 #include "zetasql/analyzer/query_resolver_helper.h"
 #include "zetasql/analyzer/resolver.h"
 #include "zetasql/analyzer/resolver_common_inl.h"
+#include "zetasql/analyzer/resolver_util.h"
 #include "zetasql/common/constant_utils.h"
 #include "zetasql/common/errors.h"
 #include "zetasql/common/internal_analyzer_options.h"
@@ -206,6 +207,28 @@ absl::StatusOr<const google::protobuf::FieldDescriptor*> VerifyFieldExtendsMessa
   return field_descriptor;
 }
 
+// If the input type is an array, returns the element annotated type. Otherwise,
+// returns `annotated_type`.
+static AnnotatedType ElementAnnotatedTypeWithFallbackToSelf(
+    AnnotatedType annotated_type) {
+  const auto& [type, annotation_map] = annotated_type;
+  if (!type->IsArray()) {
+    return annotated_type;
+  }
+
+  const AnnotationMap* element_annotation_map =
+      annotation_map == nullptr ? nullptr
+                                : annotation_map->AsStructMap()->field(0);
+  return {type->AsArray()->element_type(), element_annotation_map};
+}
+
+static std::unique_ptr<ResolvedFlattenedArg> MakeResolvedFlattenedArg(
+    AnnotatedType annotated_type) {
+  auto arg = MakeResolvedFlattenedArg(annotated_type.type);
+  arg->set_type_annotation_map(annotated_type.annotation_map);
+  return arg;
+}
+
 // Adds 'expr' to the get_field_list for the passed in flatten node.
 // Updates the flatten result type accordingly.
 absl::Status AddGetFieldToFlatten(std::unique_ptr<const ResolvedExpr> expr,
@@ -214,10 +237,19 @@ absl::Status AddGetFieldToFlatten(std::unique_ptr<const ResolvedExpr> expr,
   const Type* type = expr->type();
   // For join-column ROW types, leave the output as a ROW rather than
   // wrapping it in an ARRAY.
+  const AnnotationMap* annotation_map = expr->type_annotation_map();
   if (!type->IsArrayLike()) {
     ZETASQL_RETURN_IF_ERROR(type_factory->MakeArrayType(expr->type(), &type));
+    if (annotation_map != nullptr) {
+      auto array_annotation_map = AnnotationMap::Create(type);
+      ZETASQL_RETURN_IF_ERROR(array_annotation_map->AsStructMap()->CloneIntoField(
+          0, annotation_map));
+      ZETASQL_ASSIGN_OR_RETURN(annotation_map, type_factory->TakeOwnership(
+                                           std::move(array_annotation_map)));
+    }
   }
   flatten->set_type(type);
+  flatten->set_type_annotation_map(annotation_map);
   flatten->add_get_field_list(std::move(expr));
   return absl::OkStatus();
 }
@@ -2689,11 +2721,18 @@ absl::Status Resolver::ResolveFieldAccess(
     const ParseLocationRange& parse_location, const ASTIdentifier* identifier,
     FlattenState* flatten_state,
     std::unique_ptr<const ResolvedExpr>* resolved_expr_out) {
-  const Type* lhs_type = resolved_lhs->type();
+  AnnotatedType lhs_type = resolved_lhs->annotated_type();
   std::unique_ptr<ResolvedFlatten> resolved_flatten;
-  if (lhs_type->IsArrayLike() && flatten_state != nullptr &&
+  if (lhs_type.type->IsArrayLike() && flatten_state != nullptr &&
       flatten_state->can_flatten()) {
-    ZETASQL_ASSIGN_OR_RETURN(lhs_type, lhs_type->GetElementType());
+    if (lhs_type.type->IsRow()) {
+      ZETASQL_ASSIGN_OR_RETURN(const Type* element_type,
+                       lhs_type.type->GetElementType());
+      lhs_type = AnnotatedType(element_type, lhs_type.annotation_map);
+    } else {
+      lhs_type = ElementAnnotatedTypeWithFallbackToSelf(
+          resolved_lhs->annotated_type());
+    }
     if (resolved_lhs->Is<ResolvedFlatten>() &&
         flatten_state->active_flatten() != nullptr) {
       resolved_flatten.reset(const_cast<ResolvedFlatten*>(
@@ -2702,37 +2741,37 @@ absl::Status Resolver::ResolveFieldAccess(
     } else {
       resolved_flatten =
           MakeResolvedFlatten(/*type=*/nullptr, std::move(resolved_lhs), {});
-      analyzer_output_properties_.MarkRelevant(REWRITE_FLATTEN);
       ZETASQL_RET_CHECK_EQ(nullptr, flatten_state->active_flatten());
       flatten_state->set_active_flatten(resolved_flatten.get());
     }
     resolved_lhs = MakeResolvedFlattenedArg(lhs_type);
   }
 
-  if (lhs_type->IsProto()) {
+  if (lhs_type.type->IsProto()) {
     ZETASQL_RETURN_IF_ERROR(MaybeResolveProtoFieldAccess(
         parse_location, identifier, MaybeResolveProtoFieldOptions(),
         std::move(resolved_lhs), resolved_expr_out));
-  } else if (lhs_type->IsStruct()) {
+  } else if (lhs_type.type->IsStruct()) {
     ZETASQL_RETURN_IF_ERROR(MaybeResolveStructFieldAccess(parse_location, identifier,
                                                   /*error_if_not_found=*/true,
                                                   std::move(resolved_lhs),
                                                   resolved_expr_out));
-  } else if (lhs_type->IsJson()) {
+  } else if (lhs_type.type->IsJson()) {
     ZETASQL_RETURN_IF_ERROR(ResolveJsonFieldAccess(identifier, std::move(resolved_lhs),
                                            resolved_expr_out));
-  } else if (lhs_type->IsRow()) {
+  } else if (lhs_type.type->IsRow()) {
     ZETASQL_RETURN_IF_ERROR(ResolveGetRowField(
         identifier, flatten_state, std::move(resolved_lhs), resolved_expr_out));
-  } else if (lhs_type->IsGraphElement()) {
+  } else if (lhs_type.type->IsGraphElement()) {
     ZETASQL_RETURN_IF_ERROR(ResolveGraphElementPropertyAccess(
         identifier, std::move(resolved_lhs), resolved_expr_out));
-  } else if (lhs_type->IsArray() && language().LanguageFeatureEnabled(
-                                        FEATURE_UNNEST_AND_FLATTEN_ARRAYS)) {
+  } else if (lhs_type.type->IsArray() &&
+             language().LanguageFeatureEnabled(
+                 FEATURE_UNNEST_AND_FLATTEN_ARRAYS)) {
     return MakeSqlErrorAt(identifier)
            << "Cannot access field " << identifier->GetAsIdString()
            << " on a value with type "
-           << lhs_type->ShortTypeName(product_mode()) << ". "
+           << lhs_type.type->ShortTypeName(product_mode()) << ". "
            << "You may need an explicit call to FLATTEN, and the flattened "
               "argument may only contain 'dot' after the first array";
   } else if (resolved_lhs->Is<ResolvedParameter>() &&
@@ -2748,7 +2787,7 @@ absl::Status Resolver::ResolveFieldAccess(
     return MakeSqlErrorAt(identifier)
            << "Cannot access field " << identifier->GetAsIdString()
            << " on a value with type "
-           << lhs_type->ShortTypeName(product_mode());
+           << lhs_type.type->ShortTypeName(product_mode());
   }
 
   ZETASQL_RET_CHECK(*resolved_expr_out != nullptr);
@@ -2768,7 +2807,8 @@ absl::Status Resolver::ResolveExtensionFieldAccess(
   std::unique_ptr<ResolvedFlatten> resolved_flatten;
   if (resolved_lhs->type()->IsArray() && flatten_state != nullptr &&
       flatten_state->can_flatten()) {
-    const Type* lhs_type = resolved_lhs->type()->AsArray()->element_type();
+    AnnotatedType lhs_type =
+        ElementAnnotatedTypeWithFallbackToSelf(resolved_lhs->annotated_type());
     if (resolved_lhs->Is<ResolvedFlatten>() &&
         flatten_state->active_flatten() != nullptr) {
       resolved_flatten.reset(const_cast<ResolvedFlatten*>(
@@ -2777,7 +2817,6 @@ absl::Status Resolver::ResolveExtensionFieldAccess(
     } else {
       resolved_flatten =
           MakeResolvedFlatten(/*type=*/nullptr, std::move(resolved_lhs), {});
-      analyzer_output_properties_.MarkRelevant(REWRITE_FLATTEN);
       ZETASQL_RET_CHECK_EQ(nullptr, flatten_state->active_flatten());
       flatten_state->set_active_flatten(resolved_flatten.get());
     }
@@ -2847,6 +2886,7 @@ absl::Status Resolver::ResolveExtensionFieldAccess(
            << " has unsupported type "
            << field_type->ShortTypeName(language().product_mode());
   }
+
   auto resolved_get_proto_field = MakeResolvedGetProtoField(
       field_type, std::move(resolved_lhs), extension_field, default_value,
       options.get_has_bit,
@@ -3998,10 +4038,23 @@ absl::Status Resolver::ResolveInSubquery(
       // column to the supertype.
       ResolvedColumnList target_columns;
       ZETASQL_RET_CHECK_EQ(1, resolved_name_list->num_columns());
+
+      // If the feature is enabled, we keep the original <type_annotation_map>
+      // when coercing types of the columns since we may need to process the
+      // annotations (e.g. collation) of the original columns at a later
+      // stage.
+      const AnnotationMap* subquery_target_annotation_map = nullptr;
+      if (language().LanguageFeatureEnabled(
+              FEATURE_PRESERVE_ANNOTATION_IN_IMPLICIT_CAST_IN_SCAN)) {
+        subquery_target_annotation_map =
+            resolved_name_list->column(0).column().type_annotation_map();
+      }
+
       target_columns.push_back(
           ResolvedColumn(AllocateColumnId(), kInSubqueryCastId,
                          resolved_name_list->column(0).column().name_id(),
-                         in_subquery_cast_type));
+                         AnnotatedType(in_subquery_cast_type,
+                                       subquery_target_annotation_map)));
 
       ResolvedColumnList current_columns =
           resolved_name_list->GetResolvedColumns();
@@ -4139,7 +4192,12 @@ absl::Status Resolver::ResolveLikeExpr(
   RETURN_ERROR_IF_OUT_OF_STACK_SPACE();
   // Regular LIKE expressions (ex. X LIKE Y) are parsed as an
   // ASTBinaryExpression, not an ASTLikeExpression.
-  ZETASQL_RET_CHECK(language().LanguageFeatureEnabled(FEATURE_LIKE_ANY_SOME_ALL));
+  if (!language().LanguageFeatureEnabled(FEATURE_LIKE_ANY_SOME_ALL)) {
+    ZETASQL_ASSIGN_OR_RETURN(std::string op_type,
+                     GetLikeAnySomeAllOpTypeString(like_expr));
+    return MakeSqlErrorAt(like_expr->like_location())
+           << absl::StrCat("LIKE ", op_type, " is not supported");
+  }
   std::unique_ptr<const ResolvedExpr> resolved_like_expr;
   if (like_expr->query() != nullptr) {
     ZETASQL_RETURN_IF_ERROR(ResolveLikeExprSubquery(like_expr, expr_resolution_info,
@@ -4166,7 +4224,7 @@ absl::Status Resolver::ResolveLikeExprSubquery(
   if (!language().LanguageFeatureEnabled(FEATURE_LIKE_ANY_SOME_ALL_SUBQUERY)) {
     ZETASQL_ASSIGN_OR_RETURN(std::string op_type,
                      GetLikeAnySomeAllOpTypeString(like_subquery_expr));
-    return MakeSqlErrorAt(like_subquery_expr->like_location()) << absl::StrCat(
+    return MakeSqlErrorAt(like_subquery_expr->query()) << absl::StrCat(
                "The LIKE ANY|SOME|ALL operator does not support subquery "
                "expression as patterns. Patterns must be string or bytes; "
                "did you mean LIKE ",
@@ -5253,7 +5311,7 @@ absl::Status Resolver::GetFunctionNameAndArgumentsForAnonFunctions(
   // also need to record that anonymization is present here since
   // the expression might include an anonymized aggregate function
   // call but no related resolved scan is created for it.
-  analyzer_output_properties_.MarkRelevant(REWRITE_ANONYMIZATION);
+  analyzer_output_properties_.has_anonymization = true;
   return absl::OkStatus();
 }
 
@@ -6198,7 +6256,7 @@ absl::Status Resolver::LookupFunctionFromCatalogWithChainedCallErrors(
       language().LanguageFeatureEnabled(FEATURE_CHAINED_FUNCTION_CALLS)) {
     // Try all suffixes of the path as function names, in increasing size order.
     // This handles functions with >2 names, but the other cases below don't.
-    for (int name_start = function_name_path.size() - 1; name_start >= 1;
+    for (size_t name_start = function_name_path.size() - 1; name_start >= 1;
          --name_start) {
       ZETASQL_RETURN_IF_ERROR(TryMakeErrorSuggestionForChainedCallImpl(
           lookup_status, ast_function_call,
@@ -6473,17 +6531,6 @@ absl::Status Resolver::ResolveAnalyticFunctionCall(
   // HAVING filter modifier is not supported on analytic functions, since
   // GROUP BY modifiers are not supported on analytic functions.
   ZETASQL_RET_CHECK(analytic_function_call->function()->having_expr() == nullptr);
-  if (analytic_function_call->function_with_group_rows() != nullptr) {
-    if (MultiLevelAggregationPresent(
-            analytic_function_call->function_with_group_rows()->function())) {
-      // TODO: `ASTFunctionCallWithGroupRows` doesn't actually seem
-      // to be created anywhere, so `function_with_group_rows` might always be
-      // nullptr, in which case this codepath is dead. Investigate further.
-      return MakeSqlErrorAt(analytic_function_call)
-             << "GROUP BY modifiers not supported on analytic function calls "
-                "that use GROUP ROWS.";
-    }
-  }
 
   // TODO: support WITH GROUP ROWS on analytic functions.
   ZETASQL_RETURN_IF_ERROR(MakeSqlErrorIfPresent(
@@ -7530,9 +7577,6 @@ absl::Status Resolver::ResolveArrayElementAccess(
 
   const bool is_map_at =
       *function_name == kProtoMapAtKey || *function_name == kSafeProtoMapAtKey;
-  if (is_map_at) {
-    analyzer_output_properties_.MarkRelevant(REWRITE_PROTO_MAP_FNS);
-  }
 
   // Coerce to INT64 if necessary.
   if (!is_map_at && !resolved_array->type()->IsJson()) {
@@ -8513,7 +8557,9 @@ absl::Status Resolver::ResolveArrayConstructor(
         if (!all_integer_literals) {
           return MakeSqlErrorAt(ast_array_constructor)
                  << "Array elements of types " << element_type_set.ToString()
-                 << " do not have a common supertype";
+                 << " do not have a common supertype"
+                 << GetTypeCompatibilityExplanation(
+                        element_type_set.arguments());
         }
         super_type = type_factory_->get_uint64();
       }
@@ -9502,7 +9548,7 @@ absl::Status Resolver::ResolveAggregateFunctionOrderByModifiers(
     (*resolved_function_call)->set_argument_list(std::move(updated_args));
   }
 
-  return ResolveOrderByItems(/*output_column_list=*/{}, {order_by_info},
+  return ResolveOrderByItems(/*name_list=*/{}, {order_by_info},
                              /*is_pipe_order_by=*/false,
                              resolved_order_by_items);
 }
@@ -10471,6 +10517,62 @@ absl::Status Resolver::ValidateRegexpExtractGroupsResultCast(
   return absl::OkStatus();
 }
 
+namespace {
+
+// Returns a struct type with a field for each capturing group in the regular
+// expression. The field types for named groups  with type suffixes are replaced
+// with the corresponding simple types.
+absl::StatusOr<const Type*> ExtractGroupsAutoCastedResultStruct(
+    const functions::RegExp& regexp, const Type* original_result_type,
+    TypeFactory* type_factory, const LanguageOptions& language_options) {
+  ZETASQL_RET_CHECK(original_result_type->IsStruct());
+  const std::vector<StructField>& original_struct_fields =
+      original_result_type->AsStruct()->fields();
+
+  ZETASQL_ASSIGN_OR_RETURN(functions::RegExp::ParsedCapturingGroups group_infos,
+                   regexp.ParseCapturingGroups());
+  ZETASQL_RET_CHECK_EQ(group_infos.size(), original_struct_fields.size());
+
+  std::vector<StructField> struct_fields;
+  struct_fields.reserve(group_infos.size());
+
+  for (int i = 0; i < group_infos.size(); ++i) {
+    const functions::RegExp::CapturingGroupInfo& group_info = group_infos[i];
+    ZETASQL_RET_CHECK_EQ(group_info.field_name, original_struct_fields[i].name);
+    // Unnamed group.
+    if (group_info.type_suffix.empty()) {
+      struct_fields.push_back(original_struct_fields[i]);
+      continue;
+    }
+
+    // Named group.
+    const Type* field_type = nullptr;
+    TypeKind type_kind = Type::ResolveBuiltinTypeNameToKindIfSimple(
+        group_info.type_suffix, language_options);
+    if (type_kind != TYPE_UNKNOWN) {
+      const Type* mapped_type = type_factory->MakeSimpleType(type_kind);
+      if (mapped_type->IsSupportedType(language_options)) {
+        field_type = mapped_type;
+      }
+    }
+    if (field_type == nullptr) {
+      return absl::InvalidArgumentError(absl::StrCat(
+          "Expected a type name as the suffix of the capturing group '",
+          group_info.group_name,
+          "' in the regexp argument to REGEXP_EXTRACT_GROUPS. The suffix '",
+          group_info.type_suffix, "' is not a valid type name."));
+    }
+    struct_fields.push_back({std::string(group_info.field_name), field_type});
+  }
+
+  const Type* result_type = nullptr;
+  ZETASQL_RETURN_IF_ERROR(type_factory->MakeStructTypeFromVector(
+      std::move(struct_fields), &result_type));
+  return result_type;
+}
+
+}  // namespace
+
 absl::StatusOr<std::unique_ptr<const ResolvedExpr>>
 Resolver::ResolveAsRegexpExtractGroupsFunction(
     const ASTNode*, const Function* function,
@@ -10496,20 +10598,17 @@ Resolver::ResolveAsRegexpExtractGroupsFunction(
       resolved_function_call->signature().result_type().type();
   ZETASQL_RET_CHECK(result_type->IsStruct());
   {
-    ZETASQL_ASSIGN_OR_RETURN(
-        const Type* expected_result_type,
-        regexp->ExtractGroupsResultStruct(type_factory_, language(),
-                                          /*derive_field_types=*/false));
+    ZETASQL_ASSIGN_OR_RETURN(const Type* expected_result_type,
+                     regexp->ExtractGroupsResultStruct(type_factory_));
     ZETASQL_RET_CHECK(result_type->Equals(expected_result_type))
         << "Return type in signature does not match the expected type "
         << result_type->DebugString() << " vs "
         << expected_result_type->DebugString();
   }
 
-  ZETASQL_ASSIGN_OR_RETURN(
-      const Type* cast_result_type,
-      regexp->ExtractGroupsResultStruct(type_factory_, language(),
-                                        /*derive_field_types=*/true));
+  ZETASQL_ASSIGN_OR_RETURN(const Type* cast_result_type,
+                   ExtractGroupsAutoCastedResultStruct(
+                       *regexp, result_type, type_factory_, language()));
   ZETASQL_RET_CHECK_NE(cast_result_type, nullptr);
   if (result_type->Equals(cast_result_type)) {
     // If the types are identical, then no cast is needed.
@@ -10594,12 +10693,6 @@ absl::Status Resolver::ResolveFunctionCallWithResolvedArguments(
                      function->QualifiedSQLName())));
   }
 
-  const FunctionSignature& signature = resolved_function_call->signature();
-  if (signature.HasEnabledRewriteImplementation()) {
-    analyzer_output_properties_.MarkRelevant(
-        signature.options().rewrite_options()->rewriter());
-  }
-
   // Down-casting the 'ast_location' pointer doesn't seem like the right thing
   // to be doing here. Probably we should be plumbing the hints into this code
   // explicitly.
@@ -10656,143 +10749,121 @@ absl::Status Resolver::ResolveFunctionCallWithResolvedArguments(
                                 *unconsumed_side_effect_column,
                                 *expr_resolution_info));
     }
-  } else {
-    if (function->mode() == Function::ANALYTIC) {
+    return absl::OkStatus();
+  }
+
+  if (function->mode() == Function::ANALYTIC) {
+    return MakeSqlErrorAt(ast_location)
+           << function->QualifiedSQLName(/*capitalize_qualifier=*/true)
+           << " cannot be called without an OVER clause";
+  }
+  ABSL_DCHECK_EQ(function->mode(), Function::SCALAR);
+
+  // We handle the PROTO_DEFAULT_IF_NULL() function here so that it can be
+  // resolved to a ResolvedGetProtoField.
+  if (IsProtoDefaultIfNull(function)) {
+    if (!language().LanguageFeatureEnabled(FEATURE_PROTO_DEFAULT_IF_NULL)) {
       return MakeSqlErrorAt(ast_location)
-             << function->QualifiedSQLName(/*capitalize_qualifier=*/true)
-             << " cannot be called without an OVER clause";
+             << "The PROTO_DEFAULT_IF_NULL function is not supported";
     }
-    ABSL_DCHECK_EQ(function->mode(), Function::SCALAR);
-
-    // We handle the PROTO_DEFAULT_IF_NULL() function here so that it can be
-    // resolved to a ResolvedGetProtoField.
-    if (IsProtoDefaultIfNull(function)) {
-      if (!language().LanguageFeatureEnabled(FEATURE_PROTO_DEFAULT_IF_NULL)) {
-        return MakeSqlErrorAt(ast_location)
-               << "The PROTO_DEFAULT_IF_NULL function is not supported";
-      }
-      ZETASQL_RETURN_IF_ERROR(ResolveProtoDefaultIfNull(
-          ast_location, resolved_function_call->release_argument_list(),
-          resolved_expr_out));
-    } else if (IsFlatten(function)) {
-      if (expr_resolution_info->in_horizontal_aggregation) {
-        return MakeSqlErrorAt(ast_location)
-               << "Horizontal aggregation expression must not include FLATTEN";
-      }
-      ZETASQL_RET_CHECK(
-          language().LanguageFeatureEnabled(FEATURE_UNNEST_AND_FLATTEN_ARRAYS))
-          << "The FLATTEN function is not supported";
-      ZETASQL_RET_CHECK_EQ(1, resolved_function_call->argument_list_size());
-      *resolved_expr_out =
-          std::move(resolved_function_call->release_argument_list()[0]);
-    } else if (IsMatchRecognizeMeasuresFunction(function)) {
-      ZETASQL_RET_CHECK_EQ(function->NumSignatures(), 1);
-      ZETASQL_RET_CHECK(match_recognize_state_.has_value());
-      ZETASQL_RET_CHECK(!expr_resolution_info->in_match_recognize_define);
-      if (!expr_resolution_info->name_scope->allows_match_number_function()) {
-        // MR state is initialized, but the namescope doesn't even allow
-        // MATCH_NUMBER(). This means that the function is called from a
-        // subquery and not directly from the MEASURES clause.
-        return MakeSqlErrorAt(ast_location)
-               << function->SQLName() << " must be called directly from the "
-               << "MEASURES clause, not from a subquery";
-      }
-      int64_t signature_id = function->GetSignature(0)->context_id();
-      switch (signature_id) {
-        case FN_MATCH_NUMBER: {
-          // Rewrite to a column ref, exposing the actual state.
-          ZETASQL_RET_CHECK(
-              match_recognize_state_->match_number_column.IsInitialized());
-          ZETASQL_RET_CHECK(
-              expr_resolution_info->name_scope->allows_match_number_function());
-          *resolved_expr_out =
-              MakeColumnRef(match_recognize_state_->match_number_column);
-          ZETASQL_RET_CHECK_EQ(resolved_expr_out->get()->type()->kind(), TYPE_INT64);
-          break;
-        }
-        case FN_MATCH_ROW_NUMBER: {
-          ZETASQL_RET_CHECK(
-              match_recognize_state_->match_row_number_column.IsInitialized());
-          if (!expr_resolution_info->name_scope->allows_match_row_functions()) {
-            return MakeSqlErrorAt(ast_location)
-                   << function->QualifiedSQLName(/*capitalize_qualifier=*/true)
-                   << " must be aggregated";
-          }
-          // Rewrite to a column ref, exposing the actual state.
-          *resolved_expr_out =
-              MakeColumnRef(match_recognize_state_->match_row_number_column);
-          ZETASQL_RET_CHECK_EQ(resolved_expr_out->get()->type()->kind(), TYPE_INT64);
-          break;
-        }
-        case FN_CLASSIFIER: {
-          // Rewrite to a column ref, exposing the actual state.
-          if (!expr_resolution_info->name_scope->allows_match_row_functions()) {
-            return MakeSqlErrorAt(ast_location)
-                   << function->QualifiedSQLName(/*capitalize_qualifier=*/true)
-                   << " must be aggregated";
-          }
-          ZETASQL_RET_CHECK(match_recognize_state_->classifier_column.IsInitialized());
-          *resolved_expr_out =
-              MakeColumnRef(match_recognize_state_->classifier_column);
-          ZETASQL_RET_CHECK_EQ(resolved_expr_out->get()->type()->kind(), TYPE_STRING);
-          break;
-        }
-        default:
-          ZETASQL_RET_CHECK_FAIL()
-              << "Expected a MATCH_RECOGNIZE special function, found: "
-              << function->QualifiedSQLName(/*capitalize_qualifier=*/true);
-      }
-    } else if (IsMatchRecognizePhysicalNavigationFunction(function)) {
-      ZETASQL_ASSIGN_OR_RETURN(*resolved_expr_out,
-                       ResolveAsMatchRecognizePhysicalNavigationFunction(
-                           ast_location, function, expr_resolution_info,
-                           std::move(resolved_function_call)));
-    } else if (IsRegexpExtractGroupsFunction(
-                   function, resolved_function_call->signature())) {
-      ZETASQL_ASSIGN_OR_RETURN(*resolved_expr_out,
-                       ResolveAsRegexpExtractGroupsFunction(
-                           ast_location, function, expr_resolution_info,
-                           std::move(resolved_function_call)),
-                       _.With(zetasql::LocationOverride(ast_location)));
-    } else {
-      *resolved_expr_out = std::move(resolved_function_call);
-    }
+    return ResolveProtoDefaultIfNull(
+        ast_location, resolved_function_call->release_argument_list(),
+        resolved_expr_out);
   }
 
-  // TODO: Migrate remaining functions (that do not have lambda
-  //     type arguments for now) to use FunctionSignatureRewriteOptions.
-  if ((*resolved_expr_out)->Is<ResolvedFunctionCallBase>()) {
-    const auto* call = (*resolved_expr_out)->GetAs<ResolvedFunctionCallBase>();
-    if (call->function()->IsZetaSQLBuiltin()) {
-      switch (call->signature().context_id()) {
-        case FN_PROTO_MAP_CONTAINS_KEY:
-        case FN_PROTO_MODIFY_MAP:
-          analyzer_output_properties_.MarkRelevant(REWRITE_PROTO_MAP_FNS);
-          break;
-        case FN_STRING_ARRAY_LIKE_ANY:
-        case FN_BYTE_ARRAY_LIKE_ANY:
-        case FN_STRING_LIKE_ANY:
-        case FN_BYTE_LIKE_ANY:
-        case FN_STRING_ARRAY_LIKE_ALL:
-        case FN_BYTE_ARRAY_LIKE_ALL:
-        case FN_STRING_LIKE_ALL:
-        case FN_BYTE_LIKE_ALL:
-        case FN_STRING_NOT_LIKE_ANY:
-        case FN_BYTE_NOT_LIKE_ANY:
-        case FN_STRING_ARRAY_NOT_LIKE_ANY:
-        case FN_BYTE_ARRAY_NOT_LIKE_ANY:
-        case FN_STRING_NOT_LIKE_ALL:
-        case FN_BYTE_NOT_LIKE_ALL:
-        case FN_STRING_ARRAY_NOT_LIKE_ALL:
-        case FN_BYTE_ARRAY_NOT_LIKE_ALL:
-          analyzer_output_properties_.MarkRelevant(REWRITE_LIKE_ANY_ALL);
-          break;
-        default:
-          break;
-      }
+  if (IsFlatten(function)) {
+    if (expr_resolution_info->in_horizontal_aggregation) {
+      return MakeSqlErrorAt(ast_location)
+             << "Horizontal aggregation expression must not include FLATTEN";
     }
+    ZETASQL_RET_CHECK(
+        language().LanguageFeatureEnabled(FEATURE_UNNEST_AND_FLATTEN_ARRAYS))
+        << "The FLATTEN function is not supported";
+    ZETASQL_RET_CHECK_EQ(1, resolved_function_call->argument_list_size());
+    *resolved_expr_out =
+        std::move(resolved_function_call->release_argument_list()[0]);
+    return absl::OkStatus();
   }
 
+  if (IsMatchRecognizeMeasuresFunction(function)) {
+    ZETASQL_RET_CHECK_EQ(function->NumSignatures(), 1);
+    ZETASQL_RET_CHECK(match_recognize_state_.has_value());
+    ZETASQL_RET_CHECK(!expr_resolution_info->in_match_recognize_define);
+    if (!expr_resolution_info->name_scope->allows_match_number_function()) {
+      // MR state is initialized, but the namescope doesn't even allow
+      // MATCH_NUMBER(). This means that the function is called from a
+      // subquery and not directly from the MEASURES clause.
+      return MakeSqlErrorAt(ast_location)
+             << function->SQLName() << " must be called directly from the "
+             << "MEASURES clause, not from a subquery";
+    }
+    int64_t signature_id = function->GetSignature(0)->context_id();
+    switch (signature_id) {
+      case FN_MATCH_NUMBER: {
+        // Rewrite to a column ref, exposing the actual state.
+        ZETASQL_RET_CHECK(match_recognize_state_->match_number_column.IsInitialized());
+        ZETASQL_RET_CHECK(
+            expr_resolution_info->name_scope->allows_match_number_function());
+        *resolved_expr_out =
+            MakeColumnRef(match_recognize_state_->match_number_column);
+        ZETASQL_RET_CHECK_EQ(resolved_expr_out->get()->type()->kind(), TYPE_INT64);
+        break;
+      }
+      case FN_MATCH_ROW_NUMBER: {
+        ZETASQL_RET_CHECK(
+            match_recognize_state_->match_row_number_column.IsInitialized());
+        if (!expr_resolution_info->name_scope->allows_match_row_functions()) {
+          return MakeSqlErrorAt(ast_location)
+                 << function->QualifiedSQLName(/*capitalize_qualifier=*/true)
+                 << " must be aggregated";
+        }
+        // Rewrite to a column ref, exposing the actual state.
+        *resolved_expr_out =
+            MakeColumnRef(match_recognize_state_->match_row_number_column);
+        ZETASQL_RET_CHECK_EQ(resolved_expr_out->get()->type()->kind(), TYPE_INT64);
+        break;
+      }
+      case FN_CLASSIFIER: {
+        // Rewrite to a column ref, exposing the actual state.
+        if (!expr_resolution_info->name_scope->allows_match_row_functions()) {
+          return MakeSqlErrorAt(ast_location)
+                 << function->QualifiedSQLName(/*capitalize_qualifier=*/true)
+                 << " must be aggregated";
+        }
+        ZETASQL_RET_CHECK(match_recognize_state_->classifier_column.IsInitialized());
+        *resolved_expr_out =
+            MakeColumnRef(match_recognize_state_->classifier_column);
+        ZETASQL_RET_CHECK_EQ(resolved_expr_out->get()->type()->kind(), TYPE_STRING);
+        break;
+      }
+      default:
+        ZETASQL_RET_CHECK_FAIL()
+            << "Expected a MATCH_RECOGNIZE special function, found: "
+            << function->QualifiedSQLName(/*capitalize_qualifier=*/true);
+    }
+    return absl::OkStatus();
+  }
+
+  if (IsMatchRecognizePhysicalNavigationFunction(function)) {
+    ZETASQL_ASSIGN_OR_RETURN(*resolved_expr_out,
+                     ResolveAsMatchRecognizePhysicalNavigationFunction(
+                         ast_location, function, expr_resolution_info,
+                         std::move(resolved_function_call)));
+
+    return absl::OkStatus();
+  }
+
+  if (IsRegexpExtractGroupsFunction(function,
+                                    resolved_function_call->signature())) {
+    ZETASQL_ASSIGN_OR_RETURN(*resolved_expr_out,
+                     ResolveAsRegexpExtractGroupsFunction(
+                         ast_location, function, expr_resolution_info,
+                         std::move(resolved_function_call)),
+                     _.With(zetasql::LocationOverride(ast_location)));
+    return absl::OkStatus();
+  }
+
+  *resolved_expr_out = std::move(resolved_function_call);
   return absl::OkStatus();
 }
 
@@ -11185,12 +11256,6 @@ absl::Status Resolver::ResolveFunctionCallImpl(
     }
   }
   ZETASQL_RETURN_IF_ERROR(ValidateNamedLambdas(function, arguments));
-
-  if ((function->Is<SQLFunctionInterface>() ||
-       function->Is<TemplatedSQLFunction>()) &&
-      !function->IsAggregate()) {
-    analyzer_output_properties_.MarkRelevant(REWRITE_INLINE_SQL_FUNCTIONS);
-  }
 
   if (function->function_options().volatility == FunctionEnums::VOLATILE) {
     expr_resolution_info->findings.has_volatile = true;
@@ -11913,8 +11978,6 @@ absl::Status Resolver::ResolveWithExpr(
   const Type* const output_expr_type = output_expr->type();
   *resolved_expr_out = MakeResolvedWithExpr(
       output_expr_type, std::move(computed_columns), std::move(output_expr));
-  analyzer_output_properties_.MarkRelevant(
-      ResolvedASTRewrite::REWRITE_WITH_EXPR);
   parent_expr_resolution_info->findings.has_analytic =
       parent_expr_resolution_info->findings.has_analytic || child_has_analytic;
   parent_expr_resolution_info->findings.has_aggregation =

@@ -151,6 +151,8 @@ Important: If you use a named window, special rules apply to
 
 +  `PARTITION BY`: Breaks up the input rows into separate partitions, over
    which the window function is independently evaluated.
+   +  A `partition_expression` computes a value that determines which partition
+      each row falls into.
    +  Multiple partition expressions are allowed in the `PARTITION BY` clause.
    +  An expression can't contain floating point types, non-groupable types,
       constants, or window functions.

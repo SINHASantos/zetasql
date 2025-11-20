@@ -348,6 +348,17 @@ select k.* from TestExtraValueTable k
 [SAME AS PREVIOUS]
 ==
 
+[language_features=NONE,+TOP_LEVEL_TABLE_STATEMENTS]
+TABLE TestExtraValueTable
+--
+QueryStmt
++-output_column_list=
+| +-TestExtraValueTable.value#1 AS `$value` [PROTO<zetasql_test__.TestExtraPB>]
++-is_value_table=TRUE
++-query=
+  +-TableScan(column_list=[TestExtraValueTable.value#1], table=TestExtraValueTable, column_index_list=[0])
+==
+
 select k.k from TestExtraValueTable k
 --
 ERROR: Protocol buffer zetasql_test__.TestExtraPB does not have a field called k [at 1:10]

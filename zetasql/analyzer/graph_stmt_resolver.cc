@@ -1225,7 +1225,6 @@ absl::Status GraphStmtResolver::ResolveCreatePropertyGraphStmt(
       "Please use a different name")));
   *output = absl::WrapUnique(const_cast<ResolvedCreatePropertyGraphStmt*>(
       create_property_graph_stmt.release()));
-
   return absl::OkStatus();
 }
 

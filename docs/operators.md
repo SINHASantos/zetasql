@@ -1554,7 +1554,7 @@ value.
 ```zetasql
 SELECT
   DATE "2021-04-20" + INTERVAL 25 HOUR AS date_plus,
-  TIMESTAMP "2021-05-02 00:01:02.345" - INTERVAL 10 SECOND AS time_minus;
+  TIMESTAMP "2021-05-02 00:01:02.345+00" - INTERVAL 10 SECOND AS time_minus;
 
 /*-------------------------+--------------------------------+
  | date_plus               | time_minus                     |
@@ -3235,43 +3235,36 @@ following semantics apply in this order:
 + Returns `FALSE` if `patterns` is empty.
 + Returns `NULL` if `search_value` is `NULL`.
 + Returns `TRUE` if `search_value` matches at least one value in `patterns`.
-+ Returns `NULL` if a pattern in `patterns` is `NULL` and other patterns
-  in `patterns` don't match.
++ Returns `NULL` if a pattern in `patterns` is `NULL`.
 + Returns `FALSE`.
 
 When using the quantified `LIKE` operator with `ALL`, the following semantics
 apply in this order:
 
-+ For `pattern_subquery`, returns `TRUE` if `patterns` is empty.
-+ For `pattern_array`, returns `FALSE` if `patterns` is empty.
++ Returns `TRUE` if `patterns` is empty.
 + Returns `NULL` if `search_value` is `NULL`.
-+ Returns `TRUE` if `search_value` matches all values in `patterns`.
-+ Returns `NULL` if a pattern in `patterns` is `NULL` and other patterns
-  in `patterns` don't match.
-+ Returns `FALSE`.
++ Returns `FALSE` if `search_value LIKE pattern` is `FALSE` for at least one value in `patterns`.
++ Returns `NULL` if a pattern in `patterns` is `NULL`.
++ Returns `TRUE`.
 
 When using the quantified `NOT LIKE` operator with `ANY` or `SOME`, the
 following semantics apply in this order:
 
-+ For `pattern_subquery`, returns `TRUE` if `patterns` is empty.
-+ For `pattern_array`, returns `TRUE` if `patterns` is empty.
++ Returns `FALSE` if `patterns` is empty.
 + Returns `NULL` if `search_value` is `NULL`.
-+ Returns `TRUE` if `search_value` doesn't match at least one value in
-  `patterns`.
-+ Returns `NULL` if a pattern in `patterns` is `NULL` and other patterns
-  in `patterns` don't match.
++ Returns `TRUE` if `search_value LIKE pattern` is `FALSE` for at least one value in `patterns`.
++ Returns `NULL` if a pattern in `patterns` is `NULL`.
 + Returns `FALSE`.
 
 When using the quantified `NOT LIKE` operator with `ALL`, the following
 semantics apply in this order:
 
-+ For `pattern_subquery`, returns `FALSE` if `patterns` is empty.
++ Returns `TRUE` if `patterns` is empty.
 + For `pattern_array`, returns `TRUE` if `patterns` is empty.
 + Returns `NULL` if `search_value` is `NULL`.
-+ Returns `TRUE` if `search_value` matches none of the values in `patterns`.
-+ Returns `NULL` if a pattern in `patterns` is `NULL` and other patterns
-  in `patterns` don't match.
-+ Returns `FALSE`.
++ Returns `FALSE` if `search_value` matches at least one value in `patterns`.
++ Returns `NULL` if a pattern in `patterns` is `NULL`.
++ Returns `TRUE`.
 
 **Return Data Type**
 

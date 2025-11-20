@@ -350,7 +350,7 @@ class IntervalValue final {
       absl::string_view bytes);
 
   // Serialize and deserialize this interval value as an int128.
-  absl::int128 SerializeAsInt128();
+  absl::int128 SerializeAsInt128() const;
   static absl::StatusOr<IntervalValue> DeserializeFromInt128(
       absl::int128 value);
 

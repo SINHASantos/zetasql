@@ -8172,3 +8172,33 @@ QueryStmt
         |     +-Literal(type=STRING, value="abc")
         +-column_index_list=[0]
         +-function_call_signature=(optional(1) ANY TABLE, optional(1) STRING) -> TABLE<INT64>
+==
+
+# Test with relation argument enclosed within brackets.
+[language_features=NONE,+TABLE_VALUED_FUNCTIONS,+TOP_LEVEL_TABLE_STATEMENTS]
+
+select *
+from tvf_optional_relation_optional_scalar((Table KeyValue), "abc")
+--
+QueryStmt
++-output_column_list=
+| +-tvf_optional_relation_optional_scalar.$col0#3 AS `$col0` [INT64]
++-query=
+  +-ProjectScan
+    +-column_list=[tvf_optional_relation_optional_scalar.$col0#3]
+    +-input_scan=
+      +-TVFScan
+        +-column_list=[tvf_optional_relation_optional_scalar.$col0#3]
+        +-tvf=tvf_optional_relation_optional_scalar((optional ANY TABLE, optional STRING) -> TABLE<INT64>)
+        +-signature=(TABLE<Key INT64, Value STRING>, literal STRING) -> TABLE<INT64>
+        +-argument_list=
+        | +-FunctionArgument
+        | | +-scan=
+        | | | +-TableScan(column_list=KeyValue.[Key#1, Value#2], table=KeyValue, column_index_list=[0, 1])
+        | | +-argument_column_list=KeyValue.[Key#1, Value#2]
+        | +-FunctionArgument
+        |   +-expr=
+        |     +-Literal(type=STRING, value="abc")
+        +-column_index_list=[0]
+        +-function_call_signature=(optional(1) ANY TABLE, optional(1) STRING) -> TABLE<INT64>
+

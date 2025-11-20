@@ -91,6 +91,35 @@ cc_library(
 )
 
 cc_library(
+    name = "row_type_rewriter",
+    srcs = ["row_type_rewriter.cc"],
+    hdrs = ["row_type_rewriter.h"],
+    deps = [
+        "//zetasql/base:check",
+        "//zetasql/base:map_util",
+        "//zetasql/base:ret_check",
+        "//zetasql/base:status",
+        "//zetasql/public:analyzer_options",
+        "//zetasql/public:catalog",
+        "//zetasql/public:function_headers",
+        "//zetasql/public:options_cc_proto",
+        "//zetasql/public:rewriter_interface",
+        "//zetasql/public/types",
+        "//zetasql/resolved_ast",
+        "//zetasql/resolved_ast:column_factory",
+        "//zetasql/resolved_ast:resolved_ast_builder",
+        "//zetasql/resolved_ast:resolved_ast_rewrite_visitor",
+        "//zetasql/resolved_ast:rewrite_utils",
+        "@com_google_absl//absl/container:flat_hash_map",
+        "@com_google_absl//absl/log",
+        "@com_google_absl//absl/status",
+        "@com_google_absl//absl/status:statusor",
+        "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/types:span",
+    ],
+)
+
+cc_library(
     name = "sql_function_inliner",
     srcs = ["sql_function_inliner.cc"],
     hdrs = ["sql_function_inliner.h"],
@@ -554,6 +583,30 @@ cc_library(
         "//zetasql/resolved_ast",
         "//zetasql/resolved_ast:resolved_ast_rewrite_visitor",
         "@com_google_absl//absl/status:statusor",
+    ],
+)
+
+cc_library(
+    name = "variadic_function_signature_expander",
+    srcs = ["variadic_function_signature_expander.cc"],
+    hdrs = ["variadic_function_signature_expander.h"],
+    deps = [
+        "//zetasql/base:ret_check",
+        "//zetasql/base:status",
+        "//zetasql/public:analyzer_options",
+        "//zetasql/public:analyzer_output_properties",
+        "//zetasql/public:builtin_function_cc_proto",
+        "//zetasql/public:catalog",
+        "//zetasql/public:function_cc_proto",
+        "//zetasql/public:function_headers",
+        "//zetasql/public:options_cc_proto",
+        "//zetasql/public:rewriter_interface",
+        "//zetasql/public/types",
+        "//zetasql/resolved_ast",
+        "//zetasql/resolved_ast:resolved_ast_builder",
+        "//zetasql/resolved_ast:resolved_ast_rewrite_visitor",
+        "@com_google_absl//absl/status:statusor",
+        "@com_google_absl//absl/strings",
     ],
 )
 

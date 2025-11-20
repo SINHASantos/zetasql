@@ -105,8 +105,8 @@ QueryStmt
     |       TestEnum -> ambiguous
     |       key -> ambiguous
     |     Range variables:
-    |       TestTable -> RANGE_VARIABLE<key,TestEnum,KitchenSink>
-    |       t2 -> RANGE_VARIABLE<key,TestEnum,KitchenSink>
+    |       TestTable -> RANGE_VARIABLE<key#1,TestEnum#2,KitchenSink#3>
+    |       t2 -> RANGE_VARIABLE<key#4,TestEnum#5,KitchenSink#6>
     |   """
     +-input_scan=
       +-JoinScan
@@ -158,7 +158,7 @@ QueryStmt
     |     named zetasql_test__.TestExtraPB named.$col1#1 (value table)
     |   NameScope:
     |     Range variables:
-    |       named -> RANGE_VARIABLE<$value>
+    |       named -> RANGE_VARIABLE<$col1#1> (value table)
     |     Value table columns:
     |       named.$col1#1
     |   """
@@ -271,8 +271,8 @@ QueryStmt
     |       Filename -> STRING (TestExtraValueTable.Filename#2) (implicit) (pseudo-column)
     |       RowId -> BYTES (TestExtraValueTable.RowId#3) (implicit) (pseudo-column)
     |     Range variables:
-    |       TestExtraValueTable -> RANGE_VARIABLE<$value>
-    |       ar -> RANGE_VARIABLE<$value>
+    |       TestExtraValueTable -> RANGE_VARIABLE<value#1, pseudo_columns: Filename#2,RowId#3> (value table)
+    |       ar -> RANGE_VARIABLE<ar#4> (value table)
     |     Value table columns:
     |       TestExtraValueTable.value#1
     |       $array.ar#4
@@ -349,7 +349,7 @@ QueryStmt
     |   |   |       Filename -> STRING (TestExtraValueTable.Filename#2) (implicit) (pseudo-column)
     |   |   |       RowId -> BYTES (TestExtraValueTable.RowId#3) (implicit) (pseudo-column)
     |   |   |     Range variables:
-    |   |   |       TestExtraValueTable -> RANGE_VARIABLE<$value>
+    |   |   |       TestExtraValueTable -> RANGE_VARIABLE<value#1, pseudo_columns: Filename#2,RowId#3> (value table)
     |   |   |     Value table columns:
     |   |   |       TestExtraValueTable.value#1
     |   |   |   """
@@ -464,7 +464,7 @@ QueryStmt
     |       RowId -> BYTES (TestExtraValueTable.RowId#3) (implicit) (pseudo-column)
     |       x -> INT64 ($pipe_extend.x#4)
     |     Range variables:
-    |       TestExtraValueTable -> RANGE_VARIABLE<$value>
+    |       TestExtraValueTable -> RANGE_VARIABLE<value#1, pseudo_columns: Filename#2,RowId#3> (value table)
     |     Value table columns:
     |       TestExtraValueTable.value#1
     |   """
@@ -485,7 +485,7 @@ QueryStmt
             |       Filename -> STRING (TestExtraValueTable.Filename#2) (implicit) (pseudo-column)
             |       RowId -> BYTES (TestExtraValueTable.RowId#3) (implicit) (pseudo-column)
             |     Range variables:
-            |       TestExtraValueTable -> RANGE_VARIABLE<$value>
+            |       TestExtraValueTable -> RANGE_VARIABLE<value#1, pseudo_columns: Filename#2,RowId#3> (value table)
             |     Value table columns:
             |       TestExtraValueTable.value#1
             |   """
@@ -589,9 +589,9 @@ QueryStmt
     |       Filename -> ambiguous
     |       RowId -> ambiguous
     |     Range variables:
-    |       TestExtraValueTable -> RANGE_VARIABLE<$value>
-    |       row -> RANGE_VARIABLE<$value>
-    |       v1 -> RANGE_VARIABLE<$value>
+    |       TestExtraValueTable -> RANGE_VARIABLE<value#4, pseudo_columns: Filename#5,RowId#6> (value table)
+    |       row -> RANGE_VARIABLE<value#7, pseudo_columns: Filename#8,RowId#9> (value table)
+    |       v1 -> RANGE_VARIABLE<value#1, pseudo_columns: Filename#2,RowId#3> (value table)
     |     Value table columns:
     |       TestExtraValueTable.value#1
     |       TestExtraValueTable.value#4
@@ -693,7 +693,7 @@ QueryStmt
         |       Key -> INT64 (q1.Key#3) (implicit)
         |       Value -> STRING (q1.Value#4) (implicit)
         |     Range variables:
-        |       q1 -> RANGE_VARIABLE<Key,Value>
+        |       q1 -> RANGE_VARIABLE<Key#3,Value#4>
         |
         |   **Common table expressions**:
         |   Name  Columns
@@ -1395,8 +1395,8 @@ QueryStmt
     |       TestEnum -> ambiguous
     |       key -> ambiguous
     |     Range variables:
-    |       row1 -> RANGE_VARIABLE<key,TestEnum,AnotherTestEnum>
-    |       row2 -> RANGE_VARIABLE<key,TestEnum,AnotherTestEnum>
+    |       row1 -> RANGE_VARIABLE<key#1,TestEnum#2,AnotherTestEnum#3, pseudo_columns: Filename#4,RowId#5>
+    |       row2 -> RANGE_VARIABLE<key#6,TestEnum#7,AnotherTestEnum#8, pseudo_columns: Filename#9,RowId#10>
     |   """
     +-input_scan=
       +-JoinScan
@@ -1450,9 +1450,9 @@ QueryStmt
     |       RowId -> ambiguous
     |       Value -> ambiguous
     |     Range variables:
-    |       TestExtraValueTable -> RANGE_VARIABLE<$value>
-    |       kv1 -> RANGE_VARIABLE<Key,Value>
-    |       row -> RANGE_VARIABLE<Key,Value,TestExtraValueTable>
+    |       TestExtraValueTable -> RANGE_VARIABLE<value#3, pseudo_columns: Filename#4,RowId#5> (value table)
+    |       kv1 -> RANGE_VARIABLE<Key#1,Value#2>
+    |       row -> RANGE_VARIABLE<Key#6,Value#7,value#8 AS TestExtraValueTable, pseudo_columns: Filename#9,RowId#10>
     |     Value table columns:
     |       TestExtraValueTable.value#3
     |       TestExtraValueTable.value#8
@@ -1504,10 +1504,10 @@ QueryStmt
     |       RowId -> ambiguous
     |       Value -> ambiguous
     |     Range variables:
-    |       TestExtraValueTable -> RANGE_VARIABLE<$value>
-    |       kv1 -> RANGE_VARIABLE<Key,Value>
-    |       kv2 -> RANGE_VARIABLE<Key,Value>
-    |       vt2 -> RANGE_VARIABLE<$value>
+    |       TestExtraValueTable -> RANGE_VARIABLE<value#3, pseudo_columns: Filename#4,RowId#5> (value table)
+    |       kv1 -> RANGE_VARIABLE<Key#1,Value#2>
+    |       kv2 -> RANGE_VARIABLE<Key#6,Value#7>
+    |       vt2 -> RANGE_VARIABLE<value#8, pseudo_columns: Filename#9,RowId#10> (value table)
     |     Value table columns:
     |       TestExtraValueTable.value#3
     |       TestExtraValueTable.value#8
@@ -1560,9 +1560,9 @@ QueryStmt
     |       Value -> ambiguous
     |       vt2 -> zetasql_test__.TestExtraPB (TestExtraValueTable.value#8)
     |     Range variables:
-    |       TestExtraValueTable -> RANGE_VARIABLE<$value>
-    |       kv1 -> RANGE_VARIABLE<Key,Value>
-    |       row -> RANGE_VARIABLE<Key,Value,vt2>
+    |       TestExtraValueTable -> RANGE_VARIABLE<value#3, pseudo_columns: Filename#4,RowId#5> (value table)
+    |       kv1 -> RANGE_VARIABLE<Key#1,Value#2>
+    |       row -> RANGE_VARIABLE<Key#6,Value#7,value#8 AS vt2, pseudo_columns: Filename#9,RowId#10>
     |     Value table columns:
     |       TestExtraValueTable.value#3
     |       TestExtraValueTable.value#8
@@ -1735,7 +1735,7 @@ QueryStmt
     |           |   |       TestEnum -> zetasql_test__.TestEnum (EnumTable.TestEnum#2) (implicit)
     |           |   |       key -> INT32 (EnumTable.key#1) (implicit)
     |           |   |     Range variables:
-    |           |   |       et -> RANGE_VARIABLE<key,TestEnum,AnotherTestEnum>
+    |           |   |       et -> RANGE_VARIABLE<key#1,TestEnum#2,AnotherTestEnum#3, pseudo_columns: Filename#4,RowId#5>
     |           |   |   """
     |           |   +-input_scan=
     |           |     +-TableScan(column_list=EnumTable.[key#1, TestEnum#2, AnotherTestEnum#3, Filename#4], table=EnumTable, column_index_list=[0, 1, 2, 3], alias="et")
@@ -1758,7 +1758,7 @@ QueryStmt
         |       TestEnum -> zetasql_test__.TestEnum (q.TestEnum#7) (implicit)
         |       key -> INT32 (q.key#6) (implicit)
         |     Range variables:
-        |       q -> RANGE_VARIABLE<key,TestEnum,AnotherTestEnum>
+        |       q -> RANGE_VARIABLE<key#6,TestEnum#7,AnotherTestEnum#8>
         |
         |   **Common table expressions**:
         |   Name  Columns
@@ -1833,7 +1833,7 @@ QueryStmt
     |   |       TestEnum -> zetasql_test__.TestEnum (q.TestEnum#13) (implicit)
     |   |       key -> INT32 (q.key#12) (implicit)
     |   |     Range variables:
-    |   |       q -> RANGE_VARIABLE<key,TestEnum,AnotherTestEnum>
+    |   |       q -> RANGE_VARIABLE<key#12,TestEnum#13,AnotherTestEnum#14>
     |   |
     |   |   **Common table expressions**:
     |   |   Name  Columns
@@ -1863,7 +1863,7 @@ QueryStmt
     |     nested_repeated_int64 INT64 $array.nested_repeated_int64#4 (value table)
     |   NameScope:
     |     Range variables:
-    |       nested_repeated_int64 -> RANGE_VARIABLE<$value>
+    |       nested_repeated_int64 -> RANGE_VARIABLE<nested_repeated_int64#4> (value table)
     |     Value table columns:
     |       $array.nested_repeated_int64#4
     |   """
@@ -1906,7 +1906,7 @@ QueryStmt
     |     nested_repeated_int64 INT64 $array.nested_repeated_int64#4 (value table)
     |   NameScope:
     |     Range variables:
-    |       nested_repeated_int64 -> RANGE_VARIABLE<$value>
+    |       nested_repeated_int64 -> RANGE_VARIABLE<nested_repeated_int64#4> (value table)
     |     Value table columns:
     |       $array.nested_repeated_int64#4
     |   """
@@ -2018,8 +2018,8 @@ QueryStmt
     |   |   |     offset INT64 $array_offset.offset#2 (value table)
     |   |   |   NameScope:
     |   |   |     Range variables:
-    |   |   |       elem -> RANGE_VARIABLE<$value>
-    |   |   |       offset -> RANGE_VARIABLE<$value>
+    |   |   |       elem -> RANGE_VARIABLE<elem#1> (value table)
+    |   |   |       offset -> RANGE_VARIABLE<offset#2> (value table)
     |   |   |     Value table columns:
     |   |   |       $array.elem#1
     |   |   |       $array_offset.offset#2
@@ -2164,7 +2164,7 @@ QueryStmt
     |       Filename -> STRING (TestExtraValueTable.Filename#2) (implicit) (pseudo-column)
     |       RowId -> BYTES (TestExtraValueTable.RowId#3) (implicit) (pseudo-column)
     |     Range variables:
-    |       vt -> RANGE_VARIABLE<$value>
+    |       vt -> RANGE_VARIABLE<value#1, pseudo_columns: Filename#2,RowId#3> (value table)
     |     Value table columns:
     |       TestExtraValueTable.value#1
     |   """
@@ -2198,7 +2198,7 @@ QueryStmt
     |       Filename -> STRING (TestExtraValueTable.Filename#2) (implicit) (pseudo-column)
     |       RowId -> BYTES (TestExtraValueTable.RowId#3) (implicit) (pseudo-column)
     |     Range variables:
-    |       row2 -> RANGE_VARIABLE<$value>
+    |       row2 -> RANGE_VARIABLE<value#1, pseudo_columns: Filename#2,RowId#3> (value table)
     |     Value table columns:
     |       TestExtraValueTable.value#1
     |   """
@@ -2230,7 +2230,7 @@ QueryStmt
     |       Filename -> STRING (TestExtraValueTable.Filename#2) (implicit) (pseudo-column)
     |       RowId -> BYTES (TestExtraValueTable.RowId#3) (implicit) (pseudo-column)
     |     Range variables:
-    |       row1 -> RANGE_VARIABLE<$value>
+    |       row1 -> RANGE_VARIABLE<value#1, pseudo_columns: Filename#2,RowId#3> (value table)
     |     Value table columns:
     |       TestExtraValueTable.value#1
     |   """

@@ -3,10 +3,16 @@
 `execute_query` is a tool to parse, analyze and run SQL queries using the
 reference implementation.
 
+To use this tool, you should first untar the file
+
+```sh
+tar -xvf execute_query_linux.tar.gz && cd execute_query_release/
+```
+
 You can run a query by supplying it directly on the command-line:
 
 ```sh
-execute_query "select 1 + 1;"
+./execute_query "select 1 + 1;"
 ```
 
 The tool can be run as a local web server that presents a UI where you can enter
@@ -15,7 +21,7 @@ server and show a URL that you can open in your browser. You can also provide an
 optional `--port` flag (the default port is 8080).
 
 ```sh
-execute_query --web
+./execute_query --web
 ```
 
 > [!NOTE]
@@ -32,7 +38,7 @@ For example, this shows the
 parse tree, the resolved AST, and the results of executing the query.
 
 ```sh
-execute_query --mode=parse,analyze,execute 'SELECT 1+2, CONCAT("hello", " world");'
+./execute_query --mode=parse,analyze,execute 'SELECT 1+2, CONCAT("hello", " world");'
 ```
 
 The web UI (run with the `--web` flag) has checkboxes for selecting these modes.

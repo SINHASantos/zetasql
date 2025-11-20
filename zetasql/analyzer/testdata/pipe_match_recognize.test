@@ -261,7 +261,7 @@ QueryStmt
     |       key -> INT64 ($partitionby.key#3) (implicit)
     |       m -> INT64 ($match_recognize.m#10)
     |     Range variables:
-    |       mr -> RANGE_VARIABLE<key,m>
+    |       mr -> RANGE_VARIABLE<key#3,m#10>
     |   """
     +-input_scan=
       +-FilterScan

@@ -1120,3 +1120,11 @@ select struct<a string collate 'und:ci'>('abc');
 ERROR: Type with collation name is not supported in literal value construction [at 1:24]
 select struct<a string collate 'und:ci'>('abc');
                        ^
+==
+
+select struct<int64 x>(5);
+--
+ERROR: Type not found: x; Did you mean to define the STRUCT field as `x int64` instead?  [at 1:21]
+select struct<int64 x>(5);
+                    ^
+==

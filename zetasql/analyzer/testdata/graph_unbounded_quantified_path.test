@@ -73,15 +73,15 @@ select * from graph_table(aml
 --
 ALTERNATION GROUP: <empty>
 --
-ERROR: Unbounded quantified path pattern is not allowed without a selective search prefix or a restrictive path mode [at 2:10]
+ERROR: Unbounded quantified path pattern is not allowed without a selective search prefix or a restrictive path mode [at 2:15]
   match  (n)->{1, }(m)
-         ^
+              ^
 --
 ALTERNATION GROUP: ALL
 --
-ERROR: Unbounded quantified path pattern is not allowed without a selective search prefix or a restrictive path mode [at 2:9]
+ERROR: Unbounded quantified path pattern is not allowed without a selective search prefix or a restrictive path mode [at 2:18]
   match ALL (n)->{1, }(m)
-        ^
+                 ^
 ==
 
 # Non-selective search prefix error.
@@ -92,15 +92,15 @@ select * from graph_table(aml
 --
 ALTERNATION GROUP: <empty>
 --
-ERROR: Unbounded quantified path pattern is not allowed without a selective search prefix or a restrictive path mode [at 2:10]
+ERROR: Unbounded quantified path pattern is not allowed without a selective search prefix or a restrictive path mode [at 2:15]
   match  (n)->+(m)
-         ^
+              ^
 --
 ALTERNATION GROUP: ALL
 --
-ERROR: Unbounded quantified path pattern is not allowed without a selective search prefix or a restrictive path mode [at 2:9]
+ERROR: Unbounded quantified path pattern is not allowed without a selective search prefix or a restrictive path mode [at 2:18]
   match ALL (n)->+(m)
-        ^
+                 ^
 ==
 
 # Non-selective search prefix error.
@@ -111,15 +111,15 @@ select * from graph_table(aml
 --
 ALTERNATION GROUP: <empty>
 --
-ERROR: Unbounded quantified path pattern is not allowed without a selective search prefix or a restrictive path mode [at 2:10]
+ERROR: Unbounded quantified path pattern is not allowed without a selective search prefix or a restrictive path mode [at 2:15]
   match  (n)->*(m)
-         ^
+              ^
 --
 ALTERNATION GROUP: ALL
 --
-ERROR: Unbounded quantified path pattern is not allowed without a selective search prefix or a restrictive path mode [at 2:9]
+ERROR: Unbounded quantified path pattern is not allowed without a selective search prefix or a restrictive path mode [at 2:18]
   match ALL (n)->*(m)
-        ^
+                 ^
 ==
 
 # Non-restrictive path mode error.
@@ -130,15 +130,15 @@ select * from graph_table(aml
 --
 ALTERNATION GROUP: *
 --
-ERROR: Unbounded quantified path pattern is not allowed without a selective search prefix or a restrictive path mode [at 2:9]
+ERROR: Unbounded quantified path pattern is not allowed without a selective search prefix or a restrictive path mode [at 2:19]
   match WALK (n)->*(m)
-        ^
+                  ^
 --
 ALTERNATION GROUP: +
 --
-ERROR: Unbounded quantified path pattern is not allowed without a selective search prefix or a restrictive path mode [at 2:9]
+ERROR: Unbounded quantified path pattern is not allowed without a selective search prefix or a restrictive path mode [at 2:19]
   match WALK (n)->+(m)
-        ^
+                  ^
 ==
 
 select * from graph_table(aml
@@ -148,33 +148,33 @@ select * from graph_table(aml
 --
 ALTERNATION GROUP: *
 --
-ERROR: Unbounded quantified path pattern is not allowed without a selective search prefix or a restrictive path mode [at 2:24]
+ERROR: Unbounded quantified path pattern is not allowed without a selective search prefix or a restrictive path mode [at 2:34]
   match  ANY (a)->(b), ((n)-[e]->*(m))
-                       ^
+                                 ^
 --
 ALTERNATION GROUP: +
 --
-ERROR: Unbounded quantified path pattern is not allowed without a selective search prefix or a restrictive path mode [at 2:24]
+ERROR: Unbounded quantified path pattern is not allowed without a selective search prefix or a restrictive path mode [at 2:34]
   match  ANY (a)->(b), ((n)-[e]->+(m))
-                       ^
+                                 ^
 ==
 
 GRAPH aml
 MATCH (a)-[]->{1,}->(TRAIL (d)->())
 RETURN a.name
 --
-ERROR: Unbounded quantified path pattern is not allowed without a selective search prefix or a restrictive path mode [at 2:7]
+ERROR: Unbounded quantified path pattern is not allowed without a selective search prefix or a restrictive path mode [at 2:15]
 MATCH (a)-[]->{1,}->(TRAIL (d)->())
-      ^
+              ^
 ==
 
 GRAPH aml
 MATCH (a)-[]->(TRAIL (d)->()){1,}
 return COUNT(*)
 --
-ERROR: Unbounded quantified path pattern is not allowed without a selective search prefix or a restrictive path mode [at 2:7]
+ERROR: Unbounded quantified path pattern is not allowed without a selective search prefix or a restrictive path mode [at 2:30]
 MATCH (a)-[]->(TRAIL (d)->()){1,}
-      ^
+                             ^
 ==
 
 ###############################################################################
@@ -3001,4 +3001,5 @@ QueryStmt
                         +-aggregate_list=
                           +-cnt#20 := AggregateFunctionCall(ZetaSQL:$count_star() -> INT64)
 ==
+
 

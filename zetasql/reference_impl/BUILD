@@ -517,6 +517,7 @@ cc_library(
     deps = [
         "//zetasql/base:ret_check",
         "//zetasql/base:status",
+        "//zetasql/common:internal_value",
         "//zetasql/public:numeric_value",
         "//zetasql/public:options_cc_proto",
         "//zetasql/public:timestamp_picos_value",
@@ -987,7 +988,6 @@ cc_test(
         ":common",
         ":parameters",
         "//zetasql/base/testing:zetasql_gtest_main",
-        "@com_google_absl//absl/memory",
     ],
 )
 

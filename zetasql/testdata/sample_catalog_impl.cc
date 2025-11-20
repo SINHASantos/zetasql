@@ -9619,6 +9619,19 @@ void SampleCatalogImpl::LoadTableValuedFunctionsWithDeprecationWarnings() {
       output_schema_two_types));
 
   catalog_->AddOwnedTableValuedFunction(new FixedOutputSchemaTVF(
+      {"tvf_graph_with_named_arg"},
+      FunctionSignature(
+          FunctionArgumentType::RelationWithSchema(
+              output_schema_two_types,
+              /*extra_relation_input_columns_allowed=*/false),
+          {FunctionArgumentType::AnyGraph(),
+           FunctionArgumentType(types::StringType(),
+                                FunctionArgumentTypeOptions().set_argument_name(
+                                    "name", kNamedOnly))},
+          context_id++),
+      output_schema_two_types));
+
+  catalog_->AddOwnedTableValuedFunction(new FixedOutputSchemaTVF(
       {"bad_tvf_graph_not_first_argument"},
       {FunctionSignature(FunctionArgumentType::RelationWithSchema(
                              output_schema_two_types,

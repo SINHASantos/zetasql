@@ -17,6 +17,8 @@ load("@bazel_skylib//:bzl_library.bzl", "bzl_library")
 load("@com_google_protobuf//bazel:proto_library.bzl", "proto_library")
 load("@rules_cc//cc:cc_binary.bzl", "cc_binary")
 load("@rules_cc//cc:cc_library.bzl", "cc_library")
+load("@rules_pkg//:pkg.bzl", "pkg_tar")
+load("@rules_pkg//pkg:mappings.bzl", "pkg_attributes", "pkg_files")
 load("//zetasql/tools/execute_query:build_rules.bzl", "execute_query_test")
 
 package(
@@ -137,6 +139,34 @@ cc_binary(
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/strings:str_format",
     ],
+)
+
+pkg_files(
+    name = "execute_query_release_assets",
+    srcs = [
+        "execute_query_launcher.sh",
+        ":execute_query",
+    ],
+    attributes = pkg_attributes(
+        mode = "0755",
+    ),
+    include_runfiles = True,
+    renames = {
+        "execute_query": "execute_query_bin",
+        "execute_query_launcher.sh": "execute_query",
+    },
+    strip_prefix = ".",
+)
+
+pkg_tar(
+    name = "execute_query_release",
+    srcs = [
+        ":execute_query_release_assets",
+    ],
+    extension = "tar.gz",
+    include_runfiles = True,
+    package_dir = "execute_query_release",
+    strip_prefix = ".",
 )
 
 cc_library(

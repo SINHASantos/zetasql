@@ -653,11 +653,10 @@ LazyResolutionFunction::CreateTemplatedFunction(
     const ParseResumeLocation& templated_expression_resume_location,
     std::unique_ptr<ParserOutput> parser_output, absl::Status function_status,
     ErrorMessageOptions error_message_options,
-    FunctionEnums::Mode function_mode) {
+    FunctionEnums::Mode function_mode, ModuleDetails module_details) {
   return CreateImpl(parse_resume_location, templated_expression_resume_location,
                     std::move(parser_output), std::move(function_status),
-                    error_message_options, function_mode,
-                    ModuleDetails::CreateEmpty());
+                    error_message_options, function_mode, module_details);
 }
 
 absl::StatusOr<std::unique_ptr<LazyResolutionFunction>>

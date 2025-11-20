@@ -282,7 +282,7 @@ SubpipelineStmt
 |       |   |   |       TestEnum -> zetasql_test__.TestEnum (EnumTable.TestEnum#2) (implicit)
 |       |   |   |       key -> INT32 (EnumTable.key#1) (implicit)
 |       |   |   |     Range variables:
-|       |   |   |       EnumTable -> RANGE_VARIABLE<key,TestEnum,AnotherTestEnum>
+|       |   |   |       EnumTable -> RANGE_VARIABLE<key#1,TestEnum#2,AnotherTestEnum#3, pseudo_columns: Filename#4,RowId#5>
 |       |   |   |   """
 |       |   |   +-input_scan=
 |       |   |     +-SubpipelineInputScan(column_list=[EnumTable.key#1])
@@ -354,7 +354,7 @@ SubpipelineStmt
 |       |   |   |   |       Filename -> STRING (TestExtraValueTable.Filename#2) (implicit) (pseudo-column)
 |       |   |   |   |       RowId -> BYTES (TestExtraValueTable.RowId#3) (implicit) (pseudo-column)
 |       |   |   |   |     Range variables:
-|       |   |   |   |       TestExtraValueTable -> RANGE_VARIABLE<$value>
+|       |   |   |   |       TestExtraValueTable -> RANGE_VARIABLE<value#1, pseudo_columns: Filename#2,RowId#3> (value table)
 |       |   |   |   |     Value table columns:
 |       |   |   |   |       TestExtraValueTable.value#1
 |       |   |   |   |   """

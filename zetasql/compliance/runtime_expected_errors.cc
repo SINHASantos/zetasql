@@ -155,6 +155,9 @@ std::unique_ptr<MatcherCollection<absl::Status>> RuntimeExpectedErrorMatcher(
       absl::StatusCode::kOutOfRange,
       "Cannot write NULL to key or value of map field"));
   error_matchers.emplace_back(std::make_unique<StatusSubstringMatcher>(
+      absl::StatusCode::kOutOfRange,
+      "Cannot cast a NULL struct to a proto map entry"));
+  error_matchers.emplace_back(std::make_unique<StatusSubstringMatcher>(
       absl::StatusCode::kOutOfRange, "Key not found in map"));
   error_matchers.emplace_back(std::make_unique<StatusSubstringMatcher>(
       absl::StatusCode::kOutOfRange,
@@ -294,6 +297,8 @@ std::unique_ptr<MatcherCollection<absl::Status>> RuntimeExpectedErrorMatcher(
   error_matchers.emplace_back(std::make_unique<StatusRegexMatcher>(
       absl::StatusCode::kOutOfRange,
       "Error parsing proto: Message missing required fields.*"));
+  error_matchers.emplace_back(std::make_unique<StatusRegexMatcher>(
+      absl::StatusCode::kOutOfRange, "Cannot parse value for field:.*(\\S)+"));
 
   // Regex/Like Errors
   //
@@ -891,8 +896,22 @@ std::unique_ptr<MatcherCollection<absl::Status>> RuntimeExpectedErrorMatcher(
   error_matchers.emplace_back(std::make_unique<StatusRegexMatcher>(
       absl::StatusCode::kOutOfRange,
       "The provided JSON input is not an array"));
+  // The library that formats protos to JSON will do some extra validation on
+  // well known types and sometimes fail if it doesn't like what it finds. For
+  // example, when the seconds and nanoseconds in a protobuf.Duration sum to
+  // make a negative duration length the library will return an error.
+  error_matchers.emplace_back(std::make_unique<StatusRegexMatcher>(
+      absl::StatusCode::kOutOfRange,
+      "Converting proto to JSON failed:.*(\\S)+"));
 
   // UUID out of range errors.
+  error_matchers.emplace_back(std::make_unique<StatusRegexMatcher>(
+      absl::StatusCode::kOutOfRange,
+      "Invalid bytes value size for UUID, expected 16 bytes, but got .* "
+      "bytes."));
+  // TODO Remove this kInvalidArgument version after all external
+  // drivers have migrated to the new code, like Spanner which has a different
+  // version.
   error_matchers.emplace_back(std::make_unique<StatusRegexMatcher>(
       absl::StatusCode::kInvalidArgument,
       "Invalid bytes value size for UUID, expected 16 bytes, but got .* "

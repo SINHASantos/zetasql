@@ -24,6 +24,7 @@
 #include <optional>
 #include <set>
 #include <string>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -336,8 +337,8 @@ class TemplatedFunctionCallVisitor : public ResolvedASTVisitor {
 
   template <typename T>
   absl::Status VisitFunctionCall(const T* function_call) {
-    ZETASQL_RET_CHECK(function_call->template Is<ResolvedFunctionCall>() ||
-              function_call->template Is<ResolvedAggregateFunctionCall>());
+    static_assert(std::is_same_v<T, ResolvedFunctionCall> ||
+                  std::is_same_v<T, ResolvedAggregateFunctionCall>);
     if (function_call->function_call_info() != nullptr &&
         function_call->function_call_info()
             ->template Is<TemplatedSQLFunctionCall>()) {

@@ -324,7 +324,7 @@ QueryStmt
     |       Value -> STRING (KeyValue.Value#2) (implicit)
     |       x -> INT64 ($pipe_extend.x#3)
     |     Range variables:
-    |       KeyValue -> RANGE_VARIABLE<Key,Value>
+    |       KeyValue -> RANGE_VARIABLE<Key#1,Value#2>
     |   """
     +-input_scan=
       +-PipeIfScan
@@ -374,7 +374,7 @@ QueryStmt
     |       Value -> STRING (KeyValue.Value#2) (implicit)
     |       x -> INT64 ($pipe_extend.x#3)
     |     Range variables:
-    |       KeyValue -> RANGE_VARIABLE<Key,Value>
+    |       KeyValue -> RANGE_VARIABLE<Key#1,Value#2>
     |   """
     +-input_scan=
       +-PipeIfScan
@@ -424,7 +424,7 @@ QueryStmt
     |       Value -> STRING (KeyValue.Value#2) (implicit)
     |       y -> INT64 ($pipe_extend.y#3)
     |     Range variables:
-    |       KeyValue -> RANGE_VARIABLE<Key,Value>
+    |       KeyValue -> RANGE_VARIABLE<Key#1,Value#2>
     |   """
     +-input_scan=
       +-PipeIfScan
@@ -474,7 +474,7 @@ QueryStmt
     |       Value -> STRING (KeyValue.Value#2) (implicit)
     |       z -> INT64 ($pipe_extend.z#3)
     |     Range variables:
-    |       KeyValue -> RANGE_VARIABLE<Key,Value>
+    |       KeyValue -> RANGE_VARIABLE<Key#1,Value#2>
     |   """
     +-input_scan=
       +-PipeIfScan

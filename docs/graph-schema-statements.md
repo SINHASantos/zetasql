@@ -44,8 +44,8 @@ CREATE
   PROPERTY GRAPH
   [ IF NOT EXISTS ]
   <span class="var">property_graph_name</span>
-  <span class="var">property_graph_content</span>
-  [ OPTIONS (<span class="var">key</span>=<span class="var">value</span>, ...) ];
+  [ OPTIONS (<span class="var">key</span>=<span class="var">value</span>, ...) ]
+  <span class="var">property_graph_content</span>;
 
 <span class="var">property_graph_content</span>:
   <span class="var">node_tables</span>

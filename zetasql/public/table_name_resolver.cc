@@ -211,6 +211,9 @@ class TableNameResolver {
       const ASTGqlLinearOpsQuery* graph_linear_ops_query,
       const AliasSet& external_visible_aliases,
       AliasSet* local_visible_aliases);
+  absl::Status FindInTableClause(const ASTTableClause* table_clause,
+                                 const AliasSet& external_visible_aliases,
+                                 AliasSet* local_visible_aliases);
 
   absl::Status FindInGqlCallsOnNamedTvfsUnder(
       const ASTGraphTableQuery* graph_query,
@@ -1534,6 +1537,9 @@ absl::Status TableNameResolver::FindInQueryExpression(
           query_expr->GetAs<ASTGqlLinearOpsQuery>(), visible_aliases,
           new_aliases);
       break;
+    case AST_TABLE_CLAUSE:
+      return FindInTableClause(query_expr->GetAs<ASTTableClause>(),
+                               visible_aliases, new_aliases);
     default:
       return MakeSqlErrorAt(query_expr) << "Unhandled query_expr:\n"
                                         << query_expr->DebugString();
@@ -1909,6 +1915,36 @@ absl::Status TableNameResolver::FindInGraphLinearOpsQuery(
     ZETASQL_RETURN_IF_ERROR(FindInExpressionsUnder(op, external_visible_aliases));
   }
   return absl::OkStatus();
+}
+
+absl::Status TableNameResolver::FindInTableClause(
+    const ASTTableClause* table_clause,
+    const AliasSet& external_visible_aliases, AliasSet* local_visible_aliases) {
+  RETURN_ERROR_IF_OUT_OF_STACK_SPACE();
+  if (table_clause->table_path() != nullptr) {
+    const ASTPathExpression* path_expr = table_clause->table_path();
+    std::vector<std::string> path = path_expr->ToIdentifierVector();
+    ZETASQL_RET_CHECK(!path.empty());
+    const std::string first_identifier = absl::AsciiStrToLower(path[0]);
+    // A path in a TABLE clause should be extracted only if it refers to a
+    // catalog table. We ignore paths that resolve to WITH aliases or TVF
+    // arguments (from `local_table_aliases_`). We also ignore multi-part
+    // paths that start with an alias from an outer scope (from
+    // `external_visible_aliases`), because such paths cannot be catalog table
+    // references.
+    if ((path != recursive_view_name_) &&
+        (path.size() == 1
+             ? (!local_table_aliases_.contains(first_identifier))
+             : (!external_visible_aliases.contains(first_identifier)))) {
+      ZETASQL_RETURN_IF_ERROR(ResolveTablePath(path, /*for_system_time=*/nullptr));
+    }
+  }
+  if (table_clause->tvf() != nullptr) {
+    ZETASQL_RETURN_IF_ERROR(FindInTVF(table_clause->tvf(), external_visible_aliases,
+                              local_visible_aliases));
+  }
+  return FindInExpressionsUnder(table_clause->where_clause(),
+                                external_visible_aliases);
 }
 
 absl::Status TableNameResolver::FindInGqlCallsOnNamedTvfsUnder(

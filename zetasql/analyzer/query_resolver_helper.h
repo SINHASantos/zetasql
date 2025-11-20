@@ -286,7 +286,7 @@ struct GroupByColumnState {
 // to grouping/distinct and aggregation analysis for a single SELECT query
 // block.
 struct QueryGroupByAndAggregateInfo {
-  QueryGroupByAndAggregateInfo() {}
+  QueryGroupByAndAggregateInfo() = default;
 
   // Identifies whether or not group by or aggregation is present in this
   // (sub)query.
@@ -608,7 +608,7 @@ struct SelectColumnState {
 // and resolves the alias or ordinal references to the SELECT-list column.
 class SelectColumnStateList {
  public:
-  SelectColumnStateList() {}
+  SelectColumnStateList() = default;
   SelectColumnStateList(const SelectColumnStateList&) = delete;
   SelectColumnStateList& operator=(const SelectColumnStateList&) = delete;
 

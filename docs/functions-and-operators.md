@@ -1567,7 +1567,7 @@ value.
 ```zetasql
 SELECT
   DATE "2021-04-20" + INTERVAL 25 HOUR AS date_plus,
-  TIMESTAMP "2021-05-02 00:01:02.345" - INTERVAL 10 SECOND AS time_minus;
+  TIMESTAMP "2021-05-02 00:01:02.345+00" - INTERVAL 10 SECOND AS time_minus;
 
 /*-------------------------+--------------------------------+
  | date_plus               | time_minus                     |
@@ -3248,43 +3248,36 @@ following semantics apply in this order:
 + Returns `FALSE` if `patterns` is empty.
 + Returns `NULL` if `search_value` is `NULL`.
 + Returns `TRUE` if `search_value` matches at least one value in `patterns`.
-+ Returns `NULL` if a pattern in `patterns` is `NULL` and other patterns
-  in `patterns` don't match.
++ Returns `NULL` if a pattern in `patterns` is `NULL`.
 + Returns `FALSE`.
 
 When using the quantified `LIKE` operator with `ALL`, the following semantics
 apply in this order:
 
-+ For `pattern_subquery`, returns `TRUE` if `patterns` is empty.
-+ For `pattern_array`, returns `FALSE` if `patterns` is empty.
++ Returns `TRUE` if `patterns` is empty.
 + Returns `NULL` if `search_value` is `NULL`.
-+ Returns `TRUE` if `search_value` matches all values in `patterns`.
-+ Returns `NULL` if a pattern in `patterns` is `NULL` and other patterns
-  in `patterns` don't match.
-+ Returns `FALSE`.
++ Returns `FALSE` if `search_value LIKE pattern` is `FALSE` for at least one value in `patterns`.
++ Returns `NULL` if a pattern in `patterns` is `NULL`.
++ Returns `TRUE`.
 
 When using the quantified `NOT LIKE` operator with `ANY` or `SOME`, the
 following semantics apply in this order:
 
-+ For `pattern_subquery`, returns `TRUE` if `patterns` is empty.
-+ For `pattern_array`, returns `TRUE` if `patterns` is empty.
++ Returns `FALSE` if `patterns` is empty.
 + Returns `NULL` if `search_value` is `NULL`.
-+ Returns `TRUE` if `search_value` doesn't match at least one value in
-  `patterns`.
-+ Returns `NULL` if a pattern in `patterns` is `NULL` and other patterns
-  in `patterns` don't match.
++ Returns `TRUE` if `search_value LIKE pattern` is `FALSE` for at least one value in `patterns`.
++ Returns `NULL` if a pattern in `patterns` is `NULL`.
 + Returns `FALSE`.
 
 When using the quantified `NOT LIKE` operator with `ALL`, the following
 semantics apply in this order:
 
-+ For `pattern_subquery`, returns `FALSE` if `patterns` is empty.
++ Returns `TRUE` if `patterns` is empty.
 + For `pattern_array`, returns `TRUE` if `patterns` is empty.
 + Returns `NULL` if `search_value` is `NULL`.
-+ Returns `TRUE` if `search_value` matches none of the values in `patterns`.
-+ Returns `NULL` if a pattern in `patterns` is `NULL` and other patterns
-  in `patterns` don't match.
-+ Returns `FALSE`.
++ Returns `FALSE` if `search_value` matches at least one value in `patterns`.
++ Returns `NULL` if a pattern in `patterns` is `NULL`.
++ Returns `TRUE`.
 
 **Return Data Type**
 
@@ -34048,6 +34041,11 @@ this function doesn't generate errors for division by zero or overflow.
       <td>5.0</td>
     </tr>
     <tr>
+      <td>20.0</td>
+      <td>6.0</td>
+      <td>3.3333333333333335</td>
+    </tr>
+    <tr>
       <td>0.0</td>
       <td>25.0</td>
       <td>0.0</td>
@@ -44105,11 +44103,11 @@ SELECT
   'IX' AS b,
   NORMALIZE_AND_CASEFOLD('\u2168', NFD)=NORMALIZE_AND_CASEFOLD('IX', NFD) AS nfd,
   NORMALIZE_AND_CASEFOLD('\u2168', NFC)=NORMALIZE_AND_CASEFOLD('IX', NFC) AS nfc,
-  NORMALIZE_AND_CASEFOLD('\u2168', NFKD)=NORMALIZE_AND_CASEFOLD('IX', NFKD) AS nkfd,
-  NORMALIZE_AND_CASEFOLD('\u2168', NFKC)=NORMALIZE_AND_CASEFOLD('IX', NFKC) AS nkfc;
+  NORMALIZE_AND_CASEFOLD('\u2168', NFKD)=NORMALIZE_AND_CASEFOLD('IX', NFKD) AS nfkd,
+  NORMALIZE_AND_CASEFOLD('\u2168', NFKC)=NORMALIZE_AND_CASEFOLD('IX', NFKC) AS nfkc;
 
 /*---+----+-------+-------+------+------+
- | a | b  | nfd   | nfc   | nkfd | nkfc |
+ | a | b  | nfd   | nfc   | nfkd | nfkc |
  +---+----+-------+-------+------+------+
  | Ⅸ | IX | false | false | true | true |
  +---+----+-------+-------+------+------*/
@@ -47631,14 +47629,14 @@ SELECT FORMAT_TIMESTAMP("%b %Y", TIMESTAMP "2050-12-25 15:30:55+00")
 ```
 
 ```zetasql
-SELECT FORMAT_TIMESTAMP("%Y-%m-%dT%H:%M:%SZ", TIMESTAMP "2050-12-25 15:30:55", "UTC")
+SELECT FORMAT_TIMESTAMP("%Y-%m-%dT%H:%M:%S%Z", TIMESTAMP "2050-12-25 15:30:55", "UTC")
   AS formatted;
 
-/*+---------------------+
- |      formatted       |
- +----------------------+
- | 2050-12-25T15:30:55Z |
- +----------------------*/
+/*+-----------------------+
+ |       formatted        |
+ +------------------------+
+ | 2050-12-25T15:30:55UTC |
+ +------------------------*/
 ```
 
 [timestamp-format-elements]: https://github.com/google/zetasql/blob/master/docs/format-elements.md#format_elements_date_time

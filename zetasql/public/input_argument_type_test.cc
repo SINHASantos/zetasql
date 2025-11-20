@@ -17,7 +17,6 @@
 #include "zetasql/public/input_argument_type.h"
 
 #include <algorithm>
-#include <memory>
 #include <string>
 #include <vector>
 

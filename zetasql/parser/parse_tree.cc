@@ -796,28 +796,6 @@ std::string ASTWindowFrameExpr::GetBoundaryTypeString() const {
   return BoundaryTypeToString(boundary_type_);
 }
 
-const ASTFunctionCall* ASTAnalyticFunctionCall::function() const {
-  if (expression_ == nullptr) {
-    return nullptr;
-  }
-  if (expression_->node_kind() == ASTNodeKind::AST_FUNCTION_CALL) {
-    return static_cast<const ASTFunctionCall*>(expression_);
-  }
-  return nullptr;
-}
-
-const ASTFunctionCallWithGroupRows*
-ASTAnalyticFunctionCall::function_with_group_rows() const {
-  if (expression_ == nullptr) {
-    return nullptr;
-  }
-  if (expression_->node_kind() ==
-      ASTNodeKind::AST_FUNCTION_CALL_WITH_GROUP_ROWS) {
-    return static_cast<const ASTFunctionCallWithGroupRows*>(expression_);
-  }
-  return nullptr;
-}
-
 std::string ASTExpressionSubquery::ModifierToString(Modifier modifier) {
   switch (modifier) {
     case ARRAY:

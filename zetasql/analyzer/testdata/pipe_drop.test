@@ -30,7 +30,7 @@ QueryStmt
     |   |   |   |     Names:
     |   |   |   |       Value -> STRING (KeyValue.Value#2) (implicit)
     |   |   |   |     Range variables:
-    |   |   |   |       KeyValue -> RANGE_VARIABLE<Key,Value>
+    |   |   |   |       KeyValue -> RANGE_VARIABLE<Key#1,Value#2>
     |   |   |   |   """
     |   |   |   +-input_scan=
     |   |   |     +-StaticDescribeScan
@@ -45,7 +45,7 @@ QueryStmt
     |   |   |       |       Key -> INT64 (KeyValue.Key#1) (implicit)
     |   |   |       |       Value -> STRING (KeyValue.Value#2) (implicit)
     |   |   |       |     Range variables:
-    |   |   |       |       KeyValue -> RANGE_VARIABLE<Key,Value>
+    |   |   |       |       KeyValue -> RANGE_VARIABLE<Key#1,Value#2>
     |   |   |       |   """
     |   |   |       +-input_scan=
     |   |   |         +-TableScan(column_list=KeyValue.[Key#1, Value#2], table=KeyValue, column_index_list=[0, 1])
@@ -140,8 +140,8 @@ QueryStmt
         |   |     Names:
         |   |       Value -> ambiguous
         |   |     Range variables:
-        |   |       kv1 -> RANGE_VARIABLE<Key,Value>
-        |   |       kv2 -> RANGE_VARIABLE<Key,Value>
+        |   |       kv1 -> RANGE_VARIABLE<Key#1,Value#2>
+        |   |       kv2 -> RANGE_VARIABLE<Key#3,Value#4>
         |   |   """
         |   +-input_scan=
         |     +-StaticDescribeScan
@@ -158,8 +158,8 @@ QueryStmt
         |       |       Key -> ambiguous
         |       |       Value -> ambiguous
         |       |     Range variables:
-        |       |       kv1 -> RANGE_VARIABLE<Key,Value>
-        |       |       kv2 -> RANGE_VARIABLE<Key,Value>
+        |       |       kv1 -> RANGE_VARIABLE<Key#1,Value#2>
+        |       |       kv2 -> RANGE_VARIABLE<Key#3,Value#4>
         |       |   """
         |       +-input_scan=
         |         +-JoinScan
@@ -234,7 +234,7 @@ QueryStmt
             |     Names:
             |       Value -> STRING (KeyValue.Value#2) (implicit)
             |     Range variables:
-            |       key -> RANGE_VARIABLE<Key,Value>
+            |       key -> RANGE_VARIABLE<Key#1,Value#2>
             |   """
             +-input_scan=
               +-TableScan(column_list=[KeyValue.Value#2], table=KeyValue, column_index_list=[1], alias="key")
@@ -279,7 +279,7 @@ QueryStmt
     |       TestEnum -> zetasql_test__.TestEnum (EnumTable.TestEnum#2) (implicit)
     |       key -> INT32 (EnumTable.key#1) (implicit)
     |     Range variables:
-    |       EnumTable -> RANGE_VARIABLE<key,TestEnum,AnotherTestEnum>
+    |       EnumTable -> RANGE_VARIABLE<key#1,TestEnum#2,AnotherTestEnum#3, pseudo_columns: Filename#4,RowId#5>
     |   """
     +-input_scan=
       +-StaticDescribeScan
@@ -299,7 +299,7 @@ QueryStmt
         |       TestEnum -> zetasql_test__.TestEnum (EnumTable.TestEnum#2) (implicit)
         |       key -> INT32 (EnumTable.key#1) (implicit)
         |     Range variables:
-        |       EnumTable -> RANGE_VARIABLE<key,TestEnum,AnotherTestEnum>
+        |       EnumTable -> RANGE_VARIABLE<key#1,TestEnum#2,AnotherTestEnum#3, pseudo_columns: Filename#4,RowId#5>
         |   """
         +-input_scan=
           +-ProjectScan
@@ -332,7 +332,7 @@ QueryStmt
     |       Key -> INT64 (KeyValue.Key#1) (implicit)
     |       Value -> STRING (KeyValue.Value#2) (implicit)
     |     Range variables:
-    |       KeyValue -> RANGE_VARIABLE<Key,Value>
+    |       KeyValue -> RANGE_VARIABLE<Key#1,Value#2>
     |   """
     +-input_scan=
       +-StaticDescribeScan
@@ -349,9 +349,9 @@ QueryStmt
         |       Key -> INT64 (KeyValue.Key#1) (implicit)
         |       Value -> STRING (KeyValue.Value#2) (implicit)
         |     Range variables:
-        |       KeyValue -> RANGE_VARIABLE<Key,Value>
-        |       elem -> RANGE_VARIABLE<$value>
-        |       offset -> RANGE_VARIABLE<$value>
+        |       KeyValue -> RANGE_VARIABLE<Key#1,Value#2>
+        |       elem -> RANGE_VARIABLE<elem#3> (value table)
+        |       offset -> RANGE_VARIABLE<offset#4> (value table)
         |     Value table columns:
         |       $array.elem#3
         |       $array_offset.offset#4
@@ -419,7 +419,7 @@ QueryStmt
     |   |       Filename -> ambiguous
     |   |       RowId -> ambiguous
     |   |     Range variables:
-    |   |       vt2 -> RANGE_VARIABLE<$value>
+    |   |       vt2 -> RANGE_VARIABLE<value#4, pseudo_columns: Filename#5,RowId#6> (value table)
     |   |     Value table columns:
     |   |       TestExtraValueTable.value#4 (excluded_field_names vt1)
     |   |   """
@@ -436,8 +436,8 @@ QueryStmt
     |       |       Filename -> ambiguous
     |       |       RowId -> ambiguous
     |       |     Range variables:
-    |       |       vt1 -> RANGE_VARIABLE<$value>
-    |       |       vt2 -> RANGE_VARIABLE<$value>
+    |       |       vt1 -> RANGE_VARIABLE<value#1, pseudo_columns: Filename#2,RowId#3> (value table)
+    |       |       vt2 -> RANGE_VARIABLE<value#4, pseudo_columns: Filename#5,RowId#6> (value table)
     |       |     Value table columns:
     |       |       TestExtraValueTable.value#1
     |       |       TestExtraValueTable.value#4
@@ -528,7 +528,7 @@ QueryStmt
         |   |       Filename -> STRING (TestExtraValueTable.Filename#2) (implicit) (pseudo-column)
         |   |       RowId -> BYTES (TestExtraValueTable.RowId#3) (implicit) (pseudo-column)
         |   |     Range variables:
-        |   |       vt1 -> RANGE_VARIABLE<$value>
+        |   |       vt1 -> RANGE_VARIABLE<value#1, pseudo_columns: Filename#2,RowId#3> (value table)
         |   |     Value table columns:
         |   |       TestExtraValueTable.value#1 (excluded_field_names int32_val1)
         |   |   """
@@ -546,7 +546,7 @@ QueryStmt
         |       |       RowId -> BYTES (TestExtraValueTable.RowId#3) (implicit) (pseudo-column)
         |       |       int32_val1 -> INT32 ($pipe_extend.int32_val1#4)
         |       |     Range variables:
-        |       |       vt1 -> RANGE_VARIABLE<$value>
+        |       |       vt1 -> RANGE_VARIABLE<value#1, pseudo_columns: Filename#2,RowId#3> (value table)
         |       |     Value table columns:
         |       |       TestExtraValueTable.value#1
         |       |   """
@@ -616,7 +616,7 @@ QueryStmt
     |     TestStructValueTable STRUCT<a INT32, b STRING> TestStructValueTable.value#1 (value table) (excluded_field_names abc)
     |   NameScope:
     |     Range variables:
-    |       TestStructValueTable -> RANGE_VARIABLE<$value>
+    |       TestStructValueTable -> RANGE_VARIABLE<value#1> (value table)
     |     Value table columns:
     |       TestStructValueTable.value#1 (excluded_field_names abc)
     |   """

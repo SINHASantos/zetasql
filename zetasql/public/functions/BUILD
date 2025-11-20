@@ -812,6 +812,7 @@ cc_library(
         "//zetasql/base:strings",
         "//zetasql/common:utf_util",
         "//zetasql/public:options_cc_proto",
+        "//zetasql/public:type_cc_proto",
         "//zetasql/public:value",
         "//zetasql/public/types",
         "@com_google_absl//absl/base:core_headers",

@@ -34,25 +34,6 @@ class AnalyzerOutputProperties {
       "It doesn't mean what you think it means.")
   bool has_anonymization = false;  // NOLINT
 
-  // Marks the given `rewrite` as being applicable to the resolved AST.
-  ABSL_DEPRECATED(
-      "REWRITE_ANONYMIZATION is the only rewrite still checked through this "
-      "mechanism.")
-  void MarkRelevant(ResolvedASTRewrite rewrite) {
-    relevant_rewrites_.insert(rewrite);
-    if (rewrite == REWRITE_ANONYMIZATION) {
-      has_anonymization = true;
-    }
-  }
-
-  // Returns true if the rewrite was marked relevant by the resolver.
-  ABSL_DEPRECATED(
-      "REWRITE_ANONYMIZATION is the only rewrite still checked through this "
-      "mechanism.")
-  bool IsRelevant(ResolvedASTRewrite rewrite) const {
-    return relevant_rewrites_.contains(rewrite);
-  }
-
   // Adds a feature label to the analyzer output properties. Feature labels
   // provide visibility of feature use on (broken link) and in data
   // that query engines log for analysis. This API should only be used to log
@@ -76,7 +57,6 @@ class AnalyzerOutputProperties {
   // Defined in zetasql/common/internal_analyzer_output_properties.h.
   friend class InternalAnalyzerOutputProperties;
 
-  absl::btree_set<ResolvedASTRewrite> relevant_rewrites_;
   absl::flat_hash_set<absl::string_view> feature_labels_;
   TargetSyntaxMap target_syntax_;
 };

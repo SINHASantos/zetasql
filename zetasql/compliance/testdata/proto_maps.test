@@ -418,3 +418,17 @@ ARRAY<STRUCT<result ARRAY<>>>[
     ]
   }
 ]
+==
+
+[name=cast_null_struct_to_proto_map_entry]
+SELECT CAST(CAST(NULL AS STRUCT<key STRING, value INT32>) AS zetasql_test__.MessageWithMapField.StringInt32MapEntry)
+--
+ERROR: generic::out_of_range: Cannot cast a NULL struct to a proto map entry
+==
+
+[name=safe_cast_null_struct_to_proto_map_entry]
+SELECT SAFE_CAST(CAST(NULL AS STRUCT<key STRING, value INT32>) AS zetasql_test__.MessageWithMapField.StringInt32MapEntry)
+--
+ARRAY<STRUCT<PROTO<zetasql_test__.MessageWithMapField.StringInt32MapEntry>>>[
+  {NULL}
+]

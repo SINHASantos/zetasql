@@ -42,6 +42,7 @@
 #include "absl/strings/str_join.h"
 #include "absl/strings/string_view.h"
 #include "absl/strings/substitute.h"
+#include "absl/types/span.h"
 #include "zetasql/base/status_macros.h"
 
 namespace zetasql {
@@ -109,7 +110,7 @@ bool IsValidDistanceType(absl::string_view distance_type) {
 
 absl::Status CheckVectorSearchPostResolutionArguments(
     const FunctionSignature& signature,
-    const std::vector<TVFInputArgumentType>& arguments,
+    absl::Span<const TVFInputArgumentType> arguments,
     const LanguageOptions& language_options) {
   // The first argument is the base table, which must be a relation.
   const TVFInputArgumentType& base_table_arg = arguments[0];

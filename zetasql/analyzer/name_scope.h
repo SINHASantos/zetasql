@@ -77,25 +77,18 @@ class ValidNamePath {
  public:
   ValidNamePath(const std::vector<IdString>& name_path,
                 const ResolvedColumn& target_column)
-      : name_path_(name_path),
-        target_column_(target_column) {}
+      : name_path_(name_path), target_column_(target_column) {}
 
   ValidNamePath() = default;
   ~ValidNamePath() = default;
 
-  const std::vector<IdString>& name_path() const {
-    return name_path_;
-  }
-  std::vector<IdString>* mutable_name_path() {
-    return &name_path_;
-  }
+  const std::vector<IdString>& name_path() const { return name_path_; }
+  std::vector<IdString>* mutable_name_path() { return &name_path_; }
   void set_name_path(const std::vector<IdString>& name_path) {
     name_path_ = name_path;
   }
 
-  const ResolvedColumn& target_column() const {
-    return target_column_;
-  }
+  const ResolvedColumn& target_column() const { return target_column_; }
   void set_target_column(const ResolvedColumn& target_column) {
     target_column_ = target_column;
   }
@@ -368,9 +361,9 @@ class NameTarget {
     EXPLICIT_COLUMN,  // supports column()
     FIELD_OF,         // supports column_containing_field()
     AMBIGUOUS,
-    ACCESS_ERROR,     // supports original_kind() which indicates the
-                      // original Kind of this NameTarget, and a non-empty
-                      // 'valid_field_info_list_'
+    ACCESS_ERROR,  // supports original_kind() which indicates the
+                   // original Kind of this NameTarget, and a non-empty
+                   // 'valid_field_info_list_'
   };
 
   // Default constructor makes an ambiguous NameTarget.
@@ -413,8 +406,7 @@ class NameTarget {
   // This constructor is only used for kind==FIELD_OF.
   // The stored `field_id` is not currently used anywhere.
   NameTarget(const ResolvedColumn& column, int field_id)
-      : kind_(FIELD_OF), column_(column), field_id_(field_id) {
-  }
+      : kind_(FIELD_OF), column_(column), field_id_(field_id) {}
 
   NameTarget(NameTarget&& old) = default;
   NameTarget(const NameTarget& other) = default;
@@ -473,33 +465,15 @@ class NameTarget {
   static bool IsColumnKind(Kind kind) {
     return kind == IMPLICIT_COLUMN || kind == EXPLICIT_COLUMN;
   }
-  bool IsColumn() const {
-    return IsColumnKind(kind_);
-  }
-  static bool IsRangeVariableKind(Kind kind) {
-    return kind == RANGE_VARIABLE;
-  }
-  bool IsRangeVariable() const {
-    return IsRangeVariableKind(kind_);
-  }
-  static bool IsFieldOfKind(Kind kind) {
-    return kind == FIELD_OF;
-  }
-  bool IsFieldOf() const {
-    return IsFieldOfKind(kind_);
-  }
-  static bool IsAmbiguousKind(Kind kind) {
-    return kind == AMBIGUOUS;
-  }
-  bool IsAmbiguous() const {
-    return IsAmbiguousKind(kind_);
-  }
-  static bool IsAccessErrorKind(Kind kind) {
-    return kind == ACCESS_ERROR;
-  }
-  bool IsAccessError() const {
-    return IsAccessErrorKind(kind_);
-  }
+  bool IsColumn() const { return IsColumnKind(kind_); }
+  static bool IsRangeVariableKind(Kind kind) { return kind == RANGE_VARIABLE; }
+  bool IsRangeVariable() const { return IsRangeVariableKind(kind_); }
+  static bool IsFieldOfKind(Kind kind) { return kind == FIELD_OF; }
+  bool IsFieldOf() const { return IsFieldOfKind(kind_); }
+  static bool IsAmbiguousKind(Kind kind) { return kind == AMBIGUOUS; }
+  bool IsAmbiguous() const { return IsAmbiguousKind(kind_); }
+  static bool IsAccessErrorKind(Kind kind) { return kind == ACCESS_ERROR; }
+  bool IsAccessError() const { return IsAccessErrorKind(kind_); }
 
   bool IsExplicit() const {
     return kind_ == RANGE_VARIABLE || kind_ == EXPLICIT_COLUMN;
@@ -542,8 +516,7 @@ class NameTarget {
     return &valid_name_path_list_;
   }
 
-  void set_valid_name_path_list(
-      const ValidNamePathList& valid_name_path_list) {
+  void set_valid_name_path_list(const ValidNamePathList& valid_name_path_list) {
     valid_name_path_list_ = valid_name_path_list;
   }
 
@@ -553,8 +526,8 @@ class NameTarget {
   void AppendValidNamePathList(const ValidNamePathList& info_list) {
     ABSL_DCHECK(IsAccessError()) << DebugString();
     ABSL_DCHECK(!IsAmbiguousKind(original_kind_)) << DebugString();
-    valid_name_path_list_.insert(valid_name_path_list_.end(),
-                                 info_list.begin(), info_list.end());
+    valid_name_path_list_.insert(valid_name_path_list_.end(), info_list.begin(),
+                                 info_list.end());
   }
 
   std::string DebugString() const;
@@ -689,8 +662,7 @@ class NameScope {
   // so it can be updated to compute the set of correlated column references.
   // The <correlated_columns_set> and <previous_scope> pointers must outlive
   // this NameScope.
-  NameScope(const NameScope* previous_scope,
-            const NameListPtr& name_list,
+  NameScope(const NameScope* previous_scope, const NameListPtr& name_list,
             CorrelatedColumnsSet* correlated_columns_set = nullptr);
 
   // Make a NameScope with names from <name_list>.
@@ -1131,8 +1103,7 @@ class NameScope {
     AddRangeVariable(name, scan_columns, /*is_pattern_variable=*/false);
   }
 
-  void AddColumn(IdString name, const ResolvedColumn& column,
-                 bool is_explicit);
+  void AddColumn(IdString name, const ResolvedColumn& column, bool is_explicit);
 
   void AddNameTarget(IdString name, const NameTarget& target);
 
@@ -1261,8 +1232,7 @@ class NameList {
 
   // Add a pseudo-column.  Pseudo-columns are always implicit.
   // They can be looked up by name but don't show up in columns().
-  absl::Status AddPseudoColumn(IdString name,
-                               const ResolvedColumn& column,
+  absl::Status AddPseudoColumn(IdString name, const ResolvedColumn& column,
                                const ASTNode* ast_location);
 
   // Add a range variable.  Returns an error if the name conflicts with another
@@ -1271,8 +1241,7 @@ class NameList {
   // Adding a value table NameList is not allowed and will fail.
   // Adding cycles of NameLists is also not allowed but will not be caught.
   absl::Status AddRangeVariable(
-      IdString name,
-      const std::shared_ptr<const NameList>& scan_columns,
+      IdString name, const std::shared_ptr<const NameList>& scan_columns,
       const ASTNode* ast_location);
 
   // Adds a Column with <name> twice to the NameList, ensuring its ambiguity.

@@ -577,7 +577,7 @@ public class SimpleCatalog extends Catalog {
   private void addFunctionToFullNameMap(Function function) {
     String functionName = Ascii.toLowerCase(function.getFullName());
     Preconditions.checkArgument(
-        !functionsByFullName.containsKey(functionName), functionName + " already exists.");
+        !functionsByFullName.containsKey(functionName), "%s already exists.", functionName);
     functionsByFullName.put(functionName, function);
   }
 

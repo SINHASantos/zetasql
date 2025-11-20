@@ -1656,9 +1656,15 @@ SHARDED_TEST_F(ComplianceCodebasedTests, TestRegexpExtractGroupsFunctions, 2) {
         f.params.param(1).is_null() ? "NULL" : MakeLiteral(f.params.param(1));
     return absl::Substitute("regexp_extract_groups(@p0, $0)", regex_literal);
   };
-  RunFunctionTestsCustom(Shard(GetFunctionTestsRegexpExtractGroups()),
-                         regexp_extract_groups_fct);
+  std::vector<FunctionTestCall> tests = GetFunctionTestsRegexpExtractGroups();
+  std::vector<FunctionTestCall> auto_casting_tests =
+      GetFunctionTestsRegexpExtractGroupsWithAutoCasting(
+          /*autocast_enabled=*/true);
+  tests.insert(tests.end(), auto_casting_tests.begin(),
+               auto_casting_tests.end());
+  RunFunctionTestsCustom(Shard(tests), regexp_extract_groups_fct);
 }
+
 SHARDED_TEST_F(ComplianceCodebasedTests, TestRegexpInstrFunctions, 5) {
   SetNamePrefix("RegexpInstr");
   RunFunctionCalls(Shard(GetFunctionTestsRegexpInstr()));

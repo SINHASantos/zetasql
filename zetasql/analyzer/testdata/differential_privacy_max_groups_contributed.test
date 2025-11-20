@@ -2,7 +2,7 @@
 #
 # Base case, with max_groups_contributed set.  We inject a SampleScan to ensure that
 # each user only contributes to one group.
-[default language_features=NONE,+DIFFERENTIAL_PRIVACY,+NAMED_ARGUMENTS,+TABLESAMPLE,+STRATIFIED_RESERVOIR_TABLESAMPLE]
+[default language_features=NONE,+DIFFERENTIAL_PRIVACY,+NAMED_ARGUMENTS,+TABLESAMPLE,+STRATIFIED_RESERVOIR_TABLESAMPLE,+PIPE_AGGREGATE_WITH_DIFFERENTIAL_PRIVACY]
 [default enabled_ast_rewrites=DEFAULTS,+ANONYMIZATION]
 
 select with differential_privacy options(max_groups_contributed = 1) count(*)

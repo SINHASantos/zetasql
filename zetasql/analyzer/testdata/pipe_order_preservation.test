@@ -203,7 +203,7 @@ QueryStmt
     |       Key -> INT64 (KeyValue.Key#1) (implicit)
     |       Value -> STRING (KeyValue.Value#2) (implicit)
     |     Range variables:
-    |       KeyValue -> RANGE_VARIABLE<Key,Value>
+    |       KeyValue -> RANGE_VARIABLE<Key#1,Value#2>
     |
     |   Result is ordered.
     |   """

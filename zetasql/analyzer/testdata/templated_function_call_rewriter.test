@@ -1,7 +1,7 @@
 # Tests for the TemplatedFunctionCallRewriter, which is enabled via
 # ResolvedASTRewrite::REWRITE_APPLY_ENABLED_REWRITES_TO_TEMPLATED_FUNCTION_CALLS
 [default enabled_ast_rewrites=DEFAULTS,+APPLY_ENABLED_REWRITES_TO_TEMPLATED_FUNCTION_CALLS,+ANONYMIZATION]
-[default language_features=NONE,+BARE_ARRAY_ACCESS,+TYPEOF_FUNCTION,+TABLE_VALUED_FUNCTIONS,+DIFFERENTIAL_PRIVACY,+NAMED_ARGUMENTS]
+[default language_features=NONE,+BARE_ARRAY_ACCESS,+TYPEOF_FUNCTION,+TABLE_VALUED_FUNCTIONS,+NAMED_ARGUMENTS]
 
 # TYPEOF is rewritten when TYPEOF_FUNCTION is enabled.
 SELECT TYPEOF(1)
@@ -504,6 +504,7 @@ QueryStmt
 # Two rewrites should be applied:
 # 1. The templated TVF signature is rewritten to for TYPEOF.
 # 2. Rewrite differential_privacy_count_star to differential_privacy_sum.
+[language_features=NONE,+BARE_ARRAY_ACCESS,+TYPEOF_FUNCTION,+TABLE_VALUED_FUNCTIONS,+NAMED_ARGUMENTS,+DIFFERENTIAL_PRIVACY,+PIPE_AGGREGATE_WITH_DIFFERENTIAL_PRIVACY]
 SELECT WITH DIFFERENTIAL_PRIVACY OPTIONS(epsilon=10, delta=.01)
   value,
   COUNT(*)

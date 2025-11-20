@@ -704,8 +704,7 @@ ReferenceDriver::AnalyzeStatement(
                                               type_factory, &analyzed));
   // TODO: Remove this once the aggregation threshold rewriter and
   // anonymization rewriter are updated to follow the correct pattern.
-  if (analyzed->analyzer_output_properties().IsRelevant(
-          REWRITE_ANONYMIZATION)) {
+  if (analyzed->analyzer_output_properties().has_anonymization) {
     ZETASQL_ASSIGN_OR_RETURN(
         analyzed, RewriteForAnonymization(analyzed, analyzer_options, catalog,
                                           type_factory));

@@ -387,6 +387,9 @@ bool QueryExpression::TryAppendGroupByClause(
       ReplaceGroupingExpressionsWithAliases(aggregate_columns,
                                             group_by_columns);
       absl::StrAppend(&sql, "AGGREGATE ",
+                      anonymization_options_.empty()
+                          ? ""
+                          : absl::StrCat(anonymization_options_, " "),
                       JoinListWithAliases(aggregate_columns, ", "),
                       aggregate_columns.empty() ? "" : " ");
       appended = true;

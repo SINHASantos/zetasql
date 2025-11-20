@@ -2137,6 +2137,11 @@ this function doesn't generate errors for division by zero or overflow.
       <td>5.0</td>
     </tr>
     <tr>
+      <td>20.0</td>
+      <td>6.0</td>
+      <td>3.3333333333333335</td>
+    </tr>
+    <tr>
       <td>0.0</td>
       <td>25.0</td>
       <td>0.0</td>

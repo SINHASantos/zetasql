@@ -392,7 +392,7 @@ absl::StatusOr<Value> DoMapEntryCast(const Value& from_value,
   ZETASQL_RET_CHECK(IsMapEntryCast(from_value.type(), to_type));
 
   if (from_value.is_null()) {
-    return MakeSqlError() << "Cannot cast a NULL struct to a proto map entry";
+    return MakeEvalError() << "Cannot cast a NULL struct to a proto map entry";
   }
 
   const ProtoType* to_proto_type = to_type->AsProto();
@@ -1516,9 +1516,9 @@ absl::StatusOr<Value> CastContext::CastValue(
     }
     case FCT(TYPE_BYTES, TYPE_UUID): {
       if (v.bytes_value().size() != sizeof(UuidValue)) {
-        return MakeSqlError() << "Invalid bytes value size for UUID, expected "
-                              << sizeof(UuidValue) << " bytes, but got "
-                              << v.bytes_value().size() << " bytes.";
+        return MakeEvalError() << "Invalid bytes value size for UUID, expected "
+                               << sizeof(UuidValue) << " bytes, but got "
+                               << v.bytes_value().size() << " bytes.";
       }
       ZETASQL_ASSIGN_OR_RETURN(UuidValue uuid,
                        UuidValue::DeserializeFromBytes(v.bytes_value()));

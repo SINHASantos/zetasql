@@ -83,7 +83,7 @@ QueryStmt
     |       one -> INT64 ($pivot.one#5)
     |       zero -> INT64 ($pivot.zero#4)
     |     Range variables:
-    |       pt -> RANGE_VARIABLE<zero,one,_33>
+    |       pt -> RANGE_VARIABLE<zero#4,one#5,_33#6>
     |   """
     +-input_scan=
       +-PivotScan

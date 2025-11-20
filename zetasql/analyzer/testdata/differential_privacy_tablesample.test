@@ -1,5 +1,5 @@
 # Support TableSample with differential privacy queries.
-[default language_features=NONE,+DIFFERENTIAL_PRIVACY,+NAMED_ARGUMENTS,+TABLESAMPLE]
+[default language_features=NONE,+DIFFERENTIAL_PRIVACY,+NAMED_ARGUMENTS,+TABLESAMPLE,+PIPE_AGGREGATE_WITH_DIFFERENTIAL_PRIVACY]
 [enabled_ast_rewrites=DEFAULTS,+ANONYMIZATION]
 [parse_location_record_type=PARSE_LOCATION_RECORD_CODE_SEARCH]
 select with differential_privacy count(*, contribution_bounds_per_group => (0,100))
@@ -236,7 +236,7 @@ QueryStmt
           +-ColumnRef(type=INT64, column=$differential_privacy.$group_selection_threshold_col#20)
 ==
 
-[language_features=NONE,+DIFFERENTIAL_PRIVACY,+NAMED_ARGUMENTS,+TABLESAMPLE,+STRATIFIED_RESERVOIR_TABLESAMPLE]
+[language_features=NONE,+DIFFERENTIAL_PRIVACY,+NAMED_ARGUMENTS,+TABLESAMPLE,+STRATIFIED_RESERVOIR_TABLESAMPLE,+PIPE_AGGREGATE_WITH_DIFFERENTIAL_PRIVACY]
 [enabled_ast_rewrites=DEFAULTS,+ANONYMIZATION]
 [parse_location_record_type=PARSE_LOCATION_RECORD_CODE_SEARCH]
 select with differential_privacy count(*, contribution_bounds_per_group => (0,100))

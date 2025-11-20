@@ -1590,9 +1590,32 @@ absl::Status Resolver::ResolveStructType(
     const Type* field_type;
     // Use the same <resolve_type_modifier_options> to resolve the type
     // modifiers for the field types.
-    ZETASQL_RETURN_IF_ERROR(ResolveType(struct_field->type(),
-                                resolve_type_modifier_options, &field_type,
-                                &resolved_field_type_modifiers));
+    absl::Status status =
+        ResolveType(struct_field->type(), resolve_type_modifier_options,
+                    &field_type, &resolved_field_type_modifiers);
+
+    if (!status.ok()) {
+      // Try to give a better error message for the common case where the user
+      // may have meant to use a struct field name as the struct field type.
+      // E.g. `struct<int64 x>`
+      if (struct_field->name() != nullptr) {
+        std::string maybe_type = struct_field->name()->GetAsString();
+        if (!maybe_type.empty()) {
+          TypeKind type_kind = Type::ResolveBuiltinTypeNameToKindIfSimple(
+              maybe_type, language());
+          if (type_kind != TYPE_UNKNOWN) {
+            absl::StatusOr<absl::string_view> maybe_name =
+                GetSQLForASTNode(struct_field->type());
+            if (maybe_name.ok()) {
+              return zetasql_base::StatusBuilder(status)
+                     << "Did you mean to define the STRUCT field as `"
+                     << maybe_name << " " << maybe_type << "` instead? ";
+            }
+          }
+        }
+      }
+      return status;
+    }
 
     struct_fields.emplace_back(StructType::StructField(
         struct_field->name() != nullptr ? struct_field->name()->GetAsString()

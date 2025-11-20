@@ -146,10 +146,6 @@ inline ::zetasql_base::StatusBuilder MakeSqlErrorAt(
     const ASTAnalyticFunctionCall* ast_node) {
   return MakeSqlErrorAtLocalNode(ast_node);
 }
-inline ::zetasql_base::StatusBuilder MakeSqlErrorAt(
-    const ASTFunctionCallWithGroupRows* ast_node) {
-  return MakeSqlErrorAtLocalNode(ast_node);
-}
 
 // Returns a team policy that attaches a parse location to an error status
 // without changing the error message or code. If the error status already has a

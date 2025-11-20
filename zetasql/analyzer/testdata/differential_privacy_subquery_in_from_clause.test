@@ -1,5 +1,5 @@
 # Tests for differential privacy queries with subqueries in the FROM clause.
-[default language_features=NONE,+DIFFERENTIAL_PRIVACY,+NAMED_ARGUMENTS]
+[default language_features=NONE,+DIFFERENTIAL_PRIVACY,+NAMED_ARGUMENTS,+PIPE_AGGREGATE_WITH_DIFFERENTIAL_PRIVACY]
 
 [enabled_ast_rewrites=DEFAULTS,+ANONYMIZATION]
 # Nested projection without $uid column

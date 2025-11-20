@@ -490,7 +490,8 @@ class Algebrizer {
   //     + ResolvedTableScan(active FilterConjunctInfos = {key > 10})))
   // The algebrized tree will ultimately push down the filters as far as they
   // can go.
-  absl::StatusOr<std::unique_ptr<RelationalOp>> AlgebrizeSingleRowScan();
+  absl::StatusOr<std::unique_ptr<RelationalOp>> AlgebrizeSingleRowScan(
+      const ResolvedSingleRowScan* single_row_scan);
   absl::StatusOr<std::unique_ptr<RelationalOp>> AlgebrizeJoinScan(
       const ResolvedJoinScan* join_scan,
       std::vector<FilterConjunctInfo*>* active_conjuncts);
@@ -566,6 +567,10 @@ class Algebrizer {
   absl::StatusOr<std::unique_ptr<SortOp>> AlgebrizeOrderByScan(
       const ResolvedOrderByScan* scan, std::unique_ptr<ValueExpr> limit,
       std::unique_ptr<ValueExpr> offset);
+  absl::StatusOr<std::unique_ptr<SortOp>> AlgebrizeOrderByScan(
+      const ResolvedOrderByScan* scan) {
+    return AlgebrizeOrderByScan(scan, /*limit=*/nullptr, /*offset=*/nullptr);
+  }
   absl::StatusOr<std::unique_ptr<RelationalOp>> AlgebrizeArrayScan(
       const ResolvedArrayScan* array_scan,
       std::vector<FilterConjunctInfo*>* active_conjuncts);
@@ -581,7 +586,7 @@ class Algebrizer {
       const ResolvedWithRefScan* scan);
   absl::StatusOr<std::unique_ptr<RelationalOp>> AlgebrizeGroupRowsScan(
       const ResolvedGroupRowsScan* group_rows_scan);
-  absl::StatusOr<std::unique_ptr<RelationalOp>> AlgebrizeTvfScan(
+  absl::StatusOr<std::unique_ptr<RelationalOp>> AlgebrizeTVFScan(
       const ResolvedTVFScan* tvf_scan);
   absl::StatusOr<std::unique_ptr<RelationalOp>> AlgebrizeTableScan(
       const ResolvedTableScan* table_scan,
@@ -620,6 +625,16 @@ class Algebrizer {
   absl::StatusOr<std::unique_ptr<RelationalOp>> AlgebrizeGraphPathScan(
       const ResolvedGraphPathScan* path_scan,
       std::vector<FilterConjunctInfo*>* active_conjuncts);
+  absl::StatusOr<std::unique_ptr<RelationalOp>> AlgebrizeGraphNodeScan(
+      const ResolvedGraphElementScan* element_scan,
+      std::vector<FilterConjunctInfo*>* active_conjuncts) {
+    return AlgebrizeGraphElementScan(element_scan, active_conjuncts);
+  }
+  absl::StatusOr<std::unique_ptr<RelationalOp>> AlgebrizeGraphEdgeScan(
+      const ResolvedGraphElementScan* element_scan,
+      std::vector<FilterConjunctInfo*>* active_conjuncts) {
+    return AlgebrizeGraphElementScan(element_scan, active_conjuncts);
+  }
   absl::StatusOr<std::unique_ptr<RelationalOp>> AlgebrizeGraphElementScan(
       const ResolvedGraphElementScan* element_scan,
       std::vector<FilterConjunctInfo*>* active_conjuncts);
@@ -817,9 +832,16 @@ class Algebrizer {
   absl::StatusOr<std::unique_ptr<RelationalOp>> AlgebrizeScan(
       const ResolvedScan* scan,
       std::vector<FilterConjunctInfo*>* active_conjuncts);
-  absl::StatusOr<std::unique_ptr<RelationalOp>> AlgebrizeScanImpl(
-      const ResolvedScan* scan,
-      std::vector<FilterConjunctInfo*>* active_conjuncts);
+
+  using AlgebrizeScanFunc =
+      std::function<absl::StatusOr<std::unique_ptr<RelationalOp>>(
+          Algebrizer*, const ResolvedScan*, std::vector<FilterConjunctInfo*>*)>;
+
+  // We use a map of function pointers initialized once and outside the
+  // potentially recursively called AlgebrizeScan function to keep the stack
+  // frame of recursive callstacks small.
+  // which could lead to out of stack errors. See b/447813193.
+  static const absl::flat_hash_map<int, AlgebrizeScanFunc>* InitializeScanMap();
 
   absl::StatusOr<std::unique_ptr<RelationalOp>> AlgebrizeScan(
       const ResolvedScan* scan);

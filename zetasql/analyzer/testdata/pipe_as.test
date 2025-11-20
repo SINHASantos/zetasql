@@ -479,7 +479,7 @@ QueryStmt
         |       abc -> INT64 ($pipe_extend.abc#4)
         |       vt -> zetasql_test__.TestExtraPB (TestExtraValueTable.value#1)
         |     Range variables:
-        |       evt1 -> RANGE_VARIABLE<vt,abc>
+        |       evt1 -> RANGE_VARIABLE<value#1 AS vt,abc#4, pseudo_columns: Filename#2,RowId#3>
         |   """
         +-input_scan=
           +-StaticDescribeScan
@@ -495,7 +495,7 @@ QueryStmt
             |       RowId -> BYTES (TestExtraValueTable.RowId#3) (implicit) (pseudo-column)
             |       abc -> INT64 ($pipe_extend.abc#4)
             |     Range variables:
-            |       vt -> RANGE_VARIABLE<$value>
+            |       vt -> RANGE_VARIABLE<value#1, pseudo_columns: Filename#2,RowId#3> (value table)
             |     Value table columns:
             |       TestExtraValueTable.value#1
             |   """
@@ -549,7 +549,7 @@ QueryStmt
         |       Filename -> STRING (TestExtraValueTable.Filename#2) (implicit) (pseudo-column)
         |       RowId -> BYTES (TestExtraValueTable.RowId#3) (implicit) (pseudo-column)
         |     Range variables:
-        |       evt1 -> RANGE_VARIABLE<$value>
+        |       evt1 -> RANGE_VARIABLE<value#1, pseudo_columns: Filename#2,RowId#3> (value table)
         |     Value table columns:
         |       TestExtraValueTable.value#1
         |   """
@@ -565,7 +565,7 @@ QueryStmt
             |       Filename -> STRING (TestExtraValueTable.Filename#2) (implicit) (pseudo-column)
             |       RowId -> BYTES (TestExtraValueTable.RowId#3) (implicit) (pseudo-column)
             |     Range variables:
-            |       vt -> RANGE_VARIABLE<$value>
+            |       vt -> RANGE_VARIABLE<value#1, pseudo_columns: Filename#2,RowId#3> (value table)
             |     Value table columns:
             |       TestExtraValueTable.value#1
             |   """

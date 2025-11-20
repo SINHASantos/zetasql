@@ -981,7 +981,7 @@ class SQLTestBase : public ::testing::TestWithParam<std::string> {
 
   // Similar to the Returns matchers in the public API, but takes a TestResults
   // so that it can handle the reference impls non-determinism signal.
-  ::testing::Matcher<const TestResults&> ToStringIs(const std::string& result);
+  ::testing::Matcher<const TestResults&> ToStringIs(absl::string_view result);
 
   // Implement the ToString interface for TestResult because it's expected by
   // the matcher templates.

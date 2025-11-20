@@ -137,13 +137,11 @@ public class TypeTest {
     for (Type type : types) {
       String typeString = type.getKind().toString();
       if (kinds.contains(type.getKind())) {
-        assertWithMessage(
-                "Expected " + funcName + " function to return true for type " + typeString)
+        assertWithMessage("Expected %s function to return true for type %s", funcName, typeString)
             .that(func.test(type))
             .isTrue();
       } else {
-        assertWithMessage(
-                "Expected " + funcName + " function to return false for type " + typeString)
+        assertWithMessage("Expected %s function to return false for type %s", funcName, typeString)
             .that(func.test(type))
             .isFalse();
       }

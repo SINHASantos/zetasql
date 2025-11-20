@@ -3522,7 +3522,7 @@ QueryStmt
 
 
 DEPRECATION WARNING:
-Lateral column alias will shadow original target: RANGE_VARIABLE<$value> [at 1:48]
+Lateral column alias will shadow original target: RANGE_VARIABLE<value#1> (value table) [at 1:48]
 SELECT (SELECT as struct TestStructValueTable, TestStructValueTable.a)
                                                ^
 [zetasql.DeprecationWarning] { kind: LATERAL_COLUMN_REFERENCE }

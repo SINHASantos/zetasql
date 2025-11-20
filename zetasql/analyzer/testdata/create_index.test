@@ -1312,6 +1312,21 @@ create search index i1 on KeyValue (Value nulls first)
                                     ^
 ==
 
+create index json_col_index on JSONTable(json_col);
+--
+CreateIndexStmt
++-name_path=json_col_index
++-table_name_path=JSONTable
++-table_scan=
+| +-TableScan(column_list=[JSONTable.json_col#1], table=JSONTable, column_index_list=[0])
++-is_unique=FALSE
++-index_item_list=
+  +-IndexItem
+    +-column_ref=
+    | +-ColumnRef(type=JSON, column=JSONTable.json_col#1)
+    +-descending=FALSE
+==
+
 # The proto column can be used as key expression when creating search index.
 create search index i1 on TestTable (KitchenSink);
 --

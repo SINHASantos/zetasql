@@ -77,4 +77,17 @@ ARRAY<STRUCT<fruit STRING, NUMERIC>>[known order:
   {"banana", 5},
   {"pear", 6}
 ]
+==
 
+[name=truncation_in_array_does_not_change_orderedness]
+[required_features=NUMERIC_TYPE,PARAMETERIZED_TYPES]
+SELECT
+  CAST([NUMERIC '1.2', NUMERIC '1.3'] AS ARRAY<NUMERIC(5,0)>) AS ordered,
+  CAST(ARRAY(SELECT * FROM UNNEST([NUMERIC '1.2', NUMERIC '1.3'])) AS ARRAY<NUMERIC(5,0)>) AS unordered
+--
+ARRAY<STRUCT<ordered ARRAY<>, unordered ARRAY<>>>[
+  {
+    ARRAY<NUMERIC>[known order:1, 1],
+    ARRAY<NUMERIC>[unknown order:1, 1]
+  }
+]

@@ -1659,9 +1659,11 @@ class ResolvedUnsetArgumentScan : public <a href="#ResolvedScan">ResolvedScan</a
 // FOR SYSTEM_TIME AS OF clause. The expression is expected to be constant
 // and no columns are visible to it.
 //
-// &lt;column_index_list&gt; This list matches 1-1 with the &lt;column_list&gt;, and
-// identifies the ordinal of the corresponding column in the &lt;table&gt;&#39;s
-// column list.
+// The columns to read are specified with one of &lt;column_index_list&gt; or
+// &lt;table_column_list&gt;.  Only one can be set.
+// The list that&#39;s present matches 1:1 with the &lt;column_list&gt;, and
+// identifies which of &lt;table&gt;&#39;s Columns to read into each <a href="#ResolvedColumn">ResolvedColumn</a>.
+// &lt;table_column_list&gt; is only used if FEATURE_ROW_TYPE is enabled.
 //
 // If provided, &lt;alias&gt; refers to an explicit alias which was used to
 // reference a Table in the user query. If the Table was given an implicitly
@@ -1698,6 +1700,17 @@ class ResolvedTableScan : public <a href="#ResolvedScan">ResolvedScan</a> {
   //
   // See (broken link).</font>
   bool read_as_row_type() const;
+
+<font color="brown">  // This is the list of `Column`s from this `Table` to read.
+  //
+  // `column_list` will match 1:1 positionally with this list.
+  // `column_index_list` will not be set.
+  //
+  // Currently, this is only used when FEATURE_ROW_TYPE is enabled
+  // and the rewriter introduces a TableScan using this.</font>
+  const std::vector&lt;const Column*&gt;&amp; table_column_list() const;
+  int table_column_list_size() const;
+  const Column* table_column_list(int i) const;
 };
 </code></pre></p>
 
@@ -3033,7 +3046,7 @@ class ResolvedProjectScan : public <a href="#ResolvedScan">ResolvedScan</a> {
 //                 temporary solution to handle omitted named arguments. This
 //                 is subject to change by upcoming CLs).
 //
-// &lt;column_index_list&gt; This list matches 1-1 with the &lt;column_list&gt;, and
+// &lt;column_index_list&gt; This list matches 1:1 with the &lt;column_list&gt;, and
 // identifies the index of the corresponding column in the &lt;signature&gt;&#39;s
 // result relation column list.
 //
@@ -4942,13 +4955,13 @@ class ResolvedAssertRowsModified : public <a href="#ResolvedArgument">ResolvedAr
 // should be arbitrated. ZetaSQL only resolves them into valid column
 // references. It is the engine&#39;s responsibility to validate and infer
 // a unique constraint. See &#34;Conflict target&#34; section in
-// (broken link), http://shortn/_4GrUbFPEKm
+// (broken link), <a href="http://shortn/_4GrUbFPEKm">http://shortn/_4GrUbFPEKm</a>
 //
 // &lt;unique_constraint_name&gt; is the name of the UNIQUE constraint instead of
 // specifying the columns in conflict target. ZetaSQL only resolves it as
 // a valid identifier. It is the engine&#39;s responsibility to infer a UNIQUE
 // constraint. See &#34;Conflict target&#34; section in
-// (broken link). http://shortn/_4GrUbFPEKm
+// (broken link). <a href="http://shortn/_4GrUbFPEKm">http://shortn/_4GrUbFPEKm</a>
 //
 // &lt;insert_row_scan&gt; is a <a href="#ResolvedTableScan">ResolvedTableScan</a> on the target table. It returns
 // the new rows that were constructed to be inserted where the insert failed
@@ -9704,7 +9717,7 @@ class ResolvedUpdateFieldItem : public <a href="#ResolvedArgument">ResolvedArgum
 
 <font color="brown">  // A vector of FieldDescriptors that denotes the path to a proto
   // field that will be modified. Detailed semantics of how these work:
-  // http://shortn/_54wG2DOuZg.</font>
+  // <a href="http://shortn/_54wG2DOuZg">http://shortn/_54wG2DOuZg</a>.</font>
   const std::vector&lt;const google::protobuf::FieldDescriptor*&gt;&amp; proto_field_path() const;
   int proto_field_path_size() const;
   const google::protobuf::FieldDescriptor* proto_field_path(int i) const;

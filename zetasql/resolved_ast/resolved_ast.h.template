@@ -127,6 +127,8 @@ class {{node.name}} {{node.class_final}} : public {{node.parent}} {
 # endif
   template <typename SUBTYPE>
   bool Is() const {
+    static_assert((std::is_base_of<{{node.name}}, SUBTYPE>::value),
+                  "target type not derived from source type");
     return dynamic_cast<const SUBTYPE*>(this) != nullptr;
   }
 
@@ -415,6 +417,20 @@ inline std::unique_ptr<ResolvedColumnRef> MakeResolvedColumnRef(
   auto column_ref = MakeResolvedColumnRef(column.type(), column, is_correlated);
   column_ref->set_type_annotation_map(column.type_annotation_map());
   return column_ref;
+}
+
+// This should be the only way to create a ResolvedWithExpr, and all other
+// overloads removed, to ensure consistency of the annotated type with the
+// final expression.
+inline std::unique_ptr<ResolvedWithExpr> MakeResolvedWithExpr(
+    std::vector<std::unique_ptr<const ResolvedComputedColumn>> assignment_list,
+    std::unique_ptr<const ResolvedExpr> expr) {
+  AnnotatedType annotated_type = expr->annotated_type();
+  auto with_expr = MakeResolvedWithExpr(annotated_type.type,
+                                        std::move(assignment_list),
+                                        std::move(expr));
+  with_expr->set_type_annotation_map(annotated_type.annotation_map);
+  return with_expr;
 }
 
 // This is here for backward compatibility because we added a field

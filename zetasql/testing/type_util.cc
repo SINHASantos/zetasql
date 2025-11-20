@@ -79,15 +79,13 @@ std::vector<const Type*> ZetaSqlComplexTestTypes(
 
   for (const std::string& proto_name : ZetaSqlRandomTestProtoNames()) {
     // Protos from builtins are already loaded from the generated pool.
-    // But sadly, some external drivers still require those descriptors loaded
-    // as well.
-    // TODO: Skip the ones already loaded from the generated pool once all
-    // external drivers are updated to encapsulate their own type factory &
-    // pools.
+    if (GetBuiltinProtoDescriptors().contains(proto_name)) {
+      continue;
+    }
     const google::protobuf::Descriptor* descriptor =
         descriptor_pool->FindMessageTypeByName(proto_name);
     ABSL_CHECK(descriptor != nullptr)
-        << "Cannot fine Proto Message Type: " << proto_name
+        << "Cannot find Proto Message Type: " << proto_name
         << ", available files: "
         << absl::StrJoin(ZetaSqlTestProtoFilepaths(), ",");
 
@@ -104,7 +102,7 @@ std::vector<const Type*> ZetaSqlComplexTestTypes(
     const google::protobuf::EnumDescriptor* descriptor =
         descriptor_pool->FindEnumTypeByName(enum_name);
     ABSL_CHECK(descriptor != nullptr)
-        << "Cannot fine Enum Type: " << enum_name << ", available files: "
+        << "Cannot find Enum Type: " << enum_name << ", available files: "
         << absl::StrJoin(ZetaSqlTestProtoFilepaths(), ",");
     const Type* enum_type;
     ZETASQL_CHECK_OK(type_factory->MakeEnumType(descriptor, &enum_type));

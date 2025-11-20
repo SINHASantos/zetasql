@@ -443,7 +443,8 @@ absl::Status ModuleCatalog::MaybeUpdateCatalogFromCreateFunctionStatement(
         LazyResolutionFunction::CreateTemplatedFunction(
             parse_resume_location, templated_expression_resume_location,
             std::move(parser_output), function_status,
-            analyzer_options_.error_message_options(), function_mode));
+            analyzer_options_.error_message_options(), function_mode,
+            module_details_));
   } else {
     ZETASQL_ASSIGN_OR_RETURN(
         lazy_resolution_function,

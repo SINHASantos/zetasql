@@ -344,7 +344,7 @@ QueryStmt
     |   |       Filename -> STRING (TestExtraValueTable.Filename#2) (implicit) (pseudo-column)
     |   |       RowId -> BYTES (TestExtraValueTable.RowId#3) (implicit) (pseudo-column)
     |   |     Range variables:
-    |   |       TestExtraValueTable -> RANGE_VARIABLE<$value>
+    |   |       TestExtraValueTable -> RANGE_VARIABLE<value#1, pseudo_columns: Filename#2,RowId#3> (value table)
     |   |     Value table columns:
     |   |       TestExtraValueTable.value#1
     |   |

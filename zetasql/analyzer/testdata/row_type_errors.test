@@ -368,20 +368,20 @@ DELETE FROM KeyValueFindOnly kv
             ^
 ==
 
-# These will become errors when the statement works.
+[language_features=NONE,+ROW_TYPE,+TOP_LEVEL_TABLE_STATEMENTS]
 TABLE KeyValue{{Lazy|FindOnly}}
 --
 ALTERNATION GROUP: Lazy
 --
-ERROR: TABLE statements are not supported [at 1:1]
+ERROR: Tables with ROW type don't support top-level TABLE statements [at 1:7]
 TABLE KeyValueLazy
-^
+      ^
 --
 ALTERNATION GROUP: FindOnly
 --
-ERROR: TABLE statements are not supported [at 1:1]
+ERROR: Tables with ROW type don't support top-level TABLE statements [at 1:7]
 TABLE KeyValueFindOnly
-^
+      ^
 ==
 
 # ALTER TABLE currently works because it doesn't even look up the table.

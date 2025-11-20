@@ -246,8 +246,7 @@ absl::Status StatementEvaluatorImpl::StatementEvaluation::Analyze(
     Catalog* catalog) {
   ZETASQL_RETURN_IF_ERROR(AnalyzeStatement(sql, analyzer_options, catalog,
                                    type_factory(), &analyzer_output_));
-  if (analyzer_output_->analyzer_output_properties().IsRelevant(
-          REWRITE_ANONYMIZATION)) {
+  if (analyzer_output_->analyzer_output_properties().has_anonymization) {
     ZETASQL_ASSIGN_OR_RETURN(analyzer_output_,
                      RewriteForAnonymization(analyzer_output_, analyzer_options,
                                              catalog, type_factory()));
@@ -625,7 +624,7 @@ absl::Status StatementEvaluatorImpl::ExpressionEvaluation::EvaluateImpl(
 // returns that error. If there are multiple errors, returns a single status
 // that summarizes all of them.
 static absl::Status AggregateStatuses(
-    const std::vector<absl::StatusOr<Value>>& multi_statement_results) {
+    absl::Span<const absl::StatusOr<Value>> multi_statement_results) {
   std::vector<absl::Status> errors;
   bool has_internal_error = false;
   for (const auto& result : multi_statement_results) {

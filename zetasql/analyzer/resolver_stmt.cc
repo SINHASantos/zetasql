@@ -69,6 +69,7 @@
 #include "zetasql/public/table_valued_function.h"
 #include "zetasql/public/type.h"
 #include "zetasql/public/types/array_type.h"
+#include "zetasql/public/types/collation.h"
 #include "zetasql/public/types/simple_value.h"
 #include "zetasql/public/types/struct_type.h"
 #include "zetasql/public/types/type_parameters.h"
@@ -1122,7 +1123,6 @@ absl::Status Resolver::ResolveQueryStatement(
     }
     *output_stmt = MakeResolvedGeneralizedQueryStmt(std::move(output_schema),
                                                     std::move(resolved_scan));
-    analyzer_output_properties_.MarkRelevant(REWRITE_GENERALIZED_QUERY_STMT);
   } else {
     ZETASQL_RET_CHECK(*output_name_list != nullptr);
     *output_stmt = MakeResolvedQueryStmt(
@@ -4169,9 +4169,10 @@ Resolver::MakeResolvedColumnAnnotationsFromAnnotationMap(
         type_annotation_map->GetAnnotation(CollationAnnotation::GetId());
     if (collation_name_value != nullptr) {
       ZETASQL_RET_CHECK(collation_name_value->has_string_value());
-      ZETASQL_RET_CHECK(!collation_name_value->string_value().empty());
-      collation_name_expr = MakeResolvedLiteralWithoutLocation(
-          Value::StringValue(collation_name_value->string_value()));
+      if (!collation_name_value->string_value().empty()) {
+        collation_name_expr = MakeResolvedLiteralWithoutLocation(
+            Value::StringValue(collation_name_value->string_value()));
+      }
     }
   } else if (type_annotation_map->IsStructMap()) {
     // The type annotation map is for a complex type.
@@ -4214,6 +4215,39 @@ Resolver::MakeResolvedColumnAnnotationsFromAnnotationMap(
   return MakeResolvedColumnAnnotations(
       std::move(collation_name_expr), /*not_null=*/false,
       std::move(resolved_options_list), std::move(child_list), type_parameters);
+}
+
+// Populates the given AnnotationMap with the collation information from the
+// given the input ResolvedColumnAnnotations.
+static absl::Status PopulateCollationAnnotations(
+    const ResolvedColumnAnnotations* column_annotations, const Type* type,
+    AnnotationMap& annotation_map) {
+  if (column_annotations == nullptr) {
+    return absl::OkStatus();
+  }
+  if (column_annotations->collation_name() != nullptr) {
+    ZETASQL_RET_CHECK(type->ComponentTypes().empty());
+    const ResolvedExpr* collation_name_expr =
+        column_annotations->collation_name();
+    ZETASQL_RET_CHECK(collation_name_expr->type()->IsString());
+    ZETASQL_RET_CHECK(collation_name_expr->Is<ResolvedLiteral>());
+    absl::string_view collation_name =
+        collation_name_expr->GetAs<ResolvedLiteral>()->value().string_value();
+    return Collation::MakeScalar(collation_name)
+        .PopulateAnnotationMap(annotation_map);
+  }
+
+  if (column_annotations->child_list().empty()) {
+    return absl::OkStatus();
+  }
+  std::vector<const Type*> component_types = type->ComponentTypes();
+  ZETASQL_RET_CHECK_GE(component_types.size(), column_annotations->child_list().size());
+  for (int i = 0; i < column_annotations->child_list_size(); ++i) {
+    ZETASQL_RETURN_IF_ERROR(PopulateCollationAnnotations(
+        column_annotations->child_list(i), component_types[i],
+        *annotation_map.AsStructMap()->mutable_field(i)));
+  }
+  return absl::OkStatus();
 }
 
 absl::Status Resolver::ResolveAndAdaptQueryAndOutputColumns(
@@ -4279,6 +4313,24 @@ absl::Status Resolver::ResolveAndAdaptQueryAndOutputColumns(
     const Type* output_type = named_column.column().type();
     IdString column_name = column_definition_list[i]->column().name_id();
     const Type* defined_type = column_definition_list[i]->type();
+
+    const AnnotationMap* table_annotation_map = nullptr;
+
+    const ResolvedColumnAnnotations* column_annotations =
+        column_definition_list[i]->annotations();
+    if (column_annotations != nullptr) {
+      auto owned_annotation_map = AnnotationMap::Create(defined_type);
+      ZETASQL_ASSIGN_OR_RETURN(TypeParameters type_parameters,
+                       column_annotations->GetFullTypeParameters(defined_type));
+      ZETASQL_RETURN_IF_ERROR(PopulateCollationAnnotations(
+          column_annotations, defined_type, *owned_annotation_map));
+      if (!owned_annotation_map->Empty()) {
+        ZETASQL_ASSIGN_OR_RETURN(
+            table_annotation_map,
+            type_factory_->TakeOwnership(std::move(owned_annotation_map)));
+      }
+    }
+
     SignatureMatchResult unused;
     if (!coercer_.AssignableTo(InputArgumentType(output_type), defined_type,
                                /* is_explicit = */ false, &unused) &&
@@ -4296,8 +4348,9 @@ absl::Status Resolver::ResolveAndAdaptQueryAndOutputColumns(
       return MakeSqlErrorAt(ast_column_definitions[i])
              << "Column '" << error_message;
     }
-    desired_output_columns.emplace_back(named_column.column().column_id(),
-                                        kCreateAsId, column_name, defined_type);
+    desired_output_columns.emplace_back(
+        named_column.column().column_id(), kCreateAsId, column_name,
+        AnnotatedType(defined_type, table_annotation_map));
     output_columns.push_back(named_column.column());
   }
   ZETASQL_RETURN_IF_ERROR(

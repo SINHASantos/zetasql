@@ -1093,7 +1093,7 @@ QueryStmt
         |   |   |     Names:
         |   |   |       value -> STRING (rec.value#4)
         |   |   |     Range variables:
-        |   |   |       rec -> RANGE_VARIABLE<value>
+        |   |   |       rec -> RANGE_VARIABLE<value#4>
         |   |   |
         |   |   |   **Common table expressions**:
         |   |   |   Name  Columns
@@ -1164,7 +1164,7 @@ QueryStmt
         |     | |       |   |     Names:
         |     | |       |   |       value -> STRING (rec.value#4)
         |     | |       |   |     Range variables:
-        |     | |       |   |       rec -> RANGE_VARIABLE<value>
+        |     | |       |   |       rec -> RANGE_VARIABLE<value#4>
         |     | |       |   |
         |     | |       |   |   **Common table expressions**:
         |     | |       |   |   Name  Columns

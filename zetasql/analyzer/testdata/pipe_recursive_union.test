@@ -241,7 +241,7 @@ QueryStmt
     |       Key -> INT64 ($union_all.Key#3) (implicit)
     |       Value -> STRING ($union_all.Value#4) (implicit)
     |     Range variables:
-    |       t -> RANGE_VARIABLE<Key,Value>
+    |       t -> RANGE_VARIABLE<Key#3,Value#4>
     |   """
     +-input_scan=
       +-RecursiveScan
@@ -267,7 +267,7 @@ QueryStmt
             |   |       Key -> INT64 (t.Key#5) (implicit)
             |   |       Value -> STRING (t.Value#6) (implicit)
             |   |     Range variables:
-            |   |       t -> RANGE_VARIABLE<Key,Value>
+            |   |       t -> RANGE_VARIABLE<Key#5,Value#6>
             |   |
             |   |   **Common table expressions**:
             |   |   Name  Columns
@@ -707,7 +707,7 @@ QueryStmt
     |       Value -> STRING ($union_all.Value#4) (implicit)
     |       depth -> INT64 ($recursion_depth.depth#7)
     |     Range variables:
-    |       t -> RANGE_VARIABLE<Key,Value,depth>
+    |       t -> RANGE_VARIABLE<Key#3,Value#4,depth#7>
     |   """
     +-input_scan=
       +-RecursiveScan
@@ -733,7 +733,7 @@ QueryStmt
         |   |   |       Key -> INT64 (t.Key#5) (implicit)
         |   |   |       Value -> STRING (t.Value#6) (implicit)
         |   |   |     Range variables:
-        |   |   |       t -> RANGE_VARIABLE<Key,Value>
+        |   |   |       t -> RANGE_VARIABLE<Key#5,Value#6>
         |   |   |
         |   |   |   **Common table expressions**:
         |   |   |   Name  Columns
@@ -1205,7 +1205,7 @@ QueryStmt
     |       TestEnum -> zetasql_test__.TestEnum ($union_all.TestEnum#7) (implicit)
     |       key -> INT32 ($union_all.key#6) (implicit)
     |     Range variables:
-    |       t -> RANGE_VARIABLE<key,TestEnum,AnotherTestEnum>
+    |       t -> RANGE_VARIABLE<key#6,TestEnum#7,AnotherTestEnum#8>
     |   """
     +-input_scan=
       +-RecursiveScan
@@ -1230,7 +1230,7 @@ QueryStmt
         |   |   |       TestEnum -> zetasql_test__.TestEnum (EnumTable.TestEnum#2) (implicit)
         |   |   |       key -> INT32 (EnumTable.key#1) (implicit)
         |   |   |     Range variables:
-        |   |   |       enumtable -> RANGE_VARIABLE<key,TestEnum,AnotherTestEnum>
+        |   |   |       enumtable -> RANGE_VARIABLE<key#1,TestEnum#2,AnotherTestEnum#3, pseudo_columns: Filename#4,RowId#5>
         |   |   |   """
         |   |   +-input_scan=
         |   |     +-TableScan(column_list=EnumTable.[key#1, TestEnum#2, AnotherTestEnum#3], table=EnumTable, column_index_list=[0, 1, 2])
@@ -1252,7 +1252,7 @@ QueryStmt
             |   |       TestEnum -> zetasql_test__.TestEnum (t.TestEnum#10) (implicit)
             |   |       key -> INT32 (t.key#9) (implicit)
             |   |     Range variables:
-            |   |       t -> RANGE_VARIABLE<key,TestEnum,AnotherTestEnum>
+            |   |       t -> RANGE_VARIABLE<key#9,TestEnum#10,AnotherTestEnum#11>
             |   |
             |   |   **Common table expressions**:
             |   |   Name  Columns
@@ -1299,7 +1299,7 @@ QueryStmt
     |     TestExtraValueTable zetasql_test__.TestExtraPB $union_all.TestExtraValueTable#4 (value table)
     |   NameScope:
     |     Range variables:
-    |       TestExtraValueTable -> RANGE_VARIABLE<$value>
+    |       TestExtraValueTable -> RANGE_VARIABLE<TestExtraValueTable#4> (value table)
     |     Value table columns:
     |       $union_all.TestExtraValueTable#4
     |   """
@@ -1321,7 +1321,7 @@ QueryStmt
         |   |   |       Filename -> STRING (TestExtraValueTable.Filename#2) (implicit) (pseudo-column)
         |   |   |       RowId -> BYTES (TestExtraValueTable.RowId#3) (implicit) (pseudo-column)
         |   |   |     Range variables:
-        |   |   |       TestExtraValueTable -> RANGE_VARIABLE<$value>
+        |   |   |       TestExtraValueTable -> RANGE_VARIABLE<value#1, pseudo_columns: Filename#2,RowId#3> (value table)
         |   |   |     Value table columns:
         |   |   |       TestExtraValueTable.value#1
         |   |   |   """
@@ -1339,7 +1339,7 @@ QueryStmt
             |   |     TestExtraValueTable zetasql_test__.TestExtraPB $pipe_recursive_union.TestExtraValueTable#5 (value table)
             |   |   NameScope:
             |   |     Range variables:
-            |   |       TestExtraValueTable -> RANGE_VARIABLE<$value>
+            |   |       TestExtraValueTable -> RANGE_VARIABLE<TestExtraValueTable#5> (value table)
             |   |     Value table columns:
             |   |       $pipe_recursive_union.TestExtraValueTable#5
             |   |   """
@@ -1680,7 +1680,7 @@ QueryStmt
         |       |   |   |       my_key -> INT64 (t_1.my_key#13)
         |       |   |   |       my_value -> STRING (t_1.my_value#14)
         |       |   |   |     Range variables:
-        |       |   |   |       t -> RANGE_VARIABLE<my_key,my_value>
+        |       |   |   |       t -> RANGE_VARIABLE<my_key#13,my_value#14>
         |       |   |   |
         |       |   |   |   **Common table expressions**:
         |       |   |   |   Name  Columns
@@ -2261,7 +2261,7 @@ QueryStmt
     |       Key -> INT64 ($union_all.Key#3) (implicit)
     |       Value -> STRING ($union_all.Value#4) (implicit)
     |     Range variables:
-    |       t -> RANGE_VARIABLE<Key,Value>
+    |       t -> RANGE_VARIABLE<Key#3,Value#4>
     |   """
     +-input_scan=
       +-RecursiveScan
@@ -2356,7 +2356,7 @@ QueryStmt
     |   |   |       Key -> INT64 (KeyValue.Key#1) (implicit)
     |   |   |       Value -> STRING (KeyValue.Value#2) (implicit)
     |   |   |     Range variables:
-    |   |   |       t -> RANGE_VARIABLE<Key,Value>
+    |   |   |       t -> RANGE_VARIABLE<Key#1,Value#2>
     |   |   |   """
     |   |   +-input_scan=
     |   |     +-TableScan(column_list=KeyValue.[Key#1, Value#2], table=KeyValue, column_index_list=[0, 1])
@@ -2376,7 +2376,7 @@ QueryStmt
         |   |       Key -> INT64 (t.Key#5) (implicit)
         |   |       Value -> STRING (t.Value#6) (implicit)
         |   |     Range variables:
-        |   |       t -> RANGE_VARIABLE<Key,Value>
+        |   |       t -> RANGE_VARIABLE<Key#5,Value#6>
         |   |
         |   |   **Common table expressions**:
         |   |   Name  Columns
@@ -2478,7 +2478,7 @@ QueryStmt
     |     t zetasql_test__.TestExtraPB $union_all.TestExtraValueTable#4 (value table)
     |   NameScope:
     |     Range variables:
-    |       t -> RANGE_VARIABLE<$value>
+    |       t -> RANGE_VARIABLE<TestExtraValueTable#4> (value table)
     |     Value table columns:
     |       $union_all.TestExtraValueTable#4
     |   """
@@ -2500,7 +2500,7 @@ QueryStmt
         |   |   |       Filename -> STRING (TestExtraValueTable.Filename#2) (implicit) (pseudo-column)
         |   |   |       RowId -> BYTES (TestExtraValueTable.RowId#3) (implicit) (pseudo-column)
         |   |   |     Range variables:
-        |   |   |       TestExtraValueTable -> RANGE_VARIABLE<$value>
+        |   |   |       TestExtraValueTable -> RANGE_VARIABLE<value#1, pseudo_columns: Filename#2,RowId#3> (value table)
         |   |   |     Value table columns:
         |   |   |       TestExtraValueTable.value#1
         |   |   |   """
@@ -2518,7 +2518,7 @@ QueryStmt
             |   |     t zetasql_test__.TestExtraPB t.t#5 (value table)
             |   |   NameScope:
             |   |     Range variables:
-            |   |       t -> RANGE_VARIABLE<$value>
+            |   |       t -> RANGE_VARIABLE<t#5> (value table)
             |   |     Value table columns:
             |   |       t.t#5
             |   |
@@ -2554,7 +2554,7 @@ QueryStmt
     |     TestExtraValueTable zetasql_test__.TestExtraPB $union_all.TestExtraValueTable#4 (value table)
     |   NameScope:
     |     Range variables:
-    |       TestExtraValueTable -> RANGE_VARIABLE<$value>
+    |       TestExtraValueTable -> RANGE_VARIABLE<TestExtraValueTable#4> (value table)
     |     Value table columns:
     |       $union_all.TestExtraValueTable#4
     |   """
@@ -2576,7 +2576,7 @@ QueryStmt
         |   |   |       Filename -> STRING (TestExtraValueTable.Filename#2) (implicit) (pseudo-column)
         |   |   |       RowId -> BYTES (TestExtraValueTable.RowId#3) (implicit) (pseudo-column)
         |   |   |     Range variables:
-        |   |   |       TestExtraValueTable -> RANGE_VARIABLE<$value>
+        |   |   |       TestExtraValueTable -> RANGE_VARIABLE<value#1, pseudo_columns: Filename#2,RowId#3> (value table)
         |   |   |     Value table columns:
         |   |   |       TestExtraValueTable.value#1
         |   |   |   """
@@ -2594,7 +2594,7 @@ QueryStmt
             |   |     TestExtraValueTable zetasql_test__.TestExtraPB $pipe_recursive_union.TestExtraValueTable#5 (value table)
             |   |   NameScope:
             |   |     Range variables:
-            |   |       TestExtraValueTable -> RANGE_VARIABLE<$value>
+            |   |       TestExtraValueTable -> RANGE_VARIABLE<TestExtraValueTable#5> (value table)
             |   |     Value table columns:
             |   |       $pipe_recursive_union.TestExtraValueTable#5
             |   |   """
@@ -2629,7 +2629,7 @@ QueryStmt
     |     t zetasql_test__.TestExtraPB $union_all.TestExtraValueTable#4 (value table)
     |   NameScope:
     |     Range variables:
-    |       t -> RANGE_VARIABLE<$value>
+    |       t -> RANGE_VARIABLE<TestExtraValueTable#4> (value table)
     |     Value table columns:
     |       $union_all.TestExtraValueTable#4
     |   """
@@ -2651,7 +2651,7 @@ QueryStmt
         |   |   |       Filename -> STRING (TestExtraValueTable.Filename#2) (implicit) (pseudo-column)
         |   |   |       RowId -> BYTES (TestExtraValueTable.RowId#3) (implicit) (pseudo-column)
         |   |   |     Range variables:
-        |   |   |       TestExtraValueTable -> RANGE_VARIABLE<$value>
+        |   |   |       TestExtraValueTable -> RANGE_VARIABLE<value#1, pseudo_columns: Filename#2,RowId#3> (value table)
         |   |   |     Value table columns:
         |   |   |       TestExtraValueTable.value#1
         |   |   |   """
@@ -2679,7 +2679,7 @@ QueryStmt
             |       |   |     t zetasql_test__.TestExtraPB t.t#8 (value table)
             |       |   |   NameScope:
             |       |   |     Range variables:
-            |       |   |       t -> RANGE_VARIABLE<$value>
+            |       |   |       t -> RANGE_VARIABLE<t#8> (value table)
             |       |   |     Value table columns:
             |       |   |       t.t#8
             |       |   |
@@ -2718,7 +2718,7 @@ QueryStmt
     |     t INT64 $union_all.$value_column#2 (value table)
     |   NameScope:
     |     Range variables:
-    |       t -> RANGE_VARIABLE<$value>
+    |       t -> RANGE_VARIABLE<$value_column#2> (value table)
     |     Value table columns:
     |       $union_all.$value_column#2
     |   """
@@ -2896,7 +2896,7 @@ QueryStmt
         |           |     t INT64 t.t#3 (value table)
         |           |   NameScope:
         |           |     Range variables:
-        |           |       t -> RANGE_VARIABLE<$value>
+        |           |       t -> RANGE_VARIABLE<t#3> (value table)
         |           |     Value table columns:
         |           |       t.t#3
         |           |
@@ -3012,7 +3012,7 @@ QueryStmt
     |     Names:
     |       col -> INT64 ($union_all.col#2)
     |     Range variables:
-    |       t -> RANGE_VARIABLE<col>
+    |       t -> RANGE_VARIABLE<col#2>
     |   """
     +-input_scan=
       +-RecursiveScan
@@ -3187,7 +3187,7 @@ QueryStmt
         |           |     Names:
         |           |       col -> INT64 (t.col#3)
         |           |     Range variables:
-        |           |       t -> RANGE_VARIABLE<col>
+        |           |       t -> RANGE_VARIABLE<col#3>
         |           |
         |           |   **Common table expressions**:
         |           |   Name  Columns
@@ -3568,7 +3568,7 @@ QueryStmt
     |     t STRUCT<f1 INT64> $union_all.vt1#2 (value table)
     |   NameScope:
     |     Range variables:
-    |       t -> RANGE_VARIABLE<$value>
+    |       t -> RANGE_VARIABLE<vt1#2> (value table)
     |     Value table columns:
     |       $union_all.vt1#2
     |   """
@@ -3587,7 +3587,7 @@ QueryStmt
         |   |   |     vt1 STRUCT<f1 INT64> vt1.$col1#1 (value table)
         |   |   |   NameScope:
         |   |   |     Range variables:
-        |   |   |       vt1 -> RANGE_VARIABLE<$value>
+        |   |   |       vt1 -> RANGE_VARIABLE<$col1#1> (value table)
         |   |   |     Value table columns:
         |   |   |       vt1.$col1#1
         |   |   |   """
@@ -3646,7 +3646,7 @@ QueryStmt
             |                   |     t STRUCT<f1 INT64> t.t#3 (value table)
             |                   |   NameScope:
             |                   |     Range variables:
-            |                   |       t -> RANGE_VARIABLE<$value>
+            |                   |       t -> RANGE_VARIABLE<t#3> (value table)
             |                   |     Value table columns:
             |                   |       t.t#3
             |                   |
@@ -3688,7 +3688,7 @@ QueryStmt
     |     vt1 STRUCT<f1 INT64> $union_all.vt1#2 (value table)
     |   NameScope:
     |     Range variables:
-    |       vt1 -> RANGE_VARIABLE<$value>
+    |       vt1 -> RANGE_VARIABLE<vt1#2> (value table)
     |     Value table columns:
     |       $union_all.vt1#2
     |   """
@@ -3707,7 +3707,7 @@ QueryStmt
         |   |   |     vt1 STRUCT<f1 INT64> vt1.$col1#1 (value table)
         |   |   |   NameScope:
         |   |   |     Range variables:
-        |   |   |       vt1 -> RANGE_VARIABLE<$value>
+        |   |   |       vt1 -> RANGE_VARIABLE<$col1#1> (value table)
         |   |   |     Value table columns:
         |   |   |       vt1.$col1#1
         |   |   |   """
@@ -3761,7 +3761,7 @@ QueryStmt
             |                   |     vt1 STRUCT<f1 INT64> $pipe_recursive_union.vt1#3 (value table)
             |                   |   NameScope:
             |                   |     Range variables:
-            |                   |       vt1 -> RANGE_VARIABLE<$value>
+            |                   |       vt1 -> RANGE_VARIABLE<vt1#3> (value table)
             |                   |     Value table columns:
             |                   |       $pipe_recursive_union.vt1#3
             |                   |   """
@@ -3810,7 +3810,7 @@ QueryStmt
     |     vt1 STRUCT<f1 INT64> $union_all.vt1#2 (value table)
     |   NameScope:
     |     Range variables:
-    |       vt1 -> RANGE_VARIABLE<$value>
+    |       vt1 -> RANGE_VARIABLE<vt1#2> (value table)
     |     Value table columns:
     |       $union_all.vt1#2
     |   """
@@ -3829,7 +3829,7 @@ QueryStmt
         |   |   |     vt1 STRUCT<f1 INT64> vt1.$col1#1 (value table)
         |   |   |   NameScope:
         |   |   |     Range variables:
-        |   |   |       vt1 -> RANGE_VARIABLE<$value>
+        |   |   |       vt1 -> RANGE_VARIABLE<$col1#1> (value table)
         |   |   |     Value table columns:
         |   |   |       vt1.$col1#1
         |   |   |   """
@@ -3883,7 +3883,7 @@ QueryStmt
             |                   |     vt1 STRUCT<f1 INT64> $pipe_recursive_union.vt1#3 (value table)
             |                   |   NameScope:
             |                   |     Range variables:
-            |                   |       vt1 -> RANGE_VARIABLE<$value>
+            |                   |       vt1 -> RANGE_VARIABLE<vt1#3> (value table)
             |                   |     Value table columns:
             |                   |       $pipe_recursive_union.vt1#3
             |                   |   """
@@ -3925,7 +3925,7 @@ QueryStmt
     |       vt1 -> STRUCT<f1 INT64> ($union_all.vt1#5) (implicit)
     |       vt2 -> zetasql_test__.TestExtraPB ($union_all.vt2#6) (implicit)
     |     Range variables:
-    |       t -> RANGE_VARIABLE<vt1,vt2>
+    |       t -> RANGE_VARIABLE<vt1#5,vt2#6>
     |   """
     +-input_scan=
       +-RecursiveScan
@@ -3946,8 +3946,8 @@ QueryStmt
         |   |   |       Filename -> STRING (TestExtraValueTable.Filename#3) (implicit) (pseudo-column)
         |   |   |       RowId -> BYTES (TestExtraValueTable.RowId#4) (implicit) (pseudo-column)
         |   |   |     Range variables:
-        |   |   |       vt1 -> RANGE_VARIABLE<$value>
-        |   |   |       vt2 -> RANGE_VARIABLE<$value>
+        |   |   |       vt1 -> RANGE_VARIABLE<$col1#1> (value table)
+        |   |   |       vt2 -> RANGE_VARIABLE<value#2, pseudo_columns: Filename#3,RowId#4> (value table)
         |   |   |     Value table columns:
         |   |   |       vt1.$col1#1
         |   |   |       TestExtraValueTable.value#2
@@ -4025,7 +4025,7 @@ QueryStmt
             |                   |       vt1 -> STRUCT<f1 INT64> (t.vt1#7) (implicit)
             |                   |       vt2 -> zetasql_test__.TestExtraPB (t.vt2#8) (implicit)
             |                   |     Range variables:
-            |                   |       t -> RANGE_VARIABLE<vt1,vt2>
+            |                   |       t -> RANGE_VARIABLE<vt1#7,vt2#8>
             |                   |
             |                   |   **Common table expressions**:
             |                   |   Name  Columns
@@ -4088,8 +4088,8 @@ QueryStmt
         |   |   |       Filename -> STRING (TestExtraValueTable.Filename#3) (implicit) (pseudo-column)
         |   |   |       RowId -> BYTES (TestExtraValueTable.RowId#4) (implicit) (pseudo-column)
         |   |   |     Range variables:
-        |   |   |       vt1 -> RANGE_VARIABLE<$value>
-        |   |   |       vt2 -> RANGE_VARIABLE<$value>
+        |   |   |       vt1 -> RANGE_VARIABLE<$col1#1> (value table)
+        |   |   |       vt2 -> RANGE_VARIABLE<value#2, pseudo_columns: Filename#3,RowId#4> (value table)
         |   |   |     Value table columns:
         |   |   |       vt1.$col1#1
         |   |   |       TestExtraValueTable.value#2
@@ -4227,7 +4227,7 @@ QueryStmt
     |       Value -> ambiguous
     |       key -> INT64 ($union_all.key#5)
     |     Range variables:
-    |       t -> RANGE_VARIABLE<key,Value,Value>
+    |       t -> RANGE_VARIABLE<key#5,Value#6,Value#7>
     |   """
     +-input_scan=
       +-RecursiveScan
@@ -4249,8 +4249,8 @@ QueryStmt
         |   |   |       Value -> ambiguous
         |   |   |       key -> INT64 (KeyValue.Key#1)
         |   |   |     Range variables:
-        |   |   |       t1 -> RANGE_VARIABLE<Key,Value>
-        |   |   |       t2 -> RANGE_VARIABLE<Key,Value>
+        |   |   |       t1 -> RANGE_VARIABLE<Key#1,Value#2>
+        |   |   |       t2 -> RANGE_VARIABLE<Key#3,Value#4>
         |   |   |   """
         |   |   +-input_scan=
         |   |     +-JoinScan
@@ -4281,7 +4281,7 @@ QueryStmt
             |   |       Value -> ambiguous
             |   |       key -> INT64 (t.key#8)
             |   |     Range variables:
-            |   |       t -> RANGE_VARIABLE<key,Value,Value>
+            |   |       t -> RANGE_VARIABLE<key#8,Value#9,Value#10>
             |   |
             |   |   **Common table expressions**:
             |   |   Name  Columns
@@ -4344,8 +4344,8 @@ QueryStmt
         |   |   |       Value -> ambiguous
         |   |   |       key -> INT64 (KeyValue.Key#1)
         |   |   |     Range variables:
-        |   |   |       t1 -> RANGE_VARIABLE<Key,Value>
-        |   |   |       t2 -> RANGE_VARIABLE<Key,Value>
+        |   |   |       t1 -> RANGE_VARIABLE<Key#1,Value#2>
+        |   |   |       t2 -> RANGE_VARIABLE<Key#3,Value#4>
         |   |   |   """
         |   |   +-input_scan=
         |   |     +-JoinScan
@@ -4473,7 +4473,7 @@ QueryStmt
         |       |     number INT64 $pipe_recursive_union.number#3 (value table)
         |       |   NameScope:
         |       |     Range variables:
-        |       |       number -> RANGE_VARIABLE<$value>
+        |       |       number -> RANGE_VARIABLE<number#3> (value table)
         |       |     Value table columns:
         |       |       $pipe_recursive_union.number#3
         |       |   """

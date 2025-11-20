@@ -515,9 +515,7 @@ absl::StatusOr<const Type*> ComputeResultTypeForRegexpExtractGroups(
   // struct are set to the source type. A cast is added later to the resolved
   // AST during function call resolution.
   ZETASQL_ASSIGN_OR_RETURN(const Type* result_type,
-                   regexp.value()->ExtractGroupsResultStruct(
-                       type_factory, analyzer_options.language(),
-                       /*derive_field_types=*/false));
+                   regexp.value()->ExtractGroupsResultStruct(type_factory));
   return result_type;
 }
 }  // namespace
@@ -3653,8 +3651,8 @@ void GetCompressionFunctions(TypeFactory* type_factory,
                        .set_argument_name("size_limit", kNamedOnly)
                        .set_default(Value::Int64(1 << 30))});
   const FunctionOptions compression_and_named_arg_required =
-      FunctionOptions()
-          .AddRequiredLanguageFeature(zetasql::FEATURE_NAMED_ARGUMENTS);
+      FunctionOptions().AddRequiredLanguageFeature(
+          zetasql::FEATURE_NAMED_ARGUMENTS);
 
   InsertFunction(
       functions, options, "zstd_compress", SCALAR,

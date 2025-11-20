@@ -10,7 +10,7 @@
 # tvf_no_args_value_table_with_anonymization_uid - int32_val1
 # tvf_no_args_value_table_with_nested_anonymization_uid - nested_value.nested_int64
 
-[default language_features=NONE,+DIFFERENTIAL_PRIVACY,+NAMED_ARGUMENTS,+TABLE_VALUED_FUNCTIONS]
+[default language_features=NONE,+DIFFERENTIAL_PRIVACY,+NAMED_ARGUMENTS,+TABLE_VALUED_FUNCTIONS,+PIPE_AGGREGATE_WITH_DIFFERENTIAL_PRIVACY]
 [default enabled_ast_rewrites=DEFAULTS,+ANONYMIZATION]
 
 [parse_location_record_type=PARSE_LOCATION_RECORD_CODE_SEARCH]
@@ -39,7 +39,7 @@ QueryStmt
 select with differential_privacy count(*, contribution_bounds_per_group => @_p0_STRUCT)
 from tvf_no_args();
 
-Rewrite ERROR: A SELECT WITH DIFFERENTIAL_PRIVACY query must query data with a specified privacy unit column [at 1:1]
+Rewrite ERROR: A DIFFERENTIAL_PRIVACY query must query data with a specified privacy unit column [at 1:1]
 select with differential_privacy count(*, contribution_bounds_per_group => (0...
 ^
 ==
@@ -590,7 +590,7 @@ select with differential_privacy count(*)
 from tvf_one_relation_arg_with_fixed_output(
   (select * from SimpleTypesWithAnonymizationUid))
 
-Rewrite ERROR: A SELECT WITH DIFFERENTIAL_PRIVACY query must query data with a specified privacy unit column [at 1:1]
+Rewrite ERROR: A DIFFERENTIAL_PRIVACY query must query data with a specified privacy unit column [at 1:1]
 select with differential_privacy count(*)
 ^
 ==
@@ -634,7 +634,7 @@ select with differential_privacy count(*)
 from tvf_one_relation_arg_with_fixed_output(
   TABLE SimpleTypesWithAnonymizationUid)
 
-Rewrite ERROR: A SELECT WITH DIFFERENTIAL_PRIVACY query must query data with a specified privacy unit column [at 1:1]
+Rewrite ERROR: A DIFFERENTIAL_PRIVACY query must query data with a specified privacy unit column [at 1:1]
 select with differential_privacy count(*)
 ^
 ==
@@ -2045,7 +2045,7 @@ Rewrite ERROR: Unable to find differential_privacy user ID column `nested_value.
 # Count (*) counting unique users.
 # DIFFERENTIAL_PRIVACY_THRESHOLDING feature is enabled, therefore we should use this
 # count for k_threshold.
-[default language_features=NONE,+DIFFERENTIAL_PRIVACY,+NAMED_ARGUMENTS,+TABLE_VALUED_FUNCTIONS,+DIFFERENTIAL_PRIVACY_THRESHOLDING]
+[default language_features=NONE,+DIFFERENTIAL_PRIVACY,+NAMED_ARGUMENTS,+TABLE_VALUED_FUNCTIONS,+DIFFERENTIAL_PRIVACY_THRESHOLDING,+PIPE_AGGREGATE_WITH_DIFFERENTIAL_PRIVACY]
 [default enabled_ast_rewrites=DEFAULTS,+ANONYMIZATION]
 [parse_location_record_type=PARSE_LOCATION_RECORD_CODE_SEARCH]
 select with differential_privacy count(*, contribution_bounds_per_group => (0, 1))

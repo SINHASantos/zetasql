@@ -16,7 +16,7 @@
 
 module(
     name = "zetasql",
-    version = "2025.11.1",
+    version = "2025.11.2",
 )
 
 ZETASQL_JAVA_ARTIFACTS = [
@@ -75,6 +75,7 @@ bazel_dep(name = "rules_go", version = "0.53.0", repo_name = "io_bazel_rules_go"
 bazel_dep(name = "rules_java", version = "8.15.2")
 bazel_dep(name = "rules_jvm_external", version = "6.8")
 bazel_dep(name = "rules_m4", version = "0.3")
+bazel_dep(name = "rules_pkg", version = "1.1.0")
 bazel_dep(name = "rules_proto", version = "7.0.2")
 bazel_dep(name = "rules_python", version = "1.6.1")
 bazel_dep(name = "toolchains_llvm", version = "1.5.0")
@@ -115,7 +116,7 @@ pip.parse(
 use_repo(pip, "pypi")
 
 # Dependencies from http_archive
-http_archive_deps = use_extension("@//bazel:http_archive_deps.bzl", "zetasql_http_archive_deps")
+http_archive_deps = use_extension("@zetasql//bazel:http_archive_deps.bzl", "zetasql_http_archive_deps")
 use_repo(http_archive_deps, "com_google_cc_differential_privacy", "com_google_differential_privacy", "com_google_farmhash", "com_google_file_based_test_driver", "mstch", "native_utils", "org_publicsuffix")
 
 # Dev toolchain.
@@ -130,4 +131,7 @@ llvm.toolchain(
 )
 use_repo(llvm, "llvm_toolchain")
 
-register_toolchains("@llvm_toolchain//:all")
+register_toolchains(
+    "@llvm_toolchain//:all",
+    dev_dependency = True,
+)

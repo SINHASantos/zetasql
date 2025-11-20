@@ -36,12 +36,14 @@
 #include "zetasql/analyzer/rewriters/pipe_if_rewriter.h"
 #include "zetasql/analyzer/rewriters/pivot_rewriter.h"
 #include "zetasql/analyzer/rewriters/registration.h"
+#include "zetasql/analyzer/rewriters/row_type_rewriter.h"
 #include "zetasql/analyzer/rewriters/sql_function_inliner.h"
 #include "zetasql/analyzer/rewriters/sql_view_inliner.h"
 #include "zetasql/analyzer/rewriters/subpipeline_stmt_rewriter.h"
 #include "zetasql/analyzer/rewriters/typeof_function_rewriter.h"
 #include "zetasql/analyzer/rewriters/unpivot_rewriter.h"
 #include "zetasql/analyzer/rewriters/update_constructor_rewriter.h"
+#include "zetasql/analyzer/rewriters/variadic_function_signature_expander.h"
 #include "zetasql/analyzer/rewriters/with_expr_rewriter.h"
 #include "zetasql/public/options.pb.h"
 #include "absl/base/call_once.h"
@@ -81,6 +83,9 @@ void RegisterBuiltinRewriters() {
                GetUpdateConstructorRewriter());
 
     r.Register(ResolvedASTRewrite::REWRITE_FLATTEN, GetFlattenRewriter());
+    // REWRITE_ROW_TYPE depends on REWRITE_FLATTEN happening first.
+    r.Register(ResolvedASTRewrite::REWRITE_ROW_TYPE,
+               GetRowTypeTableScanRewriter());
     r.Register(ResolvedASTRewrite::REWRITE_ANONYMIZATION,
                GetAnonymizationRewriter());
     r.Register(ResolvedASTRewrite::REWRITE_AGGREGATION_THRESHOLD,
@@ -93,6 +98,8 @@ void RegisterBuiltinRewriters() {
                GetTypeofFunctionRewriter());
     r.Register(ResolvedASTRewrite::REWRITE_NULLIFERROR_FUNCTION,
                GetNullIfErrorFunctionRewriter());
+    r.Register(ResolvedASTRewrite::REWRITE_VARIADIC_FUNCTION_SIGNATURE_EXPANDER,
+               GetVariadicFunctionSignatureExpander());
     r.Register(ResolvedASTRewrite::REWRITE_BUILTIN_FUNCTION_INLINER,
                GetBuiltinFunctionInliner());
     r.Register(ResolvedASTRewrite::REWRITE_LIKE_ANY_ALL,

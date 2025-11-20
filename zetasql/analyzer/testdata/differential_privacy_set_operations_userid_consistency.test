@@ -1,5 +1,5 @@
 # Tests that DP queries reject set operations with inconsistent userid columns.
-[default language_features=NONE,+DIFFERENTIAL_PRIVACY,+NAMED_ARGUMENTS,+NUMERIC_TYPE]
+[default language_features=NONE,+DIFFERENTIAL_PRIVACY,+NAMED_ARGUMENTS,+NUMERIC_TYPE,+PIPE_AGGREGATE_WITH_DIFFERENTIAL_PRIVACY]
 
 [enabled_ast_rewrites=DEFAULTS,+ANONYMIZATION]
 [parse_location_record_type=PARSE_LOCATION_RECORD_CODE_SEARCH]

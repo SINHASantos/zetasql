@@ -2710,11 +2710,11 @@ SELECT
   'IX' AS b,
   NORMALIZE_AND_CASEFOLD('\u2168', NFD)=NORMALIZE_AND_CASEFOLD('IX', NFD) AS nfd,
   NORMALIZE_AND_CASEFOLD('\u2168', NFC)=NORMALIZE_AND_CASEFOLD('IX', NFC) AS nfc,
-  NORMALIZE_AND_CASEFOLD('\u2168', NFKD)=NORMALIZE_AND_CASEFOLD('IX', NFKD) AS nkfd,
-  NORMALIZE_AND_CASEFOLD('\u2168', NFKC)=NORMALIZE_AND_CASEFOLD('IX', NFKC) AS nkfc;
+  NORMALIZE_AND_CASEFOLD('\u2168', NFKD)=NORMALIZE_AND_CASEFOLD('IX', NFKD) AS nfkd,
+  NORMALIZE_AND_CASEFOLD('\u2168', NFKC)=NORMALIZE_AND_CASEFOLD('IX', NFKC) AS nfkc;
 
 /*---+----+-------+-------+------+------+
- | a | b  | nfd   | nfc   | nkfd | nkfc |
+ | a | b  | nfd   | nfc   | nfkd | nfkc |
  +---+----+-------+-------+------+------+
  | Ⅸ | IX | false | false | true | true |
  +---+----+-------+-------+------+------*/

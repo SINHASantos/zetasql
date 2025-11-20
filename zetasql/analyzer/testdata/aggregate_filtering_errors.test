@@ -1,4 +1,4 @@
-[default language_features=MAXIMUM,+ANALYTIC_FUNCTIONS,+AGGREGATE_FILTERING,+MULTILEVEL_AGGREGATION,+GROUPING_BUILTIN,+QUALIFY,+GROUP_BY_STRUCT,+ORDER_BY_IN_AGGREGATE,+ANONYMIZATION,+DIFFERENTIAL_PRIVACY,+AGGREGATION_THRESHOLD]
+[default language_features=MAXIMUM,+ANALYTIC_FUNCTIONS,+AGGREGATE_FILTERING,+MULTILEVEL_AGGREGATION,+GROUPING_BUILTIN,+QUALIFY,+GROUP_BY_STRUCT,+ORDER_BY_IN_AGGREGATE,+ANONYMIZATION,+DIFFERENTIAL_PRIVACY,+AGGREGATION_THRESHOLD,+PIPES,+PIPE_AGGREGATE_WITH_DIFFERENTIAL_PRIVACY]
 [default show_sqlbuilder_output]
 [default enabled_ast_rewrites=ALL,-WITH_EXPR]
 
@@ -316,6 +316,29 @@ from SimpleTypesWithAnonymizationUid;
 --
 ERROR: COUNT Anonymization / Differential Privacy Function does not support GROUP BY modifiers [at 2:3]
   COUNT(int64 GROUP BY int64 HAVING int64 > 1)
+  ^
+==
+
+# WHERE aggregate filtering does not work with differential privacy in pipes.
+[enabled_ast_rewrites=DEFAULTS,+ANONYMIZATION]
+FROM SimpleTypesWithAnonymizationUid
+|> AGGREGATE WITH DIFFERENTIAL_PRIVACY
+  COUNT(int64 WHERE bool);
+--
+ERROR: COUNT Anonymization / Differential Privacy Function does not support WHERE modifier [at 3:15]
+  COUNT(int64 WHERE bool);
+              ^
+==
+
+# HAVING aggregate filtering does not work with differential privacy. Since
+# GROUP BY is checked first, the error message mentions GROUP BY.
+[enabled_ast_rewrites=DEFAULTS,+ANONYMIZATION]
+FROM SimpleTypesWithAnonymizationUid
+|> AGGREGATE WITH DIFFERENTIAL_PRIVACY
+  COUNT(int64 GROUP BY int64 HAVING int64 > 1);
+--
+ERROR: COUNT Anonymization / Differential Privacy Function does not support GROUP BY modifiers [at 3:3]
+  COUNT(int64 GROUP BY int64 HAVING int64 > 1);
   ^
 ==
 

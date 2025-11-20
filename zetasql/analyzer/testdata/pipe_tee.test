@@ -113,7 +113,7 @@ ExplainStmt
         |       Value -> STRING (KeyValue.Value#2) (implicit)
         |       dval -> DOUBLE ($pipe_extend.dval#3)
         |     Range variables:
-        |       KeyValue -> RANGE_VARIABLE<Key,Value>
+        |       KeyValue -> RANGE_VARIABLE<Key#1,Value#2>
         |   """
         +-input_scan=
           +-PipeTeeScan
@@ -182,7 +182,7 @@ ExplainStmt
             |       Value -> STRING (KeyValue.Value#2) (implicit)
             |       dval -> DOUBLE ($pipe_extend.dval#3)
             |     Range variables:
-            |       KeyValue -> RANGE_VARIABLE<Key,Value>
+            |       KeyValue -> RANGE_VARIABLE<Key#1,Value#2>
             |   """
             +-input_scan=
               +-WithRefScan(column_list=[KeyValue.Key#1, KeyValue.Value#2, $pipe_extend.dval#3], with_query_name="$tee_cte_1")
@@ -451,7 +451,7 @@ GeneralizedQueryStmt
         |       Key -> INT64 (KeyValue.Key#1) (implicit)
         |       Value -> STRING (KeyValue.Value#2) (implicit)
         |     Range variables:
-        |       KeyValue -> RANGE_VARIABLE<Key,Value>
+        |       KeyValue -> RANGE_VARIABLE<Key#1,Value#2>
         |   """
         +-input_scan=
           +-PipeTeeScan
@@ -511,7 +511,7 @@ MultiStmt
             |       Key -> INT64 (KeyValue.Key#1) (implicit)
             |       Value -> STRING (KeyValue.Value#2) (implicit)
             |     Range variables:
-            |       KeyValue -> RANGE_VARIABLE<Key,Value>
+            |       KeyValue -> RANGE_VARIABLE<Key#1,Value#2>
             |   """
             +-input_scan=
               +-WithRefScan(column_list=KeyValue.[Key#1, Value#2], with_query_name="$tee_cte_1")
@@ -1256,7 +1256,7 @@ GeneralizedQueryStmt
     |       Filename -> STRING (TestExtraValueTable.Filename#2) (implicit) (pseudo-column)
     |       RowId -> BYTES (TestExtraValueTable.RowId#3) (implicit) (pseudo-column)
     |     Range variables:
-    |       TestExtraValueTable -> RANGE_VARIABLE<$value>
+    |       TestExtraValueTable -> RANGE_VARIABLE<value#1, pseudo_columns: Filename#2,RowId#3> (value table)
     |     Value table columns:
     |       TestExtraValueTable.value#1
     |   """
@@ -1309,7 +1309,7 @@ MultiStmt
         |       Filename -> STRING (TestExtraValueTable.Filename#2) (implicit) (pseudo-column)
         |       RowId -> BYTES (TestExtraValueTable.RowId#3) (implicit) (pseudo-column)
         |     Range variables:
-        |       TestExtraValueTable -> RANGE_VARIABLE<$value>
+        |       TestExtraValueTable -> RANGE_VARIABLE<value#1, pseudo_columns: Filename#2,RowId#3> (value table)
         |     Value table columns:
         |       TestExtraValueTable.value#1
         |   """
@@ -1357,7 +1357,7 @@ GeneralizedQueryStmt
       | |       |   |       Filename -> STRING (TestExtraValueTable.Filename#2) (implicit) (pseudo-column)
       | |       |   |       RowId -> BYTES (TestExtraValueTable.RowId#3) (implicit) (pseudo-column)
       | |       |   |     Range variables:
-      | |       |   |       TestExtraValueTable -> RANGE_VARIABLE<$value>
+      | |       |   |       TestExtraValueTable -> RANGE_VARIABLE<value#1, pseudo_columns: Filename#2,RowId#3> (value table)
       | |       |   |     Value table columns:
       | |       |   |       TestExtraValueTable.value#1
       | |       |   |   """
@@ -1414,7 +1414,7 @@ MultiStmt
   |     |   |       Filename -> STRING (TestExtraValueTable.Filename#2) (implicit) (pseudo-column)
   |     |   |       RowId -> BYTES (TestExtraValueTable.RowId#3) (implicit) (pseudo-column)
   |     |   |     Range variables:
-  |     |   |       TestExtraValueTable -> RANGE_VARIABLE<$value>
+  |     |   |       TestExtraValueTable -> RANGE_VARIABLE<value#1, pseudo_columns: Filename#2,RowId#3> (value table)
   |     |   |     Value table columns:
   |     |   |       TestExtraValueTable.value#1
   |     |   |   """

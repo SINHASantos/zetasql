@@ -752,6 +752,18 @@ TEST_F(ModuleTest, sql_function_with_error) {
               ::testing::HasSubstr("Unrecognized name: a"));
 }
 
+TEST_F(ModuleTest, template_udf_module_name_from_import_test) {
+  const std::string simple_module =
+      "MODULE a.B.cc; CREATE PUBLIC FUNCTION template_udf (t ANY TYPE) AS (t);";
+
+  ZETASQL_EXPECT_OK(
+      CreateModuleCatalog({"a", "B", "cc"}, "module_alias", &simple_module));
+  const Function* function;
+  ZETASQL_ASSERT_OK(module_catalog()->FindFunction({"template_udf"}, &function));
+  EXPECT_THAT(function->function_options().module_name_from_import,
+              ElementsAre("a", "B", "cc"));
+}
+
 TEST_F(ModuleTest, multi_statement_module_test) {
   std::vector<std::string> simple_modules;
   // These three modules are all logically the same, but have different

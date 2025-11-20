@@ -709,8 +709,6 @@ class Unparser : public ParseTreeVisitor {
                                  void* data) override;
   void visitASTAnalyticFunctionCall(const ASTAnalyticFunctionCall* node,
                                     void* data) override;
-  void visitASTFunctionCallWithGroupRows(
-      const ASTFunctionCallWithGroupRows* node, void* data) override;
   void visitASTWindowClause(const ASTWindowClause* node, void* data) override;
   void visitASTWindowDefinition(const ASTWindowDefinition* node,
                                 void* data) override;

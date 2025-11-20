@@ -61,7 +61,7 @@ class FunctionResolver {
  public:
   FunctionResolver(Catalog* catalog, TypeFactory* type_factory,
                    Resolver* resolver);
-  ~FunctionResolver() {}
+  ~FunctionResolver() = default;
   FunctionResolver(const FunctionResolver&) = delete;
   FunctionResolver& operator=(const FunctionResolver&) = delete;
 

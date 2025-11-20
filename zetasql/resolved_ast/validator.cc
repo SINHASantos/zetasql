@@ -56,6 +56,7 @@
 #include "zetasql/public/type.pb.h"
 #include "zetasql/public/types/collation.h"
 #include "zetasql/public/types/graph_element_type.h"
+#include "zetasql/public/types/measure_type.h"
 #include "zetasql/public/value.h"
 #include "zetasql/public/with_modifier_mode.h"
 #include "zetasql/resolved_ast/node_sources.h"
@@ -1994,6 +1995,34 @@ absl::Status Validator::AddColumnsFromGroupingCallList(
   return absl::OkStatus();
 }
 
+absl::Status Validator::ValidateTableColumnTypeEquality(
+    const Column& column, const ResolvedColumn& resolved_column,
+    absl::string_view table_name, absl::string_view column_name) {
+  VALIDATOR_RET_CHECK_EQ(column.GetType()->IsMeasureType(),
+                         resolved_column.type()->IsMeasureType());
+
+  if (column.GetType()->IsMeasureType()) {
+    // Special case for MeasureType because each measure column
+    // instantiation is a different MeasureType.
+    //
+    // TODO: b/460223066: Remove this special case once we finish formalizing
+    // the MeasureType spec.
+    const Type* column_result_type =
+        column.GetType()->AsMeasure()->result_type();
+    const Type* resolved_column_result_type =
+        resolved_column.type()->AsMeasure()->result_type();
+    VALIDATOR_RET_CHECK(
+        column_result_type->Equals(resolved_column_result_type));
+  } else {
+    VALIDATOR_RET_CHECK(column.GetType()->Equals(resolved_column.type()))
+        << "\nTable column " << column.FullName() << " type "
+        << column.GetType()->DebugString() << "\nResolvedColumn "
+        << resolved_column.DebugString() << " type "
+        << resolved_column.type()->DebugString();
+  }
+  return absl::OkStatus();
+}
+
 absl::Status Validator::ValidateResolvedTableScan(
     const ResolvedTableScan* scan,
     const std::set<ResolvedColumn>& visible_parameters) {
@@ -2063,11 +2092,8 @@ absl::Status Validator::ValidateResolvedTableScan(
       const Column* column = scan->table_column_list(i);
       const ResolvedColumn& resolved_column = scan->column_list(i);
 
-      VALIDATOR_RET_CHECK(column->GetType()->Equals(resolved_column.type()))
-          << "\nTable column " << column->FullName() << " type "
-          << column->GetType()->DebugString() << "\nResolvedColumn "
-          << resolved_column.DebugString() << " type "
-          << resolved_column.type()->DebugString();
+      ZETASQL_RETURN_IF_ERROR(ValidateTableColumnTypeEquality(
+          *column, resolved_column, table->Name(), column->Name()));
     }
 
   } else if (scan->column_index_list_size() != 0) {

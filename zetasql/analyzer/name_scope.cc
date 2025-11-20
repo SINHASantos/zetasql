@@ -88,10 +88,10 @@ static std::string ValidNamePathListDebugString(
   return debug_string;
 }
 
-ValidFieldInfoMap::~ValidFieldInfoMap() {}
+ValidFieldInfoMap::~ValidFieldInfoMap() = default;
 
-void ValidFieldInfoMap::InsertNamePath(
-    const ResolvedColumn& column, const ValidNamePath& valid_name_path) {
+void ValidFieldInfoMap::InsertNamePath(const ResolvedColumn& column,
+                                       const ValidNamePath& valid_name_path) {
   std::unique_ptr<ValidNamePathList>& valid_name_path_list =
       column_to_valid_name_paths_map_[column];
   if (valid_name_path_list == nullptr) {
@@ -126,9 +126,7 @@ bool ValidFieldInfoMap::ContainsColumnAndNamePathPrefix(
       &unused_prefix_length);
 }
 
-void ValidFieldInfoMap::Clear() {
-  column_to_valid_name_paths_map_.clear();
-}
+void ValidFieldInfoMap::Clear() { column_to_valid_name_paths_map_.clear(); }
 
 std::string ValidFieldInfoMap::DebugString(absl::string_view indent) const {
   std::string debug_string;
@@ -195,8 +193,7 @@ NameScope::NameScope(const NameScope* previous_scope,
     : previous_scope_(previous_scope),
       correlated_columns_set_(correlated_columns_set),
       // Copy state_ from name_list_.
-      state_(name_list->name_scope_.state_) {
-}
+      state_(name_list->name_scope_.state_) {}
 
 NameScope::NameScope(const NameScope* previous_scope,
                      const IdStringHashMapCase<NameTarget>& name_targets,
@@ -211,8 +208,7 @@ NameScope::NameScope(const NameScope* previous_scope,
 
 NameScope::NameScope(const NameList& name_list)
     // Copy state_ from name_list_.
-    : state_(name_list.name_scope_.state_) {
-}
+    : state_(name_list.name_scope_.state_) {}
 
 bool NameScope::IsEmpty() const {
   return names().empty() && value_table_columns().empty();
@@ -704,8 +700,8 @@ absl::Status NameScope::CreateGetFieldTargetFromInvalidValueTableColumn(
         // 'is_explicit' because this column access is the result of
         // having a ValidNamePath entry, and such entries are only
         // constructed for fields actually present in the query.
-        *field_target = NameTarget(valid_name_path.target_column(),
-                                   true /* is_explicit */);
+        *field_target =
+            NameTarget(valid_name_path.target_column(), true /* is_explicit */);
         break;
       } else {
         // There is a field path starting at this field that
@@ -1104,15 +1100,16 @@ absl::Status NameScope::CopyNameScopeWithOverridingNames(
   for (const ValueTableColumn& value_table : value_table_columns()) {
     ValueTableColumn new_value_table = value_table;
     for (const IdString name :
-             namelist_with_overriding_names->GetColumnNames()) {
+         namelist_with_overriding_names->GetColumnNames()) {
       // Since we want the new NameList name to override other names from
       // within the NameScope, if 'name' exists as a 'new_value_table'
       // field name then we must exclude this name from the value table
       // column.  Otherwise a name lookup would result as ambiguous.
       ExcludeNameFromValueTableIfPresent(name, &new_value_table);
     }
-    (*scope_with_new_names)->mutable_value_table_columns()->push_back(
-        new_value_table);
+    (*scope_with_new_names)
+        ->mutable_value_table_columns()
+        ->push_back(new_value_table);
   }
   return absl::OkStatus();
 }
@@ -1142,8 +1139,9 @@ absl::Status NameScope::CopyNameScopeWithOverridingNameTargets(
       const IdString name = entry.first;
       ExcludeNameFromValueTableIfPresent(name, &new_value_table);
     }
-    (*scope_with_new_names)->mutable_value_table_columns()->push_back(
-        new_value_table);
+    (*scope_with_new_names)
+        ->mutable_value_table_columns()
+        ->push_back(new_value_table);
   }
   return absl::OkStatus();
 }
@@ -1167,7 +1165,7 @@ static bool GetNewResolvedColumnOrRelatedValidNamePathList(
   if (valid_field_info_map.LookupNamePathList(
           original_column, &original_column_name_path_list)) {
     for (const ValidNamePath& valid_name_path :
-             *original_column_name_path_list) {
+         *original_column_name_path_list) {
       if (valid_name_path.name_path().empty()) {
         // We map this column to a new ResolvedColumn as
         // indicated by 'valid_name_path.target_column'.
@@ -1267,18 +1265,17 @@ absl::Status NameScope::CreateNewRangeVariableTargetGivenValidNamePaths(
     // name paths and columns from 'valid_field_info_map_in'.
     ValidNamePathList new_name_path_list;
     for (const NamedColumn& named_column :
-             original_name_target.scan_columns()->columns()) {
+         original_name_target.scan_columns()->columns()) {
       const ValidNamePathList* named_column_name_path_list;
       if (valid_field_info_map_in.LookupNamePathList(
               named_column.column(), &named_column_name_path_list)) {
         // There are field paths accessible from this column, so
         // remember them.
         for (const ValidNamePath& valid_name_path :
-               *named_column_name_path_list) {
+             *named_column_name_path_list) {
           std::vector<IdString> names;
           names.push_back(named_column.name());
-          names.insert(names.end(),
-                       valid_name_path.name_path().begin(),
+          names.insert(names.end(), valid_name_path.name_path().begin(),
                        valid_name_path.name_path().end());
           new_name_path_list.push_back(
               {names, valid_name_path.target_column()});
@@ -1336,12 +1333,10 @@ absl::Status NameScope::CreateNewLocalNameTargetsGivenValidNamePaths(
         if (GetNewResolvedColumnOrRelatedValidNamePathList(
                 original_target_column, valid_field_info_map_in,
                 &new_target_column, &new_name_path_list)) {
-          new_name_target = NameTarget(new_target_column,
-                                       target.IsExplicit());
+          new_name_target = NameTarget(new_target_column, target.IsExplicit());
         }
         if (new_name_target.IsAccessError() && !new_name_path_list.empty()) {
-          new_name_target.AppendValidNamePathList(
-              new_name_path_list);
+          new_name_target.AppendValidNamePathList(new_name_path_list);
         }
         break;
       }
@@ -1379,7 +1374,7 @@ absl::Status NameScope::CreateNewLocalNameTargetsGivenValidNamePaths(
         //
         ValidNamePathList new_valid_name_path_list;
         for (const ValidNamePath& target_valid_name_path :
-                 target.valid_name_path_list()) {
+             target.valid_name_path_list()) {
           const ValidNamePathList* target_column_name_path_list_in;
           if (valid_field_info_map_in.LookupNamePathList(
                   target_valid_name_path.target_column(),
@@ -1389,11 +1384,11 @@ absl::Status NameScope::CreateNewLocalNameTargetsGivenValidNamePaths(
             // update the target ResolvedColumn for this
             // 'target_valid_name_path'.
             for (const ValidNamePath& valid_name_path_in :
-                     *target_column_name_path_list_in) {
+                 *target_column_name_path_list_in) {
               if (valid_name_path_in.name_path().empty()) {
                 new_valid_name_path_list.push_back(
-                  {target_valid_name_path.name_path(),
-                   valid_name_path_in.target_column()});
+                    {target_valid_name_path.name_path(),
+                     valid_name_path_in.target_column()});
                 // There should only be one ValidNamePath with an
                 // empty name path to each column, so we break this loop
                 // here.  It would be nice to assert that condition, but
@@ -1444,16 +1439,15 @@ absl::Status NameScope::CreateNameScopeGivenValidNamePaths(
     const ValidFieldInfoMap& valid_field_info_map_in,
     std::unique_ptr<NameScope>* new_name_scope) const {
   IdStringHashMapCase<NameTarget> new_name_targets;
-  ZETASQL_RETURN_IF_ERROR(
-      CreateNewLocalNameTargetsGivenValidNamePaths(valid_field_info_map_in,
-                                                   &new_name_targets));
+  ZETASQL_RETURN_IF_ERROR(CreateNewLocalNameTargetsGivenValidNamePaths(
+      valid_field_info_map_in, &new_name_targets));
 
   std::vector<ValueTableColumn> new_value_table_columns;
   CreateNewValueTableColumnsGivenValidNamePaths(valid_field_info_map_in,
                                                 &new_value_table_columns);
-  new_name_scope->reset(new NameScope(
-      previous_scope_, new_name_targets,
-      new_value_table_columns, correlated_columns_set_));
+  new_name_scope->reset(new NameScope(previous_scope_, new_name_targets,
+                                      new_value_table_columns,
+                                      correlated_columns_set_));
 
   // If this NameScope does not allow correlated access, grouping paths are not
   // allowed to be accessed from a child scope, whether before or after
@@ -1504,7 +1498,18 @@ bool NameTarget::Equals_TESTING(const NameTarget& other) const {
       // for equality.  Implement real equality ValidNamePathList.
       return original_kind_ != other.original_kind() &&
              ValidNamePathListDebugString(valid_name_path_list_) ==
-               ValidNamePathListDebugString(other.valid_name_path_list());
+                 ValidNamePathListDebugString(other.valid_name_path_list());
+  }
+}
+
+inline void RangeVarNamedColumnFormatter(std::string* out, NamedColumn nc,
+                                         bool is_value_table) {
+  absl::StrAppend(out, nc.column().name(), "#", nc.column().column_id());
+  // If the NameList name is different from the ResolvedColumn name, print the
+  // NameList name as well, since that is what a query would reference. Don't
+  // print different names for value tables, since the name is not meaningful.
+  if (!is_value_table && !nc.name().Equals(nc.column().name_id())) {
+    absl::StrAppend(out, " AS ", nc.name().ToString());
   }
 }
 
@@ -1514,12 +1519,26 @@ std::string NameTarget::DebugString() const {
     absl::StrAppend(&debug_string, "access error(");
   }
   switch (kind_) {
-    case RANGE_VARIABLE:
-      return absl::StrCat(is_pattern_variable_ ? "PATTERN" : "RANGE",
-                          "_VARIABLE<",
-                          absl::StrJoin(scan_columns()->GetColumnNames(), ",",
-                                        IdStringFormatter),
-                          ">");
+    case RANGE_VARIABLE: {
+      std::string column_string =
+          absl::StrJoin(scan_columns()->columns(), ",",
+                        [this](std::string* out, NamedColumn nc) {
+                          RangeVarNamedColumnFormatter(
+                              out, nc, scan_columns()->is_value_table());
+                        });
+      std::string pseudo_column_string = absl::StrJoin(
+          scan_columns()->GetNamedPseudoColumns(), ",",
+          [](std::string* out, NamedColumn nc) {
+            RangeVarNamedColumnFormatter(out, nc, /*is_value_table=*/false);
+          });
+      return absl::StrCat(
+          is_pattern_variable_ ? "PATTERN_VARIABLE<" : "RANGE_VARIABLE<",
+          column_string,
+          column_string.empty() || pseudo_column_string.empty() ? "" : ", ",
+          pseudo_column_string.empty() ? "" : "pseudo_columns: ",
+          pseudo_column_string, ">",
+          scan_columns()->is_value_table() ? " (value table)" : "");
+    }
     case IMPLICIT_COLUMN:
     case EXPLICIT_COLUMN:
       return absl::StrCat(
@@ -1575,8 +1594,8 @@ std::string NameTarget::DebugString() const {
   return debug_string;
 }
 
-absl::Status NameList::AddColumn(
-    IdString name, const ResolvedColumn& column, bool is_explicit) {
+absl::Status NameList::AddColumn(IdString name, const ResolvedColumn& column,
+                                 bool is_explicit) {
   ZETASQL_RET_CHECK(!is_value_table()) << "Cannot add more columns to a value table";
   columns_.emplace_back(name, column, is_explicit);
   if (!IsInternalAlias(name)) {
@@ -1672,10 +1691,11 @@ absl::Status NameList::AddValueTableColumn(
   // clarity.
   value_table_name_list->columns_.emplace_back(
       kValueTableName, column, false /* is_explicit */, excluded_field_names);
-  value_table_name_list->name_scope_
-      .mutable_value_table_columns()->push_back(
-          {column, excluded_field_names,
-           true /* is_valid_to_access */, {} /* valid_field_info_map */});
+  value_table_name_list->name_scope_.mutable_value_table_columns()->push_back(
+      {column,
+       excluded_field_names,
+       true /* is_valid_to_access */,
+       {} /* valid_field_info_map */});
 
   if (pseudo_columns_name_list != nullptr) {
     ZETASQL_RETURN_IF_ERROR(value_table_name_list->MergeFrom(*pseudo_columns_name_list,
@@ -1703,8 +1723,10 @@ absl::Status NameList::AddValueTableColumn(
   // We need to also add it as a value table in the NameScope so we can find
   // implicit fields underneath it.
   name_scope_.mutable_value_table_columns()->push_back(
-      {column, excluded_field_names,
-       true /* is_valid_to_access */, {} /* valid_field_info_map */});
+      {column,
+       excluded_field_names,
+       true /* is_valid_to_access */,
+       {} /* valid_field_info_map */});
 
   return absl::OkStatus();
 }
@@ -1721,9 +1743,9 @@ absl::Status NameList::AddColumnMaybeValueTable(IdString name,
   }
 }
 
-absl::Status NameList::AddPseudoColumn(
-    IdString name, const ResolvedColumn& column,
-    const ASTNode* ast_location) {
+absl::Status NameList::AddPseudoColumn(IdString name,
+                                       const ResolvedColumn& column,
+                                       const ASTNode* ast_location) {
   ABSL_DCHECK(ast_location != nullptr);
   // Pseudo-columns go in the NameScope as implicit columns, but don't show
   // up in the columns_ list because they don't show up in SELECT *.
@@ -1749,10 +1771,9 @@ bool NameList::HasRangeVariable(IdString name) const {
 // a memory leak will happen.  Cycles should not happen, by construction, since
 // NameLists are usually built hierarchically as we go up the tree, and only
 // reference older NameLists.  If a problem shows up, we can update this.
-absl::Status NameList::AddRangeVariable(
-    IdString name,
-    const NameListPtr& scan_columns,
-    const ASTNode* ast_location) {
+absl::Status NameList::AddRangeVariable(IdString name,
+                                        const NameListPtr& scan_columns,
+                                        const ASTNode* ast_location) {
   ZETASQL_RET_CHECK_NE(scan_columns.get(), this)
       << "AddRangeVariable cannot add a NameList to itself";
   ZETASQL_RET_CHECK(!scan_columns->is_value_table())
@@ -1990,9 +2011,8 @@ absl::Status NameList::MergeFrom(const NameList& other,
       // Normally this would happen in AddRangeVariable, but we are bypassing
       // that call and copying the existing NameTarget directly.
       if (HasRangeVariable(name)) {
-        return MakeSqlErrorAt(ast_location)
-               << "Duplicate table alias " << name
-               << " in the same FROM clause";
+        return MakeSqlErrorAt(ast_location) << "Duplicate table alias " << name
+                                            << " in the same FROM clause";
       }
     } else {
       ABSL_DCHECK(!target.IsFieldOf());

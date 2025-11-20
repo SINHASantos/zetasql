@@ -21,8 +21,8 @@ cc_test(
     name = "zetasql_bazel_example_test",
     srcs = ["zetasql_bazel_example_test.cc"],
     deps = [
-        "@com_google_absl//absl/status",
-        "@com_google_googletest//:gtest_main",
-        "@com_google_zetasql//zetasql/public:analyzer",
+        "@absl//absl/status",
+        "@googletest//:gtest_main",
+        "@zetasql//zetasql/public:analyzer",
     ],
 )

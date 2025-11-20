@@ -4709,3 +4709,314 @@ ARRAY<STRUCT<properties JSON>>[unknown order:
   {{"id":100,"key_id":2,"name":"name2"}},
   {{"id":100,"key_id":3,"name":"name3"}}
 ]
+==
+
+[required_features=SQL_GRAPH,SQL_GRAPH_ADVANCED_QUERY,SQL_GRAPH_SET_OPERATION_PROPAGATION_MODE]
+[name=composite_query_set_op_left_union_all_basic]
+SELECT * FROM GRAPH_TABLE(aml
+  MATCH (p:Human) RETURN p.id, p.name
+  LEFT UNION ALL
+  MATCH (a:Account) RETURN a.account_id AS id, a.account_kind
+)
+ORDER BY id, name
+--
+ARRAY<STRUCT<id INT64, name STRING>>[known order:
+  {100, "name1"},
+  {100, "name2"},
+  {100, "name3"},
+  {1010, NULL},
+  {1020, NULL},
+  {1030, NULL},
+  {1040, NULL}
+]
+==
+
+[required_features=SQL_GRAPH,SQL_GRAPH_ADVANCED_QUERY,SQL_GRAPH_SET_OPERATION_PROPAGATION_MODE]
+[name=composite_query_set_op_full_union_all_basic]
+SELECT * FROM GRAPH_TABLE(aml
+  MATCH (p:Human) RETURN p.id, p.name
+  FULL UNION ALL
+  MATCH (a:Account) RETURN a.account_id AS id, a.account_kind
+)
+ORDER BY id, name, account_kind
+--
+ARRAY<STRUCT<id INT64, name STRING, account_kind STRING>>[known order:
+  {100, "name1", NULL},
+  {100, "name2", NULL},
+  {100, "name3", NULL},
+  {1010, NULL, "checking"},
+  {1020, NULL, "savings"},
+  {1030, NULL, "checking"},
+  {1040, NULL, "savings"}
+]
+==
+
+[required_features=SQL_GRAPH,SQL_GRAPH_ADVANCED_QUERY,SQL_GRAPH_SET_OPERATION_PROPAGATION_MODE]
+[name=composite_query_set_op_inner_union_all_basic]
+SELECT * FROM GRAPH_TABLE(aml
+  MATCH (p:Human) RETURN p.id, p.name
+  INNER UNION ALL
+  MATCH (a:Account) RETURN a.account_id AS id, a.account_kind
+)
+ORDER BY id
+--
+ARRAY<STRUCT<id INT64>>[known order:
+  {100},
+  {100},
+  {100},
+  {1010},
+  {1020},
+  {1030},
+  {1040}
+]
+==
+
+[required_features=SQL_GRAPH,SQL_GRAPH_ADVANCED_QUERY,SQL_GRAPH_SET_OPERATION_PROPAGATION_MODE,SQL_GRAPH_EXPOSE_GRAPH_ELEMENT]
+[name=composite_query_set_op_full_union_all_cast_node_pad_null]
+select gt.p.* from
+graph_table(aml
+  match (p:Human)
+  return p
+  FULL UNION ALL
+  match (a:Account)
+  return a
+) gt
+ORDER BY gt.p.id, gt.p.key_id
+--
+ARRAY<STRUCT<id INT64, key_id INT64, name STRING>>[known order:
+  {NULL, NULL, NULL},
+  {NULL, NULL, NULL},
+  {NULL, NULL, NULL},
+  {NULL, NULL, NULL},
+  {100, 1, "name1"},
+  {100, 2, "name2"},
+  {100, 3, "name3"}
+]
+==
+
+[required_features=SQL_GRAPH,SQL_GRAPH_ADVANCED_QUERY,SQL_GRAPH_SET_OPERATION_PROPAGATION_MODE]
+[name=composite_query_in_block_1_left_union_all]
+select *, COUNT(*) AS count
+from graph_table(aml
+  MATCH (p:Human)
+  OPTIONAL MATCH (p)-[e IS Login]->(a:Account)
+  return p.name, a.account_id as aid
+  LEFT UNION ALL
+  MATCH (p:Human)
+  OPTIONAL MATCH (p)-[e IS Login]->(a:Account)
+  return a.account_id as AID, a.account_kind, p.name
+)
+GROUP BY 1, 2
+ORDER BY 1, 2
+--
+ARRAY<STRUCT<name STRING, aid INT64, count INT64>>[known order:
+  {"name1", 1010, 2},
+  {"name2", 1030, 2},
+  {"name3", NULL, 2}
+]
+==
+
+[required_features=SQL_GRAPH,SQL_GRAPH_ADVANCED_QUERY,SQL_GRAPH_SET_OPERATION_PROPAGATION_MODE]
+[name=composite_query_in_block_1_inner_union_distinct]
+select *, COUNT(*) AS count
+from graph_table(aml
+  MATCH (p:Human)
+  OPTIONAL MATCH (p)-[e IS Login]->(a:Account)
+  return p.name, a.account_id as aid, a.account_kind
+  INNER UNION DISTINCT
+  MATCH (p:Human)
+  OPTIONAL MATCH (p)-[e IS Login]->(a:Account)
+  return a.account_id as AID, p.name
+)
+GROUP BY 1, 2
+ORDER BY 1, 2
+--
+ARRAY<STRUCT<name STRING, aid INT64, count INT64>>[known order:
+  {"name1", 1010, 1},
+  {"name2", 1030, 1},
+  {"name3", NULL, 1}
+]
+==
+
+[required_features=SQL_GRAPH,SQL_GRAPH_ADVANCED_QUERY,SQL_GRAPH_SET_OPERATION_PROPAGATION_MODE]
+[name=composite_query_in_block_1_left_union_distinct]
+select *, COUNT(*) AS count
+from graph_table(aml
+  MATCH (p:Human)
+  OPTIONAL MATCH (p)-[e IS Login]->(a:Account)
+  return p.name, a.account_id as aid
+  LEFT UNION DISTINCT
+  MATCH (p:Human)
+  OPTIONAL MATCH (p)-[e IS Login]->(a:Account)
+  WHERE p.name = "name1"
+  return a.account_id as AID, p.name
+)
+GROUP BY 1, 2
+ORDER BY 1, 2
+--
+ARRAY<STRUCT<name STRING, aid INT64, count INT64>>[known order:
+  {"name1", 1010, 1},
+  {"name2", NULL, 1},
+  {"name2", 1030, 1},
+  {"name3", NULL, 1}
+]
+==
+
+[name=composite_query_in_block_1_full_union_distinct]
+[required_features=SQL_GRAPH,SQL_GRAPH_ADVANCED_QUERY,SQL_GRAPH_SET_OPERATION_PROPAGATION_MODE]
+select * from graph_table(aml
+  MATCH (a:Account)
+  return a as c
+  FULL UNION DISTINCT
+  MATCH (c is ! Account)
+  return c
+  NEXT
+  return c.account_id, c.name
+)
+ORDER BY 1, 2
+--
+ARRAY<STRUCT<account_id INT64, name STRING>>[known order:
+  {NULL, "name1"},
+  {NULL, "name2"},
+  {NULL, "name3"},
+  {1010, NULL},
+  {1020, NULL},
+  {1030, NULL},
+  {1040, NULL}
+]
+==
+
+[required_features=SQL_GRAPH,SQL_GRAPH_ADVANCED_QUERY,SQL_GRAPH_SET_OPERATION_PROPAGATION_MODE]
+[name=composite_query_in_block_1_full_union_all_with_next]
+select COUNT(*) AS count
+from graph_table(aml
+  MATCH (p:Human)
+  OPTIONAL MATCH (p)-[e IS Login]->(a:Account)
+  return p.name, a.account_id as aid
+  FULL UNION ALL
+  MATCH (p:Human)
+  OPTIONAL MATCH (p)-[e IS Login]->(a:Account)
+  return a.account_id as AID, p.name, a.account_kind
+  NEXT
+  MATCH (p:Human)
+  return 1 AS output
+)
+order by 1
+--
+ARRAY<STRUCT<count INT64>>[{18}]
+==
+
+[required_features=SQL_GRAPH,SQL_GRAPH_ADVANCED_QUERY,SQL_GRAPH_SET_OPERATION_PROPAGATION_MODE]
+[name=composite_query_in_block_2_inner_union_all]
+select *, COUNT(*) AS count
+from graph_table(aml
+  MATCH (p:Human)
+  return 1 AS output
+  NEXT
+  MATCH (p:Human)
+  OPTIONAL MATCH (p)-[e IS Login]->(a:Account)
+  return p.name, a.account_id as aid
+  INNER UNION ALL
+  MATCH (p:Human)
+  OPTIONAL MATCH (p)-[e IS Login]->(a:Account)
+  return 1 AS output, p.name
+)
+GROUP BY 1
+ORDER BY 1
+--
+ARRAY<STRUCT<name STRING, count INT64>>[known order:
+  {"name1", 6},
+  {"name2", 6},
+  {"name3", 6}
+]
+==
+
+[required_features=SQL_GRAPH,SQL_GRAPH_ADVANCED_QUERY,SQL_GRAPH_SET_OPERATION_PROPAGATION_MODE]
+[name=composite_query_in_block_2_left_union_distinct]
+select *, COUNT(*) AS count
+from graph_table(aml
+  MATCH ()
+  RETURN 1 AS output
+  NEXT
+  MATCH (p:Human)
+  OPTIONAL MATCH (p)-[e IS Login]->(a:Account)
+  return p.name, a.account_id as aid
+  LEFT UNION DISTINCT
+  MATCH (p:Human)
+  OPTIONAL MATCH (p)-[e IS Login]->(a:Account)
+  return a.account_id as AID, p.name, a.account_kind
+)
+GROUP BY 1, 2
+ORDER BY 1, 2
+--
+ARRAY<STRUCT<name STRING, aid INT64, count INT64>>[known order:
+  {"name1", 1010, 1},
+  {"name2", 1030, 1},
+  {"name3", NULL, 1}
+]
+==
+
+[required_features=SQL_GRAPH,SQL_GRAPH_ADVANCED_QUERY,SQL_GRAPH_SET_OPERATION_PROPAGATION_MODE]
+[name=composite_query_in_block_1_left_intersect_all]
+select *, COUNT(*) AS count
+from graph_table(aml
+  MATCH (a:Account)-[e:Transfer]->(b:Account)
+  return a.account_id AS source_account_id, b.account_id AS target_account_id
+  LEFT INTERSECT ALL
+  MATCH (a:Account)-[e:Transfer]->(b:Account)
+  WHERE a.account_id = 1010 OR a.account_id = 1020
+  return b.account_id AS target_account_id, a.account_id AS source_account_id, a.account_kind
+)
+GROUP BY 1, 2
+ORDER BY 1, 2
+--
+ARRAY<STRUCT<
+        source_account_id INT64,
+        target_account_id INT64,
+        count INT64
+      >>
+[known order:{1010, 1010, 1}, {1010, 1020, 2}, {1020, 1030, 2}]
+==
+
+[required_features=SQL_GRAPH,SQL_GRAPH_ADVANCED_QUERY,SQL_GRAPH_SET_OPERATION_PROPAGATION_MODE]
+[name=composite_query_in_block_1_inner_intersect_distinct]
+select *, COUNT(*) AS count
+from graph_table(aml
+  MATCH (a:Account)-[e:Transfer]->(b:Account)
+  return a.account_id AS source_account_id, b.account_id AS target_account_id, b.account_kind AS b_kind
+  INNER INTERSECT DISTINCT
+  MATCH (a:Account)-[e:Transfer]->(b:Account)
+  WHERE a.account_id = 1010 OR a.account_id = 1020
+  return a.account_id AS source_account_id, b.account_id AS target_account_id, a.account_kind AS a_kind
+)
+GROUP BY 1, 2
+ORDER BY 1, 2
+--
+ARRAY<STRUCT<
+        source_account_id INT64,
+        target_account_id INT64,
+        count INT64
+      >>
+[known order:{1010, 1010, 1}, {1010, 1020, 1}, {1020, 1030, 1}]
+==
+
+[required_features=SQL_GRAPH,SQL_GRAPH_ADVANCED_QUERY,SQL_GRAPH_SET_OPERATION_PROPAGATION_MODE]
+[name=composite_query_in_block_1_left_except_all]
+select *, COUNT(*) AS count
+from graph_table(aml
+  MATCH (a:Account)-[e:Transfer]->(b:Account)
+  return a.account_id AS source_account_id, b.account_id AS target_account_id
+  LEFT EXCEPT ALL
+  MATCH (a:Account)-[e:Transfer]->(b:Account)
+  WHERE a.account_id = 1010
+  return b.account_id AS target_account_id, a.account_id AS source_account_id, a.account_kind AS a_kind
+)
+GROUP BY 1, 2
+ORDER BY 1, 2
+--
+ARRAY<STRUCT<
+        source_account_id INT64,
+        target_account_id INT64,
+        count INT64
+      >>
+[known order:{1020, 1030, 2}, {1030, 1010, 1}]

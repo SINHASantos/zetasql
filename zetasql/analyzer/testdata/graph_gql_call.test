@@ -1,4 +1,4 @@
-[default language_features=NONE,+SQL_GRAPH,+SQL_GRAPH_ADVANCED_QUERY,+SQL_GRAPH_CALL,+TABLE_VALUED_FUNCTIONS,+ANALYTIC_FUNCTIONS,+SQL_GRAPH_BOUNDED_PATH_QUANTIFICATION,+SQL_GRAPH_RETURN_EXTENSIONS,+SQL_GRAPH_PATH_TYPE,+GROUP_BY_GRAPH_PATH,+SQL_GRAPH_PATH_MODE,+SQL_GRAPH_EXPOSE_GRAPH_ELEMENT]
+[default language_features=NONE,+SQL_GRAPH,+SQL_GRAPH_ADVANCED_QUERY,+SQL_GRAPH_CALL,+TABLE_VALUED_FUNCTIONS,+ANALYTIC_FUNCTIONS,+SQL_GRAPH_BOUNDED_PATH_QUANTIFICATION,+SQL_GRAPH_RETURN_EXTENSIONS,+SQL_GRAPH_PATH_TYPE,+GROUP_BY_GRAPH_PATH,+SQL_GRAPH_PATH_MODE,+SQL_GRAPH_EXPOSE_GRAPH_ELEMENT,+NAMED_ARGUMENTS]
 [default no_test_extract_table_names]
 [default run_sqlbuilder]
 
@@ -5259,6 +5259,51 @@ ERROR: No matching signature for tvf_graph with no arguments
     Signature requires at least 1 argument, found 0 arguments; CALL is not the first statement in the graph query so tvf_graph cannot access the implicit graph argument [at 5:8]
   call tvf_graph()
        ^
+==
+
+# Bug with named arguments in implicit graph calls
+graph aml
+call tvf_graph_with_named_arg(name => "foo")
+return 1 as x
+--
+QueryStmt
++-output_column_list=
+| +-$graph_table.x#3 AS x [INT64]
++-query=
+  +-GraphTableScan
+    +-column_list=[$graph_table.x#3]
+    +-property_graph=aml
+    +-input_scan=
+      +-GraphLinearScan
+        +-column_list=[$graph_table.x#3]
+        +-scan_list=
+          +-GraphLinearScan
+            +-column_list=[$graph_table.x#3]
+            +-scan_list=
+              +-GraphCallScan
+              | +-column_list=tvf_graph_with_named_arg.[column_bool#1, column_bytes#2]
+              | +-optional=FALSE
+              | +-subquery=
+              | | +-TVFScan
+              | |   +-column_list=tvf_graph_with_named_arg.[column_bool#1, column_bytes#2]
+              | |   +-tvf=tvf_graph_with_named_arg((ANY GRAPH, STRING name) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+              | |   +-signature=(ANY GRAPH, literal STRING) -> TABLE<column_bool BOOL, column_bytes BYTES>
+              | |   +-argument_list=
+              | |   | +-FunctionArgument(graph=aml)
+              | |   | +-FunctionArgument
+              | |   |   +-expr=
+              | |   |     +-Literal(type=STRING, value="foo")
+              | |   +-column_index_list=[0, 1]
+              | |   +-function_call_signature=(ANY GRAPH, STRING name) -> TABLE<column_bool BOOL, column_bytes BYTES>
+              | +-input_scan=
+              |   +-SingleRowScan
+              +-ProjectScan
+                +-column_list=[$graph_table.x#3]
+                +-expr_list=
+                | +-x#3 := Literal(type=INT64, value=1)
+                +-input_scan=
+                  +-GraphRefScan(column_list=tvf_graph_with_named_arg.[column_bool#1, column_bytes#2])
+
 ==
 
 # TODO: Reenable once SqlBuilder properly aliases all columns.

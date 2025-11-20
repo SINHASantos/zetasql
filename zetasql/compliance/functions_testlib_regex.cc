@@ -638,9 +638,6 @@ std::vector<FunctionTestCall> GetFunctionTestsRegexp2(
 }
 
 std::vector<FunctionTestCall> GetFunctionTestsRegexpExtractGroups() {
-  // The result structs in these cases are only used to indicate the type of the
-  // struct for the ExtractGroupsResultStruct() tests. The values of the result
-  // struct fields are not used in these tests.
   return {
       {"regexp_extract_groups",
        {"abc", "(?P<name>abc)"},
@@ -682,27 +679,6 @@ std::vector<FunctionTestCall> GetFunctionTestsRegexpExtractGroups() {
       {"regexp_extract_groups",
        {"name", "(?P<NamE__STRING>[a-z]+)"},
        Struct({{"NamE", String("name")}})},
-      {"regexp_extract_groups",
-       {"123", "(?P<age__INT64>[0-9]+)"},
-       Struct({{"age", Int64(123)}})},
-      {"regexp_extract_groups",
-       {"true", "(?P<checked__BOOL>true)"},
-       Struct({{"checked", Bool(true)}})},
-      {"regexp_extract_groups",
-       {"123 123.456", "(?P<age__iNt64>[0-9]+) (?P<val__double>[.0-9]+)"},
-       Struct({{"age", Int64(123)}, {"val", Double(123.456)}})},
-      {"regexp_extract_groups",
-       {"123", "(?P<__INT64>[0-9]+)"},
-       Struct({{"", Int64(123)}})},
-      {"regexp_extract_groups",
-       {"123", "(?P<a__b__INT64>[0-9]+)"},
-       Struct({{"a__b", Int64(123)}})},
-      {"regexp_extract_groups",
-       {"123", "(?P<a__>[0-9]+)"},
-       Struct({{"a", String("123")}})},
-      {"regexp_extract_groups",
-       {"2024-11-21", "(?P<d__DATE>[-0-9]+)"},
-       Struct({{"d", Date(absl::CivilDay(2024, 11, 21))}})},
 
       // regexp_extract_groups(bytes, bytes) -> struct
       {"regexp_extract_groups",
@@ -720,51 +696,39 @@ std::vector<FunctionTestCall> GetFunctionTestsRegexpExtractGroups() {
   };
 }
 
-// Returns the tests cases in GetFunctionTestsRegexpExtractGroups() except that
-// the result struct has all STRING (or BYTES) field, depending on the regexp
-// type. This is useful for testing the ExtractGroups() function.
 std::vector<FunctionTestCall>
-GetFunctionTestsRegexpExtractGroupsWithoutAutoCasting() {
-  std::vector<FunctionTestCall> original_tests =
-      GetFunctionTestsRegexpExtractGroups();
-  std::vector<FunctionTestCall> modified_tests;
-
-  for (const auto& test_call : original_tests) {
-    FunctionTestCall modified_call = test_call;
-    const Value& regexp = test_call.params.param(1);
-    const Value& original_result = test_call.params.result();
-    const Type* field_type =
-        regexp.type()->IsString() ? StringType() : BytesType();
-
-    if (!original_result.is_null() && original_result.type()->IsStruct()) {
-      std::vector<StructField> struct_fields;
-      std::vector<Value> new_fields;
-      for (int i = 0; i < original_result.num_fields(); ++i) {
-        const Value& field = original_result.field(i);
-        if (field.type()->Equals(field_type)) {
-          new_fields.push_back(field);
-        } else {
-          auto uncast_value = CastValue(field, {}, {}, field_type);
-          new_fields.push_back(uncast_value.ok() ? uncast_value.value()
-                                                 : Value::Null(field_type));
-        }
-        struct_fields.push_back(
-            {original_result.type()->AsStruct()->field(i).name, field_type});
-      }
-
-      const Type* uncast_result_type = nullptr;
-      TypeFactory type_factory;
-      type_factory
-          .MakeStructTypeFromVector(std::move(struct_fields),
-                                    &uncast_result_type)
-          .IgnoreError();
-      modified_call.params.SetResult(
-          Value::Struct(uncast_result_type->AsStruct(), new_fields),
-          test_call.params.status());
-    }
-    modified_tests.push_back(modified_call);
-  }
-  return modified_tests;
+GetFunctionTestsRegexpExtractGroupsWithAutoCasting(bool autocast_enabled) {
+  return {
+      {"regexp_extract_groups",
+       {"123", "(?P<age__INT64>[0-9]+)"},
+       autocast_enabled ? Struct({{"age", Int64(123)}})
+                        : Struct({{"age", String("123")}})},
+      {"regexp_extract_groups",
+       {"true", "(?P<checked__BOOL>true)"},
+       autocast_enabled ? Struct({{"checked", Bool(true)}})
+                        : Struct({{"checked", String("true")}})},
+      {"regexp_extract_groups",
+       {"123 123.456", "(?P<age__iNt64>[0-9]+) (?P<val__double>[.0-9]+)"},
+       autocast_enabled
+           ? Struct({{"age", Int64(123)}, {"val", Double(123.456)}})
+           : Struct({{"age", String("123")}, {"val", String("123.456")}})},
+      {"regexp_extract_groups",
+       {"123", "(?P<__INT64>[0-9]+)"},
+       autocast_enabled ? Struct({{"", Int64(123)}})
+                        : Struct({{"", String("123")}})},
+      {"regexp_extract_groups",
+       {"123", "(?P<a__b__INT64>[0-9]+)"},
+       autocast_enabled ? Struct({{"a__b", Int64(123)}})
+                        : Struct({{"a__b", String("123")}})},
+      {"regexp_extract_groups",
+       {"123", "(?P<a__>[0-9]+)"},  // No type suffix.
+       autocast_enabled ? Struct({{"a", String("123")}})
+                        : Struct({{"a", String("123")}})},
+      {"regexp_extract_groups",
+       {"2024-11-21", "(?P<d__DATE>[-0-9]+)"},
+       autocast_enabled ? Struct({{"d", Date(absl::CivilDay(2024, 11, 21))}})
+                        : Struct({{"d", String("2024-11-21")}})},
+  };
 }
 
 std::vector<FunctionTestCall> GetFunctionTestsRegexpInstr() {
