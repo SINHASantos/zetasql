@@ -284,6 +284,7 @@ cc_test(
         ":sample_catalog",
         "//zetasql/base/testing:status_matchers",
         "//zetasql/base/testing:zetasql_gtest_main",
+        "//zetasql/proto:simple_catalog_cc_proto",
         "//zetasql/public:catalog",
         "//zetasql/public:evaluator_table_iterator",
         "//zetasql/public:function",

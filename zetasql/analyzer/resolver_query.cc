@@ -572,6 +572,129 @@ bool IsMultiGroupingSets(const ASTGroupBy* group_by) {
   return !all_expr;
 }
 
+// Checks that the row identity columns are valid w.r.t. the `table` and are
+// groupable.
+//
+// `measure_source_string` is used for error message printing.
+//
+// `column_name` represents which column the row identity columns are specified
+// for. If empty, the row identity columns are for the measure source
+// represented by `table`, e.g., a catalog table or a tvf output.
+absl::Status CheckRowIdentityColumns(
+    const ASTNode* ast_location, const std::vector<int>& row_identity_columns,
+    const Table* table, const LanguageOptions& language,
+    absl::string_view measure_source_string,
+    absl::string_view column_name = "") {
+  std::string capitalized_measure_source;
+  if (!measure_source_string.empty()) {
+    capitalized_measure_source =
+        absl::StrCat(absl::AsciiStrToUpper(measure_source_string.substr(0, 1)),
+                     measure_source_string.substr(1));
+  }
+  if (row_identity_columns.empty()) {
+    if (column_name.empty()) {
+      // TODO: b/450295734 - Improve the error message. "Row identity columns"
+      // are probably not understood by users, and users might not be able
+      // to fix this since they don't necessarily own the table. We should
+      // revisit whether this should be a SQL error or an internal error.
+      return MakeSqlErrorAt(ast_location)
+             << capitalized_measure_source
+             << " must have at least one row identity column if it contains "
+                "a measure column.";
+    }
+    return MakeSqlErrorAt(ast_location)
+           << "Measure column " << column_name
+           << " must have at least one row identity column.";
+  }
+
+  const std::string error_column_source =
+      column_name.empty() ? ""
+                          : absl::StrCat(" for measure column ", column_name);
+  for (int row_identity_column_idx : row_identity_columns) {
+    if (row_identity_column_idx < 0 ||
+        row_identity_column_idx >= table->NumColumns()) {
+      return MakeSqlErrorAt(ast_location)
+             << capitalized_measure_source
+             << " has invalid index for row identity column"
+             << error_column_source << ". Index: " << row_identity_column_idx;
+    }
+    const Column* row_identity_column =
+        table->GetColumn(row_identity_column_idx);
+    std::string type_description;
+    if (!row_identity_column->GetType()->SupportsGrouping(language,
+                                                          &type_description)) {
+      return MakeSqlErrorAt(ast_location)
+             << capitalized_measure_source << " has row identity column "
+             << row_identity_column->Name() << error_column_source
+             << " with type " << type_description << " which is not groupable.";
+    }
+  }
+  return absl::OkStatus();
+}
+
+// Validates a measure column, and sets `needs_table_row_identity_columns` to
+// true if table-level row identity columns are required for this measure
+// column.
+//
+// - `column_name` is passed in separately instead of using `column->Name()`
+//   because `column->Name()` can be empty.
+// - `measure_source_string`: A string explanation on the source of the measure
+//   column, e.g., "table x", "table valued function xy". This is used for
+//   error messages.
+// - `needs_table_row_identity_columns`: Output parameter, set to true if
+//   table-level row identity columns are required for this measure column.
+//   Must not be null.
+absl::Status ValidateMeasureColumn(const ASTNode* ast_location,
+                                   const Column* column, const Table* table,
+                                   IdString column_name,
+                                   const LanguageOptions& language,
+                                   absl::string_view measure_source_string,
+                                   bool* needs_table_row_identity_columns) {
+  *needs_table_row_identity_columns = false;
+  if (!language.LanguageFeatureEnabled(FEATURE_ENABLE_MEASURES)) {
+    return MakeSqlErrorAt(ast_location)
+           << "Column " << column_name << " in " << measure_source_string
+           << " has unsupported type "
+           << column->GetType()->TypeName(language.product_mode());
+  }
+  if (!column->HasMeasureExpression()) {
+    // TODO: b/350555383 -
+    // Attempt to re-resolve the measure expression if the sql expression
+    // is available but the resolved expression is nullptr (this case can
+    // occur following column deserialization).
+    return MakeSqlErrorAt(ast_location)
+           << "Column " << column_name << " in " << measure_source_string
+           << " is a measure column but does not have a measure "
+              "expression";
+  } else {
+    // Validate the supplied measure expression.
+    zetasql::Column::ExpressionAttributes expression_attributes =
+        column->GetExpression().value();
+    if (!expression_attributes.HasResolvedExpression()) {
+      return MakeSqlErrorAt(ast_location)
+             << "Column " << column_name << " in " << measure_source_string
+             << " is a measure column but does not have a measure "
+                "expression";
+    }
+    ZETASQL_RETURN_IF_ERROR(ValidateMeasureExpression(
+        expression_attributes.GetExpressionString(),
+        *expression_attributes.GetResolvedExpression(), language,
+        column_name.ToStringView()));
+    if (expression_attributes.RowIdentityColumns().has_value()) {
+      ZETASQL_RETURN_IF_ERROR(CheckRowIdentityColumns(
+          ast_location, *expression_attributes.RowIdentityColumns(), table,
+          language, measure_source_string, column_name.ToStringView()));
+      // TODO: b/450295734 - Support column-level row identity columns.
+      return MakeSqlErrorAt(ast_location)
+             << "Measure with column-level row identity columns are not "
+                "supported yet";
+    } else {
+      *needs_table_row_identity_columns = true;
+    }
+  }
+  return absl::OkStatus();
+}
+
 }  // namespace
 
 // These are constant identifiers used mostly for generated column or table
@@ -7005,6 +7128,7 @@ absl::Status Resolver::ResolveSelectListExprsFirstPass(
     // outside of an expression subquery *must* be an aggregate expression and
     // therefore never valid to be used in the 'GROUP BY' clause. Thus, deferred
     // resolution of these expressions is considered safe.
+    // TODO: b/430036320 - Cleanup if not needed by simplified GROUP ROWS.
     if (select_column_info.has_outer_group_rows_or_group_by_modifiers) {
       auto select_column_state = std::make_unique<SelectColumnState>(
           select_column, alias, /*is_explicit=*/true,
@@ -14808,78 +14932,6 @@ absl::Status Resolver::ResolveParenthesizedJoin(
   return absl::OkStatus();
 }
 
-absl::Status Resolver::ResolveGroupRowsTVF(
-    const ASTTVF* ast_tvf, std::unique_ptr<const ResolvedScan>* output,
-    std::shared_ptr<const NameList>* group_rows_name_list) {
-  RETURN_ERROR_IF_OUT_OF_STACK_SPACE();
-  if (name_lists_for_group_rows_.empty()) {
-    return MakeSqlErrorAt(ast_tvf)
-           << "GROUP_ROWS() can only be used inside WITH GROUP ROWS clause";
-  }
-
-  std::shared_ptr<const NameList> from_clause_name_list =
-      name_lists_for_group_rows_.top().name_list;
-  name_lists_for_group_rows_.top().group_rows_tvf_used = true;
-
-  // Clone the FROM clause's name list. Also remember mapping and new columns in
-  // column_list and in out_cols.
-  ResolvedColumnList column_list;
-  // For each cloned column, create a new computed column with a
-  // column reference pointing to the column in the original table.
-  // This is necessary so that if the GROUP_ROWS() is referenced twice,
-  // we get distinct column ids for each scan.
-  std::vector<std::unique_ptr<const ResolvedComputedColumn>> out_cols;
-  absl::flat_hash_map<ResolvedColumn, ResolvedColumn> cloned_columns;
-  auto clone_column = [this, &column_list, &out_cols, &cloned_columns](
-                          const ResolvedColumn& from_clause_column) {
-    ResolvedColumn group_rows_column(
-        AllocateColumnId(), from_clause_column.table_name_id(),
-        from_clause_column.name_id(), from_clause_column.type());
-    cloned_columns[from_clause_column] = group_rows_column;
-    column_list.emplace_back(group_rows_column);
-    out_cols.push_back(MakeResolvedComputedColumn(
-        group_rows_column, MakeColumnRef(from_clause_column)));
-    return group_rows_column;
-  };
-
-  absl::string_view value_table_error =
-      "Value tables are not allowed to pass through GROUP_ROWS() TVF";
-  // Table value currently does not propagate. When it is encountered,
-  // value_table_error is raised.
-  ZETASQL_ASSIGN_OR_RETURN(
-      auto cloned_name_list,
-      from_clause_name_list->CloneWithNewColumns(
-          ast_tvf, value_table_error,
-          ast_tvf->alias() == nullptr ? nullptr
-                                      : ast_tvf->alias()->identifier(),
-          clone_column, id_string_pool_));
-
-  ZETASQL_RET_CHECK_EQ(cloned_name_list->num_columns(),
-               from_clause_name_list->num_columns());
-
-  std::string alias;
-  *group_rows_name_list = std::move(cloned_name_list);
-  if (ast_tvf->alias() != nullptr) {
-    alias = ast_tvf->alias()->GetAsString();
-  }
-
-  // Resolve the query hint, if present.
-  std::vector<std::unique_ptr<const ResolvedOption>> hints;
-  if (ast_tvf->hint() != nullptr) {
-    ZETASQL_RETURN_IF_ERROR(ResolveHintAndAppend(ast_tvf->hint(), &hints));
-  }
-
-  std::unique_ptr<ResolvedGroupRowsScan> group_rows_scan =
-      MakeResolvedGroupRowsScan(column_list, std::move(out_cols), alias);
-  group_rows_scan->set_hint_list(std::move(hints));
-
-  ZETASQL_RETURN_IF_ERROR(EnsureNoMeasuresInNameList(*group_rows_name_list, ast_tvf,
-                                             "GROUP ROWS", product_mode()));
-
-  *output = std::move(group_rows_scan);
-  return absl::OkStatus();
-}
-
 namespace {
 // Vertifies that argument of TVF call inside <resolved_tvf_args> has no
 // collation, i.e. each argument is not a scalar argument of collated type or a
@@ -14972,17 +15024,6 @@ absl::Status Resolver::ResolveTVF(
     std::shared_ptr<const NameList>* output_name_list) {
   RETURN_ERROR_IF_OUT_OF_STACK_SPACE();
 
-  if (language().LanguageFeatureEnabled(FEATURE_WITH_GROUP_ROWS)) {
-    std::vector<std::string> fn_name = ast_tvf->name()->ToIdentifierVector();
-    if (ast_tvf->name()->num_names() == 1 &&
-        zetasql_base::CaseEqual(
-            ast_tvf->name()->first_name()->GetAsIdString().ToStringView(),
-            "GROUP_ROWS") &&
-        ast_tvf->argument_entries().empty()) {
-      return ResolveGroupRowsTVF(ast_tvf, output, output_name_list);
-    }
-  }
-
   // Check the language options to make sure TVFs are supported on this server.
   if (!language().LanguageFeatureEnabled(FEATURE_TABLE_VALUED_FUNCTIONS)) {
     return MakeSqlErrorAt(ast_tvf)
@@ -15046,6 +15087,29 @@ absl::Status Resolver::ResolveTVF(
         ast_tvf,
         absl::StrCat("Invalid table-valued function ", tvf_name_string),
         resolve_status, analyzer_options_.error_message_mode());
+  }
+
+  bool has_measure = absl::c_any_of(tvf_signature->result_schema().columns(),
+                                    [](const TVFSchemaColumn& column) {
+                                      return column.type->IsMeasureType();
+                                    });
+  if (has_measure) {
+    if (!language().LanguageFeatureEnabled(FEATURE_MEASURES_TVF)) {
+      return MakeSqlErrorAt(ast_tvf)
+             << "TVF returning MEASURE-typed columns is not supported";
+    }
+    // TVFs that emit measure columns must provide a `const Table*` to describe
+    // their output schema to provide information like row identity columns.
+    //
+    // This is not a SQL error because it is usually because engines
+    // misconfigured the catalog and users cannot change their query to fix it.
+    ZETASQL_RET_CHECK(tvf_signature->result_table_schema() != nullptr);
+
+    const std::string measure_source =
+        absl::StrCat("the output of the table valued function ",
+                     ast_tvf->name()->ToIdentifierPathString());
+    ZETASQL_RETURN_IF_ERROR(ValidateMeasureSource(
+        ast_tvf, tvf_signature->result_table_schema(), measure_source));
   }
 
   bool is_value_table = tvf_signature->result_schema().is_value_table();
@@ -17375,40 +17439,6 @@ static bool IsColumnOfTableArgument(const ASTPathExpression& path_expr,
   return false;
 }
 
-static absl::Status CheckRowIdentityColumns(const ASTNode* ast_location,
-                                            const Table* table,
-                                            const IdString& table_name,
-                                            const LanguageOptions& language) {
-  std::vector<int> row_identity_columns =
-      table->RowIdentityColumns().value_or(std::vector<int>{});
-  if (row_identity_columns.empty()) {
-    return MakeSqlErrorAt(ast_location)
-           << "Table " << table_name
-           << " must have at least one row identity column if it contains "
-              "a measure column.";
-  }
-  for (int row_identity_column_idx : row_identity_columns) {
-    if (row_identity_column_idx < 0 ||
-        row_identity_column_idx >= table->NumColumns()) {
-      return MakeSqlErrorAt(ast_location)
-             << "Table " << table_name
-             << " has invalid index for row identity column. Index: "
-             << row_identity_column_idx;
-    }
-    const Column* row_identity_column =
-        table->GetColumn(row_identity_column_idx);
-    std::string type_description;
-    if (!row_identity_column->GetType()->SupportsGrouping(language,
-                                                          &type_description)) {
-      return MakeSqlErrorAt(ast_location)
-             << "Table " << table_name << " has row identity column "
-             << row_identity_column->Name() << " with type " << type_description
-             << " which is not groupable.";
-    }
-  }
-  return absl::OkStatus();
-}
-
 NOINLINE_PREVENT_HUGE_STACK_FRAMES
 absl::Status Resolver::MakeScanForTable(
     const ASTNode* ast_location, const Table* table, IdString alias,
@@ -17434,7 +17464,7 @@ absl::Status Resolver::MakeScanForTable(
 
   ResolvedColumnList column_list;
   std::shared_ptr<NameList> name_list(new NameList);
-  bool table_has_measure_column = false;
+  bool has_measure = false;
 
   bool read_as_row_type = false;
   if (!table->HasColumnList()) {
@@ -17478,37 +17508,7 @@ absl::Status Resolver::MakeScanForTable(
                << column->Name() << " with unsupported ROW type";
       }
       if (column->GetType()->IsMeasureType()) {
-        table_has_measure_column = true;
-        if (!language().LanguageFeatureEnabled(FEATURE_ENABLE_MEASURES)) {
-          return MakeSqlErrorAt(ast_location)
-                 << "Column " << column_name << " in table " << table_name
-                 << " has unsupported type "
-                 << column->GetType()->TypeName(language().product_mode());
-        }
-        if (!column->HasMeasureExpression()) {
-          // TODO: b/350555383 -
-          // Attempt to re-resolve the measure expression if the sql expression
-          // is available but the resolved expression is nullptr (this case can
-          // occur following column deserialization).
-          return MakeSqlErrorAt(ast_location)
-                 << "Column " << column_name << " in table " << table_name
-                 << " is a measure column but does not have a measure "
-                    "expression";
-        } else {
-          // Validate the supplied measure expression.
-          zetasql::Column::ExpressionAttributes expression_attributes =
-              column->GetExpression().value();
-          if (!expression_attributes.HasResolvedExpression()) {
-            return MakeSqlErrorAt(ast_location)
-                   << "Column " << column_name << " in table " << table_name
-                   << " is a measure column but does not have a measure "
-                      "expression";
-          }
-          ZETASQL_RETURN_IF_ERROR(ValidateMeasureExpression(
-              expression_attributes.GetExpressionString(),
-              *expression_attributes.GetResolvedExpression(), language(),
-              column_name.ToStringView()));
-        }
+        has_measure = true;
       }
 
       const Type* resolved_column_type = column->GetType();
@@ -17553,9 +17553,11 @@ absl::Status Resolver::MakeScanForTable(
       }
     }
 
-    if (table_has_measure_column) {
+    if (has_measure) {
+      const std::string measure_source =
+          absl::StrCat("table ", table_name.ToStringView());
       ZETASQL_RETURN_IF_ERROR(
-          CheckRowIdentityColumns(ast_location, table, table_name, language()));
+          ValidateMeasureSource(ast_location, table, measure_source));
     }
   }
 
@@ -18082,6 +18084,33 @@ absl::Status Resolver::ResolvePipeRecursiveUnion(
   // `named_subquery_map_`.
   ZETASQL_RETURN_IF_ERROR(RemoveInnermostNamedSubqueryWithAlias(alias));
 
+  return absl::OkStatus();
+}
+
+absl::Status Resolver::ValidateMeasureSource(const ASTNode* ast_location,
+                                             const Table* table,
+                                             absl::string_view measure_source) {
+  bool needs_table_row_identity_columns = false;
+  for (int i = 0; i < table->NumColumns(); ++i) {
+    const Column* column = table->GetColumn(i);
+    if (column->GetType()->IsMeasureType()) {
+      IdString column_name = MakeIdString(column->Name());
+      if (column_name.empty()) {
+        // This is to stay consistent with the implementation in
+        // `MakeScanForTable`.
+        column_name = MakeIdString(absl::StrCat("$col", i + 1));
+      }
+      ZETASQL_RETURN_IF_ERROR(ValidateMeasureColumn(
+          ast_location, column, table, column_name, language(), measure_source,
+          &needs_table_row_identity_columns));
+    }
+  }
+  if (needs_table_row_identity_columns) {
+    std::vector<int> row_identity_columns =
+        table->RowIdentityColumns().value_or(std::vector<int>{});
+    ZETASQL_RETURN_IF_ERROR(CheckRowIdentityColumns(ast_location, row_identity_columns,
+                                            table, language(), measure_source));
+  }
   return absl::OkStatus();
 }
 

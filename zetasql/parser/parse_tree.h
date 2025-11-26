@@ -26,7 +26,7 @@
 #include <string>
 
 #include "zetasql/parser/ast_node.h"  
-#include "zetasql/parser/ast_node_kind.h"
+#include "zetasql/parser/ast_node_kind.h"  
 #include "zetasql/parser/parse_tree_generated.h"  
 #include "zetasql/parser/visit_result.h"
 #include "zetasql/public/id_string.h"

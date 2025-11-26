@@ -690,11 +690,6 @@ OrderByAndLimitInAggregateRewriterVisitor::HandleAggregateFunctionCall(
         "Only ARRAY_AGG, STRING_AGG and ARRAY_CONCAT_AGG are supported in "
         "ORDER_BY_AND_LIMIT_IN_AGGREGATE rewriter");
   }
-  if (aggregate_function_call->with_group_rows_subquery() != nullptr) {
-    return absl::UnimplementedError(
-        "WITH GROUP_ROWS subqueries are not supported in "
-        "ORDER_BY_AND_LIMIT_IN_AGGREGATE rewriter");
-  }
   if (!aggregate_function_call->group_by_list().empty()) {
     return absl::UnimplementedError(
         "Aggregate functions with GROUP BY modifiers are not supported in "

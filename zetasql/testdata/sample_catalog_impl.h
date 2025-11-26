@@ -156,6 +156,7 @@ class SampleCatalogImpl {
   void LoadDescriptorTableValuedFunctions();
   void LoadTableValuedFunctionsWithDeprecationWarnings();
   void LoadTableValuedFunctionsWithMultipleSignatures();
+  absl::Status LoadTvfsWithTableSchema();
 
   // Add a SQL table function to catalog starting from a full create table
   // function statement.

@@ -17322,7 +17322,7 @@ MATCH (p:Person)-[o:Owns]->(:Account)
 RETURN p.name AS name, ELEMENT_ID(p) AS node_element_id, ELEMENT_ID(o) AS edge_element_id
 
 /*--------------------------------------------------------------------------------------------------------------------------------------------+
- | name | node_element_id              | edge_element_id         .                                                                            |
+ | name | node_element_id              | edge_element_id                                                                                      |
  +------|------------------------------|------------------------------------------------------------------------------------------------------+
  | Alex | mUZpbkdyYXBoLlBlcnNvbgB4kQI= | mUZpbkdyYXBoLlBlcnNvbk93bkFjY291bnQAeJECkQ6ZRmluR3JhcGguUGVyc29uAHiRAplGaW5HcmFwaC5BY2NvdW50AHiRDg== |
  | Dana | mUZpbkdyYXBoLlBlcnNvbgB4kQQ= | mUZpbkdyYXBoLlBlcnNvbk93bkFjY291bnQAeJEGkSCZRmluR3JhcGguUGVyc29uAHiRBplGaW5HcmFwaC5BY2NvdW50AHiRIA== |
@@ -31604,6 +31604,22 @@ The following SQL to JSON encodings are supported:
       <td>
         SQL input: <code>TIME '12:34:56.789012'</code><br />
         JSON output: <code>"12:34:56.789012"</code><br />
+      </td>
+    </tr>
+    
+    
+    <tr>
+      <td>UUID</td>
+      <td>
+        <p>string</p>
+        <p>
+          Encoded as lowercase hexadecimal format as specified in
+          <a href="https://www.rfc-editor.org/rfc/rfc9562#name-uuid-format">RFC 9562</a>.
+        </p>
+      </td>
+      <td>
+        SQL input: <code>CAST('f81d4fae-7dec-11d0-a765-00a0c91e6bf6' AS UUID)</code><br />
+        JSON output: <code>"f81d4fae-7dec-11d0-a765-00a0c91e6bf6"</code><br />
       </td>
     </tr>
     

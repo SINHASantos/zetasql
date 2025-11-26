@@ -17,6 +17,7 @@
 #include "zetasql/public/catalog.h"
 
 #include <memory>
+#include <optional>
 #include <string>
 #include <utility>
 #include <vector>
@@ -86,6 +87,22 @@ absl::Status TableNotFoundErrorWithPathPrefix(
 }
 
 }  // namespace
+
+absl::StatusOr<Column::ExpressionAttributes>
+Column::ExpressionAttributes::Create(
+    ExpressionKind expression_kind, const std::string& expression_string,
+    const ResolvedExpr* resolved_expression,
+    std::optional<std::vector<int>> row_identity_columns) {
+  if (row_identity_columns.has_value() &&
+      expression_kind != ExpressionKind::MEASURE_EXPRESSION) {
+    return absl::InvalidArgumentError(
+        "Row identity columns can only be provided for measure "
+        "expressions");
+  }
+  return ExpressionAttributes(expression_kind, expression_string,
+                              resolved_expression,
+                              std::move(row_identity_columns));
+}
 
 absl::Status Catalog::FindTableWithPathPrefixImpl(
     const absl::Span<const std::string> path, const std::string& root_name,

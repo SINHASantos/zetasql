@@ -1305,15 +1305,14 @@ absl::StatusOr<std::unique_ptr<ValueExpr>> Algebrizer::AlgebrizeArrayAggregate(
       column_to_variable_->variable_generator()->GetNewVariableName("$agg");
   ZETASQL_RET_CHECK(array_aggregate->aggregate()->group_by_list().empty() &&
             array_aggregate->aggregate()->group_by_aggregate_list().empty());
-  ZETASQL_ASSIGN_OR_RETURN(
-      std::unique_ptr<AggregateArg> aggregate,
-      AlgebrizeAggregateFnWithAlgebrizedArguments(
-          agg_variable, /*anonymization_options=*/{}, /*filter=*/nullptr,
-          array_aggregate->aggregate(), std::move(arguments),
-          /*group_rows_subquery=*/nullptr, /*inner_grouping_keys=*/{},
-          /*inner_aggregators=*/{},
-          /*side_effects_variable=*/VariableId(),
-          std::move(order_by_key_override)));
+  ZETASQL_ASSIGN_OR_RETURN(std::unique_ptr<AggregateArg> aggregate,
+                   AlgebrizeAggregateFnWithAlgebrizedArguments(
+                       agg_variable, /*anonymization_options=*/{},
+                       /*filter=*/nullptr, array_aggregate->aggregate(),
+                       std::move(arguments), /*inner_grouping_keys=*/{},
+                       /*inner_aggregators=*/{},
+                       /*side_effects_variable=*/VariableId(),
+                       std::move(order_by_key_override)));
   ZETASQL_ASSIGN_OR_RETURN(std::unique_ptr<ValueExpr> input_array_expr,
                    AlgebrizeExpression(array_aggregate->array()));
   return ArrayAggregateExpr::Create(std::move(input_array_expr),
@@ -1323,12 +1322,12 @@ absl::StatusOr<std::unique_ptr<ValueExpr>> Algebrizer::AlgebrizeArrayAggregate(
 
 absl::StatusOr<std::unique_ptr<ValueExpr>>
 Algebrizer::AlgebrizeGraphIsLabeledPredicate(
-    const ResolvedGraphIsLabeledPredicate& predicate) {
-  predicate.MarkFieldsAccessed();
+    const ResolvedGraphIsLabeledPredicate* predicate) {
+  predicate->MarkFieldsAccessed();
   ZETASQL_ASSIGN_OR_RETURN(std::unique_ptr<ValueExpr> element,
-                   AlgebrizeExpression(predicate.expr()));
-  return GraphIsLabeledExpr::Create(std::move(element), predicate.label_expr(),
-                                    predicate.is_not());
+                   AlgebrizeExpression(predicate->expr()));
+  return GraphIsLabeledExpr::Create(std::move(element), predicate->label_expr(),
+                                    predicate->is_not());
 }
 
 }  // namespace zetasql

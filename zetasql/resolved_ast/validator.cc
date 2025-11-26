@@ -930,11 +930,6 @@ absl::Status Validator::ValidateOrderByAndLimitClausesOfAggregateFunctionCall(
         ResolvedComputedColumnBase>(
         aggregate_function_call->group_by_aggregate_list(),
         order_by_visible_columns);
-  } else if (aggregate_function_call->with_group_rows_subquery() != nullptr) {
-    order_by_visible_columns.clear();
-    ZETASQL_RETURN_IF_ERROR(AddColumnList(
-        aggregate_function_call->with_group_rows_subquery()->column_list(),
-        &order_by_visible_columns));
   }
 
   zetasql_base::VarSetter<bool> disallow_aggregate_resolved_arg_refs_setter(
@@ -1196,34 +1191,6 @@ absl::Status Validator::ValidateResolvedAggregateFunctionCall(
   std::set<ResolvedColumn> multi_level_aggregation_columns;
   const std::set<ResolvedColumn>* function_visible_columns = &visible_columns;
   bool is_multi_level_aggregate_function = false;
-  if (aggregate_function_call->with_group_rows_subquery() != nullptr) {
-    // Validate subquery
-    {
-      // If the aggregate function has WITH GROUP ROWS, then we must have a set
-      // of input columns from the related FROM clause.
-      std::optional<std::set<ResolvedColumn>> prev =
-          input_columns_for_group_rows_;
-      input_columns_for_group_rows_.emplace(visible_columns);
-      auto cleanup = absl::MakeCleanup(
-          [this, &prev]() { input_columns_for_group_rows_.swap(prev); });
-      // The subquery sees only its own parameters, not the
-      // visible_parameters that were passed in.
-      std::set<ResolvedColumn> subquery_parameters;
-      for (const std::unique_ptr<const ResolvedColumnRef>& column_ref :
-           aggregate_function_call->with_group_rows_parameter_list()) {
-        ZETASQL_RETURN_IF_ERROR(ValidateResolvedExpr(
-            visible_columns, visible_parameters, column_ref.get()));
-        subquery_parameters.insert(column_ref->column());
-      }
-      ZETASQL_RETURN_IF_ERROR(ValidateResolvedScan(
-          aggregate_function_call->with_group_rows_subquery(),
-          subquery_parameters));
-    }
-    ZETASQL_RETURN_IF_ERROR(AddColumnList(
-        aggregate_function_call->with_group_rows_subquery()->column_list(),
-        &group_rows_columns));
-    function_visible_columns = &group_rows_columns;
-  }
   if (!aggregate_function_call->group_by_list().empty()) {
     is_multi_level_aggregate_function = true;
     // Validate the `group_by_hint_list`.
@@ -8637,6 +8604,15 @@ absl::Status Validator::ValidateResolvedGraphElementLabel(
   PushErrorContext push(this, label);
 
   VALIDATOR_RET_CHECK(!label->name().empty());
+  if (!label->options_list().empty()) {
+    VALIDATOR_RET_CHECK(language_options_.LanguageFeatureEnabled(
+        FEATURE_SQL_GRAPH_DEFAULT_LABEL_AND_PROPERTY_DEFINITION_OPTIONS))
+        << "Found options list in label, but "
+           "SQL_GRAPH_DEFAULT_LABEL_AND_PROPERTY_DEFINITION_OPTIONS is not "
+           "enabled";
+    ZETASQL_RETURN_IF_ERROR(ValidateOptionsList(label->options_list()));
+  }
+
   for (absl::string_view property_name :
        label->property_declaration_name_list()) {
     VALIDATOR_RET_CHECK(property_dcl_name_set.find(property_name) !=
@@ -8659,6 +8635,14 @@ absl::Status Validator::ValidateResolvedGraphPropertyDefinition(
   VALIDATOR_RET_CHECK(all_property_name_set.find(
                           property_definition->property_declaration_name()) !=
                       all_property_name_set.end());
+  if (!property_definition->options_list().empty()) {
+    VALIDATOR_RET_CHECK(language_options_.LanguageFeatureEnabled(
+        FEATURE_SQL_GRAPH_DEFAULT_LABEL_AND_PROPERTY_DEFINITION_OPTIONS))
+        << "Found options list in property definition, but "
+           "SQL_GRAPH_DEFAULT_LABEL_AND_PROPERTY_DEFINITION_OPTIONS is "
+           "not enabled";
+    ZETASQL_RETURN_IF_ERROR(ValidateOptionsList(property_definition->options_list()));
+  }
 
   return ValidateResolvedExpr(visible_columns, /*visible_parameters=*/{},
                               property_definition->expr());

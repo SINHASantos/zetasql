@@ -29,6 +29,7 @@
 #include "zetasql/public/evaluator_table_iterator.h"
 #include "zetasql/public/property_graph.h"
 #include "zetasql/public/type.h"
+#include "absl/base/attributes.h"
 #include "absl/base/nullability.h"
 #include "absl/container/flat_hash_set.h"
 #include "zetasql/base/check.h"
@@ -1124,6 +1125,7 @@ class Column {
   // 1. The kind of expression as default or generated.
   // 2. The string representation of the expression.
   // 3. The analyzed expression.
+  // 4. For measure columns, row identity columns may also be provided.
   class ExpressionAttributes {
    public:
     enum class ExpressionKind {
@@ -1131,12 +1133,24 @@ class Column {
       GENERATED,
       MEASURE_EXPRESSION,
     };
+
+    ABSL_DEPRECATED("Use ExpressionAttributes::Create() instead")
     ExpressionAttributes(const ExpressionKind expression_kind,
                          const std::string& expression_string,
                          const ResolvedExpr* resolved_expression)
         : expression_kind_(expression_kind),
           expression_string_(expression_string),
           resolved_expression_(resolved_expression) {}
+
+    // Creates an ExpressionAttributes object.
+    //
+    // If `row_identity_columns` is provided, the `expression_kind` must be
+    // `MEASURE_EXPRESSION`.
+    static absl::StatusOr<ExpressionAttributes> Create(
+        ExpressionKind expression_kind, const std::string& expression_string,
+        const ResolvedExpr* resolved_expression,
+        std::optional<std::vector<int>> row_identity_columns = std::nullopt);
+
     ExpressionKind GetExpressionKind() const { return expression_kind_; }
     const std::string& GetExpressionString() const {
       return expression_string_;
@@ -1149,12 +1163,31 @@ class Column {
       return resolved_expression_;
     }
 
+    // Return the row identity column indices for a measure column, if the
+    // measure column specifies its own row identity columns.
+    //
+    // Returns nullopt for non-measure columns, or for measure columns that use
+    // row identity column indices from the Table.
+    std::optional<std::vector<int>> RowIdentityColumns() const {
+      return row_identity_columns_;
+    }
+
    private:
+    ExpressionAttributes(const ExpressionKind expression_kind,
+                         const std::string& expression_string,
+                         const ResolvedExpr* resolved_expression,
+                         std::optional<std::vector<int>> row_identity_columns)
+        : expression_kind_(expression_kind),
+          expression_string_(expression_string),
+          resolved_expression_(resolved_expression),
+          row_identity_columns_(std::move(row_identity_columns)) {}
+
     // This class uses implicitly defined copy assignment operator. Hence, the
     // members are not declared as consts.
     ExpressionKind expression_kind_;
     std::string expression_string_;
     const ResolvedExpr* resolved_expression_;  // not owned
+    std::optional<std::vector<int>> row_identity_columns_;
   };
 
   // Returns ExpressionAttributes if a column has default or generated

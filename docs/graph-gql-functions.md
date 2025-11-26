@@ -287,7 +287,7 @@ MATCH (p:Person)-[o:Owns]->(:Account)
 RETURN p.name AS name, ELEMENT_ID(p) AS node_element_id, ELEMENT_ID(o) AS edge_element_id
 
 /*--------------------------------------------------------------------------------------------------------------------------------------------+
- | name | node_element_id              | edge_element_id         .                                                                            |
+ | name | node_element_id              | edge_element_id                                                                                      |
  +------|------------------------------|------------------------------------------------------------------------------------------------------+
  | Alex | mUZpbkdyYXBoLlBlcnNvbgB4kQI= | mUZpbkdyYXBoLlBlcnNvbk93bkFjY291bnQAeJECkQ6ZRmluR3JhcGguUGVyc29uAHiRAplGaW5HcmFwaC5BY2NvdW50AHiRDg== |
  | Dana | mUZpbkdyYXBoLlBlcnNvbgB4kQQ= | mUZpbkdyYXBoLlBlcnNvbk93bkFjY291bnQAeJEGkSCZRmluR3JhcGguUGVyc29uAHiRBplGaW5HcmFwaC5BY2NvdW50AHiRIA== |

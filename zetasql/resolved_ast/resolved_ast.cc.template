@@ -966,8 +966,14 @@ static absl::Status SaveToImpl(
       }
     }
   }
-  ZETASQL_RETURN_IF_ERROR(tvf_signature->result_schema().Serialize(
-      file_descriptor_set_map, proto->mutable_output_schema()));
+  if (tvf_signature->result_table_schema() != nullptr) {
+    const Table* table = tvf_signature->result_table_schema();
+    ZETASQL_RETURN_IF_ERROR(SaveToImpl(table, file_descriptor_set_map,
+                               proto->mutable_output_table_schema()));
+  } else {
+    ZETASQL_RETURN_IF_ERROR(tvf_signature->result_schema().Serialize(
+        file_descriptor_set_map, proto->mutable_output_schema()));
+  }
 
   for (const FreestandingDeprecationWarning& warning :
            tvf_signature->options().additional_deprecation_warnings) {
@@ -1032,18 +1038,25 @@ absl::StatusOr<std::shared_ptr<TVFSignature>> RestoreFromImpl(
       }
     }
   }
-  ZETASQL_ASSIGN_OR_RETURN(TVFRelation table_schema, TVFRelation::Deserialize(
-      proto.output_schema(),
-      TypeDeserializer(params.type_factory, params.pools)));
-
   TVFSignatureOptions options;
   for (const FreestandingDeprecationWarning& warning :
            proto.options().additional_deprecation_warning()) {
     options.additional_deprecation_warnings.push_back(warning);
   }
 
+  if (proto.has_output_table_schema()) {
+    ZETASQL_ASSIGN_OR_RETURN(
+        const Table* result_table_schema,
+        RestoreFromImpl<const Table*>(proto.output_table_schema(), params));
+    return TVFSignature::Create(input_args, result_table_schema, options);
+  }
+
+  ZETASQL_ASSIGN_OR_RETURN(TVFRelation relation_schema, TVFRelation::Deserialize(
+      proto.output_schema(),
+      TypeDeserializer(params.type_factory, params.pools)));
+
   return std::shared_ptr<TVFSignature>(
-      new TVFSignature(input_args, std::move(table_schema), options));
+      new TVFSignature(input_args, std::move(relation_schema), options));
 }
 
 static absl::Status SaveToImpl(

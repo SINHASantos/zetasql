@@ -383,6 +383,9 @@ absl::Status ValidateScanCanEmitMeasureColumns(
       RESOLVED_ANALYTIC_SCAN,
       RESOLVED_SAMPLE_SCAN,
   };
+  if (language_options.LanguageFeatureEnabled(FEATURE_MEASURES_TVF)) {
+    allow_listed_scan_kinds.insert(RESOLVED_TVFSCAN);
+  }
   auto it =
       std::find_if(scan->column_list().cbegin(), scan->column_list().cend(),
                    [](const ResolvedColumn& column) {

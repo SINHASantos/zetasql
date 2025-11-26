@@ -845,4 +845,45 @@ static bool module_initialization_complete = []() {
 } ();
 }  // namespace
 
+absl::StatusOr<std::shared_ptr<TVFSignature>> TVFSignature::Create(
+    const std::vector<TVFInputArgumentType>& input_arguments,
+    const Table* result_table_schema, const TVFSignatureOptions& options) {
+  ZETASQL_ASSIGN_OR_RETURN(TVFRelation result_schema,
+                   CreateTVFRelationFromTable(result_table_schema));
+  auto tvf_signature =
+      std::make_shared<TVFSignature>(input_arguments, result_schema, options);
+  tvf_signature->result_table_schema_ = result_table_schema;
+  return tvf_signature;
+}
+
+absl::StatusOr<TVFRelation> CreateTVFRelationFromTable(const Table* table) {
+  std::vector<TVFSchemaColumn> columns;
+  columns.reserve(table->NumColumns());
+  int non_pseudo_column_count = 0;
+  int value_column_idx = -1;
+  for (int i = 0; i < table->NumColumns(); ++i) {
+    const Column* col = table->GetColumn(i);
+    columns.emplace_back(col->Name(), col->GetType(), col->IsPseudoColumn());
+    if (!col->IsPseudoColumn()) {
+      non_pseudo_column_count++;
+      value_column_idx = i;
+    }
+  }
+  if (!table->IsValueTable()) {
+    return TVFRelation(columns);
+  }
+  if (non_pseudo_column_count != 1) {
+    return absl::InvalidArgumentError(
+        "Value table must have exactly one non-pseudo column");
+  }
+  TVFSchemaColumn value_col = columns[value_column_idx];
+  std::vector<TVFSchemaColumn> pseudo_columns;
+  pseudo_columns.reserve(columns.size() - 1);
+  for (int i = 0; i < columns.size(); ++i) {
+    if (i == value_column_idx) continue;
+    pseudo_columns.push_back(columns[i]);
+  }
+  return TVFRelation::ValueTable(value_col.annotated_type(), pseudo_columns);
+}
+
 }  // namespace zetasql

@@ -118,10 +118,11 @@ class GraphStmtResolver {
   // Used by ResolveGraphProperties.
   absl::StatusOr<
       std::vector<std::unique_ptr<const ResolvedGraphPropertyDefinition>>>
-  ResolveGraphPropertyList(const ASTNode* ast_location,
-                           absl::Span<const ASTSelectColumn* const> properties,
-                           const ResolvedTableScan& base_table_scan,
-                           const NameScope* input_scope) const;
+  ResolveGraphPropertyList(
+      const ASTNode* ast_location,
+      absl::Span<const ASTGraphDerivedProperty* const> properties,
+      const ResolvedTableScan& base_table_scan,
+      const NameScope* input_scope) const;
 
   // Resolves all columns from `base_table_scan` into a list of
   // ResolvedGraphPropertyDefinitions: excluding the ones specified in

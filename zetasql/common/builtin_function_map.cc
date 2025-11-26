@@ -539,13 +539,20 @@ void GetMapCoreFunctions(TypeFactory* type_factory,
 
   const FunctionArgumentTypeList arglist_map_and_kv_pairs = {
       input_map_argument_type,
-      ARG_TYPE_ANY_1,
-      ARG_TYPE_ANY_2,
+      {ARG_TYPE_ANY_1,
+       FunctionArgumentTypeOptions().set_argument_name("key", kPositionalOnly)},
+      {ARG_TYPE_ANY_2, FunctionArgumentTypeOptions().set_argument_name(
+                           "value", kPositionalOnly)},
       // The function library treats multiple repeated arguments as interleaved.
       // Thus, this creates the signature of (MAP<K,V>, K, V, K, V, ...).
-      {ARG_TYPE_ANY_1, FunctionArgumentType::REPEATED},
-      {ARG_TYPE_ANY_2, FunctionArgumentType::REPEATED},
+      {ARG_TYPE_ANY_1, FunctionArgumentTypeOptions()
+                           .set_argument_name("repeated_key", kPositionalOnly)
+                           .set_cardinality(FunctionEnums::REPEATED)},
+      {ARG_TYPE_ANY_2, FunctionArgumentTypeOptions()
+                           .set_argument_name("repeated_value", kPositionalOnly)
+                           .set_cardinality(FunctionEnums::REPEATED)},
   };
+
   FunctionOptions map_insert_function_options =
       FunctionOptions().AddRequiredLanguageFeature(FEATURE_MAP_TYPE);
   InsertFunction(
@@ -558,23 +565,28 @@ void GetMapCoreFunctions(TypeFactory* type_factory,
                    FN_MAP_INSERT_OR_REPLACE,
                    FunctionSignatureOptions().set_rejects_collation()}},
                  map_insert_function_options);
-  InsertFunction(functions, options, "map_replace", Function::SCALAR,
-                 {
-                     {ARG_MAP_TYPE_ANY_1_2, arglist_map_and_kv_pairs,
-                      FN_MAP_REPLACE_KV_PAIRS,
-                      FunctionSignatureOptions().set_rejects_collation()},
-                     {ARG_MAP_TYPE_ANY_1_2,
-                      {input_map_argument_type,
-                       ARG_TYPE_ANY_1,
-                       {ARG_TYPE_ANY_1, FunctionArgumentType::REPEATED},
-                       FunctionArgumentType::Lambda(
-                           {ARG_TYPE_ANY_2}, ARG_TYPE_ANY_2,
-                           FunctionArgumentTypeOptions().set_argument_name(
-                               "value", kPositionalOnly))},
-                      FN_MAP_REPLACE_K_REPEATED_V_LAMBDA,
-                      FunctionSignatureOptions().set_rejects_collation()},
-                 },
-                 map_insert_function_options);
+  InsertFunction(
+      functions, options, "map_replace", Function::SCALAR,
+      {
+          {ARG_MAP_TYPE_ANY_1_2, arglist_map_and_kv_pairs,
+           FN_MAP_REPLACE_KV_PAIRS,
+           FunctionSignatureOptions().set_rejects_collation()},
+          {ARG_MAP_TYPE_ANY_1_2,
+           {input_map_argument_type,
+            {ARG_TYPE_ANY_1, FunctionArgumentTypeOptions().set_argument_name(
+                                 "key", kPositionalOnly)},
+            {ARG_TYPE_ANY_1,
+             FunctionArgumentTypeOptions()
+                 .set_argument_name("repeated_key", kPositionalOnly)
+                 .set_cardinality(FunctionEnums::REPEATED)},
+            FunctionArgumentType::Lambda(
+                {ARG_TYPE_ANY_2}, ARG_TYPE_ANY_2,
+                FunctionArgumentTypeOptions().set_argument_name(
+                    "updater_lambda", kPositionalOnly))},
+           FN_MAP_REPLACE_K_REPEATED_V_LAMBDA,
+           FunctionSignatureOptions().set_rejects_collation()},
+      },
+      map_insert_function_options);
   InsertFunction(
       functions, options, "map_cardinality", Function::SCALAR,
       {{type_factory->get_int64(),
@@ -591,8 +603,13 @@ void GetMapCoreFunctions(TypeFactory* type_factory,
       functions, options, "map_delete", Function::SCALAR,
       {{ARG_MAP_TYPE_ANY_1_2,
         {input_map_argument_type,
-         ARG_TYPE_ANY_1,  // At least one key must be provided.
-         {ARG_TYPE_ANY_1, FunctionArgumentType::REPEATED}},
+         {ARG_TYPE_ANY_1,
+          FunctionArgumentTypeOptions().set_argument_name(
+              "key", kPositionalOnly)},  // At least one key must be provided.
+         {ARG_TYPE_ANY_1,
+          FunctionArgumentTypeOptions()
+              .set_argument_name("repeated_key", kPositionalOnly)
+              .set_cardinality(FunctionEnums::REPEATED)}},
         FN_MAP_DELETE,
         FunctionSignatureOptions().set_rejects_collation()}},
       FunctionOptions().AddRequiredLanguageFeature(FEATURE_MAP_TYPE));

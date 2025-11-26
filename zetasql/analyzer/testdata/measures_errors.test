@@ -10,16 +10,16 @@
 # workaround this by disabling java support for now. This should be removed
 # once the serialization/deserialization is implemented.
 [default no_java]
-[default language_features=MAXIMUM,+ENABLE_MEASURES,+MULTILEVEL_AGGREGATION,+GROUP_BY_STRUCT,+AGGREGATE_FILTERING]
+[default language_features=MAXIMUM,+ENABLE_MEASURES,+MULTILEVEL_AGGREGATION,+GROUP_BY_STRUCT,+AGGREGATE_FILTERING,+MEASURES_TVF]
 [default enabled_ast_rewrites=DEFAULTS,+MEASURE_TYPE]
 [default no_run_sqlbuilder]
-[default no_java]
 
 # Measures cannot be output by top-level queries.
-SELECT key, measure_sum_quantity FROM MeasureTable_SingleKey;
+SELECT key, measure_sum_quantity
+FROM {{MeasureTable_SingleKey|tvf_lookup_table("MeasureTable_SingleKey")}};
 --
 ERROR: Returning expressions of type MEASURE is not allowed [at 2:1]
-SELECT key, measure_sum_quantity FROM MeasureTable_SingleKey;
+SELECT key, measure_sum_quantity
 ^
 
 ==
@@ -1266,3 +1266,56 @@ QueryStmt
 
 
 Rewrite ERROR: SQL function inliner cannot inline aggregate function Lazy_resolution_function:SumOfAggregateArgs with GROUP BY modifier
+==
+
+# Measure with column-level row identity columns requires at least one row
+# identity column.
+SELECT AGG(measure_count)
+FROM {{MeasureTable_ColumnEmptyRowIdentities|tvf_lookup_table("MeasureTable_ColumnEmptyRowIdentities")}};
+--
+ALTERNATION GROUP: MeasureTable_ColumnEmptyRowIdentities
+--
+ERROR: Measure column measure_count must have at least one row identity column. [at 2:6]
+FROM MeasureTable_ColumnEmptyRowIdentities;
+     ^
+--
+ALTERNATION GROUP: tvf_lookup_table("MeasureTable_ColumnEmptyRowIdentities")
+--
+ERROR: Measure column measure_count must have at least one row identity column. [at 2:6]
+FROM tvf_lookup_table("MeasureTable_ColumnEmptyRowIdentities");
+     ^
+==
+
+# Measure with column-level row identity columns cannot have index out of bound.
+SELECT AGG(measure_count)
+FROM {{MeasureTable_ColumnInvalidRowIdentityIndex|tvf_lookup_table("MeasureTable_ColumnInvalidRowIdentityIndex")}};
+--
+ALTERNATION GROUP: MeasureTable_ColumnInvalidRowIdentityIndex
+--
+ERROR: Table MeasureTable_ColumnInvalidRowIdentityIndex has invalid index for row identity column for measure column measure_count. Index: 100 [at 2:6]
+FROM MeasureTable_ColumnInvalidRowIdentityIndex;
+     ^
+--
+ALTERNATION GROUP: tvf_lookup_table("MeasureTable_ColumnInvalidRowIdentityIndex")
+--
+ERROR: The output of the table valued function tvf_lookup_table has invalid index for row identity column for measure column measure_count. Index: 100 [at 2:6]
+FROM tvf_lookup_table("MeasureTable_ColumnInvalidRowIdentityIndex");
+     ^
+==
+
+# Measure with column-level row identity columns cannot be non-groupable.
+[language_features=MAXIMUM,+AGGREGATE_FILTERING,-JSON_TYPE_COMPARISON,+MEASURES_TVF]
+SELECT AGG(measure_count)
+FROM {{MeasureTable_ColumnNonGroupableRowIdentity|tvf_lookup_table("MeasureTable_ColumnNonGroupableRowIdentity")}};
+--
+ALTERNATION GROUP: MeasureTable_ColumnNonGroupableRowIdentity
+--
+ERROR: Table MeasureTable_ColumnNonGroupableRowIdentity has row identity column json_col for measure column measure_count with type JSON which is not groupable. [at 2:6]
+FROM MeasureTable_ColumnNonGroupableRowIdentity;
+     ^
+--
+ALTERNATION GROUP: tvf_lookup_table("MeasureTable_ColumnNonGroupableRowIdentity")
+--
+ERROR: The output of the table valued function tvf_lookup_table has row identity column json_col for measure column measure_count with type JSON which is not groupable. [at 2:6]
+FROM tvf_lookup_table("MeasureTable_ColumnNonGroupableRowIdentity");
+     ^

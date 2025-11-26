@@ -231,7 +231,7 @@ void UuidValue::SerializeAndAppendToBytes(std::string* bytes) const {
 
 absl::StatusOr<UuidValue> UuidValue::DeserializeFromBytes(
     absl::string_view bytes) {
-  if (bytes.empty() || bytes.size() != sizeof(UuidValue)) {
+  if (bytes.size() != sizeof(UuidValue)) {
     return absl::OutOfRangeError(absl::StrCat(
         "Invalid serialized UUID size, expected ", sizeof(UuidValue),
         " bytes, but got ", bytes.size(), " bytes."));

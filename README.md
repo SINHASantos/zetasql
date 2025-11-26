@@ -41,7 +41,7 @@ standardized SQL dialect used across Google.
 Functionally, nothing about the language, semantics, or the reference
 implementation will change; however, users and engine implementers must prepare
 for mandatory code changes: you will need to update the namespace from zetasql
-to zetasql, and update all dependency file paths that currently include
+to googlesql, and update all dependency file paths that currently include
 "zetasql" in their name. We will provide a detailed migration guide to help you
 navigate these updates smoothly.
 

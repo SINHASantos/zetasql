@@ -733,6 +733,7 @@ absl::Status SampleCatalogImpl::LoadCatalogImpl(
   LoadConnectionTableValuedFunctions();
   LoadTableValuedFunctionsWithDeprecationWarnings();
   LoadTableValuedFunctionsWithMultipleSignatures();
+  RETURN_IF_ERROR_UNLESS_DBG(LoadTvfsWithTableSchema());
   LoadTemplatedSQLTableValuedFunctions();
   LoadTableValuedFunctionsWithAnonymizationUid();
   LoadTableValuedFunctionsWithOptionalRelations();
@@ -1025,6 +1026,62 @@ class LazySimpleTable : public SimpleTable {
   int64_t num_rows_ = 0;
 };
 
+// A TVF class whose resolved output schema is described by a const Table* or
+// a table looked up from the catalog.
+class TvfWithTableSchema : public TableValuedFunction {
+ public:
+  // Creates a TVF with output schema described by the given `result_table`.
+  TvfWithTableSchema(const std::vector<std::string>& function_name_path,
+                     const std::vector<FunctionSignature>& signatures,
+                     const Table* result_table,
+                     const TableValuedFunctionOptions& tvf_options = {})
+      : TableValuedFunction(function_name_path, /*group=*/"", signatures,
+                            tvf_options),
+        result_table_(result_table) {}
+
+  // Creates a TVF whose output schema is determined by looking up
+  // a table named via the table name argument to the TVF.
+  TvfWithTableSchema(const std::vector<std::string>& function_name_path,
+                     const std::vector<FunctionSignature>& signatures,
+                     const TableValuedFunctionOptions& tvf_options = {})
+      : TableValuedFunction(function_name_path, /*group=*/"", signatures,
+                            tvf_options) {}
+
+  absl::Status Resolve(
+      const AnalyzerOptions* analyzer_options,
+      const std::vector<TVFInputArgumentType>& actual_arguments,
+      const FunctionSignature& concrete_signature, Catalog* catalog,
+      TypeFactory* type_factory,
+      std::shared_ptr<TVFSignature>* tvf_signature) const override {
+    const Table* output_schema_table = result_table_;
+    if (output_schema_table == nullptr) {
+      // Dynamic lookup.
+      ZETASQL_RET_CHECK_EQ(actual_arguments.size(), 1);
+      const TVFInputArgumentType& table_name_argument = actual_arguments[0];
+      ZETASQL_RET_CHECK(table_name_argument.is_scalar());
+      ZETASQL_RET_CHECK(table_name_argument.scalar_expr()->Is<ResolvedLiteral>())
+          << table_name_argument.scalar_expr()->DebugString();
+      const std::string table_name = table_name_argument.scalar_expr()
+                                         ->GetAs<ResolvedLiteral>()
+                                         ->value()
+                                         .string_value();
+      ZETASQL_RETURN_IF_ERROR(catalog->FindTable({table_name}, &output_schema_table));
+      if (output_schema_table == nullptr) {
+        return absl::NotFoundError(
+            absl::StrCat("Table not found: ", table_name));
+      }
+    }
+    ZETASQL_ASSIGN_OR_RETURN(
+        *tvf_signature,
+        TVFSignature::Create(actual_arguments, output_schema_table, {}));
+    return absl::OkStatus();
+  }
+
+ private:
+  // If set, the output schema is described by this table.
+  const Table* result_table_ = nullptr;
+};
+
 }  // namespace
 
 absl::Status SampleCatalogImpl::AddGeneratedColumnToTable(
@@ -1039,9 +1096,11 @@ absl::Status SampleCatalogImpl::AddGeneratedColumnToTable(
   }
   ZETASQL_RET_CHECK_OK(AnalyzeExpression(generated_expr, options, catalog_.get(),
                                  catalog_->type_factory(), &output));
-  SimpleColumn::ExpressionAttributes expr_attributes(
-      SimpleColumn::ExpressionAttributes::ExpressionKind::GENERATED,
-      generated_expr, output->resolved_expr());
+  ZETASQL_ASSIGN_OR_RETURN(
+      SimpleColumn::ExpressionAttributes expr_attributes,
+      SimpleColumn::ExpressionAttributes::Create(
+          SimpleColumn::ExpressionAttributes::ExpressionKind::GENERATED,
+          generated_expr, output->resolved_expr()));
   ZETASQL_RET_CHECK_OK(table->AddColumn(
       new SimpleColumn(table->Name(), column_name, types::Int64Type(),
                        {.column_expression = expr_attributes}),
@@ -1179,9 +1238,11 @@ absl::Status SampleCatalogImpl::LoadTables() {
   ZETASQL_RET_CHECK_OK(AnalyzeExpression(default_expr, analyzer_options, catalog_.get(),
                                  catalog_->type_factory(), &output));
 
-  SimpleColumn::ExpressionAttributes expr_attributes(
-      SimpleColumn::ExpressionAttributes::ExpressionKind::DEFAULT, default_expr,
-      output->resolved_expr());
+  ZETASQL_ASSIGN_OR_RETURN(
+      SimpleColumn::ExpressionAttributes expr_attributes,
+      SimpleColumn::ExpressionAttributes::Create(
+          SimpleColumn::ExpressionAttributes::ExpressionKind::DEFAULT,
+          default_expr, output->resolved_expr()));
   ZETASQL_RET_CHECK_OK(table_with_default_column->AddColumn(
       new SimpleColumn(table_with_default_column->Name(), "default_col",
                        types_->get_int64(),
@@ -1226,6 +1287,27 @@ absl::Status SampleCatalogImpl::LoadTables() {
   SimpleTable* geo_struct_table2 =
       new SimpleTable("GeoStructTable2", {{"geo", struct_with_geo_type2}});
   AddOwnedTable(geo_struct_table2);
+
+  // Create a table with a struct containing JSON.
+  const StructType* struct_with_json_type;
+  ZETASQL_RET_CHECK_OK(types_->MakeStructType(
+      {{"json", types_->get_json()}, {"json_2", types_->get_json()}},
+      &struct_with_json_type));
+  SimpleTable* struct_with_json_table = new SimpleTable(
+      "StructWithJsonTable", {{"json_struct", struct_with_json_type}});
+  AddOwnedTable(struct_with_json_table);
+
+  const StructType* struct_with_json_and_int_type;
+  ZETASQL_RET_CHECK_OK(types_->MakeStructType(
+      {{"json", types_->get_json()}, {"int", types_->get_int64()}},
+      &struct_with_json_and_int_type));
+  const ArrayType* array_of_struct_with_json_and_int_type;
+  ZETASQL_RET_CHECK_OK(types_->MakeArrayType(struct_with_json_and_int_type,
+                                     &array_of_struct_with_json_and_int_type));
+  SimpleTable* table_with_array_of_struct_with_json_and_int = new SimpleTable(
+      "ArrayOfStructOfJsonAndIntTable",
+      {{"json_and_int_array", array_of_struct_with_json_and_int_type}});
+  AddOwnedTable(table_with_array_of_struct_with_json_and_int);
 
   auto collatedTable = new SimpleTable("CollatedTable");
   const AnnotationMap* annotation_map_string_ci;
@@ -2183,6 +2265,129 @@ absl::Status SampleCatalogImpl::LoadMeasureTables() {
        {"measure_uda_sum_max_price_per_country",
         "SumOfAggregateArgs(MaxOfAggregateArgs(price) GROUP BY country)"}},
       /*is_value_table=*/false));
+
+  // A Measure table the represents a "join" of two fact tables.
+  //
+  // `price` is uniquely identified by `item_id`.
+  // `quantity` is uniquely identified by `store_id`.
+  {
+    const std::string table_name = "MeasureTable_SalesFacts";
+    ZETASQL_RETURN_IF_ERROR(AddTableWithMeasures(
+        analyzer_options, table_name,
+        {new SimpleColumn(table_name, "item_id", types_->get_int64()),
+         new SimpleColumn(table_name, "store_id", types_->get_int64()),
+         new SimpleColumn(table_name, "price", types_->get_int64()),
+         new SimpleColumn(table_name, "quantity", types_->get_int64())},
+        /*row_identity_column_indices=*/absl::flat_hash_set<int>{0, 1},
+        /*measures=*/
+        {{
+             .name = "measure_total_price",
+             .expression = "SUM(price)",
+             .is_pseudo_column = false,
+             .row_identity_column_indices = {{0}},
+         },
+         {
+             .name = "measure_total_quantity",
+             .expression = "SUM(quantity)",
+             .is_pseudo_column = false,
+             .row_identity_column_indices = {{1}},
+         },
+         {
+             .name = "measure_price_to_quantity_ratio",
+             .expression = "SUM(price)/SUM(quantity)",
+             .is_pseudo_column = false,
+             // Defaults to the table's row identity columns.
+             .row_identity_column_indices = std::nullopt,
+         }},
+        /*is_value_table=*/false));
+  }
+
+  {
+    // The table does not have row identity columns specified, but each measure
+    // column does, so it is still valid.
+    const std::string table_name = "MeasureTable_NoTableKey";
+    ZETASQL_RETURN_IF_ERROR(AddTableWithMeasures(
+        analyzer_options, table_name,
+        {new SimpleColumn(table_name, "item_id", types_->get_int64()),
+         new SimpleColumn(table_name, "store_id", types_->get_int64()),
+         new SimpleColumn(table_name, "price", types_->get_int64()),
+         new SimpleColumn(table_name, "quantity", types_->get_int64())},
+        /*row_identity_column_indices=*/std::nullopt,
+        /*measures=*/
+        {{
+             .name = "measure_total_price",
+             .expression = "SUM(price)",
+             .is_pseudo_column = false,
+             .row_identity_column_indices = std::vector<int>{0},
+         },
+         {
+             .name = "measure_total_quantity",
+             .expression = "SUM(quantity)",
+             .is_pseudo_column = false,
+             .row_identity_column_indices = std::vector<int>{1},
+         },
+         {
+             .name = "measure_price_to_quantity_ratio",
+             .expression = "SUM(price)/SUM(quantity)",
+             .is_pseudo_column = false,
+             .row_identity_column_indices = std::vector<int>{0, 1},
+         }},
+        /*is_value_table=*/false));
+  }
+
+  // Invalid measure TVF: The underlying table has a measure column whose row
+  // identity column is empty.
+  {
+    const std::string table_name = "MeasureTable_ColumnEmptyRowIdentities";
+    ZETASQL_RETURN_IF_ERROR(AddTableWithMeasures(
+        analyzer_options, table_name,
+        {new SimpleColumn(table_name, "key", types_->get_int64())},
+        /*row_identity_column_indices=*/absl::flat_hash_set<int>{0},
+        /*measures=*/
+        {{
+            .name = "measure_count",
+            .expression = "COUNT(*)",
+            .is_pseudo_column = false,
+            .row_identity_column_indices = std::vector<int>{},
+        }},
+        /*is_value_table=*/false));
+  }
+
+  // Invalid measure TVF: The underlying table has a measure column with
+  // out-of-bound column-level row identity column indices.
+  {
+    const std::string table_name = "MeasureTable_ColumnInvalidRowIdentityIndex";
+    ZETASQL_RETURN_IF_ERROR(AddTableWithMeasures(
+        analyzer_options, table_name,
+        {new SimpleColumn(table_name, "key", types_->get_int64())},
+        /*row_identity_column_indices=*/absl::flat_hash_set<int>{0},
+        /*measures=*/
+        {{
+            .name = "measure_count",
+            .expression = "COUNT(*)",
+            .is_pseudo_column = false,
+            .row_identity_column_indices = std::vector<int>{100},
+        }},
+        /*is_value_table=*/false));
+  }
+
+  // Invalid measure TVF: The underlying table has a measure column with
+  // non-groupable column-level row identity columns.
+  {
+    const std::string table_name = "MeasureTable_ColumnNonGroupableRowIdentity";
+    ZETASQL_RETURN_IF_ERROR(AddTableWithMeasures(
+        analyzer_options, table_name,
+        {new SimpleColumn(table_name, "json_col", types_->get_json())},
+        /*row_identity_column_indices=*/absl::flat_hash_set<int>{0},
+        /*measures=*/
+        {{
+            .name = "measure_count",
+            .expression = "COUNT(*)",
+            .is_pseudo_column = false,
+            .row_identity_column_indices = std::vector<int>{0},
+        }},
+        /*is_value_table=*/false));
+  }
 
   return absl::OkStatus();
 }
@@ -5695,6 +5900,14 @@ absl::Status SampleCatalogImpl::LoadAmlBasedPropertyGraphs() {
                                                {"data", types_->get_bytes()},
                                            });
   ZETASQL_RET_CHECK_OK(person->SetPrimaryKey({0}));
+  person->SetContents({
+      {Value::Int64(1), Value::String("Alice"), Value::String("Female"),
+       Value::Date(0), Value::String("alice@example.com"), Value::Uint32(30),
+       Value::Bytes("data1")},
+      {Value::Int64(2), Value::String("Bob"), Value::String("Male"),
+       Value::Date(0), Value::String("bob@example.com"), Value::Uint32(40),
+       Value::Bytes("data2")},
+  });
   AddOwnedTable(person);
 
   auto* account = new SimpleTable(
@@ -5702,6 +5915,10 @@ absl::Status SampleCatalogImpl::LoadAmlBasedPropertyGraphs() {
                                           {"name", types_->get_string()},
                                           {"balance", types_->get_uint64()}});
   ZETASQL_RET_CHECK_OK(account->SetPrimaryKey({0}));
+  account->SetContents({
+      {Value::Int64(1), Value::String("Alice"), Value::Uint64(100)},
+      {Value::Int64(2), Value::String("Bob"), Value::Uint64(200)},
+  });
   AddOwnedTable(account);
 
   auto* syndicate = new SimpleTable(
@@ -5710,6 +5927,12 @@ absl::Status SampleCatalogImpl::LoadAmlBasedPropertyGraphs() {
                                {"syndicateName", types_->get_string()},
                                {"syndicateData", int64array_type_}});
   ZETASQL_RET_CHECK_OK(syndicate->SetPrimaryKey({0}));
+  syndicate->SetContents({
+      {Value::Int64(1), Value::String("Syndicate1"),
+       Value::Array(int64array_type_, {Value::Int64(1), Value::Int64(2)})},
+      {Value::Int64(2), Value::String("Syndicate2"),
+       Value::Array(int64array_type_, {Value::Int64(3), Value::Int64(4)})},
+  });
   AddOwnedTable(syndicate);
 
   auto* person_own_acc = new SimpleTable(
@@ -5718,6 +5941,10 @@ absl::Status SampleCatalogImpl::LoadAmlBasedPropertyGraphs() {
                                {"accountId", types_->get_int64()},
                                {"startDate", types_->get_timestamp()}});
   ZETASQL_RET_CHECK_OK(person_own_acc->SetPrimaryKey({0, 1}));
+  person_own_acc->SetContents({
+      {Value::Int64(1), Value::Int64(1), Value::TimestampFromUnixMicros(10000)},
+      {Value::Int64(2), Value::Int64(2), Value::TimestampFromUnixMicros(20000)},
+  });
   AddOwnedTable(person_own_acc);
 
   auto* transfer =
@@ -5729,6 +5956,10 @@ absl::Status SampleCatalogImpl::LoadAmlBasedPropertyGraphs() {
                                       {"amount", types_->get_uint64()},
                                   });
   ZETASQL_RET_CHECK_OK(transfer->SetPrimaryKey({0}));
+  transfer->SetContents({
+      {Value::Int64(1), Value::Int64(1), Value::Int64(2),
+       Value::TimestampFromUnixMicros(10000000), Value::Uint64(50)},
+  });
   AddOwnedTable(transfer);
 
   const std::vector<const Column*> columns = {
@@ -9761,6 +9992,80 @@ void SampleCatalogImpl::LoadTableValuedFunctionsWithMultipleSignatures() {
                                   "arg_d", kNamedOnly))},
                          context_id++)},
       tvf_relation));
+}
+
+// Creates and adds a table-backed TVF to `catalog`. The TVF is backed by a
+// table whose columns are the same as `tvf_columns`. The table is also added to
+// `catalog`.
+static absl::Status AddTableBackedTvf(
+    absl::string_view tvf_name, const std::vector<TVFSchemaColumn>& tvf_columns,
+    SimpleCatalog& catalog, bool is_value_table = false) {
+  std::string table_name = absl::StrCat("table_for_", tvf_name);
+  std::vector<const Column*> columns;
+  columns.reserve(tvf_columns.size());
+  for (const auto& col : tvf_columns) {
+    // `table` takes ownership of the columns.
+    columns.push_back(
+        new SimpleColumn(table_name, col.name, col.annotated_type(),
+                         {.is_pseudo_column = col.is_pseudo_column}));
+  }
+  auto table = std::make_unique<SimpleTable>(table_name, columns,
+                                             /*take_ownership=*/true);
+  table->set_is_value_table(is_value_table);
+  auto tvf = std::make_unique<TvfWithTableSchema>(
+      std::vector<std::string>{std::string(tvf_name)},
+      std::vector<FunctionSignature>{
+          FunctionSignature(ARG_TYPE_RELATION, /*arguments=*/{},
+                            /*context_id=*/0, /*options=*/{}),
+      },
+      table.get());
+  catalog.AddOwnedTable(std::move(table));
+  catalog.AddOwnedTableValuedFunction(std::move(tvf));
+  return absl::OkStatus();
+}
+
+absl::Status SampleCatalogImpl::LoadTvfsWithTableSchema() {
+  ZETASQL_RETURN_IF_ERROR(
+      AddTableBackedTvf("tvf_key_value",
+                        /*tvf_columns=*/
+                        {TVFSchemaColumn("Key", types_->get_int64()),
+                         TVFSchemaColumn("Value", types_->get_string())},
+                        *catalog_));
+
+  const StructType* key_value_struct = nullptr;
+  ZETASQL_RETURN_IF_ERROR(types_->MakeStructType(
+      {{"Key", types_->get_int64()}, {"Value", types_->get_string()}},
+      &key_value_struct));
+  ZETASQL_RETURN_IF_ERROR(
+      AddTableBackedTvf("tvf_key_value_vt",
+                        /*tvf_columns=*/
+                        {
+                            TVFSchemaColumn("$value", key_value_struct),
+                        },
+                        *catalog_,
+                        /*is_value_table=*/true));
+
+  ZETASQL_RETURN_IF_ERROR(
+      AddTableBackedTvf("tvf_key_value_vt_with_pseudo",
+                        /*tvf_columns=*/
+                        {
+                            TVFSchemaColumn("$value", key_value_struct),
+                            TVFSchemaColumn("pseudo_col", types_->get_int64(),
+                                            /*is_pseudo_column_in=*/true),
+                        },
+                        *catalog_,
+                        /*is_value_table=*/true));
+
+  // A TVF that dynamically looks up a table via its first argument which
+  // must be a string literal specifying table name. The TVF returns all
+  // columns from the looked up table.
+  catalog_->AddOwnedTableValuedFunction(std::make_unique<TvfWithTableSchema>(
+      std::vector<std::string>{"tvf_lookup_table"},
+      std::vector<FunctionSignature>{FunctionSignature(
+          ARG_TYPE_RELATION, /*arguments=*/{types_->get_string()},
+          /*context_id=*/0, /*options=*/{})}));
+
+  return absl::OkStatus();
 }
 
 // Add a SQL table function to catalog starting from a full create table

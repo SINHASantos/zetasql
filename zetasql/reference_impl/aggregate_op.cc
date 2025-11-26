@@ -587,6 +587,8 @@ absl::StatusOr<std::unique_ptr<TupleDataDeque>> GatherTuples(
 // AggregateArg
 // -------------------------------------------------------
 
+// TODO: b/430036320 - Remove group_rows_subquery arg if no longer needed with
+//                     GROUP ROWS simplified.
 absl::StatusOr<std::unique_ptr<AggregateArg>> AggregateArg::Create(
     const VariableId& variable,
     std::unique_ptr<const AggregateFunctionBody> function,

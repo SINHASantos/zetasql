@@ -978,6 +978,7 @@ struct TVFSignatureOptions {
 // this to include more information if needed.
 class TVFSignature {
  public:
+  ABSL_DEPRECATED("Use the Create() factory function instead")
   // Represents a TVF call that returns 'output_schema'.
   TVFSignature(const std::vector<TVFInputArgumentType>& input_arguments,
                const TVFRelation& result_schema,
@@ -985,6 +986,26 @@ class TVFSignature {
       : input_arguments_(input_arguments),
         result_schema_(result_schema),
         options_(options) {}
+
+  // Creates a `TVFSignature` with the given input arguments and output schema.
+  static absl::StatusOr<std::shared_ptr<TVFSignature>> Create(
+      const std::vector<TVFInputArgumentType>& input_arguments,
+      const TVFRelation& result_schema,
+      const TVFSignatureOptions& options = {}) {
+    return std::make_shared<TVFSignature>(input_arguments, result_schema,
+                                          options);
+  }
+
+  // Similar to the above function, but takes a `const Table*` instead of a
+  // `TVFRelation` as the output schema. The caller manages the lifetime of the
+  // provided `Table*`.
+  //
+  // Returns an error if the table schema is not a valid TVF output schema,
+  // e.g., if it is a value table with more than one non-pseudo columns.
+  static absl::StatusOr<std::shared_ptr<TVFSignature>> Create(
+      const std::vector<TVFInputArgumentType>& input_arguments,
+      const Table* result_table_schema,
+      const TVFSignatureOptions& options = {});
 
   TVFSignature(const TVFSignature&) = delete;
   TVFSignature& operator=(const TVFSignature&) = delete;
@@ -996,7 +1017,19 @@ class TVFSignature {
   const TVFInputArgumentType& argument(int idx) const {
     return input_arguments_[idx];
   }
+
+  // Returns the output schema of the TVFSignature. If the TVFSignature was
+  // constructed with a `const Table*` as the output schema, this will be a
+  // TVFRelation constructed from the output Table in the signature.
   const TVFRelation& result_schema() const { return result_schema_; }
+
+  // Returns the output schema as a `const Table*`. Returns nullptr if the
+  // TVFSignature was not constructed with a `const Table*` as the output
+  // schema.
+  //
+  // Must be non-null if the TVFSignature outputs measure columns.
+  const Table* result_table_schema() const { return result_table_schema_; }
+
   const TVFSignatureOptions& options() const { return options_; }
 
   virtual std::string DebugString(bool verbose) const {
@@ -1007,6 +1040,9 @@ class TVFSignature {
     }
     std::string ret = absl::StrCat("(", absl::StrJoin(arg_debug_strings, ", "),
                                    ") -> ", result_schema_.DebugString());
+    if (result_table_schema_ != nullptr) {
+      absl::StrAppend(&ret, " (table: ", result_table_schema_->FullName(), ")");
+    }
     if (verbose) {
       const std::string deprecation_warnings_debug_string =
           DeprecationWarningsToDebugString(
@@ -1065,7 +1101,16 @@ class TVFSignature {
   const std::vector<TVFInputArgumentType> input_arguments_;
 
   // Returns the output schema returned by this TVF call.
+  //
+  // This field is always populated. If the TVFSignature was constructed with a
+  // `const Table*` as the output schema, this will be a TVFRelation constructed
+  // from the output Table in the signature.
   const TVFRelation result_schema_;
+
+  // The output schema of the TVFSignature represented as a `Table*`. This field
+  // is only populated if the TVFSignature was constructed with the Create()
+  // factory function that accepts a `const Table*` as the output schema.
+  const Table* result_table_schema_ = nullptr;
 
   const TVFSignatureOptions options_;
 
@@ -1268,6 +1313,13 @@ class ForwardInputSchemaToOutputSchemaWithAppendedColumnTVF
  private:
   const std::vector<TVFSchemaColumn> extra_columns_;
 };
+
+// Converts a `const Table*` to a `TVFRelation` which describes the same
+// schema.
+//
+// Returns an error if the table schema is not a valid Table schema, e.g., if it
+// is a value table with more than one non-pseudo columns.
+absl::StatusOr<TVFRelation> CreateTVFRelationFromTable(const Table* table);
 
 }  // namespace zetasql
 

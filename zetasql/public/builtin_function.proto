@@ -62,7 +62,7 @@ enum FunctionSignatureId {
   // 3100-3199 Measure functions              (NextId: 3101)
   // 3200-3299 MATCH_RECOGNIZE functions      (NextId: 3207)
   // 3300-3399 Aggregate functions III        (NextId: 3303)
-  // 3400-3499 Misc functions II              (NextId: 3405)
+  // 3400-3499 Misc functions II              (NextId: 3407)
   // 4000-4099 Table valued functions         (NextId: 4003)
 
   // enum value                       // Related function name
@@ -868,9 +868,13 @@ enum FunctionSignatureId {
   FN_TO_JSON_STRING = 1622;         // to_json_string(any[, bool]) -> string
   FN_TO_JSON = 1697;                // to_json(any[, bool]) -> json
   FN_TO_JSON_UNSUPPORTED_FIELDS =
-      1948;                // to_json(any[, bool][, unsupported_fields]) -> json
-  FN_SAFE_TO_JSON = 1949;  // safe_to_json(any) -> json
-  FN_JSON_QUERY = 1623;    // json_query(string, string) -> string
+      1948;  // to_json(any[, bool][, unsupported_fields]) -> json
+  FN_TO_JSON_PATH_AS_OBJECT =
+      3405;  // to_json(any[, bool][, path_as_object]) -> json
+  FN_TO_JSON_UNSUPPORTED_FIELDS_PATH_AS_OBJECT = 3406;
+  // to_json(any[, bool][, unsupported_fields][, path_as_object]) -> json
+  FN_SAFE_TO_JSON = 1949;     // safe_to_json(any) -> json
+  FN_JSON_QUERY = 1623;       // json_query(string, string) -> string
   FN_JSON_QUERY_JSON = 1686;  // json_query(json, string) -> json
   FN_JSON_VALUE = 1624;       // json_value(string[, string]) -> string
   FN_JSON_VALUE_JSON = 1687;  // json_value(json[, string]) -> string

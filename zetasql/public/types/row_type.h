@@ -106,6 +106,16 @@ class RowType : public Type {
   // unnested like array scans.
   const RowType* element_type() const { return element_type_; }
 
+  // ComponentTypes() is defined based on the element type.
+  // APIs like AnnotationMap::Create(type) use this to create the correct
+  // structure.
+  std::vector<const Type*> ComponentTypes() const override {
+    if (element_type_ == nullptr) {
+      return {};
+    }
+    return {element_type_};
+  }
+
   bool EqualsForSameKind(const Type* that, bool equivalent) const override {
     // A RowType is only equal to itself; two RowTypes for the same Table
     // are not considered equal or equivalent.

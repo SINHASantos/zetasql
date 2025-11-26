@@ -144,7 +144,11 @@ bool ContainsTableArrayNamePathWithFreeColumnRef(const ResolvedExpr* node,
 // insertions.
 size_t FieldPathHash(const ResolvedExpr* expr);
 
-enum class FieldPathMatchingOption { kExpression, kFieldPath };
+enum class FieldPathMatchingOption {
+  kExpression,
+  kFieldPath,
+  kUpdateItemElement
+};
 
 // This function determines whether <field_path1> and <field_path2> are
 // generalized path expressions that point to the same field.
@@ -163,6 +167,12 @@ enum class FieldPathMatchingOption { kExpression, kFieldPath };
 // both <field_path1> and <field_path2>. However, it does not consider any
 // specialized field accesses. Therefore, this option does not guarantee
 // <field_path1> and <field_path2> evaluate to the same result.
+//
+// If the FieldPathMatchingOption::kUpdateItemElement option is specified this
+// function will return true if <field_path1> and <field_path2> represent the
+// same field path up until the root `RESOLVED_COLUMN_REF` which may differ.
+// This accounts for the special case of an multiple paths in an UPDATE ... SET
+// statement where field paths share the same literal in a subscript.
 bool IsSameFieldPath(const ResolvedExpr* field_path1,
                      const ResolvedExpr* field_path2,
                      FieldPathMatchingOption match_option);

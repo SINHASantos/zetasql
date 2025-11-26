@@ -108,7 +108,10 @@ const google::protobuf::FileDescriptor* IterativeAddOrFindFile(
   while (!stack.empty()) {
     LoadInstruction& current = stack.top();
 
-    if (current.next_child >= current.proto.dependency_size()) {
+    int num_deps = current.proto.dependency_size()
+        ;  // NOLINT
+
+    if (current.next_child >= num_deps) {
       // There are no more children to build. We just finished building all the
       // child nodes. We should build this node now.
       if (descriptor_pool->BuildFileCollectingErrors(
@@ -125,10 +128,13 @@ const google::protobuf::FileDescriptor* IterativeAddOrFindFile(
       // 3) Add the first children of current_child if missing.
       int current_child = current.next_child;
       current.next_child++;
-      const std::string& dependency = current.proto.dependency(current_child);
-      if (!AddToStackIfMissing(dependency, descriptor_pool, descriptor_database,
-                               stack)) {
-        failed_file_name = dependency;
+      const std::string* dependency;
+      if (current_child < current.proto.dependency_size()) {
+        dependency = &current.proto.dependency(current_child);
+      }
+      if (!AddToStackIfMissing(*dependency, descriptor_pool,
+                               descriptor_database, stack)) {
+        failed_file_name = *dependency;
         return nullptr;
       }
     }

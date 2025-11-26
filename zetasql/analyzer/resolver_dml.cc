@@ -1207,12 +1207,16 @@ static const ResolvedExpr* StripLastnFields(const ResolvedExpr* expr, int n) {
 }
 
 // Returns true:
-// - if IsSameFieldPath(<field_path1>, <field_path2>) is true.
+// - if is_subscript_update and IsSameFieldPath(<field_path1>, <field_path2>,
+// kUpdateItemElement) is true.
+// - if !is_subscript_update and IsSameFieldPath(<field_path1>, <field_path2>,
+// kFieldPath) is true.
 // - if <field_path2> is a direct field or is any descendent sub-field inside
 //   the object <field_path1> or vice versa.
 // Otherwise false.
 static bool AreFieldPathsOverlapping(const ResolvedExpr* field_path1,
-                                     const ResolvedExpr* field_path2) {
+                                     const ResolvedExpr* field_path2,
+                                     bool is_subscript_update) {
   const int field_path1_depth = GetFieldPathDepth(field_path1);
   const int field_path2_depth = GetFieldPathDepth(field_path2);
   const int compare_depth = std::min(field_path1_depth, field_path2_depth);
@@ -1220,8 +1224,11 @@ static bool AreFieldPathsOverlapping(const ResolvedExpr* field_path1,
       StripLastnFields(field_path1, field_path1_depth - compare_depth);
   field_path2 =
       StripLastnFields(field_path2, field_path2_depth - compare_depth);
-  return IsSameFieldPath(field_path1, field_path2,
-                         FieldPathMatchingOption::kFieldPath);
+  bool same_field_path = IsSameFieldPath(
+      field_path1, field_path2,
+      is_subscript_update ? FieldPathMatchingOption::kUpdateItemElement
+                          : FieldPathMatchingOption::kFieldPath);
+  return same_field_path;
 }
 
 absl::Status Resolver::ResolveUpdateItemList(
@@ -1243,6 +1250,94 @@ absl::Status Resolver::ResolveUpdateItemList(
   }
 
   return absl::OkStatus();
+}
+
+namespace {
+bool IsLiteralWithEqualValue(const ResolvedExpr* expr1,
+                             const ResolvedExpr* expr2) {
+  if (expr1->Is<ResolvedLiteral>() && expr2->Is<ResolvedLiteral>()) {
+    return expr1->GetAs<ResolvedLiteral>()->value() ==
+           expr2->GetAs<ResolvedLiteral>()->value();
+  }
+  return false;
+}
+}  // namespace
+
+absl::StatusOr<bool> Resolver::AreOverlappingUpdateItemsWithSubscript(
+    absl::Span<const UpdateTargetInfo> update_target_infos,
+    const ResolvedUpdateItem* resolved_update_item, bool is_subscript_update) {
+  RETURN_ERROR_IF_OUT_OF_STACK_SPACE();
+  // Base Case. If there are no more update targets, then they must have been
+  // overlapping.
+  if (update_target_infos.empty()) {
+    return true;
+  }
+  bool update_target_has_subscript =
+      update_target_infos.front().subscript_expr != nullptr;
+  bool update_item_has_subscript =
+      !resolved_update_item->update_item_element_list().empty();
+  // If both the update target and the update item have subscripts, then
+  // it is necessary to check that they are the same field path to see if they
+  // are overlapping. For example json.a[0](.b.c) and json.a[0](.d.e.). This
+  // will check that json.a and json.a are the same, then check that the literal
+  // 0 in the subscript is the same, then recurse into checking b.c against d.e.
+  if (update_target_has_subscript && update_item_has_subscript) {
+    // If `is_subscript_update` is true, then do not check for the same
+    // `RESOLVE_COLUMN_REF` between update targets.
+    bool same_field_path = IsSameFieldPath(
+        update_target_infos.front().target.get(),
+        resolved_update_item->target(),
+        is_subscript_update ? FieldPathMatchingOption::kUpdateItemElement
+                            : FieldPathMatchingOption::kFieldPath);
+    if (same_field_path &&
+        update_target_infos.front().subscript_expr->Is<ResolvedLiteral>()) {
+      // Check to make sure that the subscripts are the same. If not, then
+      // the update is not overlapping. Otherwise, we recurse.
+      for (const auto& element :
+           resolved_update_item->update_item_element_list()) {
+        if (IsLiteralWithEqualValue(
+                update_target_infos.front().subscript_expr.get(),
+                element->subscript())) {
+          ZETASQL_ASSIGN_OR_RETURN(
+              bool are_overlapping,
+              AreOverlappingUpdateItemsWithSubscript(
+                  absl::MakeSpan(update_target_infos).subspan(1),
+                  element->update_item(), /*is_subscript_update=*/true));
+          if (are_overlapping) {
+            return true;
+          }
+        }
+      }
+    }
+  }
+  // In the case where exactly one of the update target or update item has a
+  // subscript then they can only be overlapping if the target not
+  // containing the subscript is a prefix of the update item. If neither have
+  // a subscript then still check if they are overlapping.
+  //
+  // This check is necessary for a case like
+  // UPDATE json["a"], json.b
+  // where json overlaps with json.b, but json["a"] does not.
+  int update_target_depth =
+      GetFieldPathDepth(update_target_infos.front().target.get());
+  int update_item_depth = GetFieldPathDepth(resolved_update_item->target());
+  // Check for overlap
+  bool check_overlap =
+      // 1. If neither have a subscript.
+      (!update_target_has_subscript && !update_item_has_subscript) ||
+      // 2. If the target which has a subscript has a longer field path than
+      // the one which does not. For example check for overlap between
+      // json.a.b["c"] and json.a but not json["a"](.b.c) and json.a.b.
+      (update_target_has_subscript && !update_item_has_subscript &&
+       update_target_depth >= update_item_depth) ||
+      (!update_target_has_subscript && update_item_has_subscript &&
+       update_item_depth >= update_target_depth);
+  if (check_overlap) {
+    return AreFieldPathsOverlapping(update_target_infos.front().target.get(),
+                                    resolved_update_item->target(),
+                                    is_subscript_update);
+  }
+  return false;
 }
 
 absl::Status Resolver::ResolveUpdateItem(
@@ -1291,13 +1386,9 @@ absl::Status Resolver::VerifyIfElementUpdateIsAllowed(
     return MakeSqlErrorAt(array_element->position())
            << "UPDATE ... SET does not support array modification with []";
   }
-  if (update_target_type->IsJson() &&
-      !language_options.LanguageFeatureEnabled(FEATURE_JSON_DML_UPDATE)) {
-    return MakeSqlErrorAt(array_element->position())
-           << "UPDATE ... SET does not support JSON "
-              "modification with []";
-  }
-  if (!update_target_type->IsArray() && !update_target_type->IsJson()) {
+  if ((update_target_type->IsJson() && !language_options.LanguageFeatureEnabled(
+                                           FEATURE_JSON_SUBFIELDS_WITH_SET)) ||
+      (!update_target_type->IsArray() && !update_target_type->IsJson())) {
     return MakeSqlErrorAt(array_element->position())
            << "UPDATE ... SET does not support value modification with [] "
            << "for type " << update_target_type->ShortTypeName(product_mode());
@@ -1442,12 +1533,29 @@ absl::Status Resolver::PopulateUpdateTargetInfos(
             &function_name, &unwrapped_ast_position_expr, &info.subscript_expr,
             &original_wrapper_name));
       } else {
+        ZETASQL_RET_CHECK(
+            info.target->type()->IsJson() &&
+            language().LanguageFeatureEnabled(FEATURE_JSON_SUBFIELDS_WITH_SET));
         std::unique_ptr<const ResolvedExpr> resolved_position;
         std::string original_wrapper_name("");
         ZETASQL_RETURN_IF_ERROR(ResolveNonArraySubscriptElementAccess(
             info.target.get(), array_element->position(), expr_resolution_info,
             &function_name_path, &unwrapped_ast_position_expr,
             &info.subscript_expr, &original_wrapper_name));
+        AnnotatedType int64_type = AnnotatedType(types::Int64Type());
+        AnnotatedType string_type = AnnotatedType(types::StringType());
+        auto coerce_to_int64 = CoerceExprToType(
+            array_element->position(), int64_type, kImplicitCoercion,
+            /*error_template=*/"", &info.subscript_expr);
+        auto coerce_to_string = CoerceExprToType(
+            array_element->position(), string_type, kImplicitCoercion,
+            /*error_template=*/"", &info.subscript_expr);
+        if (!coerce_to_int64.ok() && !coerce_to_string.ok()) {
+          return MakeSqlErrorAt(array_element->position())
+                 << "JSON subscript expression in [] must be coercible to type "
+                 << "STRING or INT64 but has type: "
+                 << info.subscript_expr->type()->ShortTypeName(product_mode());
+        }
         function_name = function_name_path.back();
       }
       if (function_name == kSafeArrayAtOffset) {
@@ -1458,6 +1566,15 @@ absl::Status Resolver::PopulateUpdateTargetInfos(
         return MakeSqlErrorAt(array_element->position())
                << "UPDATE ... SET does not support array[SAFE_ORDINAL(...)]; "
                << "use ORDINAL instead";
+      } else if (function_name == kSafeSubscriptWithOffset) {
+        return MakeSqlErrorAt(array_element->position())
+               << "UPDATE ... SET does not support subscript[SAFE_OFFSET("
+               << ")] on "
+               << info.target->type()->ShortTypeName(product_mode());
+      } else if (function_name == kSafeSubscriptWithOrdinal) {
+        return MakeSqlErrorAt(array_element->position())
+               << "UPDATE ... SET does not support subscript[SAFE_ORDINAL("
+               << ")]";
       } else if (function_name == kArrayAtOrdinal ||
                  function_name == kSubscriptWithOrdinal) {
         // 'info.subscript_expr' is 1-based. Subtract 1 to make it 0-based.
@@ -1495,8 +1612,8 @@ absl::Status Resolver::PopulateUpdateTargetInfos(
                   function_name == kSubscript);
       }
 
-      ZETASQL_RET_CHECK(info.target->type()->IsArray() ||
-                info.target->type()->IsJson());
+      ZETASQL_RET_CHECK(info.target->type()->IsArray() || info.target->type()->IsJson())
+          << info.target->type()->DebugString();
       const Type* update_target_type =
           info.target->type()->IsArray()
               ? info.target->type()->AsArray()->element_type()
@@ -1544,7 +1661,7 @@ absl::Status Resolver::VerifyUpdateTargetIsWritable(
       return VerifyUpdateTargetIsWritable(
           ast_location, target->GetAs<ResolvedGetStructField>()->expr(), value);
     case RESOLVED_GET_JSON_FIELD:
-      if (language().LanguageFeatureEnabled(FEATURE_JSON_DML_UPDATE)) {
+      if (language().LanguageFeatureEnabled(FEATURE_JSON_SUBFIELDS_WITH_SET)) {
         return absl::OkStatus();
       } else {
         return MakeSqlErrorAt(ast_location)
@@ -1656,6 +1773,19 @@ static absl::Status VerifyNestedStatementsOrdering(
   return absl::OkStatus();
 }
 
+namespace {
+bool UpdateItemElementHasJsonSubscript(const ResolvedExpr* target,
+                                       const ResolvedExpr* subscript_expr) {
+  return subscript_expr != nullptr && target->type()->IsJson();
+}
+
+bool UpdateItemElementHasJsonSubscript(
+    const ResolvedExpr* target, const ResolvedColumnHolder* element_column) {
+  return element_column != nullptr && target->type()->IsJson();
+}
+
+}  // namespace
+
 absl::Status Resolver::ShouldMergeWithUpdateItem(
     const ASTUpdateItem* ast_update_item,
     absl::Span<const UpdateTargetInfo> update_target_infos,
@@ -1666,11 +1796,59 @@ absl::Status Resolver::ShouldMergeWithUpdateItem(
 
   const ASTGeneralizedPathExpression* target_path =
       GetTargetPath(ast_update_item);
+  // We only check the first update target info. In the case where this is not
+  // a json update the overlap only checks up until the first subscript and does
+  // not check if the subscripts match. In the case of a json update, the
+  // overlap check will recurse through the entire `update_target_infos`.
+  const UpdateTargetInfo& update_target_info = update_target_infos.front();
+  // This checks that both updates being compared are json field updates.
+  // Notably, `is_json_field_updates` is
+  // 1. false for top level column updates: UPDATE T SET json = JSON '1'
+  // 2. true for json field updates: UPDATE T SET json.a = '1'
+  // 3. true for json subscript updates: UPDATE T SET json["a"]["b"] = '1'
+  // 4. false for non-json updates: UPDATE T SET string_col = '1'
+  // 5. false for any top level container json updates:
+  //    UPDATE T SET struct.json = JSON '1'
+  // 6. (TODO: b/447116823) Catch this in analyzer) false for any json field
+  // updates where
+  //    the json field is not at the top level. Suppose A is an array of
+  //    a struct containing a json field and string field:
+  //    UPDATE T SET A[0].S.a = 1
+  bool is_json_field_updates =
+      (update_target_info.target->Is<ResolvedGetJsonField>() ||
+       UpdateItemElementHasJsonSubscript(
+           update_target_info.target.get(),
+           update_target_info.subscript_expr.get())) &&
+      (update_item.resolved_update_item->target()->Is<ResolvedGetJsonField>() ||
+       UpdateItemElementHasJsonSubscript(
+           update_item.resolved_update_item->target(),
+           update_item.resolved_update_item->element_column()));
+  // For JSON updates we check for overlapping updates for literals in
+  // subscripts. For example, `json["a"]["b"]` and `json["a"]["b"]["c"]` are
+  // overlapping updates. This also makes sure we do not reject cases such as
+  // json["a"] and json.b as overlapping updates.
+  if (is_json_field_updates &&
+      language().LanguageFeatureEnabled(FEATURE_JSON_SUBFIELDS_WITH_SET)) {
+    if (AreOverlappingUpdateItemsWithSubscript(
+            update_target_infos, update_item.resolved_update_item.get(),
+            /*is_subscript_update=*/false)
+            .value_or(false)) {
+      return MakeSqlErrorAt(target_path)
+             << "Update item " << GeneralizedPathAsString(target_path)
+             << " overlaps with "
+             << GeneralizedPathAsString(update_item.one_target_path);
+    }
+    *merge = IsSameFieldPath(update_target_infos.front().target.get(),
+                             update_item.resolved_update_item->target(),
+                             FieldPathMatchingOption::kFieldPath);
+    return absl::OkStatus();
+  }
   if (!IsSameFieldPath(update_target_infos.front().target.get(),
                        update_item.resolved_update_item->target(),
                        FieldPathMatchingOption::kFieldPath)) {
     if (AreFieldPathsOverlapping(update_target_infos.front().target.get(),
-                                 update_item.resolved_update_item->target())) {
+                                 update_item.resolved_update_item->target(),
+                                 /*is_subscript_update=*/false)) {
       return MakeSqlErrorAt(target_path)
              << "Update item " << GeneralizedPathAsString(target_path)
              << " overlaps with "
@@ -1883,7 +2061,7 @@ absl::Status Resolver::MergeWithUpdateItem(
     bool is_table_column =
         deepest_new_resolved_update_item->target()->Is<ResolvedColumnRef>() &&
         merged_update_item->resolved_update_item->element_column() == nullptr;
-    if (language().LanguageFeatureEnabled(FEATURE_JSON_DML_UPDATE) &&
+    if (language().LanguageFeatureEnabled(FEATURE_JSON_SUBFIELDS_WITH_SET) &&
         annotated_target_type.type->IsJson() && !is_table_column) {
       std::unique_ptr<const ResolvedExpr> resolved_value;
       ZETASQL_RETURN_IF_ERROR(ResolveScalarExpr(ast_value, update_scope,

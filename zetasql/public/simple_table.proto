@@ -61,6 +61,7 @@ message ExpressionAttributeProto {
     MEASURE_EXPRESSION = 2;
   }
   optional ExpressionKind expression_kind = 9;
+  repeated int32 row_identity_column_index = 10 [packed = true];
 }
 
 message SimpleColumnProto {

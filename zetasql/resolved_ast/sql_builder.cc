@@ -327,22 +327,6 @@ bool IsScanUnsupportedInPipeSyntax(const ResolvedScan* node) {
     case RESOLVED_ANONYMIZED_AGGREGATE_SCAN:
     case RESOLVED_AGGREGATION_THRESHOLD_AGGREGATE_SCAN:
       return true;
-    case RESOLVED_AGGREGATE_SCAN: {
-      // Since Pipe SQL syntax does not support SELECT WITH GROUP ROWS, if the
-      // aggregate scan contains a with group rows subquery, we do not support
-      // it in Pipe SQL syntax.
-      for (const auto& computed_column :
-           node->GetAs<ResolvedAggregateScan>()->aggregate_list()) {
-        const ResolvedExpr* computed_col_expr = computed_column->expr();
-        if (computed_col_expr->Is<ResolvedAggregateFunctionCall>()) {
-          if (computed_col_expr->GetAs<ResolvedAggregateFunctionCall>()
-                  ->with_group_rows_subquery() != nullptr) {
-            return true;
-          }
-        }
-      }
-      return false;
-    }
     default:
       return false;
   }
@@ -1110,7 +1094,8 @@ absl::Status SQLBuilder::VisitResolvedFunctionCall(
       }
     }
     if (!argument->argument_alias().empty()) {
-      absl::StrAppend(&inputs.back(), " AS ", argument->argument_alias());
+      absl::StrAppend(&inputs.back(), " AS ",
+                      ToIdentifierLiteral(argument->argument_alias()));
       if (first_arg) {
         allow_chained_call = false;
       }
@@ -1177,56 +1162,6 @@ absl::Status SQLBuilder::VisitResolvedAggregateFunctionCall(
   std::string arguments_suffix;
   std::string with_group_rows;
 
-  if (node->with_group_rows_subquery() != nullptr) {
-    std::unique_ptr<QueryExpression> subquery_result;
-    // While resolving a subquery in WITH GROUP ROWS we should start with a
-    // fresh scope, i.e. it should not see any columns (except which are
-    // correlated) outside the query. To ensure that, we clear the
-    // pending_columns_ after maintaining a copy of it locally. We then copy it
-    // back once we have processed the subquery. NOTE: For correlated aggregate
-    // columns we are expected to print the column path and not the sql to
-    // compute the column. So clearing the pending_aggregate_columns here would
-    // not have any side effects.
-    std::map<int, std::string> previous_pending_aggregate_columns;
-    previous_pending_aggregate_columns.swap(mutable_pending_columns());
-    auto cleanup =
-        absl::MakeCleanup([this, &previous_pending_aggregate_columns]() {
-          previous_pending_aggregate_columns.swap(mutable_pending_columns());
-        });
-
-    ZETASQL_ASSIGN_OR_RETURN(std::unique_ptr<QueryFragment> result,
-                     ProcessNode(node->with_group_rows_subquery()));
-    subquery_result = std::move(result->query_expression);
-    ZETASQL_RETURN_IF_ERROR(
-        AddSelectListIfNeeded(node->with_group_rows_subquery()->column_list(),
-                              subquery_result.get()));
-
-    // Make sure column paths are set without table alias. Otherwise incorrect
-    // path will be used inside function call. Example of incorrect SQL that
-    // would be generated if the existing full path is used. Simplified example:
-    //              Unrecognized name: grouprowsscan_6 (in COUNT())
-    //              v
-    // SELECT COUNT(grouprowsscan_6.a_5) WITH GROUP ROWS(
-    //     SELECT grouprowsscan_6.a_5 AS a_5
-    //     FROM (SELECT a_1 AS a_5 FROM GROUP_ROWS()) AS grouprowsscan_6
-    //    )
-    // FROM testtable_4
-    for (const ResolvedColumn& column :
-         node->with_group_rows_subquery()->column_list()) {
-      SetPathForColumn(column, ToIdentifierLiteral(GetColumnAlias(column)));
-    }
-
-    // Dummy access the referenced columns to satisfy the final
-    // CheckFieldsAccessed() on a statement level before building the sql.
-    for (const std::unique_ptr<const ResolvedColumnRef>& ref :
-         node->with_group_rows_parameter_list()) {
-      ref->column();
-    }
-
-    allow_chained_call = false;
-    with_group_rows =
-        absl::StrCat(" WITH GROUP ROWS (", subquery_result->GetSQLQuery(), ")");
-  }
   // Handle multi-level aggregation.
   std::string group_by_modifiers;
   if (!node->group_by_list().empty()) {
@@ -1775,8 +1710,9 @@ absl::Status SQLBuilder::VisitResolvedReplaceField(
         absl::StrAppend(&field_path_sql, ".");
       }
       ZETASQL_RET_CHECK_LT(field_index, current_struct_type->num_fields());
-      absl::StrAppend(&field_path_sql,
-                      current_struct_type->field(field_index).name);
+      absl::StrAppend(
+          &field_path_sql,
+          ToIdentifierLiteral(current_struct_type->field(field_index).name));
       current_struct_type =
           current_struct_type->field(field_index).type->AsStruct();
     }
@@ -1788,9 +1724,10 @@ absl::Status SQLBuilder::VisitResolvedReplaceField(
       if (field->is_extension()) {
         absl::StrAppend(&field_path_sql, "(");
       }
-      absl::StrAppend(&field_path_sql, field->is_extension()
-                                           ? field->full_name()
-                                           : field->name());
+      absl::StrAppend(&field_path_sql,
+                      field->is_extension()
+                          ? field->full_name()
+                          : ToIdentifierLiteral(field->name()));
       if (field->is_extension()) {
         absl::StrAppend(&field_path_sql, ")");
       }
@@ -3322,7 +3259,7 @@ absl::StatusOr<std::string> SQLBuilder::ProcessResolvedTVFScan(
 
   // Used to detect the first relation argument in the TVF call, to avoid
   // printing it especially in GQL.
-  bool seen_first_relation_arg = false;
+  std::optional<int> first_relation_arg_idx;
   // Used to make sure there is only one implicit graph argument.
   bool seen_first_graph_arg = false;
 
@@ -3395,11 +3332,14 @@ absl::StatusOr<std::string> SQLBuilder::ProcessResolvedTVFScan(
     ZETASQL_RET_CHECK_LT(arg_idx, node->signature()->input_arguments().size());
     ZETASQL_RET_CHECK(node->signature()->argument(arg_idx).is_relation());
 
-    if (!seen_first_relation_arg) {
-      seen_first_relation_arg = true;
+    if (!first_relation_arg_idx.has_value()) {
+      first_relation_arg_idx = arg_idx;
       if (build_mode == TVFBuildMode::kGqlImplicit) {
-        // We already handled that separately in the GQL path. The implicit
-        // table argument is not printed.
+        // We add a bogus argument to align the argument names with the given
+        // arguments. It will be removed later. We're using something that does
+        // not parse as SQL in order to make it obvious if we accidentally
+        // produce it.
+        argument_list.push_back("<implicit table>");
         continue;
       }
     }
@@ -3494,9 +3434,10 @@ absl::StatusOr<std::string> SQLBuilder::ProcessResolvedTVFScan(
           // If the TVF call included explicit column names for the input table
           // argument, specify them again here in case the TVF requires these
           // exact column names to work properly.
-          arg_col_list_select_items.push_back({*alias, required_col});
+          arg_col_list_select_items.push_back(
+              {*alias, ToIdentifierLiteral(required_col)});
           zetasql_base::InsertOrUpdate(&mutable_computed_column_alias(), col.column_id(),
-                              required_col);
+                              ToIdentifierLiteral(required_col));
         } else {
           // If there is no explicit column/alias name, then we use the
           // original column name/alias.
@@ -3517,6 +3458,11 @@ absl::StatusOr<std::string> SQLBuilder::ProcessResolvedTVFScan(
       argument_list.push_back("(" + result->GetSQL() + ")");
     }
   }
+  ZETASQL_RET_CHECK_EQ(argument_list.size() + unset_arg_indices.size(),
+               node->argument_list_size())
+      << "All arguments in the function must make it to argument_list or "
+         "unset_arg_indices. argument_list.size() = "
+      << argument_list.size() << "; node: " << node->DebugString();
 
   std::string from;
   UpdateArgsForGetSQL(node->function_call_signature().get(), &argument_list,
@@ -3527,11 +3473,26 @@ absl::StatusOr<std::string> SQLBuilder::ProcessResolvedTVFScan(
     absl::AsciiStrToUpper(&name);
   }
 
-  if (!argument_list.empty() && build_mode == TVFBuildMode::kGqlExplicit &&
-      node->argument_list(0)->graph() != nullptr) {
-    // For GQL CALL, the first argument is the implicit graph argument, which we
-    // don't print.
-    argument_list.erase(argument_list.begin());
+  if (!argument_list.empty()) {
+    switch (build_mode) {
+      case TVFBuildMode::kGqlExplicit:
+        if (node->argument_list(0)->graph() != nullptr) {
+          // For GQL CALL, the first argument is the implicit graph argument,
+          // which we don't print.
+          argument_list.erase(argument_list.begin());
+        }
+        break;
+      case TVFBuildMode::kGqlImplicit:
+        if (first_relation_arg_idx.has_value()) {
+          // For GQL CALL PER, the first argument is the implicit scan argument,
+          // which we don't print.
+          ZETASQL_RET_CHECK_LT(*first_relation_arg_idx, argument_list.size());
+          argument_list.erase(argument_list.begin() + *first_relation_arg_idx);
+        }
+        break;
+      case TVFBuildMode::kSql:
+        break;
+    }
   }
   if (IsPipeSyntaxTargetMode() && !argument_list.empty() &&
       is_first_arg_query && build_mode == TVFBuildMode::kSql) {
@@ -3562,8 +3523,10 @@ absl::StatusOr<std::string> SQLBuilder::ProcessResolvedTVFScan(
       if (i > 0) {
         absl::StrAppend(&from, ", ");
       }
-      absl::StrAppend(&from, schema.column(node->column_index_list(i)).name,
-                      " AS ", GetColumnAlias(node->column_list(i)));
+      absl::StrAppend(
+          &from,
+          ToIdentifierLiteral(schema.column(node->column_index_list(i)).name),
+          " AS ", GetColumnAlias(node->column_list(i)));
     }
     // That is all for a GQL CALL or CALL PER().
     return from;
@@ -3592,6 +3555,9 @@ absl::StatusOr<std::string> SQLBuilder::ProcessResolvedTVFScan(
       // TODO: Figure out what's going on here, the signature's
       // result schema should always have appropriate column names and it's
       // unclear why this one does not.
+      // TODO: Treating IsInternalAlias() as special isn't right:
+      // there are other quotable identifiers (like `where`) that must be
+      // handled as well.
       if (node->tvf()->Is<ForwardInputSchemaToOutputSchemaTVF>()) {
         ZETASQL_RET_CHECK(node->signature()->argument(0).is_relation());
         column_name = node->signature()->argument(0).relation().column(i).name;
@@ -9613,7 +9579,6 @@ absl::Status SQLBuilder::VisitResolvedCreatePropertyGraphStmt(
     const ResolvedCreatePropertyGraphStmt* node) {
   std::string sql;
   ZETASQL_RETURN_IF_ERROR(GetCreateStatementPrefix(node, "PROPERTY GRAPH", &sql));
-  ZETASQL_RETURN_IF_ERROR(AppendOptionsIfPresent(node->option_list(), &sql));
   absl::StrAppend(&sql, "NODE TABLES(");
   absl::flat_hash_map<std::string, const ResolvedGraphElementLabel*>
       name_to_label;
@@ -9631,6 +9596,7 @@ absl::Status SQLBuilder::VisitResolvedCreatePropertyGraphStmt(
         AppendElementTables(node->edge_table_list(), name_to_label, sql));
     absl::StrAppend(&sql, ")");
   }
+  ZETASQL_RETURN_IF_ERROR(AppendOptionsIfPresent(node->option_list(), &sql));
   node->MarkFieldsAccessed();
   PushQueryFragment(node, sql);
   return absl::OkStatus();
@@ -9862,7 +9828,7 @@ absl::Status SQLBuilder::ProcessResolvedGqlNamedCallOp(
                  implicit_input_table->argument_column_list(i).column_id());
     absl::StrAppend(&output_sql,
                     GetColumnAlias(implicit_input_scan->column_list(i)), " AS ",
-                    schema.column(i).name);
+                    ToIdentifierLiteral(schema.column(i).name));
   }
 
   ZETASQL_ASSIGN_OR_RETURN(std::string tvf_sql,

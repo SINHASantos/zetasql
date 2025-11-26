@@ -16,7 +16,7 @@
 ################################################################################
 # Create a property graph with one NodeTable.
 create {{|or replace}} property graph {{|if not exists}} catalog.aml
-{{|options(opt1='v1', opt2='v2')}} node tables(person)
+ node tables(person) {{|options(opt1='v1', opt2='v2')}}
 --
 ALTERNATION GROUP: <empty>
 --
@@ -130,57 +130,57 @@ CreatePropertyGraphStmt
 |   +-label_name_list=[person]
 |   +-property_definition_list=
 |     +-GraphPropertyDefinition
-|     | +-parse_location=842-842
+|     | +-parse_location=813-813
 |     | +-expr=
 |     | | +-ColumnRef(type=INT64, column=Person.id#1)
 |     | +-sql="id"
 |     | +-property_declaration_name="id"
 |     +-GraphPropertyDefinition
-|     | +-parse_location=842-842
+|     | +-parse_location=813-813
 |     | +-expr=
 |     | | +-ColumnRef(type=STRING, column=Person.name#2)
 |     | +-sql="name"
 |     | +-property_declaration_name="name"
 |     +-GraphPropertyDefinition
-|     | +-parse_location=842-842
+|     | +-parse_location=813-813
 |     | +-expr=
 |     | | +-ColumnRef(type=STRING, column=Person.gender#3)
 |     | +-sql="gender"
 |     | +-property_declaration_name="gender"
 |     +-GraphPropertyDefinition
-|     | +-parse_location=842-842
+|     | +-parse_location=813-813
 |     | +-expr=
 |     | | +-ColumnRef(type=DATE, column=Person.birthday#4)
 |     | +-sql="birthday"
 |     | +-property_declaration_name="birthday"
 |     +-GraphPropertyDefinition
-|     | +-parse_location=842-842
+|     | +-parse_location=813-813
 |     | +-expr=
 |     | | +-ColumnRef(type=STRING, column=Person.email#5)
 |     | +-sql="email"
 |     | +-property_declaration_name="email"
 |     +-GraphPropertyDefinition
-|     | +-parse_location=842-842
+|     | +-parse_location=813-813
 |     | +-expr=
 |     | | +-ColumnRef(type=UINT32, column=Person.age#6)
 |     | +-sql="age"
 |     | +-property_declaration_name="age"
 |     +-GraphPropertyDefinition
-|       +-parse_location=842-842
+|       +-parse_location=813-813
 |       +-expr=
 |       | +-ColumnRef(type=BYTES, column=Person.data#7)
 |       +-sql="data"
 |       +-property_declaration_name="data"
 +-label_list=
-| +-GraphElementLabel(parse_location=842-842, name="person", property_declaration_name_list=[id, name, gender, birthday, email, age, data])
+| +-GraphElementLabel(parse_location=813-813, name="person", property_declaration_name_list=[id, name, gender, birthday, email, age, data])
 +-property_declaration_list=
-| +-GraphPropertyDeclaration(parse_location=842-842, name="id", type=INT64)
-| +-GraphPropertyDeclaration(parse_location=842-842, name="name", type=STRING)
-| +-GraphPropertyDeclaration(parse_location=842-842, name="gender", type=STRING)
-| +-GraphPropertyDeclaration(parse_location=842-842, name="birthday", type=DATE)
-| +-GraphPropertyDeclaration(parse_location=842-842, name="email", type=STRING)
-| +-GraphPropertyDeclaration(parse_location=842-842, name="age", type=UINT32)
-| +-GraphPropertyDeclaration(parse_location=842-842, name="data", type=BYTES)
+| +-GraphPropertyDeclaration(parse_location=813-813, name="id", type=INT64)
+| +-GraphPropertyDeclaration(parse_location=813-813, name="name", type=STRING)
+| +-GraphPropertyDeclaration(parse_location=813-813, name="gender", type=STRING)
+| +-GraphPropertyDeclaration(parse_location=813-813, name="birthday", type=DATE)
+| +-GraphPropertyDeclaration(parse_location=813-813, name="email", type=STRING)
+| +-GraphPropertyDeclaration(parse_location=813-813, name="age", type=UINT32)
+| +-GraphPropertyDeclaration(parse_location=813-813, name="data", type=BYTES)
 +-option_list=
   +-opt1 := Literal(type=STRING, value="v1")
   +-opt2 := Literal(type=STRING, value="v2")
@@ -188,7 +188,6 @@ CreatePropertyGraphStmt
 [SQLBUILDER_TARGET_SYNTAX_MODE standard]
 [SQLBUILDER_OUTPUT]
 CREATE PROPERTY GRAPH catalog.aml
-OPTIONS(opt1 = "v1", opt2 = "v2")
   NODE TABLES(
     Person AS person
       KEY(id)
@@ -200,12 +199,12 @@ OPTIONS(opt1 = "v1", opt2 = "v2")
         email,
         age,
         data)
-  );
+  )
+OPTIONS(opt1 = "v1", opt2 = "v2");
 
 [SQLBUILDER_TARGET_SYNTAX_MODE pipe]
 [SQLBUILDER_OUTPUT]
 CREATE PROPERTY GRAPH catalog.aml
-OPTIONS(opt1 = "v1", opt2 = "v2")
   NODE TABLES(
     Person AS person
       KEY(id)
@@ -217,7 +216,8 @@ OPTIONS(opt1 = "v1", opt2 = "v2")
         email,
         age,
         data)
-  );
+  )
+OPTIONS(opt1 = "v1", opt2 = "v2");
 --
 ALTERNATION GROUP: if not exists,
 --
@@ -333,57 +333,57 @@ CreatePropertyGraphStmt
 |   +-label_name_list=[person]
 |   +-property_definition_list=
 |     +-GraphPropertyDefinition
-|     | +-parse_location=855-855
+|     | +-parse_location=826-826
 |     | +-expr=
 |     | | +-ColumnRef(type=INT64, column=Person.id#1)
 |     | +-sql="id"
 |     | +-property_declaration_name="id"
 |     +-GraphPropertyDefinition
-|     | +-parse_location=855-855
+|     | +-parse_location=826-826
 |     | +-expr=
 |     | | +-ColumnRef(type=STRING, column=Person.name#2)
 |     | +-sql="name"
 |     | +-property_declaration_name="name"
 |     +-GraphPropertyDefinition
-|     | +-parse_location=855-855
+|     | +-parse_location=826-826
 |     | +-expr=
 |     | | +-ColumnRef(type=STRING, column=Person.gender#3)
 |     | +-sql="gender"
 |     | +-property_declaration_name="gender"
 |     +-GraphPropertyDefinition
-|     | +-parse_location=855-855
+|     | +-parse_location=826-826
 |     | +-expr=
 |     | | +-ColumnRef(type=DATE, column=Person.birthday#4)
 |     | +-sql="birthday"
 |     | +-property_declaration_name="birthday"
 |     +-GraphPropertyDefinition
-|     | +-parse_location=855-855
+|     | +-parse_location=826-826
 |     | +-expr=
 |     | | +-ColumnRef(type=STRING, column=Person.email#5)
 |     | +-sql="email"
 |     | +-property_declaration_name="email"
 |     +-GraphPropertyDefinition
-|     | +-parse_location=855-855
+|     | +-parse_location=826-826
 |     | +-expr=
 |     | | +-ColumnRef(type=UINT32, column=Person.age#6)
 |     | +-sql="age"
 |     | +-property_declaration_name="age"
 |     +-GraphPropertyDefinition
-|       +-parse_location=855-855
+|       +-parse_location=826-826
 |       +-expr=
 |       | +-ColumnRef(type=BYTES, column=Person.data#7)
 |       +-sql="data"
 |       +-property_declaration_name="data"
 +-label_list=
-| +-GraphElementLabel(parse_location=855-855, name="person", property_declaration_name_list=[id, name, gender, birthday, email, age, data])
+| +-GraphElementLabel(parse_location=826-826, name="person", property_declaration_name_list=[id, name, gender, birthday, email, age, data])
 +-property_declaration_list=
-| +-GraphPropertyDeclaration(parse_location=855-855, name="id", type=INT64)
-| +-GraphPropertyDeclaration(parse_location=855-855, name="name", type=STRING)
-| +-GraphPropertyDeclaration(parse_location=855-855, name="gender", type=STRING)
-| +-GraphPropertyDeclaration(parse_location=855-855, name="birthday", type=DATE)
-| +-GraphPropertyDeclaration(parse_location=855-855, name="email", type=STRING)
-| +-GraphPropertyDeclaration(parse_location=855-855, name="age", type=UINT32)
-| +-GraphPropertyDeclaration(parse_location=855-855, name="data", type=BYTES)
+| +-GraphPropertyDeclaration(parse_location=826-826, name="id", type=INT64)
+| +-GraphPropertyDeclaration(parse_location=826-826, name="name", type=STRING)
+| +-GraphPropertyDeclaration(parse_location=826-826, name="gender", type=STRING)
+| +-GraphPropertyDeclaration(parse_location=826-826, name="birthday", type=DATE)
+| +-GraphPropertyDeclaration(parse_location=826-826, name="email", type=STRING)
+| +-GraphPropertyDeclaration(parse_location=826-826, name="age", type=UINT32)
+| +-GraphPropertyDeclaration(parse_location=826-826, name="data", type=BYTES)
 +-option_list=
   +-opt1 := Literal(type=STRING, value="v1")
   +-opt2 := Literal(type=STRING, value="v2")
@@ -391,7 +391,6 @@ CreatePropertyGraphStmt
 [SQLBUILDER_TARGET_SYNTAX_MODE standard]
 [SQLBUILDER_OUTPUT]
 CREATE PROPERTY GRAPH IF NOT EXISTS catalog.aml
-OPTIONS(opt1 = "v1", opt2 = "v2")
   NODE TABLES(
     Person AS person
       KEY(id)
@@ -403,12 +402,12 @@ OPTIONS(opt1 = "v1", opt2 = "v2")
         email,
         age,
         data)
-  );
+  )
+OPTIONS(opt1 = "v1", opt2 = "v2");
 
 [SQLBUILDER_TARGET_SYNTAX_MODE pipe]
 [SQLBUILDER_OUTPUT]
 CREATE PROPERTY GRAPH IF NOT EXISTS catalog.aml
-OPTIONS(opt1 = "v1", opt2 = "v2")
   NODE TABLES(
     Person AS person
       KEY(id)
@@ -420,7 +419,8 @@ OPTIONS(opt1 = "v1", opt2 = "v2")
         email,
         age,
         data)
-  );
+  )
+OPTIONS(opt1 = "v1", opt2 = "v2");
 --
 ALTERNATION GROUP: or replace,,
 --
@@ -536,57 +536,57 @@ CreatePropertyGraphStmt
 |   +-label_name_list=[person]
 |   +-property_definition_list=
 |     +-GraphPropertyDefinition
-|     | +-parse_location=852-852
+|     | +-parse_location=823-823
 |     | +-expr=
 |     | | +-ColumnRef(type=INT64, column=Person.id#1)
 |     | +-sql="id"
 |     | +-property_declaration_name="id"
 |     +-GraphPropertyDefinition
-|     | +-parse_location=852-852
+|     | +-parse_location=823-823
 |     | +-expr=
 |     | | +-ColumnRef(type=STRING, column=Person.name#2)
 |     | +-sql="name"
 |     | +-property_declaration_name="name"
 |     +-GraphPropertyDefinition
-|     | +-parse_location=852-852
+|     | +-parse_location=823-823
 |     | +-expr=
 |     | | +-ColumnRef(type=STRING, column=Person.gender#3)
 |     | +-sql="gender"
 |     | +-property_declaration_name="gender"
 |     +-GraphPropertyDefinition
-|     | +-parse_location=852-852
+|     | +-parse_location=823-823
 |     | +-expr=
 |     | | +-ColumnRef(type=DATE, column=Person.birthday#4)
 |     | +-sql="birthday"
 |     | +-property_declaration_name="birthday"
 |     +-GraphPropertyDefinition
-|     | +-parse_location=852-852
+|     | +-parse_location=823-823
 |     | +-expr=
 |     | | +-ColumnRef(type=STRING, column=Person.email#5)
 |     | +-sql="email"
 |     | +-property_declaration_name="email"
 |     +-GraphPropertyDefinition
-|     | +-parse_location=852-852
+|     | +-parse_location=823-823
 |     | +-expr=
 |     | | +-ColumnRef(type=UINT32, column=Person.age#6)
 |     | +-sql="age"
 |     | +-property_declaration_name="age"
 |     +-GraphPropertyDefinition
-|       +-parse_location=852-852
+|       +-parse_location=823-823
 |       +-expr=
 |       | +-ColumnRef(type=BYTES, column=Person.data#7)
 |       +-sql="data"
 |       +-property_declaration_name="data"
 +-label_list=
-| +-GraphElementLabel(parse_location=852-852, name="person", property_declaration_name_list=[id, name, gender, birthday, email, age, data])
+| +-GraphElementLabel(parse_location=823-823, name="person", property_declaration_name_list=[id, name, gender, birthday, email, age, data])
 +-property_declaration_list=
-| +-GraphPropertyDeclaration(parse_location=852-852, name="id", type=INT64)
-| +-GraphPropertyDeclaration(parse_location=852-852, name="name", type=STRING)
-| +-GraphPropertyDeclaration(parse_location=852-852, name="gender", type=STRING)
-| +-GraphPropertyDeclaration(parse_location=852-852, name="birthday", type=DATE)
-| +-GraphPropertyDeclaration(parse_location=852-852, name="email", type=STRING)
-| +-GraphPropertyDeclaration(parse_location=852-852, name="age", type=UINT32)
-| +-GraphPropertyDeclaration(parse_location=852-852, name="data", type=BYTES)
+| +-GraphPropertyDeclaration(parse_location=823-823, name="id", type=INT64)
+| +-GraphPropertyDeclaration(parse_location=823-823, name="name", type=STRING)
+| +-GraphPropertyDeclaration(parse_location=823-823, name="gender", type=STRING)
+| +-GraphPropertyDeclaration(parse_location=823-823, name="birthday", type=DATE)
+| +-GraphPropertyDeclaration(parse_location=823-823, name="email", type=STRING)
+| +-GraphPropertyDeclaration(parse_location=823-823, name="age", type=UINT32)
+| +-GraphPropertyDeclaration(parse_location=823-823, name="data", type=BYTES)
 +-option_list=
   +-opt1 := Literal(type=STRING, value="v1")
   +-opt2 := Literal(type=STRING, value="v2")
@@ -594,7 +594,6 @@ CreatePropertyGraphStmt
 [SQLBUILDER_TARGET_SYNTAX_MODE standard]
 [SQLBUILDER_OUTPUT]
 CREATE OR REPLACE PROPERTY GRAPH catalog.aml
-OPTIONS(opt1 = "v1", opt2 = "v2")
   NODE TABLES(
     Person AS person
       KEY(id)
@@ -606,12 +605,12 @@ OPTIONS(opt1 = "v1", opt2 = "v2")
         email,
         age,
         data)
-  );
+  )
+OPTIONS(opt1 = "v1", opt2 = "v2");
 
 [SQLBUILDER_TARGET_SYNTAX_MODE pipe]
 [SQLBUILDER_OUTPUT]
 CREATE OR REPLACE PROPERTY GRAPH catalog.aml
-OPTIONS(opt1 = "v1", opt2 = "v2")
   NODE TABLES(
     Person AS person
       KEY(id)
@@ -623,7 +622,8 @@ OPTIONS(opt1 = "v1", opt2 = "v2")
         email,
         age,
         data)
-  );
+  )
+OPTIONS(opt1 = "v1", opt2 = "v2");
 --
 ALTERNATION GROUPS:
     or replace,if not exists,
@@ -2934,12 +2934,11 @@ CreatePropertyGraphStmt
 ==
 
 [disallow_duplicate_options]
-create property graph catalog.aml
-options(opt1='v1', opt1='v2') node tables(person)
+create property graph catalog.aml node tables(person) options(opt1='v1', opt1='v2')
 --
-ERROR: Duplicate option specified for 'opt1' [at 2:20]
-options(opt1='v1', opt1='v2') node tables(person)
-                   ^
+ERROR: Duplicate option specified for 'opt1' [at 1:74]
+...catalog.aml node tables(person) options(opt1='v1', opt1='v2')
+                                                      ^
 ==
 
 # Query expression like `select 1` is not allowed in property value expression.
@@ -5043,3 +5042,192 @@ ERROR: DYNAMIC LABEL clause must hold expression of type STRING for edge tables.
      DYNAMIC LABEL (nodeLabelCol)
                     ^
 ==
+
+==
+
+CREATE PROPERTY GRAPH aml_with_options
+  NODE TABLES(
+    Person
+      KEY(id)
+      DEFAULT LABEL OPTIONS(description = "v1")
+      PROPERTIES(
+        id OPTIONS(description = "v2"),
+        name OPTIONS(description = "v3")
+      ),
+    Account
+      KEY(id)
+      DEFAULT LABEL OPTIONS(description = "v4")
+      PROPERTIES(
+        id OPTIONS(description = "v5"),
+        name OPTIONS(description = "v6")
+      )
+  )
+  EDGE TABLES(
+    PersonOwnAccount AS own
+      KEY(personId, accountId)
+      SOURCE KEY(personId) REFERENCES person(id)
+      DESTINATION KEY(accountId) REFERENCES account(id)
+      DEFAULT LABEL OPTIONS(description = "v7")
+      PROPERTIES(
+        personId + accountId AS id OPTIONS(description = "v8")
+      )
+  );
+--
+
+ERROR: OPTIONS clause is not supported for labels [at 5:28]
+      DEFAULT LABEL OPTIONS(description = "v1")
+                           ^
+==
+
+CREATE PROPERTY GRAPH aml_with_options
+  NODE TABLES(
+    Person
+      KEY(id)
+      PROPERTIES(
+        id OPTIONS(description = "v2"),
+        name
+      )
+  );
+--
+
+ERROR: OPTIONS clause is not supported for property definitions [at 6:19]
+        id OPTIONS(description = "v2"),
+                  ^
+==
+
+[language_features=NONE,+SQL_GRAPH_DEFAULT_LABEL_AND_PROPERTY_DEFINITION_OPTIONS]
+CREATE PROPERTY GRAPH aml_with_options
+  NODE TABLES(
+    Person
+      KEY(id)
+      DEFAULT LABEL OPTIONS(description = "v1")
+      PROPERTIES(
+        id OPTIONS(description = "v2"),
+        name OPTIONS(description = "v3")
+      ),
+    Account
+      KEY(id)
+      DEFAULT LABEL OPTIONS(description = "v4")
+      PROPERTIES(
+        id OPTIONS(description = "v5"),
+        name OPTIONS(description = "v6")
+      )
+  )
+  EDGE TABLES(
+    PersonOwnAccount AS own
+      KEY(personId, accountId)
+      SOURCE KEY(personId) REFERENCES person(id)
+      DESTINATION KEY(accountId) REFERENCES account(id)
+      DEFAULT LABEL OPTIONS(description = "v7")
+      PROPERTIES(
+        personId + accountId AS id OPTIONS(description = "v8")
+      )
+  );
+--
+CreatePropertyGraphStmt
++-name_path=aml_with_options
++-node_table_list=
+| +-GraphElementTable
+| | +-alias="Person"
+| | +-input_scan=
+| | | +-TableScan(column_list=Person.[id#1, name#2, gender#3, birthday#4, email#5, age#6, data#7], table=Person, column_index_list=[0, 1, 2, 3, 4, 5, 6])
+| | +-key_list=
+| | | +-ColumnRef(type=INT64, column=Person.id#1)
+| | +-label_name_list=[Person]
+| | +-property_definition_list=
+| |   +-GraphPropertyDefinition
+| |   | +-parse_location=153-183
+| |   | +-expr=
+| |   | | +-ColumnRef(type=INT64, column=Person.id#1)
+| |   | +-sql="id"
+| |   | +-property_declaration_name="id"
+| |   | +-options_list=
+| |   |   +-description := Literal(type=STRING, value="v2")
+| |   +-GraphPropertyDefinition
+| |     +-parse_location=193-225
+| |     +-expr=
+| |     | +-ColumnRef(type=STRING, column=Person.name#2)
+| |     +-sql="name"
+| |     +-property_declaration_name="name"
+| |     +-options_list=
+| |       +-description := Literal(type=STRING, value="v3")
+| +-GraphElementTable
+|   +-alias="Account"
+|   +-input_scan=
+|   | +-TableScan(column_list=Account.[id#8, name#9, balance#10], table=Account, column_index_list=[0, 1, 2])
+|   +-key_list=
+|   | +-ColumnRef(type=INT64, column=Account.id#8)
+|   +-label_name_list=[Account]
+|   +-property_definition_list=
+|     +-GraphPropertyDefinition
+|     | +-parse_location=335-365
+|     | +-expr=
+|     | | +-ColumnRef(type=INT64, column=Account.id#8)
+|     | +-sql="id"
+|     | +-property_declaration_name="id"
+|     | +-options_list=
+|     |   +-description := Literal(type=STRING, value="v5")
+|     +-GraphPropertyDefinition
+|       +-parse_location=375-407
+|       +-expr=
+|       | +-ColumnRef(type=STRING, column=Account.name#9)
+|       +-sql="name"
+|       +-property_declaration_name="name"
+|       +-options_list=
+|         +-description := Literal(type=STRING, value="v6")
++-edge_table_list=
+| +-GraphElementTable
+|   +-alias="own"
+|   +-input_scan=
+|   | +-TableScan(column_list=PersonOwnAccount.[personId#11, accountId#12, startDate#13], table=PersonOwnAccount, column_index_list=[0, 1, 2])
+|   +-key_list=
+|   | +-ColumnRef(type=INT64, column=PersonOwnAccount.personId#11)
+|   | +-ColumnRef(type=INT64, column=PersonOwnAccount.accountId#12)
+|   +-source_node_reference=
+|   | +-GraphNodeTableReference
+|   |   +-node_table_identifier="person"
+|   |   +-edge_table_column_list=
+|   |   | +-ColumnRef(type=INT64, column=PersonOwnAccount.personId#11)
+|   |   +-node_table_column_list=
+|   |     +-ColumnRef(type=INT64, column=Person.id#1)
+|   +-dest_node_reference=
+|   | +-GraphNodeTableReference
+|   |   +-node_table_identifier="account"
+|   |   +-edge_table_column_list=
+|   |   | +-ColumnRef(type=INT64, column=PersonOwnAccount.accountId#12)
+|   |   +-node_table_column_list=
+|   |     +-ColumnRef(type=INT64, column=Account.id#8)
+|   +-label_name_list=[own]
+|   +-property_definition_list=
+|     +-GraphPropertyDefinition
+|       +-parse_location=673-727
+|       +-expr=
+|       | +-FunctionCall(ZetaSQL:$add(INT64, INT64) -> INT64)
+|       |   +-ColumnRef(type=INT64, column=PersonOwnAccount.personId#11)
+|       |   +-ColumnRef(type=INT64, column=PersonOwnAccount.accountId#12)
+|       +-sql="personId + accountId"
+|       +-property_declaration_name="id"
+|       +-options_list=
+|         +-description := Literal(type=STRING, value="v8")
++-label_list=
+| +-GraphElementLabel
+| | +-parse_location=85-233
+| | +-name="Person"
+| | +-property_declaration_name_list=[id, name]
+| | +-options_list=
+| |   +-description := Literal(type=STRING, value="v1")
+| +-GraphElementLabel
+| | +-parse_location=267-415
+| | +-name="Account"
+| | +-property_declaration_name_list=[id, name]
+| | +-options_list=
+| |   +-description := Literal(type=STRING, value="v4")
+| +-GraphElementLabel
+|   +-parse_location=605-735
+|   +-name="own"
+|   +-property_declaration_name_list=[id]
+|   +-options_list=
+|     +-description := Literal(type=STRING, value="v7")
++-property_declaration_list=
+  +-GraphPropertyDeclaration(parse_location=153-183, name="id", type=INT64)
+  +-GraphPropertyDeclaration(parse_location=193-225, name="name", type=STRING)

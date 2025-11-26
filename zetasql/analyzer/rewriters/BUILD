@@ -351,11 +351,18 @@ cc_library(
         # The utility files should be private to this target.
         "measure_type_rewriter_util.cc",
         "measure_type_rewriter_util.h",
+        "measure_collector.cc",
+        "measure_collector.h",
+        "measure_source_scan_rewrite_util.cc",
+        "measure_source_scan_rewrite_util.h",
+        "measure_reference_rewrite_util.cc",
+        "measure_reference_rewrite_util.h",
     ],
     hdrs = [
         "measure_type_rewriter.h",
     ],
     deps = [
+        "//zetasql/base:check",
         "//zetasql/base:ret_check",
         "//zetasql/base:status",
         "//zetasql/base:strings",
@@ -364,7 +371,7 @@ cc_library(
         "//zetasql/public:builtin_function_cc_proto",
         "//zetasql/public:catalog",
         "//zetasql/public:function_headers",
-        "//zetasql/public:id_string",
+        "//zetasql/public:language_options",
         "//zetasql/public:options_cc_proto",
         "//zetasql/public:rewriter_interface",
         "//zetasql/public/types",

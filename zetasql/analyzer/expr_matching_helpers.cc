@@ -714,6 +714,11 @@ bool IsSameFieldPath(const ResolvedExpr* field_path1,
              struct_field1->type()->Equals(struct_field2->type());
     }
     case RESOLVED_COLUMN_REF: {
+      // A special case for comparing subscripted paths in UPDATE ... SET
+      // statements when subscript literal values are equal.
+      if (match_option == FieldPathMatchingOption::kUpdateItemElement) {
+        return true;
+      }
       // Ignore ResolvedColumnRef::is_correlated because it is IGNORABLE and
       // therefore semantically meaningless. If the ResolvedColumnRefs indicate
       // the same ResolvedColumn, then the expressions must be equivalent.

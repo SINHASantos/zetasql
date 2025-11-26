@@ -478,6 +478,10 @@ class Unparser : public ParseTreeVisitor {
                                      void* data) override;
   void visitASTGraphElementTable(const ASTGraphElementTable* node,
                                  void* data) override;
+  void visitASTGraphDerivedPropertyList(const ASTGraphDerivedPropertyList* node,
+                                        void* data) override;
+  void visitASTGraphDerivedProperty(const ASTGraphDerivedProperty* node,
+                                    void* data) override;
   void visitASTGraphNodeTableReference(const ASTGraphNodeTableReference* node,
                                        void* data) override;
   void visitASTGraphElementLabelAndPropertiesList(
@@ -633,6 +637,7 @@ class Unparser : public ParseTreeVisitor {
                                     void* data) override;
   void visitASTOrExpr(const ASTOrExpr* node, void* data) override;
   void visitASTAndExpr(const ASTAndExpr* node, void* data) override;
+  void visitASTConcatExpr(const ASTConcatExpr* node, void* data) override;
   void visitASTUnaryExpression(const ASTUnaryExpression* node,
                                void* data) override;
   void visitASTCaseNoValueExpression(const ASTCaseNoValueExpression* node,
@@ -667,7 +672,6 @@ class Unparser : public ParseTreeVisitor {
   void visitASTFunctionCall(const ASTFunctionCall* node, void* data) override;
   void visitASTChainedBaseExpr(const ASTChainedBaseExpr* node,
                                void* data) override;
-  void visitASTWithGroupRows(const ASTWithGroupRows* node, void* data) override;
   void visitASTArrayElement(const ASTArrayElement* node, void* data) override;
   void visitASTExpressionSubquery(const ASTExpressionSubquery* node,
                                   void* data) override;

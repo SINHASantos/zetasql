@@ -254,8 +254,15 @@ message TVFSignatureOptionsProto {
 
 message TVFSignatureProto {
   repeated TVFArgumentProto argument = 1;
-  optional TVFRelationProto output_schema = 2;
   optional TVFSignatureOptionsProto options = 3;
+
+  oneof output_schema_oneof {
+    // If set, the tvf output schema is described by a TVFRelation.
+    TVFRelationProto output_schema = 2;
+
+    // If set, the tvf output schema is described by a table reference.
+    TableRefProto output_table_schema = 4;
+  }
 }
 
 message ProcedureProto {

@@ -1854,51 +1854,6 @@ def main(unused_argv):
                       """,
           ),
           Field(
-              'with_group_rows_subquery',
-              'ResolvedScan',
-              tag_id=4,
-              ignorable=IGNORABLE_DEFAULT,
-              is_constructor_arg=False,
-              comment="""
-              Holds a table subquery defined in WITH GROUP ROWS(...) that is
-              evaluated over the input rows of a ResolvedAggregateScan
-              corresponding to the current group. The function itself is
-              evaluated over the rows returned from the subquery.
-
-              The subquery should refer to a special TVF GROUP_ROWS(), which
-              resolves as ResolvedGroupRowsScan. The subquery will be run for
-              each group produced by ResolvedAggregateScan.
-
-              GROUP_ROWS() produces a row for each source row in the
-              ResolvedAggregateScan's input that matches current group.
-
-              The subquery cannot reference any ResolvedColumns from the outer
-              query except what comes in via <with_group_rows_parameter_list>,
-              and GROUP_ROWS().
-
-              The subquery can return more than one column, and these columns
-              can be referenced by the function.
-
-              The subquery can be correlated. In this case the
-              <with_group_rows_parameter_list> gives the set of ResolvedColumns
-              from outside the subquery that are used inside. The subuery cannot
-              refer to correlated columns that are used as aggregation input in
-              the immediate outer query. The same rules apply to
-              <with_group_rows_parameter_list> as in ResolvedSubqueryExpr.
-                      """,
-          ),
-          Field(
-              'with_group_rows_parameter_list',
-              'ResolvedColumnRef',
-              tag_id=5,
-              vector=True,
-              ignorable=IGNORABLE_DEFAULT,
-              is_constructor_arg=False,
-              comment="""
-              Correlated parameters to <with_group_rows_subquery>
-                      """,
-          ),
-          Field(
               'where_expr',
               'ResolvedExpr',
               tag_id=6,
@@ -4727,6 +4682,7 @@ value.
       ],
   )
 
+  # TODO: b/430036320 - Cleanup if not needed for simplified GROUP ROWS syntax.
   gen.AddNode(
       name='ResolvedGroupRowsScan',
       tag_id=176,
@@ -11223,6 +11179,8 @@ ResolvedArgumentRef(y)
       <name> is the name of the label.
       <property_declaration_name_list> is a list of property declarations
       exposed by the label.
+      <options_list> is the list of engine-specific options applied to
+      the label.
           """,
       fields=[
           Field(
@@ -11239,6 +11197,14 @@ ResolvedArgumentRef(y)
               vector=True,
               to_string_method='ToStringCommaSeparated',
               java_to_string_method='toStringCommaSeparated',
+          ),
+          Field(
+              'options_list',
+              'ResolvedOption',
+              tag_id=4,
+              ignorable=IGNORABLE_DEFAULT,
+              vector=True,
+              is_optional_constructor_arg=True,
           ),
       ],
   )
@@ -11263,17 +11229,27 @@ ResolvedArgumentRef(y)
       comment="""
         Represents a property exposed by a GraphElementLabel on a specific
         GraphElementTable.
-        <expr> [ AS <property_declaration_name> ]
+        <expr> [ AS <property_declaration_name> ] [ OPTIONS (<options_list>) ]
 
         <expr> is the property definition, a ResolvedExpression to identify a
         column.
         <sql> is the original sql string of the property definition.
         <property_declaration_name> refers to a property declaration.
+        <options_list> is the list of engine-specific options applied to
+        the property definition.
     """,
       fields=[
           Field('expr', 'ResolvedExpr', tag_id=2),
           Field('sql', SCALAR_STRING, tag_id=3),
           Field('property_declaration_name', SCALAR_STRING, tag_id=4),
+          Field(
+              'options_list',
+              'ResolvedOption',
+              tag_id=5,
+              ignorable=IGNORABLE_DEFAULT,
+              vector=True,
+              is_optional_constructor_arg=True,
+          ),
       ],
   )
 

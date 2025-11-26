@@ -1304,3 +1304,145 @@ ALTERNATION GROUP: <empty>
 ERROR: The input table to a CALL PER() TVF must have at least one column [at 3:6]
      CALL PER () tvf_graph()
      ^
+
+==
+
+# Bug with named arguments in call per ()
+GRAPH aml
+LET a = 1
+CALL PER () tvf_optional_table_default_mandatory_string(foobar => "hi")
+RETURN 1 as x
+--
+QueryStmt
++-output_column_list=
+| +-$graph_table.x#4 AS x [INT64]
++-query=
+  +-GraphTableScan
+    +-column_list=[$graph_table.x#4]
+    +-property_graph=aml
+    +-input_scan=
+      +-GraphLinearScan
+        +-column_list=[$graph_table.x#4]
+        +-scan_list=
+          +-GraphLinearScan
+            +-column_list=[$graph_table.x#4]
+            +-scan_list=
+              +-ProjectScan
+              | +-column_list=[$graph_table.a#1]
+              | +-expr_list=
+              | | +-a#1 := Literal(type=INT64, value=1)
+              | +-input_scan=
+              |   +-SingleRowScan
+              +-TVFScan
+              | +-column_list=tvf_optional_table_default_mandatory_string.[column_bool#2, column_bytes#3]
+              | +-tvf=tvf_optional_table_default_mandatory_string((optional ANY TABLE, optional STRING {default_value: "default"} foobar) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+              | +-signature=(TABLE<a INT64>, literal STRING) -> TABLE<column_bool BOOL, column_bytes BYTES>
+              | +-argument_list=
+              | | +-FunctionArgument
+              | | | +-scan=
+              | | | | +-GraphRefScan(column_list=[$graph_table.a#1])
+              | | | +-argument_column_list=[$graph_table.a#1]
+              | | +-FunctionArgument
+              | |   +-expr=
+              | |     +-Literal(type=STRING, value="hi")
+              | +-column_index_list=[0, 1]
+              | +-function_call_signature=(optional(1) ANY TABLE, optional(1) STRING foobar) -> TABLE<column_bool BOOL, column_bytes BYTES>
+              +-ProjectScan
+                +-column_list=[$graph_table.x#4]
+                +-expr_list=
+                | +-x#4 := Literal(type=INT64, value=1)
+                +-input_scan=
+                  +-GraphRefScan(column_list=tvf_optional_table_default_mandatory_string.[column_bool#2, column_bytes#3])
+
+==
+
+GRAPH aml
+LET `$a` = 1
+CALL PER () tvf_optional_table_default_mandatory_string(foobar => "foo")
+RETURN 1 as x
+--
+QueryStmt
++-output_column_list=
+| +-$graph_table.x#4 AS x [INT64]
++-query=
+  +-GraphTableScan
+    +-column_list=[$graph_table.x#4]
+    +-property_graph=aml
+    +-input_scan=
+      +-GraphLinearScan
+        +-column_list=[$graph_table.x#4]
+        +-scan_list=
+          +-GraphLinearScan
+            +-column_list=[$graph_table.x#4]
+            +-scan_list=
+              +-ProjectScan
+              | +-column_list=[$graph_table.$a#1]
+              | +-expr_list=
+              | | +-$a#1 := Literal(type=INT64, value=1)
+              | +-input_scan=
+              |   +-SingleRowScan
+              +-TVFScan
+              | +-column_list=tvf_optional_table_default_mandatory_string.[column_bool#2, column_bytes#3]
+              | +-tvf=tvf_optional_table_default_mandatory_string((optional ANY TABLE, optional STRING {default_value: "default"} foobar) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+              | +-signature=(TABLE<$a INT64>, literal STRING) -> TABLE<column_bool BOOL, column_bytes BYTES>
+              | +-argument_list=
+              | | +-FunctionArgument
+              | | | +-scan=
+              | | | | +-GraphRefScan(column_list=[$graph_table.$a#1])
+              | | | +-argument_column_list=[$graph_table.$a#1]
+              | | +-FunctionArgument
+              | |   +-expr=
+              | |     +-Literal(type=STRING, value="foo")
+              | +-column_index_list=[0, 1]
+              | +-function_call_signature=(optional(1) ANY TABLE, optional(1) STRING foobar) -> TABLE<column_bool BOOL, column_bytes BYTES>
+              +-ProjectScan
+                +-column_list=[$graph_table.x#4]
+                +-expr_list=
+                | +-x#4 := Literal(type=INT64, value=1)
+                +-input_scan=
+                  +-GraphRefScan(column_list=tvf_optional_table_default_mandatory_string.[column_bool#2, column_bytes#3])
+
+==
+
+GRAPH aml
+LET `where` = 1
+CALL PER () tvf_append_no_column()
+RETURN 1 as x
+--
+QueryStmt
++-output_column_list=
+| +-$graph_table.x#3 AS x [INT64]
++-query=
+  +-GraphTableScan
+    +-column_list=[$graph_table.x#3]
+    +-property_graph=aml
+    +-input_scan=
+      +-GraphLinearScan
+        +-column_list=[$graph_table.x#3]
+        +-scan_list=
+          +-GraphLinearScan
+            +-column_list=[$graph_table.x#3]
+            +-scan_list=
+              +-ProjectScan
+              | +-column_list=[$graph_table.where#1]
+              | +-expr_list=
+              | | +-where#1 := Literal(type=INT64, value=1)
+              | +-input_scan=
+              |   +-SingleRowScan
+              +-TVFScan
+              | +-column_list=[tvf_append_no_column.where#2]
+              | +-tvf=tvf_append_no_column((ANY TABLE) -> ANY TABLE)
+              | +-signature=(TABLE<where INT64>) -> TABLE<where INT64>
+              | +-argument_list=
+              | | +-FunctionArgument
+              | |   +-scan=
+              | |   | +-GraphRefScan(column_list=[$graph_table.where#1])
+              | |   +-argument_column_list=[$graph_table.where#1]
+              | +-column_index_list=[0]
+              | +-function_call_signature=(ANY TABLE) -> ANY TABLE
+              +-ProjectScan
+                +-column_list=[$graph_table.x#3]
+                +-expr_list=
+                | +-x#3 := Literal(type=INT64, value=1)
+                +-input_scan=
+                  +-GraphRefScan(column_list=[tvf_append_no_column.where#2])

@@ -2686,6 +2686,12 @@ void Unparser::visitASTAndExpr(const ASTAndExpr* node, void* data) {
   PrintCloseParenIfNeeded(node);
 }
 
+void Unparser::visitASTConcatExpr(const ASTConcatExpr* node, void* data) {
+  PrintOpenParenIfNeeded(node);
+  UnparseChildrenWithSeparator(node, data, "||");
+  PrintCloseParenIfNeeded(node);
+}
+
 static bool IsPostfix(ASTUnaryExpression::Op op) {
   return op == ASTUnaryExpression::IS_UNKNOWN ||
          op == ASTUnaryExpression::IS_NOT_UNKNOWN;
@@ -2998,9 +3004,6 @@ void Unparser::visitASTFunctionCall(const ASTFunctionCall* node, void* data) {
   if (node->hint() != nullptr) {
     node->hint()->Accept(this, data);
   }
-  if (node->with_group_rows() != nullptr) {
-    node->with_group_rows()->Accept(this, data);
-  }
   PrintCloseParenIfNeeded(node);
 }
 
@@ -3014,15 +3017,6 @@ void Unparser::visitASTChainedBaseExpr(const ASTChainedBaseExpr* node,
   if (force_paren) print("(");
   node->expr()->Accept(this, data);
   if (force_paren) print(")");
-}
-
-void Unparser::visitASTWithGroupRows(const ASTWithGroupRows* node, void* data) {
-  print("WITH GROUP ROWS (");
-  {
-    Formatter::Indenter indenter(&formatter_);
-    node->subquery()->Accept(this, data);
-  }
-  print(")");
 }
 
 void Unparser::visitASTArrayElement(const ASTArrayElement* node, void* data) {
@@ -5201,12 +5195,6 @@ void Unparser::visitASTCreatePropertyGraphStatement(
   visitASTPathExpression(node->name(), data);
   println();
 
-  if (node->options_list() != nullptr) {
-    print("OPTIONS");
-    node->options_list()->Accept(this, data);
-    println();
-  }
-
   {
     Formatter::Indenter indenter(&formatter_);
     println("NODE TABLES(");
@@ -5226,6 +5214,11 @@ void Unparser::visitASTCreatePropertyGraphStatement(
     }
     println();
     println(")");
+  }
+  if (node->options_list() != nullptr) {
+    print("OPTIONS");
+    node->options_list()->Accept(this, data);
+    println();
   }
 }
 
@@ -5332,7 +5325,35 @@ void Unparser::visitASTGraphElementLabelAndProperties(
     print("DEFAULT LABEL");
   }
 
+  if (node->label_options_list() != nullptr) {
+    print("OPTIONS");
+    visitASTOptionsList(node->label_options_list(), data);
+  }
+
   visitASTGraphProperties(node->properties(), data);
+}
+
+void Unparser::visitASTGraphDerivedProperty(const ASTGraphDerivedProperty* node,
+                                            void* data) {
+  if (node->expression() != nullptr) {
+    node->expression()->Accept(this, data);
+  }
+  if (node->alias() != nullptr) {
+    visitASTAlias(node->alias(), data);
+  }
+  if (node->options_list() != nullptr) {
+    print("OPTIONS");
+    visitASTOptionsList(node->options_list(), data);
+  }
+}
+
+void Unparser::visitASTGraphDerivedPropertyList(
+    const ASTGraphDerivedPropertyList* node, void* data) {
+  println();
+  {
+    Formatter::Indenter indenter(&formatter_);
+    UnparseChildrenWithSeparator(node, data, ",", /*break_line=*/true);
+  }
 }
 
 void Unparser::visitASTGraphProperties(const ASTGraphProperties* node,
@@ -5352,7 +5373,7 @@ void Unparser::visitASTGraphProperties(const ASTGraphProperties* node,
   print("PROPERTIES(");
   {
     Formatter::Indenter indenter(&formatter_);
-    visitASTSelectList(node->derived_property_list(), data);
+    visitASTGraphDerivedPropertyList(node->derived_property_list(), data);
   }
   print(")");
 }

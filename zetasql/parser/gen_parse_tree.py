@@ -42,7 +42,7 @@ from zetasql.parser.generator_utils import UpperCamelCase
 
 # You can use `tag_id=GetTempTagId()` until doing the final submit.
 # That will avoid merge conflicts when syncing in other changes.
-NEXT_NODE_TAG_ID = 543
+NEXT_NODE_TAG_ID = 546
 
 
 def GetTempTagId():
@@ -2242,6 +2242,23 @@ def main(argv):
       )
 
   gen.AddNode(
+      name='ASTConcatExpr',
+      comment="""
+      Represents a concatenation expression, such as "a || b || c".
+      """,
+      tag_id=543,
+      parent='ASTExpression',
+      fields=[
+          Field(
+              'operands',
+              'ASTExpression',
+              tag_id=2,
+              field_loader=FieldLoaderMethod.REST_AS_REPEATED,
+          ),
+      ],
+  )
+
+  gen.AddNode(
       name='ASTOrderingExpression',
       tag_id=27,
       parent='ASTNode',
@@ -3076,14 +3093,6 @@ def main(argv):
               """,
           ),
           Field(
-              'with_group_rows',
-              'ASTWithGroupRows',
-              tag_id=9,
-              private_comment="""
-      Set if the function was called WITH GROUP ROWS(...).
-              """,
-          ),
-          Field(
               'null_handling_modifier',
               SCALAR_NULL_HANDLING_MODIFIER,
               tag_id=10,
@@ -3142,9 +3151,9 @@ def main(argv):
     return distinct_ || null_handling_modifier_ != DEFAULT_NULL_HANDLING ||
            having_modifier_ != nullptr ||
            clamped_between_modifier_ != nullptr || order_by_ != nullptr ||
-           limit_offset_ != nullptr || with_group_rows_ != nullptr ||
-           group_by_ != nullptr || where_expr_ != nullptr ||
-           having_expr_ != nullptr || with_report_modifier_ != nullptr ||
+           limit_offset_ != nullptr || group_by_ != nullptr ||
+           where_expr_ != nullptr || having_expr_ != nullptr ||
+           with_report_modifier_ != nullptr ||
            (is_chained_call_ && !ignore_is_chained_call);
   }
 
@@ -3160,7 +3169,6 @@ def main(argv):
          (clamped_between_modifier_ != nullptr  ? 1 : 0) +
          (order_by_ != nullptr  ? 1 : 0) +
          (limit_offset_ != nullptr  ? 1 : 0) +
-         (with_group_rows_ != nullptr  ? 1 : 0) +
          (group_by_ != nullptr  ? 1 : 0) +
          (where_expr_ != nullptr  ? 1 : 0) +
          (having_expr_ != nullptr  ? 1 : 0) +
@@ -5606,19 +5614,6 @@ def main(argv):
           Field(
               'path',
               'ASTPathExpression',
-              tag_id=2,
-              field_loader=FieldLoaderMethod.REQUIRED),
-      ])
-
-  # TODO: b/430036320 - Clean up deprecated group rows syntax
-  gen.AddNode(
-      name='ASTWithGroupRows',
-      tag_id=141,
-      parent='ASTNode',
-      fields=[
-          Field(
-              'subquery',
-              'ASTQuery',
               tag_id=2,
               field_loader=FieldLoaderMethod.REQUIRED),
       ])
@@ -10992,7 +10987,17 @@ def main(argv):
               Label of the element table.
               If NULL, it is equivalent to explicitly specifying "DEFAULT LABEL" in
               the element table definition.
-              """),
+              """,
+          ),
+          Field(
+              'label_options_list',
+              'ASTOptionsList',
+              tag_id=4,
+              field_loader=FieldLoaderMethod.OPTIONAL,
+              comment="""
+              Options associated with the label.
+              """,
+          ),
           Field(
               'properties',
               'ASTGraphProperties',
@@ -11000,7 +11005,63 @@ def main(argv):
               field_loader=FieldLoaderMethod.REQUIRED,
               comment="""
               Properties exposed by the label.
-              """),
+              """,
+          ),
+      ],
+  )
+
+  gen.AddNode(
+      name='ASTGraphDerivedProperty',
+      tag_id=544,
+      parent='ASTNode',
+      comment="""
+      <expression> [AS <alias>] [OPTIONS (<options>)]
+      """,
+      fields=[
+          Field(
+              'expression',
+              'ASTExpression',
+              tag_id=2,
+              field_loader=FieldLoaderMethod.REQUIRED,
+              comment="""
+              Sql expression for the property.
+              """,
+          ),
+          Field(
+              'alias',
+              'ASTAlias',
+              tag_id=3,
+              field_loader=FieldLoaderMethod.OPTIONAL,
+              comment="""
+              Alias for the property.
+              """,
+          ),
+          Field(
+              'options_list',
+              'ASTOptionsList',
+              tag_id=4,
+              field_loader=FieldLoaderMethod.OPTIONAL,
+              comment="""
+              Options associated with the property definition.
+              """,
+          ),
+      ],
+  )
+
+  gen.AddNode(
+      name='ASTGraphDerivedPropertyList',
+      tag_id=545,
+      parent='ASTNode',
+      fields=[
+          Field(
+              'properties',
+              'ASTGraphDerivedProperty',
+              tag_id=2,
+              field_loader=FieldLoaderMethod.REST_AS_REPEATED,
+              comment="""
+              This can never be empty.
+              """,
+          ),
       ],
   )
 
@@ -11016,17 +11077,19 @@ def main(argv):
               comment="""
               If true, derived_property_list and all_except_columns are ignored.
               It means NO PROPERTIES
-              """),
+              """,
+          ),
           Field(
               'derived_property_list',
-              'ASTSelectList',
+              'ASTGraphDerivedPropertyList',
               tag_id=3,
               field_loader=FieldLoaderMethod.OPTIONAL,
               comment="""
               no_properties must be false for the following to take effect:
               If NULL, it means: PROPERTIES [ARE] ALL COLUMNS.
               If not NULL, it means: PROPERTIES(<derived property list>);
-              """),
+              """,
+          ),
           Field(
               'all_except_columns',
               'ASTColumnList',
@@ -11037,7 +11100,8 @@ def main(argv):
               NULL for the following to take effect:
               If not NULL, it appends optional EXCEPT(<all_except_columns>)
               list to PROPERTIES [ARE] ALL COLUMNS.
-              """),
+              """,
+          ),
       ],
   )
   gen.AddNode(

@@ -3211,7 +3211,7 @@ GraphTableQueryResolver::GraphSetOperationResolver::BuildSetOperationItems(
 
 absl::StatusOr<std::vector<IdString>>
 GraphTableQueryResolver::GraphSetOperationResolver::GetFinalColumnNames(
-    const std::vector<ResolvedGraphWithNameList<const ResolvedGraphLinearScan>>&
+    absl::Span<const ResolvedGraphWithNameList<const ResolvedGraphLinearScan>>
         resolved_inputs,
     absl::Span<IndexedColumnNames> indexed_column_names_list,
     ResolvedSetOperationScan::SetOperationColumnPropagationMode
@@ -3234,9 +3234,10 @@ GraphTableQueryResolver::GraphSetOperationResolver::GetFinalColumnNames(
     case ResolvedSetOperationScan::STRICT: {
       return CalculateFinalColumnNamesForStrictCorresponding(
           indexed_column_names_list,
-          /*input_column_mismatch_error=*/[&](int query_idx,
-                                              const std::vector<IdString>&,
-                                              const std::vector<IdString>&) {
+          /*input_column_mismatch_error=*/[&, resolved_inputs](
+                                              int query_idx,
+                                              absl::Span<const IdString>,
+                                              absl::Span<const IdString>) {
             // When the feature is disabled, users are not exposed with the
             // internal details of column propagation mode.
             absl::string_view specify_propagation_mode_err_msg =

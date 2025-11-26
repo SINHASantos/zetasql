@@ -93,7 +93,7 @@ absl::Status AppendUniquePtr(absl::StatusOr<std::unique_ptr<const T1>> data,
 // Gets the name of property declaration: either explicitly via alias or
 // implicitly from the expression itself.
 absl::StatusOr<std::string> GetPropertyDeclarationName(
-    const ASTSelectColumn* property) {
+    const ASTGraphDerivedProperty* property) {
   if (property->alias() != nullptr) {
     return property->alias()->GetAsString();
   }
@@ -662,7 +662,7 @@ absl::StatusOr<
     std::vector<std::unique_ptr<const ResolvedGraphPropertyDefinition>>>
 GraphStmtResolver::ResolveGraphPropertyList(
     const ASTNode* ast_location,
-    absl::Span<const ASTSelectColumn* const> properties,
+    absl::Span<const ASTGraphDerivedProperty* const> properties,
     const ResolvedTableScan& base_table_scan,
     const NameScope* input_scope) const {
   static constexpr char kPropertiesClause[] = "PROPERTIES clause";
@@ -684,12 +684,27 @@ GraphStmtResolver::ResolveGraphPropertyList(
                      GetAstNodeSql(property->expression(), resolver_.sql_));
     ZETASQL_ASSIGN_OR_RETURN(std::string property_decl_name,
                      GetPropertyDeclarationName(property));
+
+    // Resolve options
+    std::vector<std::unique_ptr<const ResolvedOption>> options_list;
+    if (property->options_list() != nullptr) {
+      if (!resolver_.language().LanguageFeatureEnabled(
+              FEATURE_SQL_GRAPH_DEFAULT_LABEL_AND_PROPERTY_DEFINITION_OPTIONS)) {  // NOLINT
+        return MakeSqlErrorAt(property->options_list())
+               << "OPTIONS clause is not supported for property definitions";
+      }
+      ZETASQL_RETURN_IF_ERROR(resolver_.ResolveOptionsList(
+          property->options_list(), /*allow_alter_array_operators=*/false,
+          &options_list));
+    }
+
     ZETASQL_ASSIGN_OR_RETURN(
         std::unique_ptr<const ResolvedGraphPropertyDefinition> property_def,
         ResolvedGraphPropertyDefinitionBuilder()
             .set_expr(std::move(resolved_expr))
             .set_sql(sql)
             .set_property_declaration_name(std::move(property_decl_name))
+            .set_options_list(std::move(options_list))
             .Build());
     property_defs.push_back(GetResolvedElementWithLocation(
         std::move(property_def), property->location()));
@@ -789,7 +804,7 @@ GraphStmtResolver::ResolveGraphProperties(
     // PROPERTIES(<derived_property_list>)
     ZETASQL_RET_CHECK_EQ(ast_properties->all_except_columns(), nullptr);
     return ResolveGraphPropertyList(
-        ast_properties, ast_properties->derived_property_list()->columns(),
+        ast_properties, ast_properties->derived_property_list()->properties(),
         base_table_scan, input_scope);
   }
 
@@ -809,6 +824,19 @@ GraphStmtResolver::ResolveLabelAndProperties(
         output_property_defs) const {
   // Resolves label name: either explicitly defined or implicitly the element
   // table alias.
+  std::vector<std::unique_ptr<const ResolvedOption>> options_list;
+  if (ast_label_and_properties->label_options_list() != nullptr) {
+    if (!resolver_.language().LanguageFeatureEnabled(
+            FEATURE_SQL_GRAPH_DEFAULT_LABEL_AND_PROPERTY_DEFINITION_OPTIONS)) {
+      return MakeSqlErrorAt(ast_label_and_properties->label_options_list())
+             << "OPTIONS clause is not supported for labels";
+    }
+    ZETASQL_RET_CHECK_EQ(ast_label_and_properties->label_name(), nullptr)
+        << "OPTIONS clause is not supported for non-default labels";
+    ZETASQL_RETURN_IF_ERROR(resolver_.ResolveOptionsList(
+        ast_label_and_properties->label_options_list(),
+        /*allow_alter_array_operators=*/false, &options_list));
+  }
   IdString label_name =
       ast_label_and_properties->label_name() == nullptr
           ? element_table_alias
@@ -847,6 +875,7 @@ GraphStmtResolver::ResolveLabelAndProperties(
                        .set_name(label_name.ToString())
                        .set_property_declaration_name_list(
                            std::move(property_declaration_names))
+                       .set_options_list(std::move(options_list))
                        .Build());
 
   label = GetResolvedElementWithLocation(std::move(label),

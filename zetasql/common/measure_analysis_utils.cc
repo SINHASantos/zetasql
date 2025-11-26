@@ -67,9 +67,16 @@ absl::StatusOr<std::unique_ptr<SimpleColumn>> CreateMeasureColumn(
     absl::string_view table_name, absl::string_view measure_name,
     absl::string_view measure_expr, const ResolvedExpr& resolved_measure_expr,
     const LanguageOptions& language_options, TypeFactory& type_factory,
-    bool is_pseudo_column = false) {
+    bool is_pseudo_column,
+    std::optional<std::vector<int>> row_identity_column_indices) {
   ZETASQL_ASSIGN_OR_RETURN(const Type* measure_type,
                    type_factory.MakeMeasureType(resolved_measure_expr.type()));
+  ZETASQL_ASSIGN_OR_RETURN(
+      Column::ExpressionAttributes expr_attributes,
+      Column::ExpressionAttributes::Create(
+          Column::ExpressionAttributes::ExpressionKind::MEASURE_EXPRESSION,
+          std::string(measure_expr), &resolved_measure_expr,
+          std::move(row_identity_column_indices)));
   return std::make_unique<SimpleColumn>(
       table_name, measure_name,
       AnnotatedType(measure_type, /*annotation_map=*/nullptr),
@@ -77,10 +84,7 @@ absl::StatusOr<std::unique_ptr<SimpleColumn>> CreateMeasureColumn(
       SimpleColumn::Attributes{
           .is_pseudo_column = is_pseudo_column,
           .is_writable_column = false,
-          .column_expression = std::make_optional<Column::ExpressionAttributes>(
-              {Column::ExpressionAttributes::ExpressionKind::MEASURE_EXPRESSION,
-               std::string(measure_expr), &resolved_measure_expr}),
-      });
+          .column_expression = std::move(expr_attributes)});
 }
 
 absl::Status EnsureNoDuplicateColumnNames(const Table& table) {
@@ -356,7 +360,8 @@ AddMeasureColumnsToTable(SimpleTable& table,
         CreateMeasureColumn(table.Name(), measure_column.name,
                             measure_column.expression, *resolved_measure_expr,
                             analyzer_options.language(), type_factory,
-                            measure_column.is_pseudo_column));
+                            measure_column.is_pseudo_column,
+                            measure_column.row_identity_column_indices));
     ZETASQL_RETURN_IF_ERROR(table.AddColumn(new_column.release(), /*is_owned=*/true));
     analyzer_outputs.push_back(std::move(analyzer_output));
   }

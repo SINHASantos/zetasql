@@ -2728,7 +2728,13 @@ absl::Status Resolver::ResolveFieldAccess(
     if (lhs_type.type->IsRow()) {
       ZETASQL_ASSIGN_OR_RETURN(const Type* element_type,
                        lhs_type.type->GetElementType());
-      lhs_type = AnnotatedType(element_type, lhs_type.annotation_map);
+      const AnnotationMap* annotation_map = nullptr;
+      if (lhs_type.annotation_map != nullptr) {
+        ZETASQL_RET_CHECK(lhs_type.annotation_map->IsStructMap());
+        ZETASQL_RET_CHECK_EQ(lhs_type.annotation_map->AsStructMap()->num_fields(), 1);
+        annotation_map = lhs_type.annotation_map->AsStructMap()->field(0);
+      }
+      lhs_type = AnnotatedType(element_type, annotation_map);
     } else {
       lhs_type = ElementAnnotatedTypeWithFallbackToSelf(
           resolved_lhs->annotated_type());
@@ -4206,6 +4212,10 @@ absl::Status Resolver::ResolveLikeExpr(
     ZETASQL_RETURN_IF_ERROR(ResolveLikeExprList(like_expr, expr_resolution_info,
                                         &resolved_like_expr));
   } else if (like_expr->unnest_expr() != nullptr) {
+    ZETASQL_ASSIGN_OR_RETURN(std::string op_type,
+                     GetLikeAnySomeAllOpTypeString(like_expr));
+    ZETASQL_RETURN_IF_ERROR(ValidateUnnestSingleExpression(
+        like_expr->unnest_expr(), absl::StrCat("LIKE ", op_type)));
     ZETASQL_RETURN_IF_ERROR(ResolveLikeExprArray(like_expr, expr_resolution_info,
                                          &resolved_like_expr));
   } else {
@@ -5370,12 +5380,6 @@ absl::Status Resolver::CheckChainedFunctionCall(
       return MakeSqlErrorAt(function_call)
              << "Chained function call cannot use multi-level aggregation";
     }
-    if (function_call->with_group_rows()) {
-      // This is disallowed because it doesn't act like it evaluates
-      // the function's base expression first.
-      return MakeSqlErrorAt(function_call)
-             << "Chained function call cannot use WITH GROUP ROWS";
-    }
     if (function_call->clamped_between_modifier()) {
       // This is disallowed because the parse only allows it on calls with
       // at least one argument. It would seem weird if
@@ -5861,142 +5865,32 @@ absl::Status Resolver::ResolveAggregateFunctionCallFirstPass(
   std::unique_ptr<ExprResolutionInfo> local_expr_resolution_info;
   std::vector<std::unique_ptr<const ResolvedColumnRef>> correlated_columns;
 
-  if (ast_function->with_group_rows() == nullptr) {
-    // Normal case, do initial function call resolution.
-    local_expr_resolution_info = std::make_unique<ExprResolutionInfo>(
-        expr_resolution_info,
-        ExprResolutionInfoOptions{
-            .name_scope = expr_resolution_info->aggregate_name_scope,
-            // When resolving arguments of aggregation functions, we resolve
-            // against pre-grouped versions of columns only.
-            .use_post_grouping_columns = false});
-    local_expr_resolution_info->grouping_context =
-        ExprGroupingContext::kPreGrouping;
-
-    if (expr_resolution_info->allows_horizontal_aggregation) {
-      if (local_expr_resolution_info->in_horizontal_aggregation) {
-        return MakeSqlErrorAt(ast_function)
-               << "Horizontal aggregations of horizontal aggregations are not "
-                  "allowed";
-      }
-      local_expr_resolution_info->in_horizontal_aggregation = true;
-      ZETASQL_RET_CHECK(!expr_resolution_info->horizontal_aggregation_info.has_value());
-    }
-
-    return ResolveFunctionCallImpl(
-        ast_function, function, error_mode, function_arguments,
-        argument_option_map, local_expr_resolution_info.get(),
-        /*with_group_rows_subquery=*/nullptr, std::move(correlated_columns),
-        resolved_expr_out);
-  }
-
-  ZETASQL_RET_CHECK_NE(ast_function->with_group_rows(), nullptr);
-  if (!expr_resolution_info->allows_aggregation) {
-    return MakeSqlErrorAt(ast_function)
-           << function->QualifiedSQLName(/*capitalize_qualifier=*/true)
-           << " not allowed in " << expr_resolution_info->clause_name;
-  }
-  if (expr_resolution_info->query_resolution_info == nullptr) {
-    return MakeSqlErrorAt(ast_function)
-           << function->QualifiedSQLName(/*capitalize_qualifier=*/true)
-           << " not expected";
-  }
-  // The `GROUP_ROWS()` TVF can only be resolved when there are names from a
-  // `FROM` clause. Not having names can happen, for example, in a
-  // CREATE AGGREGATE FUNCTION body expression
-  if (expr_resolution_info->query_resolution_info->from_clause_name_list() ==
-      nullptr) {
-    return MakeSqlErrorAt(ast_function->with_group_rows())
-           << "WITH GROUP ROWS is not supported in "
-           << expr_resolution_info->clause_name;
-  }
-
-  // Evaluate the subquery first and then use resulting name list to resolve
-  // the aggregate function.
-  const ASTQuery* subquery = ast_function->with_group_rows()->subquery();
-  CorrelatedColumnsSet correlated_columns_set;
-  // The name scope is constructed to skip expr_resolution_info's name scope,
-  // which contains columns from the table being aggregated. Instead the
-  // subquery will use columns from group_rows() tvf.
-  // We also want to make correlation references available to the aggregate
-  // function call.  To support this, we can use the previous_scope() here. Note
-  // that this is only valid when the current name scope is the from clause name
-  // scope.  If the from clause name scope has a previous scope, then it is the
-  // correlation scope due to the way it is constructed in the resolver.  For
-  // other name scopes, for instance the NameScope representing both the select
-  // list aliases and from clause, the previous scope is *not* the correlation
-  // scope.  So it is not in general true that the previous scope always
-  // represents a correlation scope.  In this context, the current name scope is
-  // the from clause scope, so we can rely on that here.
-  auto subquery_scope = std::make_unique<NameScope>(
-      expr_resolution_info->name_scope->previous_scope(),
-      &correlated_columns_set);
-  NameListPtr with_group_rows_subquery_name_list;
-  ZETASQL_RET_CHECK_NE(subquery, nullptr);
-  std::unique_ptr<const ResolvedScan> resolved_with_group_rows_subquery;
-  {
-    ZETASQL_RET_CHECK_NE(
-        expr_resolution_info->query_resolution_info->from_clause_name_list(),
-        nullptr);
-    name_lists_for_group_rows_.push(
-        {expr_resolution_info->query_resolution_info->from_clause_name_list(),
-         /*group_rows_tvf_used=*/false});
-    auto cleanup =
-        absl::MakeCleanup([this]() { name_lists_for_group_rows_.pop(); });
-    IdString subquery_alias = AllocateSubqueryName();
-    ZETASQL_RETURN_IF_ERROR(ResolveQuery(subquery, subquery_scope.get(), subquery_alias,
-                                 &resolved_with_group_rows_subquery,
-                                 &with_group_rows_subquery_name_list));
-    ZETASQL_RET_CHECK(!name_lists_for_group_rows_.empty());
-    ZETASQL_RET_CHECK_EQ(
-        expr_resolution_info->query_resolution_info->from_clause_name_list(),
-        name_lists_for_group_rows_.top().name_list);
-    if (!name_lists_for_group_rows_.top().group_rows_tvf_used) {
-      return MakeSqlErrorAt(ast_function->with_group_rows())
-             << "GROUP_ROWS() TVF must be used at least once inside WITH "
-                "GROUP ROWS";
-    }
-    // Support AS VALUE in the subquery to produce value table, make it
-    // available to the aggregate function.
-    if (with_group_rows_subquery_name_list->is_value_table()) {
-      ZETASQL_RET_CHECK_EQ(with_group_rows_subquery_name_list->num_columns(), 1);
-      auto new_name_list = std::make_shared<NameList>();
-      ZETASQL_RETURN_IF_ERROR(new_name_list->AddValueTableColumn(
-          subquery_alias,
-          with_group_rows_subquery_name_list->column(0).column(), subquery));
-      with_group_rows_subquery_name_list = new_name_list;
-    }
-  }
-
-  FetchCorrelatedSubqueryParameters(correlated_columns_set,
-                                    &correlated_columns);
-
-  MaybeRecordParseLocation(
-      subquery,
-      const_cast<ResolvedScan*>(resolved_with_group_rows_subquery.get()));
-  // NameScope of the aggregate function arguments is the output of the WITH
-  // GROUPS ROWS subquery along with correlation references.
-  auto with_group_rows_subquery_scope = std::make_unique<NameScope>(
-      expr_resolution_info->name_scope->previous_scope(),
-      with_group_rows_subquery_name_list);
+  // Normal case, do initial function call resolution.
   local_expr_resolution_info = std::make_unique<ExprResolutionInfo>(
-      expr_resolution_info->query_resolution_info,
-      with_group_rows_subquery_scope.get(),
+      expr_resolution_info,
       ExprResolutionInfoOptions{
-          .allows_aggregation = true,
-          .allows_analytic = true,
-          .clause_name = "Function call WITH GROUP ROWS",
-      });
+          .name_scope = expr_resolution_info->aggregate_name_scope,
+          // When resolving arguments of aggregation functions, we resolve
+          // against pre-grouped versions of columns only.
+          .use_post_grouping_columns = false});
+  local_expr_resolution_info->grouping_context =
+      ExprGroupingContext::kPreGrouping;
 
-  absl::Status status = ResolveFunctionCallImpl(
+  if (expr_resolution_info->allows_horizontal_aggregation) {
+    if (local_expr_resolution_info->in_horizontal_aggregation) {
+      return MakeSqlErrorAt(ast_function)
+             << "Horizontal aggregations of horizontal aggregations are not "
+                "allowed";
+    }
+    local_expr_resolution_info->in_horizontal_aggregation = true;
+    ZETASQL_RET_CHECK(!expr_resolution_info->horizontal_aggregation_info.has_value());
+  }
+
+  return ResolveFunctionCallImpl(
       ast_function, function, error_mode, function_arguments,
       argument_option_map, local_expr_resolution_info.get(),
-      std::move(resolved_with_group_rows_subquery),
-      std::move(correlated_columns), resolved_expr_out);
-  // Ensure `local_expr_resolution_info` is destroyed before
-  // `with_group_rows_subquery_scope`.
-  local_expr_resolution_info.reset();
-  return status;
+      /*with_group_rows_subquery=*/nullptr, std::move(correlated_columns),
+      resolved_expr_out);
 }
 
 // Add the resolved_agg_function_call to the aggregate expression map.
@@ -6464,8 +6358,6 @@ absl::Status Resolver::ResolveFunctionCall(
       << "WHERE in arguments is not supported on scalar functions";
   ZETASQL_RETURN_IF_ERROR(MakeSqlErrorIfPresent(ast_function->having_expr()))
       << "HAVING in arguments is not supported on scalar functions";
-  ZETASQL_RETURN_IF_ERROR(MakeSqlErrorIfPresent(ast_function->with_group_rows()))
-      << "WITH GROUP ROWS is not supported on scalar functions";
 
   return ResolveFunctionCallImpl(
       ast_function, function, error_mode, function_arguments,
@@ -6531,11 +6423,6 @@ absl::Status Resolver::ResolveAnalyticFunctionCall(
   // HAVING filter modifier is not supported on analytic functions, since
   // GROUP BY modifiers are not supported on analytic functions.
   ZETASQL_RET_CHECK(analytic_function_call->function()->having_expr() == nullptr);
-
-  // TODO: support WITH GROUP ROWS on analytic functions.
-  ZETASQL_RETURN_IF_ERROR(MakeSqlErrorIfPresent(
-      analytic_function_call->function()->with_group_rows()))
-      << "WITH GROUP ROWS syntax is not supported on analytic functions";
 
   ZETASQL_RETURN_IF_ERROR(
       MakeSqlErrorIfPresent(analytic_function_call->function()->order_by()))
@@ -7537,8 +7424,7 @@ absl::Status Resolver::ResolveArrayElementAccess(
   }
 
   if (*unwrapped_ast_position_expr == nullptr) {
-    if (!language().LanguageFeatureEnabled(FEATURE_BARE_ARRAY_ACCESS) &&
-        !resolved_array->type()->IsJson()) {
+    if (!language().LanguageFeatureEnabled(FEATURE_BARE_ARRAY_ACCESS)) {
       return MakeSqlErrorAt(ast_position)
              << "Array element access with array[position] is not supported. "
                 "Use array[OFFSET(zero_based_offset)] or "
@@ -7579,7 +7465,7 @@ absl::Status Resolver::ResolveArrayElementAccess(
       *function_name == kProtoMapAtKey || *function_name == kSafeProtoMapAtKey;
 
   // Coerce to INT64 if necessary.
-  if (!is_map_at && !resolved_array->type()->IsJson()) {
+  if (!is_map_at) {
     ZETASQL_RETURN_IF_ERROR(CoerceExprToType(
         *unwrapped_ast_position_expr, types::Int64Type(), kImplicitCoercion,
         "Array position in [] must be coercible to $0 type, but has type $1",
@@ -9313,13 +9199,6 @@ absl::Status Resolver::ResolveAggregateFunctionOrderByModifiers(
                                                     function);
     }
 
-    // WITH GROUP ROWS is not allowed either.
-    if (ast_function_call->with_group_rows() != nullptr) {
-      return MakeSqlErrorAt(ast_function_call->with_group_rows())
-             << function->QualifiedSQLName(/*capitalize_qualifier=*/true)
-             << " does not support WITH GROUP ROWS";
-    }
-
     // Add the order by match_row_number.
     resolved_order_by_items->push_back(MakeResolvedOrderByItem(
         MakeColumnRef(match_recognize_state_->match_row_number_column),
@@ -9696,9 +9575,6 @@ absl::Status Resolver::FinishResolvingAggregateFunction(
     const ASTFunctionCall* ast_function_call,
     std::unique_ptr<ResolvedFunctionCall>* resolved_function_call,
     ExprResolutionInfo* expr_resolution_info,
-    std::unique_ptr<const ResolvedScan> with_group_rows_subquery,
-    std::vector<std::unique_ptr<const ResolvedColumnRef>>
-        with_group_rows_correlation_references,
     std::unique_ptr<QueryResolutionInfo> multi_level_aggregate_info,
     std::unique_ptr<const ResolvedExpr>* resolved_expr_out,
     std::optional<ResolvedColumn>& out_unconsumed_side_effect_column) {
@@ -9954,10 +9830,6 @@ absl::Status Resolver::FinishResolvingAggregateFunction(
                                          &resolved_hints));
     resolved_agg_call->set_group_by_hint_list(std::move(resolved_hints));
   }
-  resolved_agg_call->set_with_group_rows_subquery(
-      std::move(with_group_rows_subquery));
-  resolved_agg_call->set_with_group_rows_parameter_list(
-      std::move(with_group_rows_correlation_references));
   resolved_agg_call->set_hint_list(
       (*resolved_function_call)->release_hint_list());
   MaybeRecordFunctionCallParseLocation(ast_function_call,
@@ -10624,6 +10496,7 @@ Resolver::ResolveAsRegexpExtractGroupsFunction(
                           /* time_zone= */ {}, TypeModifiers());
 }
 
+// TODO: b/430036320 - Clean up deprecated GROUP ROWS related parameters.
 absl::Status Resolver::ResolveFunctionCallWithResolvedArguments(
     const ASTNode* ast_location,
     const std::vector<const ASTNode*>& arg_locations,
@@ -10721,8 +10594,6 @@ absl::Status Resolver::ResolveFunctionCallWithResolvedArguments(
     std::optional<ResolvedColumn> unconsumed_side_effect_column;
     ZETASQL_RETURN_IF_ERROR(FinishResolvingAggregateFunction(
         ast_function_call, &resolved_function_call, expr_resolution_info,
-        std::move(with_group_rows_subquery),
-        std::move(with_group_rows_correlation_references),
         std::move(multi_level_aggregate_info), resolved_expr_out,
         unconsumed_side_effect_column));
     if (language().LanguageFeatureEnabled(
@@ -11224,6 +11095,7 @@ CreatePostGroupingNameScopeForMultiLevelAggregation(
   return post_grouping_name_scope;
 }
 
+// TODO: b/430036320 - Clean up deprecated GROUP ROWS related parameters.
 absl::Status Resolver::ResolveFunctionCallImpl(
     const ASTNode* ast_location, const Function* function,
     ResolvedFunctionCallBase::ErrorMode error_mode,

@@ -15,7 +15,7 @@ QueryStmt
     +-column_list=[$query.$col1#1]
     +-expr_list=
     | +-$col1#1 :=
-    |   +-FunctionCall(ZetaSQL:map_insert(MAP<INT64, STRING> input_map, INT64, STRING, repeated(1) INT64, repeated(1) STRING) -> MAP<INT64, STRING>)
+    |   +-FunctionCall(ZetaSQL:map_insert(MAP<INT64, STRING> input_map, INT64 key, STRING value, repeated(1) INT64 repeated_key, repeated(1) STRING repeated_value) -> MAP<INT64, STRING>)
     |     +-FunctionCall(ZetaSQL:map_from_array(ARRAY<STRUCT<INT64, STRING>>) -> MAP<INT64, STRING>)
     |     | +-Literal(type=ARRAY<STRUCT<INT64, STRING>>, value=[], has_explicit_type=TRUE)
     |     +-Literal(type=INT64, value=1)
@@ -61,7 +61,7 @@ QueryStmt
     +-column_list=[$query.$col1#1]
     +-expr_list=
     | +-$col1#1 :=
-    |   +-FunctionCall(ZetaSQL:map_insert(MAP<INT64, STRING> input_map, INT64, STRING, repeated(1) INT64, repeated(1) STRING) -> MAP<INT64, STRING>)
+    |   +-FunctionCall(ZetaSQL:map_insert(MAP<INT64, STRING> input_map, INT64 key, STRING value, repeated(1) INT64 repeated_key, repeated(1) STRING repeated_value) -> MAP<INT64, STRING>)
     |     +-FunctionCall(ZetaSQL:map_from_array(ARRAY<STRUCT<INT64, STRING>>) -> MAP<INT64, STRING>)
     |     | +-Literal(type=ARRAY<STRUCT<INT64, STRING>>, value=[], has_explicit_type=TRUE)
     |     +-Literal(type=INT64, value=1)
@@ -314,7 +314,7 @@ QueryStmt
     +-column_list=[$query.$col1#1]
     +-expr_list=
     | +-$col1#1 :=
-    |   +-FunctionCall(ZetaSQL:map_insert(MAP<INT64, STRING> input_map, INT64, STRING, repeated(3) INT64, repeated(3) STRING) -> MAP<INT64, STRING>)
+    |   +-FunctionCall(ZetaSQL:map_insert(MAP<INT64, STRING> input_map, INT64 key, STRING value, repeated(3) INT64 repeated_key, repeated(3) STRING repeated_value) -> MAP<INT64, STRING>)
     |     +-FunctionCall(ZetaSQL:map_from_array(ARRAY<STRUCT<INT64, STRING>>) -> MAP<INT64, STRING>)
     |     | +-Literal(type=ARRAY<STRUCT<INT64, STRING>>, value=[], has_explicit_type=TRUE)
     |     +-Literal(type=INT64, value=1)
@@ -368,7 +368,7 @@ QueryStmt
     +-column_list=[$query.$col1#1]
     +-expr_list=
     | +-$col1#1 :=
-    |   +-FunctionCall(ZetaSQL:map_insert(MAP<INT64, STRING> input_map, INT64, STRING, repeated(3) INT64, repeated(3) STRING) -> MAP<INT64, STRING>)
+    |   +-FunctionCall(ZetaSQL:map_insert(MAP<INT64, STRING> input_map, INT64 key, STRING value, repeated(3) INT64 repeated_key, repeated(3) STRING repeated_value) -> MAP<INT64, STRING>)
     |     +-FunctionCall(ZetaSQL:map_from_array(ARRAY<STRUCT<INT64, STRING>>) -> MAP<INT64, STRING>)
     |     | +-Literal(type=ARRAY<STRUCT<INT64, STRING>>, value=[], has_explicit_type=TRUE)
     |     +-Literal(type=INT64, value=1)
@@ -664,7 +664,7 @@ QueryStmt
     +-column_list=[$query.$col1#1]
     +-expr_list=
     | +-$col1#1 :=
-    |   +-FunctionCall(ZetaSQL:map_insert_or_replace(MAP<INT64, STRING> input_map, INT64, STRING, repeated(1) INT64, repeated(1) STRING) -> MAP<INT64, STRING>)
+    |   +-FunctionCall(ZetaSQL:map_insert_or_replace(MAP<INT64, STRING> input_map, INT64 key, STRING value, repeated(1) INT64 repeated_key, repeated(1) STRING repeated_value) -> MAP<INT64, STRING>)
     |     +-FunctionCall(ZetaSQL:map_from_array(ARRAY<STRUCT<INT64, STRING>>) -> MAP<INT64, STRING>)
     |     | +-Literal(type=ARRAY<STRUCT<INT64, STRING>>, value=[{1, "x"}])
     |     +-Literal(type=INT64, value=1)
@@ -712,7 +712,7 @@ QueryStmt
     +-column_list=[$query.$col1#1]
     +-expr_list=
     | +-$col1#1 :=
-    |   +-FunctionCall(ZetaSQL:map_insert_or_replace(MAP<INT64, STRING> input_map, INT64, STRING, repeated(1) INT64, repeated(1) STRING) -> MAP<INT64, STRING>)
+    |   +-FunctionCall(ZetaSQL:map_insert_or_replace(MAP<INT64, STRING> input_map, INT64 key, STRING value, repeated(1) INT64 repeated_key, repeated(1) STRING repeated_value) -> MAP<INT64, STRING>)
     |     +-FunctionCall(ZetaSQL:map_from_array(ARRAY<STRUCT<INT64, STRING>>) -> MAP<INT64, STRING>)
     |     | +-Literal(type=ARRAY<STRUCT<INT64, STRING>>, value=[{1, "x"}])
     |     +-Literal(type=INT64, value=1)
@@ -945,7 +945,7 @@ QueryStmt
     +-column_list=[$query.$col1#1]
     +-expr_list=
     | +-$col1#1 :=
-    |   +-FunctionCall(ZetaSQL:map_insert_or_replace(MAP<INT64, STRING> input_map, INT64, STRING, repeated(3) INT64, repeated(3) STRING) -> MAP<INT64, STRING>)
+    |   +-FunctionCall(ZetaSQL:map_insert_or_replace(MAP<INT64, STRING> input_map, INT64 key, STRING value, repeated(3) INT64 repeated_key, repeated(3) STRING repeated_value) -> MAP<INT64, STRING>)
     |     +-FunctionCall(ZetaSQL:map_from_array(ARRAY<STRUCT<INT64, STRING>>) -> MAP<INT64, STRING>)
     |     | +-Literal(type=ARRAY<STRUCT<INT64, STRING>>, value=[{1, "x"}, {3, "y"}])
     |     +-Literal(type=INT64, value=1)
@@ -1001,7 +1001,7 @@ QueryStmt
     +-column_list=[$query.$col1#1]
     +-expr_list=
     | +-$col1#1 :=
-    |   +-FunctionCall(ZetaSQL:map_insert_or_replace(MAP<INT64, STRING> input_map, INT64, STRING, repeated(3) INT64, repeated(3) STRING) -> MAP<INT64, STRING>)
+    |   +-FunctionCall(ZetaSQL:map_insert_or_replace(MAP<INT64, STRING> input_map, INT64 key, STRING value, repeated(3) INT64 repeated_key, repeated(3) STRING repeated_value) -> MAP<INT64, STRING>)
     |     +-FunctionCall(ZetaSQL:map_from_array(ARRAY<STRUCT<INT64, STRING>>) -> MAP<INT64, STRING>)
     |     | +-Literal(type=ARRAY<STRUCT<INT64, STRING>>, value=[{1, "x"}, {3, "y"}])
     |     +-Literal(type=INT64, value=1)
@@ -1279,7 +1279,7 @@ QueryStmt
     +-column_list=[$query.$col1#1]
     +-expr_list=
     | +-$col1#1 :=
-    |   +-FunctionCall(ZetaSQL:map_replace(MAP<INT64, STRING> input_map, INT64, STRING, repeated(1) INT64, repeated(1) STRING) -> MAP<INT64, STRING>)
+    |   +-FunctionCall(ZetaSQL:map_replace(MAP<INT64, STRING> input_map, INT64 key, STRING value, repeated(1) INT64 repeated_key, repeated(1) STRING repeated_value) -> MAP<INT64, STRING>)
     |     +-FunctionCall(ZetaSQL:map_from_array(ARRAY<STRUCT<INT64, STRING>>) -> MAP<INT64, STRING>)
     |     | +-Literal(type=ARRAY<STRUCT<INT64, STRING>>, value=[{1, "x"}, {3, "y"}])
     |     +-Literal(type=INT64, value=1)
@@ -1327,7 +1327,7 @@ QueryStmt
     +-column_list=[$query.$col1#1]
     +-expr_list=
     | +-$col1#1 :=
-    |   +-FunctionCall(ZetaSQL:map_replace(MAP<INT64, STRING> input_map, INT64, STRING, repeated(1) INT64, repeated(1) STRING) -> MAP<INT64, STRING>)
+    |   +-FunctionCall(ZetaSQL:map_replace(MAP<INT64, STRING> input_map, INT64 key, STRING value, repeated(1) INT64 repeated_key, repeated(1) STRING repeated_value) -> MAP<INT64, STRING>)
     |     +-FunctionCall(ZetaSQL:map_from_array(ARRAY<STRUCT<INT64, STRING>>) -> MAP<INT64, STRING>)
     |     | +-Literal(type=ARRAY<STRUCT<INT64, STRING>>, value=[{1, "x"}, {3, "y"}])
     |     +-Literal(type=INT64, value=1)
@@ -1575,7 +1575,7 @@ QueryStmt
     +-column_list=[$query.$col1#1]
     +-expr_list=
     | +-$col1#1 :=
-    |   +-FunctionCall(ZetaSQL:map_replace(MAP<INT64, STRING> input_map, INT64, STRING, repeated(2) INT64, repeated(2) STRING) -> MAP<INT64, STRING>)
+    |   +-FunctionCall(ZetaSQL:map_replace(MAP<INT64, STRING> input_map, INT64 key, STRING value, repeated(2) INT64 repeated_key, repeated(2) STRING repeated_value) -> MAP<INT64, STRING>)
     |     +-FunctionCall(ZetaSQL:map_from_array(ARRAY<STRUCT<INT64, STRING>>) -> MAP<INT64, STRING>)
     |     | +-Literal(type=ARRAY<STRUCT<INT64, STRING>>, value=[{1, "x"}, {2, "y"}, {3, "z"}, {4, "w"}, {5, "v"}])
     |     +-Literal(type=INT64, value=1)
@@ -1629,7 +1629,7 @@ QueryStmt
     +-column_list=[$query.$col1#1]
     +-expr_list=
     | +-$col1#1 :=
-    |   +-FunctionCall(ZetaSQL:map_replace(MAP<INT64, STRING> input_map, INT64, STRING, repeated(2) INT64, repeated(2) STRING) -> MAP<INT64, STRING>)
+    |   +-FunctionCall(ZetaSQL:map_replace(MAP<INT64, STRING> input_map, INT64 key, STRING value, repeated(2) INT64 repeated_key, repeated(2) STRING repeated_value) -> MAP<INT64, STRING>)
     |     +-FunctionCall(ZetaSQL:map_from_array(ARRAY<STRUCT<INT64, STRING>>) -> MAP<INT64, STRING>)
     |     | +-Literal(type=ARRAY<STRUCT<INT64, STRING>>, value=[{1, "x"}, {2, "y"}, {3, "z"}, {4, "w"}, {5, "v"}])
     |     +-Literal(type=INT64, value=1)
@@ -1901,7 +1901,7 @@ QueryStmt
     +-column_list=[$query.$col1#2]
     +-expr_list=
     | +-$col1#2 :=
-    |   +-FunctionCall(ZetaSQL:map_replace(MAP<INT64, STRING> input_map, INT64, repeated(1) INT64, FUNCTION<STRING->STRING> value) -> MAP<INT64, STRING>)
+    |   +-FunctionCall(ZetaSQL:map_replace(MAP<INT64, STRING> input_map, INT64 key, repeated(1) INT64 repeated_key, FUNCTION<STRING->STRING> updater_lambda) -> MAP<INT64, STRING>)
     |     +-FunctionArgument
     |     | +-expr=
     |     |   +-FunctionCall(ZetaSQL:map_from_array(ARRAY<STRUCT<INT64, STRING>>) -> MAP<INT64, STRING>)
@@ -1971,7 +1971,7 @@ QueryStmt
     +-column_list=[$query.$col1#2]
     +-expr_list=
     | +-$col1#2 :=
-    |   +-FunctionCall(ZetaSQL:map_replace(MAP<INT64, STRING> input_map, INT64, repeated(1) INT64, FUNCTION<STRING->STRING> value) -> MAP<INT64, STRING>)
+    |   +-FunctionCall(ZetaSQL:map_replace(MAP<INT64, STRING> input_map, INT64 key, repeated(1) INT64 repeated_key, FUNCTION<STRING->STRING> updater_lambda) -> MAP<INT64, STRING>)
     |     +-FunctionArgument
     |     | +-expr=
     |     |   +-FunctionCall(ZetaSQL:map_from_array(ARRAY<STRUCT<INT64, STRING>>) -> MAP<INT64, STRING>)
@@ -2248,7 +2248,7 @@ QueryStmt
     +-column_list=[$query.$col1#2]
     +-expr_list=
     | +-$col1#2 :=
-    |   +-FunctionCall(ZetaSQL:map_replace(MAP<INT64, STRING> input_map, INT64, repeated(2) INT64, FUNCTION<STRING->STRING> value) -> MAP<INT64, STRING>)
+    |   +-FunctionCall(ZetaSQL:map_replace(MAP<INT64, STRING> input_map, INT64 key, repeated(2) INT64 repeated_key, FUNCTION<STRING->STRING> updater_lambda) -> MAP<INT64, STRING>)
     |     +-FunctionArgument
     |     | +-expr=
     |     |   +-FunctionCall(ZetaSQL:map_from_array(ARRAY<STRUCT<INT64, STRING>>) -> MAP<INT64, STRING>)
@@ -2326,7 +2326,7 @@ QueryStmt
     +-column_list=[$query.$col1#2]
     +-expr_list=
     | +-$col1#2 :=
-    |   +-FunctionCall(ZetaSQL:map_replace(MAP<INT64, STRING> input_map, INT64, repeated(2) INT64, FUNCTION<STRING->STRING> value) -> MAP<INT64, STRING>)
+    |   +-FunctionCall(ZetaSQL:map_replace(MAP<INT64, STRING> input_map, INT64 key, repeated(2) INT64 repeated_key, FUNCTION<STRING->STRING> updater_lambda) -> MAP<INT64, STRING>)
     |     +-FunctionArgument
     |     | +-expr=
     |     |   +-FunctionCall(ZetaSQL:map_from_array(ARRAY<STRUCT<INT64, STRING>>) -> MAP<INT64, STRING>)
@@ -2623,7 +2623,7 @@ QueryStmt
     +-column_list=[$query.$col1#1]
     +-expr_list=
     | +-$col1#1 :=
-    |   +-FunctionCall(ZetaSQL:map_delete(MAP<INT64, STRING> input_map, INT64, repeated(1) INT64) -> MAP<INT64, STRING>)
+    |   +-FunctionCall(ZetaSQL:map_delete(MAP<INT64, STRING> input_map, INT64 key, repeated(1) INT64 repeated_key) -> MAP<INT64, STRING>)
     |     +-FunctionCall(ZetaSQL:map_from_array(ARRAY<STRUCT<INT64, STRING>>) -> MAP<INT64, STRING>)
     |     | +-Literal(type=ARRAY<STRUCT<INT64, STRING>>, value=[{1, "a"}, {2, "b"}, {3, "c"}])
     |     +-Literal(type=INT64, value=1)
@@ -2667,7 +2667,7 @@ QueryStmt
     +-column_list=[$query.$col1#1]
     +-expr_list=
     | +-$col1#1 :=
-    |   +-FunctionCall(ZetaSQL:map_delete(MAP<INT64, STRING> input_map, INT64, repeated(1) INT64) -> MAP<INT64, STRING>)
+    |   +-FunctionCall(ZetaSQL:map_delete(MAP<INT64, STRING> input_map, INT64 key, repeated(1) INT64 repeated_key) -> MAP<INT64, STRING>)
     |     +-FunctionCall(ZetaSQL:map_from_array(ARRAY<STRUCT<INT64, STRING>>) -> MAP<INT64, STRING>)
     |     | +-Literal(type=ARRAY<STRUCT<INT64, STRING>>, value=[{1, "a"}, {2, "b"}, {3, "c"}])
     |     +-Literal(type=INT64, value=1)
@@ -2903,7 +2903,7 @@ QueryStmt
     +-column_list=[$query.$col1#1]
     +-expr_list=
     | +-$col1#1 :=
-    |   +-FunctionCall(ZetaSQL:map_delete(MAP<INT64, STRING> input_map, INT64, repeated(3) INT64) -> MAP<INT64, STRING>)
+    |   +-FunctionCall(ZetaSQL:map_delete(MAP<INT64, STRING> input_map, INT64 key, repeated(3) INT64 repeated_key) -> MAP<INT64, STRING>)
     |     +-FunctionCall(ZetaSQL:map_from_array(ARRAY<STRUCT<INT64, STRING>>) -> MAP<INT64, STRING>)
     |     | +-Literal(type=ARRAY<STRUCT<INT64, STRING>>, value=[{1, "a"}, {2, "b"}, {3, "c"}, {4, "d"}, {5, "e"}])
     |     +-Literal(type=INT64, value=1)
@@ -2953,7 +2953,7 @@ QueryStmt
     +-column_list=[$query.$col1#1]
     +-expr_list=
     | +-$col1#1 :=
-    |   +-FunctionCall(ZetaSQL:map_delete(MAP<INT64, STRING> input_map, INT64, repeated(3) INT64) -> MAP<INT64, STRING>)
+    |   +-FunctionCall(ZetaSQL:map_delete(MAP<INT64, STRING> input_map, INT64 key, repeated(3) INT64 repeated_key) -> MAP<INT64, STRING>)
     |     +-FunctionCall(ZetaSQL:map_from_array(ARRAY<STRUCT<INT64, STRING>>) -> MAP<INT64, STRING>)
     |     | +-Literal(type=ARRAY<STRUCT<INT64, STRING>>, value=[{1, "a"}, {2, "b"}, {3, "c"}, {4, "d"}, {5, "e"}])
     |     +-Literal(type=INT64, value=1)

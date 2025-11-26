@@ -139,14 +139,14 @@ JSONValue ToJsonFromFloat(FloatType value, bool canonicalize_zero) {
 
 absl::StatusOr<JSONValue> ToJsonFromGraphElement(
     const Value& value, bool stringify_wide_numbers,
-    const LanguageOptions& language_options, int current_nesting_level,
-    bool canonicalize_zero,
+    const LanguageOptions& language_options, bool path_as_object,
+    int current_nesting_level, bool canonicalize_zero,
     UnsupportedFieldsEnum::UnsupportedFields unsupported_fields);
 
 absl::StatusOr<JSONValue> ToJsonFromGraphPath(
     const Value& value, bool stringify_wide_numbers,
-    const LanguageOptions& language_options, int current_nesting_level,
-    bool canonicalize_zero,
+    const LanguageOptions& language_options, bool path_as_object,
+    int current_nesting_level, bool canonicalize_zero,
     UnsupportedFieldsEnum::UnsupportedFields unsupported_fields);
 
 // Helper function for ToJson except that this function internally keeps
@@ -156,8 +156,8 @@ absl::StatusOr<JSONValue> ToJsonFromGraphPath(
 // stack overflows.
 absl::StatusOr<JSONValue> ToJsonHelper(
     const Value& value, bool stringify_wide_numbers,
-    const LanguageOptions& language_options, int current_nesting_level,
-    bool canonicalize_zero,
+    const LanguageOptions& language_options, bool path_as_object,
+    int current_nesting_level, bool canonicalize_zero,
     UnsupportedFieldsEnum::UnsupportedFields unsupported_fields) {
   // Check the stack usage iff the <current_neesting_level> not less than
   // kNestingLevelStackCheckThreshold.
@@ -277,8 +277,8 @@ absl::StatusOr<JSONValue> ToJsonHelper(
         ZETASQL_ASSIGN_OR_RETURN(
             JSONValue json_member_value,
             ToJsonHelper(field_value, stringify_wide_numbers, language_options,
-                         current_nesting_level + 1, canonicalize_zero,
-                         unsupported_fields));
+                         path_as_object, current_nesting_level + 1,
+                         canonicalize_zero, unsupported_fields));
         JSONValueRef member_value_ref = json_value_ref.GetMember(name);
         member_value_ref.Set(std::move(json_member_value));
       }
@@ -292,10 +292,10 @@ absl::StatusOr<JSONValue> ToJsonHelper(
         json_value_ref.GetArrayElement(value.num_elements() - 1);
         int element_index = 0;
         for (const auto& element_value : value.elements()) {
-          auto json_element =
-              ToJsonHelper(element_value, stringify_wide_numbers,
-                           language_options, current_nesting_level + 1,
-                           canonicalize_zero, UnsupportedFieldsEnum::FAIL);
+          auto json_element = ToJsonHelper(
+              element_value, stringify_wide_numbers, language_options,
+              path_as_object, current_nesting_level + 1, canonicalize_zero,
+              UnsupportedFieldsEnum::FAIL);
           if (json_element.status().code() ==
               absl::StatusCode::kUnimplemented) {
             // The value type is not supported by TO_JSON, and we should
@@ -331,31 +331,33 @@ absl::StatusOr<JSONValue> ToJsonHelper(
       }
     }
     case TYPE_GRAPH_ELEMENT: {
-      return ToJsonFromGraphElement(value, stringify_wide_numbers,
-                                    language_options, current_nesting_level,
-                                    canonicalize_zero, unsupported_fields);
+      return ToJsonFromGraphElement(
+          value, stringify_wide_numbers, language_options, path_as_object,
+          current_nesting_level, canonicalize_zero, unsupported_fields);
     }
     case TYPE_GRAPH_PATH: {
-      return ToJsonFromGraphPath(value, stringify_wide_numbers,
-                                 language_options, current_nesting_level,
-                                 canonicalize_zero, unsupported_fields);
+      return ToJsonFromGraphPath(
+          value, stringify_wide_numbers, language_options, path_as_object,
+          current_nesting_level, canonicalize_zero, unsupported_fields);
     }
     case TYPE_RANGE: {
       JSONValue json_value;
       JSONValueRef json_value_ref = json_value.GetRef();
       json_value_ref.SetToEmptyObject();
 
-      ZETASQL_ASSIGN_OR_RETURN(JSONValue json_member_value,
-                       ToJsonHelper(value.start(), stringify_wide_numbers,
-                                    language_options, current_nesting_level + 1,
-                                    canonicalize_zero, unsupported_fields));
+      ZETASQL_ASSIGN_OR_RETURN(
+          JSONValue json_member_value,
+          ToJsonHelper(value.start(), stringify_wide_numbers, language_options,
+                       path_as_object, current_nesting_level + 1,
+                       canonicalize_zero, unsupported_fields));
       JSONValueRef member_value_ref = json_value_ref.GetMember("start");
       member_value_ref.Set(std::move(json_member_value));
 
-      ZETASQL_ASSIGN_OR_RETURN(json_member_value,
-                       ToJsonHelper(value.end(), stringify_wide_numbers,
-                                    language_options, current_nesting_level + 1,
-                                    canonicalize_zero, unsupported_fields));
+      ZETASQL_ASSIGN_OR_RETURN(
+          json_member_value,
+          ToJsonHelper(value.end(), stringify_wide_numbers, language_options,
+                       path_as_object, current_nesting_level + 1,
+                       canonicalize_zero, unsupported_fields));
       member_value_ref = json_value_ref.GetMember("end");
       member_value_ref.Set(std::move(json_member_value));
 
@@ -383,8 +385,8 @@ absl::StatusOr<JSONValue> ToJsonHelper(
 
 absl::StatusOr<JSONValue> ToJsonFromGraphElement(
     const Value& value, bool stringify_wide_numbers,
-    const LanguageOptions& language_options, int current_nesting_level,
-    bool canonicalize_zero,
+    const LanguageOptions& language_options, bool path_as_object,
+    int current_nesting_level, bool canonicalize_zero,
     UnsupportedFieldsEnum::UnsupportedFields unsupported_fields) {
   JSONValue json_value;
   JSONValueRef json_value_ref = json_value.GetRef();
@@ -420,10 +422,11 @@ absl::StatusOr<JSONValue> ToJsonFromGraphElement(
          property_type->value_type->Equals(property_value.type()))
         // A dynamic property is json typed and graph element must be dynamic.
         || (type->is_dynamic() && property_value.type()->IsJson()));
-    ZETASQL_ASSIGN_OR_RETURN(JSONValue v,
-                     ToJsonHelper(property_value, stringify_wide_numbers,
-                                  language_options, current_nesting_level + 1,
-                                  canonicalize_zero, unsupported_fields));
+    ZETASQL_ASSIGN_OR_RETURN(
+        JSONValue v,
+        ToJsonHelper(property_value, stringify_wide_numbers, language_options,
+                     path_as_object, current_nesting_level + 1,
+                     canonicalize_zero, unsupported_fields));
     properties_ref.GetMember(property_name).Set(std::move(v));
   }
 
@@ -449,23 +452,43 @@ absl::StatusOr<JSONValue> ToJsonFromGraphElement(
 
 absl::StatusOr<JSONValue> ToJsonFromGraphPath(
     const Value& value, bool stringify_wide_numbers,
-    const LanguageOptions& language_options, int current_nesting_level,
-    bool canonicalize_zero,
+    const LanguageOptions& language_options, bool path_as_object,
+    int current_nesting_level, bool canonicalize_zero,
     UnsupportedFieldsEnum::UnsupportedFields unsupported_fields) {
-  JSONValue json_value;
-  JSONValueRef json_value_ref = json_value.GetRef();
-  json_value_ref.SetToEmptyArray();
+  bool to_json_object = path_as_object;
 
-  for (int i = 0; i < value.num_graph_elements(); ++i) {
-    ZETASQL_ASSIGN_OR_RETURN(
-        JSONValue v,
-        ToJsonHelper(value.graph_element(i), stringify_wide_numbers,
-                     language_options, current_nesting_level + 1,
-                     canonicalize_zero, unsupported_fields));
-    json_value_ref.GetArrayElement(i).Set(std::move(v));
+  if (!to_json_object) {
+    JSONValue json_value;
+    JSONValueRef json_value_ref = json_value.GetRef();
+    json_value_ref.SetToEmptyArray();
+
+    for (int i = 0; i < value.num_graph_elements(); ++i) {
+      ZETASQL_RET_CHECK(value.graph_element(i).type()->IsGraphElement());
+      ZETASQL_ASSIGN_OR_RETURN(JSONValue v,
+                       ToJsonHelper(value.graph_element(i),
+                                    stringify_wide_numbers, language_options,
+                                    path_as_object, current_nesting_level + 1,
+                                    canonicalize_zero, unsupported_fields));
+      json_value_ref.GetArrayElement(i).Set(std::move(v));
+    }
+    return json_value;
+  } else {
+    JSONValue json_value;
+    JSONValueRef json_value_ref = json_value.GetRef();
+    json_value_ref.SetToEmptyObject();
+    JSONValueRef elements_ref = json_value_ref.GetMember("elements");
+    elements_ref.SetToEmptyArray();
+    for (int i = 0; i < value.num_graph_elements(); ++i) {
+      ZETASQL_ASSIGN_OR_RETURN(JSONValue v,
+                       ToJsonHelper(value.graph_element(i),
+                                    stringify_wide_numbers, language_options,
+                                    path_as_object, current_nesting_level + 1,
+                                    canonicalize_zero, unsupported_fields));
+      elements_ref.GetArrayElement(i).Set(std::move(v));
+    }
+
+    return json_value;
   }
-
-  return json_value;
 }
 
 }  // namespace
@@ -473,10 +496,11 @@ absl::StatusOr<JSONValue> ToJsonFromGraphPath(
 absl::StatusOr<JSONValue> ToJson(
     const Value& value, bool stringify_wide_numbers,
     const LanguageOptions& language_options, bool canonicalize_zero,
-    UnsupportedFieldsEnum::UnsupportedFields unsupported_fields) {
+    UnsupportedFieldsEnum::UnsupportedFields unsupported_fields,
+    bool path_as_object) {
   return ToJsonHelper(value, stringify_wide_numbers, language_options,
-                      /*current_nesting_level=*/0, canonicalize_zero,
-                      unsupported_fields);
+                      path_as_object, /*current_nesting_level=*/0,
+                      canonicalize_zero, unsupported_fields);
 }
 
 }  // namespace functions

@@ -2660,7 +2660,7 @@ exists_graph_subquery {ASTExpressionSubquery*}:
 
 create_property_graph_statement {ASTNode*}:
     "CREATE" opt_or_replace "PROPERTY" "GRAPH" opt_if_not_exists path_expression
-    opt_options_list "NODE" "TABLES" element_table_list edge_table_clause?
+    "NODE" "TABLES" element_table_list edge_table_clause? opt_options_list
     {
       ASTCreateStatement* create =
             MakeNode<ASTCreatePropertyGraphStatement>(@$,
@@ -2683,7 +2683,8 @@ element_table_list {ASTNode*}:
 ;
 
 element_table_definition {ASTNode*}:
-    path_expression as_alias_with_required_as? key_clause?
+    path_expression as_alias_with_required_as?
+    key_clause?
     source_node_table_clause? dest_node_table_clause?
     opt_label_and_properties_clause
     dynamic_label_and_properties?
@@ -2746,11 +2747,11 @@ opt_label_and_properties_clause {ASTNode*}:
       $$ = MakeGraphElementLabelAndPropertiesListImplicitDefaultLabel(
         node_factory, /*properties=*/properties, @$);
     }
-  | properties_clause
+  | properties_clause[properties]
     {
       // Implicit DEFAULT LABEL PROPERTIES ...
       $$ = MakeGraphElementLabelAndPropertiesListImplicitDefaultLabel(
-        node_factory, /*properties=*/$1, @$);
+        node_factory, /*properties=*/$properties, @$);
     }
   | label_and_properties+[label_and_properties_list]
     {
@@ -2760,16 +2761,18 @@ opt_label_and_properties_clause {ASTNode*}:
 ;
 
 label_and_properties {ASTNode*}:
-    ("DEFAULT" "LABEL" | "LABEL" identifier) properties_clause?
+    ("DEFAULT" "LABEL" opt_options_list | "LABEL" identifier) properties_clause?
     {
       if ($properties_clause.has_value()) {
         $$ = MakeNode<ASTGraphElementLabelAndProperties>(@$, $identifier,
+            $opt_options_list,
             $properties_clause);
       } else {
         auto* properties = MakeNode<ASTGraphProperties>(
           ParseLocationRange(@$.end(), @$.end()));
         properties->set_no_properties(false);
         $$ = MakeNode<ASTGraphElementLabelAndProperties>(@$, $identifier,
+            $opt_options_list,
             properties);
       }
     }
@@ -2813,14 +2816,14 @@ except_column_list {ASTNode*}:
 derived_property_list {ASTNode*}:
     (derived_property separator ",")+[derived_properties]
     {
-      $$ = MakeNode<ASTSelectList>(@$, $derived_properties);
+      $$ = MakeNode<ASTGraphDerivedPropertyList>(@$, $derived_properties);
     }
 ;
 
 derived_property {ASTNode*}:
-    expression as_alias_with_required_as?
+    expression as_alias_with_required_as[alias]? opt_options_list[options]
     {
-      $$ = MakeNode<ASTSelectColumn>(@$, $1, $2);
+      $$ = MakeNode<ASTGraphDerivedProperty>(@$, $expression, $alias, $options);
     }
 ;
 

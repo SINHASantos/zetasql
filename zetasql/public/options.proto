@@ -562,12 +562,10 @@ enum LanguageFeature {
   // CREATE VIEW v(a, b) AS SELECT ...
   FEATURE_CREATE_VIEW_WITH_COLUMN_LIST = 59;
 
-  // TODO: Clean up in_development annotation.
   // Enables support for altering column options for columns in views.
   // Example:
   // ALTER VIEW v ALTER COLUMN a SET OPTIONS(description="col a")
-  FEATURE_ALTER_VIEWS_ALTER_COLUMN_SET_OPTIONS = 87
-      [(language_feature_options).in_development = true];
+  FEATURE_ALTER_VIEWS_ALTER_COLUMN_SET_OPTIONS = 87;
 
   // Enables support for altering column options for columns in materialized
   // views.
@@ -865,7 +863,7 @@ enum LanguageFeature {
       [(language_feature_options).ideally_enabled = false];
 
   // Enables syntax for updating specific fields in a JSON column.
-  FEATURE_JSON_DML_UPDATE = 138
+  FEATURE_JSON_SUBFIELDS_WITH_SET = 138
       [(language_feature_options).in_development = true];
 
   // Enables equality comparison and ordering for the JSON type.
@@ -1591,6 +1589,15 @@ enum LanguageFeature {
     (language_feature_options).in_development = true
   ];
 
+  // Enables options clause for default labels and property definitions
+  // inside a graph element table.
+  // See (broken link):semantic-graph-ddl-options for more details.
+  // REQUIRES: SQL_GRAPH feature to be enabled.
+  FEATURE_SQL_GRAPH_DEFAULT_LABEL_AND_PROPERTY_DEFINITION_OPTIONS = 14121 [
+    (language_feature_options).language_version = VERSION_1_4,
+    (language_feature_options).in_development = true
+  ];
+
   // Enable support for remote models (e.g. CREATE MODEL ... REMOTE ...)
   // (broken link)
   FEATURE_REMOTE_MODEL = 14009
@@ -2201,6 +2208,12 @@ enum LanguageFeature {
   // Enable ROW type. See (broken link).
   // This is experimental and not ready to use yet.
   FEATURE_ROW_TYPE = 14119 [
+    (language_feature_options).language_version = VERSION_1_4,
+    (language_feature_options).in_development = true
+  ];
+
+  // Enables MEASURE in the output of a TVFScan.
+  FEATURE_MEASURES_TVF = 14122 [
     (language_feature_options).language_version = VERSION_1_4,
     (language_feature_options).in_development = true
   ];

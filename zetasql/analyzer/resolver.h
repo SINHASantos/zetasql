@@ -3729,6 +3729,19 @@ class Resolver {
       std::vector<std::unique_ptr<const ResolvedExpr>> exprs,
       std::unique_ptr<const ResolvedExpr>* output_expr) const;
 
+  // Validates the given measure source `table`, including:
+  // - Each measure column has a valid measure expression,
+  // - Row identity columns are present and valid,
+  // - etc.
+  //
+  // - `ast_location`: The AST node to attach errors to.
+  // - `table`: The table containing measure columns to be validated. This may
+  //   represent a catalog table or the output schema of a TVF.
+  // - `measure_source_string`: Used only when printing error messages.
+  absl::Status ValidateMeasureSource(const ASTNode* ast_location,
+                                     const Table* table,
+                                     absl::string_view measure_source_string);
+
   // Copies the parse location from the AST to resolved node depending on the
   // value of the analyzer option 'parse_location_record_type()'.
   void MaybeRecordParseLocation(const ASTNode* ast_location,
@@ -3968,14 +3981,6 @@ class Resolver {
 
   absl::StatusOr<InputArgumentType> GetTVFArgType(
       const ResolvedTVFArg& resolved_tvf_arg);
-
-  // Resolves GROUP_ROWS() TVF in a special way: GROUP_ROWS() expected to be
-  // used inside WITH GROUP ROWS(...) subquery on an aggregate function.
-  // GROUP_ROWS() TVF allows subquery to access input rows of the aggregate
-  // function and do preprocessing before the final aggregation happens.
-  absl::Status ResolveGroupRowsTVF(
-      const ASTTVF* ast_tvf, std::unique_ptr<const ResolvedScan>* output,
-      std::shared_ptr<const NameList>* group_rows_name_list);
 
   // Returns true if the relation argument of <tvf_signature_arg> at <arg_idx>
   // has a required schema where the number, order, and/or types of columns do
@@ -4874,9 +4879,6 @@ class Resolver {
       const ASTFunctionCall* ast_function_call,
       std::unique_ptr<ResolvedFunctionCall>* resolved_function_call,
       ExprResolutionInfo* expr_resolution_info,
-      std::unique_ptr<const ResolvedScan> with_group_rows_subquery,
-      std::vector<std::unique_ptr<const ResolvedColumnRef>>
-          with_group_rows_correlation_references,
       // `multi_level_aggregate_info` is needed to resolve ORDER BY modifiers
       // for multi-level aggregate functions.
       std::unique_ptr<QueryResolutionInfo> multi_level_aggregate_info,
@@ -5215,6 +5217,13 @@ class Resolver {
     ResolvedColumnRef* subscripted_element_ref = nullptr;  // Not owned.
   };
 
+  // Check if the new `update_target_infos` overlaps with any element of the
+  // existing `resolved_update_item`. This only determines if the subscripts
+  // overlap if `subscript_expr` are literals.
+  absl::StatusOr<bool> AreOverlappingUpdateItemsWithSubscript(
+      absl::Span<const UpdateTargetInfo> update_target_infos,
+      const ResolvedUpdateItem* resolved_update_item, bool is_subscript_update);
+
   // Returns whether the update target type supports element updates, given the
   // provided language options.
   absl::Status VerifyIfElementUpdateIsAllowed(
@@ -5232,6 +5241,13 @@ class Resolver {
   // - x1.c[<expr2>] with <array_element_column> = x2,
   // - x2.d.e.f[<expr3>] with <array_element_column> = x3
   // - x3.g
+  //
+  // If the item ends in an array element, the last UpdateTargetInfo will
+  // contain the `subscripted_element_ref`. For example
+  // a.b[<expr1>].c[<expr2>]
+  // - a.b[<expr1>] with <array_element_column> = x1,
+  // - x1.c[<expr2>] with <array_element_column> = x2,
+  // - x2
   absl::Status PopulateUpdateTargetInfos(
       const ASTUpdateItem* ast_update_item, bool is_nested,
       const ASTGeneralizedPathExpression* path,

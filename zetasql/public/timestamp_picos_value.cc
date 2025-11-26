@@ -60,7 +60,7 @@ void TimestampPicosValue::SerializeAndAppendToProtoBytes(
 
 absl::StatusOr<TimestampPicosValue>
 TimestampPicosValue::DeserializeFromProtoBytes(absl::string_view bytes) {
-  if (bytes.empty() || bytes.size() != sizeof(TimestampPicosValue)) {
+  if (bytes.size() != sizeof(TimestampPicosValue)) {
     return absl::OutOfRangeError(
         absl::StrCat("Invalid serialized TIMESTAMP_PICO size, expected ",
                      sizeof(TimestampPicosValue), " bytes, but got ",

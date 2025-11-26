@@ -233,10 +233,35 @@ class Algebrizer {
   absl::StatusOr<std::unique_ptr<ValueExpr>> AlgebrizeFunctionCallWithLambda(
       const ResolvedFunctionCall* function_call);
 
+  // A helper for AlgebrizeFunctionCall that algebrizes the argument exprs.
+  absl::StatusOr<std::vector<std::unique_ptr<AlgebraArg>>>
+  AlgebrizeFunctionArgs(
+  const ResolvedFunctionCall* function_call);
+
+  // AlgebrizeFunctionCall logic that is specific to SQL functions that provide
+  // an evaluator factory to supply an evaluator.
+  absl::StatusOr<std::unique_ptr<ValueExpr>>
+  AlgebrizeFunctionCallWithAlgebriedArgsAndEvalFactory(
+      const ResolvedFunctionCall* function_call,
+      std::vector<std::unique_ptr<AlgebraArg>> arguments);
+
+  // AlgebrizeFunctionCall logic that is specific to SQL functions.
+  absl::StatusOr<std::unique_ptr<ValueExpr>>
+  AlgebrizeSqlFunctionCallWithAlgebrizedArgs(
+      const ResolvedFunctionCall* function_call,
+      std::vector<std::unique_ptr<AlgebraArg>> arguments);
+
+  // AlgebrizeFunctionCall logic for builtin functions (excepting those with an
+  // evaluator factory),
+  absl::StatusOr<std::unique_ptr<ValueExpr>>
+  AlgebrizeBuiltinFunctionCallWithAlgebrizedArguments(
+      const ResolvedFunctionCall* function_call,
+  std::vector<std::unique_ptr<AlgebraArg>> arguments);
+
   absl::StatusOr<std::unique_ptr<ValueExpr>> AlgebrizeFunctionCall(
       const ResolvedFunctionCall* function_call);
 
-  absl::StatusOr<std::unique_ptr<NewStructExpr>> MakeStruct(
+  absl::StatusOr<std::unique_ptr<NewStructExpr>> AlgebrizeMakeStruct(
       const ResolvedMakeStruct* make_struct);
 
   absl::StatusOr<std::unique_ptr<FieldValueExpr>> AlgebrizeGetStructField(
@@ -267,6 +292,35 @@ class Algebrizer {
   absl::StatusOr<std::unique_ptr<ValueExpr>> AlgebrizeFlattenedArg(
       const ResolvedFlattenedArg* flattened_arg);
 
+  absl::StatusOr<std::unique_ptr<ValueExpr>> AlgebrizeLiteral(
+      const ResolvedLiteral* literal);
+  absl::StatusOr<std::unique_ptr<ValueExpr>> AlgebrizeConstant(
+      const ResolvedConstant* resolved_constant);
+  absl::StatusOr<std::unique_ptr<ValueExpr>> AlgebrizeColumnRef(
+      const ResolvedColumnRef* column_ref);
+  absl::StatusOr<std::unique_ptr<ValueExpr>> AlgebrizeCatalogColumnRef(
+      const ResolvedCatalogColumnRef* column_ref);
+  absl::StatusOr<std::unique_ptr<ValueExpr>> AlgebrizeExpressionColumn(
+      const ResolvedExpressionColumn* expr_column);
+  absl::StatusOr<std::unique_ptr<ValueExpr>> AlgebrizeGetProtoOneof(
+      const ResolvedGetProtoOneof* get_proto_oneof);
+  absl::StatusOr<std::unique_ptr<ValueExpr>> AlgebrizeSystemVariable(
+      const ResolvedSystemVariable* system_variable);
+  absl::StatusOr<std::unique_ptr<ValueExpr>> AlgebrizeParameter(
+      const ResolvedParameter* parameter);
+  absl::StatusOr<std::unique_ptr<ValueExpr>> AlgebrizeArgumentRef(
+      const ResolvedArgumentRef* argument_ref);
+  absl::StatusOr<std::unique_ptr<ValueExpr>> AlgebrizeMakeProto(
+      const ResolvedMakeProto* make_proto);
+  absl::StatusOr<std::unique_ptr<ValueExpr>> AlgebrizeDMLDefault(
+      const ResolvedDMLDefault* dml_default);
+  absl::StatusOr<std::unique_ptr<ValueExpr>> AlgebrizeFilterField(
+      const ResolvedFilterField* filter_fields);
+  absl::StatusOr<std::unique_ptr<ValueExpr>> AlgebrizeReplaceField(
+      const ResolvedReplaceField* replace_fields);
+  absl::StatusOr<std::unique_ptr<ValueExpr>> AlgebrizeUpdateConstructor(
+      const ResolvedUpdateConstructor* update_constructor);
+
   // Helper for AlgebrizeGetProtoField() for the case where we are getting a
   // proto field of an expression of the form
   // <column_or_param_expr>.<path>. <column_or_param> must be a
@@ -290,7 +344,6 @@ class Algebrizer {
       std::optional<AnonymizationOptions> anonymization_options,
       std::unique_ptr<ValueExpr> filter, const ResolvedExpr* expr,
       std::vector<std::unique_ptr<ValueExpr>> arguments,
-      std::unique_ptr<RelationalOp> group_rows_subquery,
       std::vector<std::unique_ptr<KeyArg>> inner_grouping_keys,
       std::vector<std::unique_ptr<AggregateArg>> inner_aggregators,
       const VariableId& side_effects_variable = VariableId(),
@@ -714,7 +767,7 @@ class Algebrizer {
 
   // Algebrizes GraphIsLabeledPredicate
   absl::StatusOr<std::unique_ptr<ValueExpr>> AlgebrizeGraphIsLabeledPredicate(
-      const ResolvedGraphIsLabeledPredicate& predicate);
+      const ResolvedGraphIsLabeledPredicate* predicate);
 
   // Maps a ResolvedColumn from a table scan to its corresponding Variable and
   // index in the scan (not the Table).
@@ -837,11 +890,22 @@ class Algebrizer {
       std::function<absl::StatusOr<std::unique_ptr<RelationalOp>>(
           Algebrizer*, const ResolvedScan*, std::vector<FilterConjunctInfo*>*)>;
 
+  using AlgebrizeExprFunc =
+      std::function<absl::StatusOr<std::unique_ptr<ValueExpr>>(
+          Algebrizer*, const ResolvedExpr*)>;
+
   // We use a map of function pointers initialized once and outside the
   // potentially recursively called AlgebrizeScan function to keep the stack
   // frame of recursive callstacks small.
   // which could lead to out of stack errors. See b/447813193.
-  static const absl::flat_hash_map<int, AlgebrizeScanFunc>* InitializeScanMap();
+  static const absl::flat_hash_map<ResolvedNodeKind, AlgebrizeScanFunc>*
+  InitializeScanMap();
+
+  // We use a map of function pointers initialized once and outside the
+  // potentially recursively called AlgebrizeExpr function to keep the stack
+  // frame of recursive callstacks small.
+  static const absl::flat_hash_map<ResolvedNodeKind, AlgebrizeExprFunc>*
+  InitializeExprMap();
 
   absl::StatusOr<std::unique_ptr<RelationalOp>> AlgebrizeScan(
       const ResolvedScan* scan);

@@ -8871,6 +8871,22 @@ The following SQL to JSON encodings are supported:
     
     
     <tr>
+      <td>UUID</td>
+      <td>
+        <p>string</p>
+        <p>
+          Encoded as lowercase hexadecimal format as specified in
+          <a href="https://www.rfc-editor.org/rfc/rfc9562#name-uuid-format">RFC 9562</a>.
+        </p>
+      </td>
+      <td>
+        SQL input: <code>CAST('f81d4fae-7dec-11d0-a765-00a0c91e6bf6' AS UUID)</code><br />
+        JSON output: <code>"f81d4fae-7dec-11d0-a765-00a0c91e6bf6"</code><br />
+      </td>
+    </tr>
+    
+    
+    <tr>
       <td>JSON</td>
       <td>
         <p>data of the input JSON</p>

@@ -227,7 +227,7 @@ class DeferredResolutionFinder : public NonRecursiveParseTreeVisitor {
 
   absl::StatusOr<VisitResult> visitASTFunctionCall(
       const ASTFunctionCall* node) override {
-    if (node->group_by() != nullptr || node->with_group_rows() != nullptr) {
+    if (node->group_by() != nullptr) {
       info_.has_outer_group_rows_or_group_by_modifiers = true;
     }
     return VisitResult::VisitChildren(node);

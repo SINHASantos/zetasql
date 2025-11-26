@@ -6036,3 +6036,74 @@ ALTERNATION GROUP: ALL
 ERROR: No matching signature for operator NOT LIKE ALL for argument types literal STRING and {STRING, BYTES}. STRING and BYTES are different types that are not directly comparable. To write a BYTES literal, use a b-prefixed literal such as b'bytes value' [at 2:16]
 select 'a' NOT LIKE ALL ('a', b'x', 'y')
                ^
+==
+
+[language_features=NONE,+LIKE_ANY_SOME_ALL,+LIKE_ANY_SOME_ALL_ARRAY]
+# Array containing more than one expression is not allowed
+select 'a' LIKE {{ANY|SOME|ALL}} UNNEST(['a'], ['b', 'c']);
+--
+ALTERNATION GROUP: ANY
+--
+ERROR: UNNEST expression used with LIKE ANY does not allow multiple arguments [at 2:35]
+select 'a' LIKE ANY UNNEST(['a'], ['b', 'c']);
+                                  ^
+--
+ALTERNATION GROUP: SOME
+--
+ERROR: UNNEST expression used with LIKE SOME does not allow multiple arguments [at 2:36]
+select 'a' LIKE SOME UNNEST(['a'], ['b', 'c']);
+                                   ^
+--
+ALTERNATION GROUP: ALL
+--
+ERROR: UNNEST expression used with LIKE ALL does not allow multiple arguments [at 2:35]
+select 'a' LIKE ALL UNNEST(['a'], ['b', 'c']);
+                                  ^
+==
+
+[language_features=NONE,+LIKE_ANY_SOME_ALL,+LIKE_ANY_SOME_ALL_ARRAY]
+# Specifying `array_zip_mode` inside UNNEST is not allowed
+select 'a' LIKE {{ANY|SOME|ALL}} UNNEST(['a'],  mode => 'STRICT');
+--
+ALTERNATION GROUP: ANY
+--
+ERROR: UNNEST expression used with LIKE ANY does not allow named arguments [at 2:36]
+select 'a' LIKE ANY UNNEST(['a'],  mode => 'STRICT');
+                                   ^
+--
+ALTERNATION GROUP: SOME
+--
+ERROR: UNNEST expression used with LIKE SOME does not allow named arguments [at 2:37]
+select 'a' LIKE SOME UNNEST(['a'],  mode => 'STRICT');
+                                    ^
+--
+ALTERNATION GROUP: ALL
+--
+ERROR: UNNEST expression used with LIKE ALL does not allow named arguments [at 2:36]
+select 'a' LIKE ALL UNNEST(['a'],  mode => 'STRICT');
+                                   ^
+==
+
+[language_features=NONE,+LIKE_ANY_SOME_ALL,+LIKE_ANY_SOME_ALL_ARRAY]
+# Alias inside UNNEST is not allowed
+select 'a' LIKE {{ANY|SOME|ALL}} UNNEST(['a'] as array);
+
+--
+ALTERNATION GROUP: ANY
+--
+ERROR: Syntax error: Unexpected keyword ARRAY [at 2:37]
+select 'a' LIKE ANY UNNEST(['a'] as array);
+                                    ^
+--
+ALTERNATION GROUP: SOME
+--
+ERROR: Syntax error: Unexpected keyword ARRAY [at 2:38]
+select 'a' LIKE SOME UNNEST(['a'] as array);
+                                     ^
+--
+ALTERNATION GROUP: ALL
+--
+ERROR: Syntax error: Unexpected keyword ARRAY [at 2:37]
+select 'a' LIKE ALL UNNEST(['a'] as array);
+                                    ^
+

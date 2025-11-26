@@ -47,13 +47,16 @@ const int kNestingLevelStackCheckThreshold = 10;
 //   - FAIL (default): fail the query for any unsupported field
 //   - IGNORE: treat unsupported fields as non-existent
 //   - PLACEHOLDER: replace value with descriptive message for the type
+// - path_as_object: if true, the graph path is converted to an object.
+//   If false, the graph path is converted to an array of graph elements.
 // TODO : remove canonicalize_zero flag when all
 // engines have rolled out this new behavior.
 absl::StatusOr<JSONValue> ToJson(
     const Value& value, bool stringify_wide_numbers,
     const LanguageOptions& language_options, bool canonicalize_zero = false,
     UnsupportedFieldsEnum::UnsupportedFields unsupported_fields =
-        UnsupportedFieldsEnum::FAIL);
+        UnsupportedFieldsEnum::FAIL,
+    bool path_as_object = false);
 
 }  // namespace functions
 }  // namespace zetasql

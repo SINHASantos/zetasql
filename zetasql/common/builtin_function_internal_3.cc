@@ -1478,36 +1478,69 @@ absl::Status GetJsonParseFunctions(
   const EnumType* const unsupported_fields_type =
       types::UnsupportedFieldsEnumType();
 
+  bool path_as_object_enabled = false;
+  const bool unsupported_fields_enabled =
+      options.language_options.LanguageFeatureEnabled(
+          FEATURE_TO_JSON_UNSUPPORTED_FIELDS);
+
+  const FunctionArgumentTypeOptions stringify_wide_numbers_option =
+      FunctionArgumentTypeOptions()
+          .set_cardinality(FunctionEnums::OPTIONAL)
+          .set_argument_name("stringify_wide_numbers", kNamedOnly)
+          .set_default(values::Bool(false));
+  const FunctionArgumentTypeOptions unsupported_fields_option =
+      FunctionArgumentTypeOptions()
+          .set_cardinality(FunctionEnums::OPTIONAL)
+          .set_argument_name("unsupported_fields", kNamedOnly)
+          .set_default(values::Enum(unsupported_fields_type,
+                                    functions::UnsupportedFieldsEnum::FAIL));
+  const FunctionArgumentTypeOptions path_as_object_option =
+      FunctionArgumentTypeOptions()
+          .set_cardinality(FunctionEnums::OPTIONAL)
+          .set_argument_name("path_as_object", kNamedOnly)
+          .set_default(values::Bool(false));
+
   std::vector<FunctionSignatureOnHeap> signatures = {
       {json_type,
-       {ARG_TYPE_ANY_1,
-        {bool_type, FunctionArgumentTypeOptions()
-                        .set_cardinality(FunctionEnums::OPTIONAL)
-                        .set_argument_name("stringify_wide_numbers", kNamedOnly)
-                        .set_default(values::Bool(false))}},
+       {ARG_TYPE_ANY_1, {bool_type, stringify_wide_numbers_option}},
        FN_TO_JSON},
   };
-  if (options.language_options.LanguageFeatureEnabled(
-          FEATURE_TO_JSON_UNSUPPORTED_FIELDS)) {
+
+  if (path_as_object_enabled && unsupported_fields_enabled) {
     signatures.push_back(
         {json_type,
          {ARG_TYPE_ANY_1,
-          {bool_type,
-           FunctionArgumentTypeOptions()
-               .set_cardinality(FunctionEnums::OPTIONAL)
-               .set_argument_name("stringify_wide_numbers", kNamedOnly)
-               .set_default(values::Bool(false))},
-          {
-              unsupported_fields_type,
-              FunctionArgumentTypeOptions()
-                  .set_cardinality(FunctionEnums::OPTIONAL)
-                  .set_argument_name("unsupported_fields", kNamedOnly)
-                  .set_default(
-                      values::Enum(unsupported_fields_type,
-                                   functions::UnsupportedFieldsEnum::FAIL)),
-          }},
+          {bool_type, stringify_wide_numbers_option},
+          {unsupported_fields_type, unsupported_fields_option}},
          FN_TO_JSON_UNSUPPORTED_FIELDS});
-
+    signatures.push_back({json_type,
+                          {ARG_TYPE_ANY_1,
+                           {bool_type, stringify_wide_numbers_option},
+                           {bool_type, path_as_object_option}},
+                          FN_TO_JSON_PATH_AS_OBJECT});
+    signatures.push_back({json_type,
+                          {ARG_TYPE_ANY_1,
+                           {bool_type, stringify_wide_numbers_option},
+                           {unsupported_fields_type, unsupported_fields_option},
+                           {bool_type, path_as_object_option}},
+                          FN_TO_JSON_UNSUPPORTED_FIELDS_PATH_AS_OBJECT});
+    ZETASQL_RETURN_IF_ERROR(InsertFunctionAndTypes(
+        functions, types, options, "to_json", Function::SCALAR, signatures,
+        /*function_options=*/{}, {unsupported_fields_type}));
+  } else if (path_as_object_enabled) {
+    signatures.push_back({json_type,
+                          {ARG_TYPE_ANY_1,
+                           {bool_type, stringify_wide_numbers_option},
+                           {bool_type, path_as_object_option}},
+                          FN_TO_JSON_PATH_AS_OBJECT});
+    InsertFunction(functions, options, "to_json", Function::SCALAR, signatures);
+  } else if (unsupported_fields_enabled) {
+    signatures.push_back(
+        {json_type,
+         {ARG_TYPE_ANY_1,
+          {bool_type, stringify_wide_numbers_option},
+          {unsupported_fields_type, unsupported_fields_option}},
+         FN_TO_JSON_UNSUPPORTED_FIELDS});
     ZETASQL_RETURN_IF_ERROR(InsertFunctionAndTypes(
         functions, types, options, "to_json", Function::SCALAR, signatures,
         /*function_options=*/{}, {unsupported_fields_type}));

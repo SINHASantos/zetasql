@@ -1477,6 +1477,9 @@ absl::Status SimpleCatalog::SerializeImpl(
   for (const auto& entry : table_valued_functions) {
     const TableValuedFunction* const table_valued_function = entry.second;
     TableValuedFunctionProto tvf_proto;
+    if (table_valued_function->IsZetaSQLBuiltin() && ignore_builtin) {
+      continue;
+    }
     ZETASQL_RETURN_IF_ERROR(
         table_valued_function->Serialize(file_descriptor_set_map, &tvf_proto));
     if (tvf_proto.type() == FunctionEnums::INVALID) {
@@ -2106,6 +2109,14 @@ absl::Status SimpleColumn::Serialize(
       default:
         ZETASQL_RET_CHECK_FAIL() << "Unknown expression kind";
     }
+    if (const std::optional<std::vector<int>>& row_identity_columns =
+            GetExpression()->RowIdentityColumns();
+        row_identity_columns.has_value()) {
+      for (int column_index : *row_identity_columns) {
+        proto->mutable_column_expression()->add_row_identity_column_index(
+            column_index);
+      }
+    }
   }
   return absl::OkStatus();
 }
@@ -2138,9 +2149,17 @@ absl::StatusOr<std::unique_ptr<SimpleColumn>> SimpleColumn::Deserialize(
       expression_kind =
           ExpressionAttributes::ExpressionKind::MEASURE_EXPRESSION;
     }
-    attributes.column_expression = SimpleColumn::ExpressionAttributes(
-        expression_kind, proto.column_expression().expression_string(),
-        nullptr);
+    std::optional<std::vector<int>> row_identity_columns;
+    if (proto.column_expression().row_identity_column_index_size() > 0) {
+      row_identity_columns = std::vector<int>(
+          proto.column_expression().row_identity_column_index().begin(),
+          proto.column_expression().row_identity_column_index().end());
+    }
+    ZETASQL_ASSIGN_OR_RETURN(
+        attributes.column_expression,
+        SimpleColumn::ExpressionAttributes::Create(
+            expression_kind, proto.column_expression().expression_string(),
+            nullptr, row_identity_columns));
   }
 
   return std::make_unique<SimpleColumn>(table_name, proto.name(),

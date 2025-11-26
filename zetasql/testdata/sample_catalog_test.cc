@@ -22,12 +22,15 @@
 #include <vector>
 
 #include "zetasql/base/testing/status_matchers.h"
+#include "zetasql/proto/simple_catalog.pb.h"
 #include "zetasql/public/catalog.h"
 #include "zetasql/public/evaluator_table_iterator.h"
 #include "zetasql/public/function.h"
+#include "zetasql/public/function_signature.h"
 #include "zetasql/public/language_options.h"
 #include "zetasql/public/sql_view.h"
 #include "zetasql/public/table_valued_function.h"
+#include "zetasql/public/types/type.h"
 #include "zetasql/public/types/type_factory.h"
 #include "zetasql/resolved_ast/resolved_ast_enums.pb.h"
 #include "gmock/gmock.h"
@@ -232,6 +235,50 @@ TEST(SampleCatalogTest, LazyTables) {
       ZETASQL_EXPECT_OK(iterator->Status());
     }
   }
+}
+
+TEST(SampleCatalogTest, BuiltInTVFSerialize) {
+  LanguageOptions options;
+  options.EnableMaximumLanguageFeatures();
+  TypeFactory type_factory;
+  SampleCatalog sample(options, &type_factory);
+  sample.catalog()->AddOwnedTableValuedFunction(new TableValuedFunction(
+      {"custom_tvf"}, Function::kZetaSQLFunctionGroupName,
+      {FunctionSignature(
+          FunctionArgumentType::AnyRelation(),
+          {FunctionArgumentType(ARG_TYPE_RELATION,
+                                FunctionArgumentTypeOptions().set_argument_name(
+                                    "t", FunctionEnums::POSITIONAL_OR_NAMED))},
+          -1)},
+      TableValuedFunctionOptions()));
+
+  SimpleCatalogProto proto_with_builtin;
+  FileDescriptorSetMap file_descriptor_set_map;
+  // Builtin TVFs should be serialized when `ignore_builtin` is false.
+  ZETASQL_ASSERT_OK(sample.catalog()->Serialize(
+      &file_descriptor_set_map, &proto_with_builtin,
+      /*ignore_builtin=*/false, /*ignore_recursive=*/true));
+
+  // Iterate over custom_tvf entries to find the one named "custom_tvf"
+  bool found_tvf_proto = false;
+  for (const auto& tvf_proto : proto_with_builtin.custom_tvf()) {
+    if (tvf_proto.name_path()[0] == "custom_tvf") {
+      found_tvf_proto = true;
+    }
+  }
+  EXPECT_TRUE(found_tvf_proto);
+  SimpleCatalogProto proto_without_builtin;
+  // Builtin TVFs should not be serialized when `ignore_builtin` is true.
+  ZETASQL_ASSERT_OK(sample.catalog()->Serialize(
+      &file_descriptor_set_map, &proto_without_builtin,
+      /*ignore_builtin=*/true, /*ignore_recursive=*/true));
+  found_tvf_proto = false;
+  for (const auto& tvf_proto : proto_without_builtin.custom_tvf()) {
+    if (tvf_proto.name_path()[0] == "custom_tvf") {
+      found_tvf_proto = true;
+    }
+  }
+  EXPECT_FALSE(found_tvf_proto);
 }
 
 }  // namespace zetasql

@@ -851,8 +851,9 @@ class GraphTableQueryResolver {
     // - If `column_propagation_mode` is STRICT, all column name set from
     // different inputs should be the same.
     absl::StatusOr<std::vector<IdString>> GetFinalColumnNames(
-        const std::vector<ResolvedGraphWithNameList<
-            const ResolvedGraphLinearScan>>& resolved_inputs,
+        absl::Span<
+            const ResolvedGraphWithNameList<const ResolvedGraphLinearScan>>
+            resolved_inputs,
         absl::Span<IndexedColumnNames> indexed_column_names_list,
         ResolvedSetOperationScan::SetOperationColumnPropagationMode
             column_propagation_mode,

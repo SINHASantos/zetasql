@@ -8202,3 +8202,35 @@ QueryStmt
         +-column_index_list=[0]
         +-function_call_signature=(optional(1) ANY TABLE, optional(1) STRING) -> TABLE<INT64>
 
+==
+
+# Test quoting column names.
+[language_features=MAXIMUM,+TABLE_VALUED_FUNCTIONS]
+select * from tvf_optional_relation_optional_scalar((select 1 as `where`), "abc")
+--
+QueryStmt
++-output_column_list=
+| +-tvf_optional_relation_optional_scalar.$col0#2 AS `$col0` [INT64]
++-query=
+  +-ProjectScan
+    +-column_list=[tvf_optional_relation_optional_scalar.$col0#2]
+    +-input_scan=
+      +-TVFScan
+        +-column_list=[tvf_optional_relation_optional_scalar.$col0#2]
+        +-tvf=tvf_optional_relation_optional_scalar((optional ANY TABLE, optional STRING) -> TABLE<INT64>)
+        +-signature=(TABLE<where INT64>, literal STRING) -> TABLE<INT64>
+        +-argument_list=
+        | +-FunctionArgument
+        | | +-scan=
+        | | | +-ProjectScan
+        | | |   +-column_list=[$subquery1.where#1]
+        | | |   +-expr_list=
+        | | |   | +-where#1 := Literal(type=INT64, value=1)
+        | | |   +-input_scan=
+        | | |     +-SingleRowScan
+        | | +-argument_column_list=[$subquery1.where#1]
+        | +-FunctionArgument
+        |   +-expr=
+        |     +-Literal(type=STRING, value="abc")
+        +-column_index_list=[0]
+        +-function_call_signature=(optional(1) ANY TABLE, optional(1) STRING) -> TABLE<INT64>

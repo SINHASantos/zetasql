@@ -18,6 +18,7 @@
 #define ZETASQL_COMMON_MEASURE_ANALYSIS_UTILS_H_
 
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -38,6 +39,7 @@ struct MeasureColumnDef {
   std::string name;
   std::string expression;
   bool is_pseudo_column = false;
+  std::optional<std::vector<int>> row_identity_column_indices = std::nullopt;
 };
 
 // Implements core logic for `AnalyzeMeasureExpression`.
