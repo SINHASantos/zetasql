@@ -56,7 +56,6 @@ SubpipelineStmt
       +-KeyValue.Key#1 AS Key [INT64]
       +-KeyValue.Value#2 AS Value [STRING]
 
-
 [REWRITTEN AST]
 GeneralizedQueryStmt
 +-output_schema=
@@ -96,7 +95,6 @@ SubpipelineStmt
       +-$pipe_select.$col1#3 AS `$col1` [INT64]
       +-KeyValue.Value#2 AS value [STRING]
 
-
 [REWRITTEN AST]
 QueryStmt
 +-output_column_list=
@@ -132,7 +130,6 @@ SubpipelineStmt
     +-output_column_list=
       +-KeyValue.Value#2 AS value [STRING]
 
-
 [REWRITTEN AST]
 QueryStmt
 +-output_column_list=
@@ -163,7 +160,6 @@ SubpipelineStmt
   +-OutputSchema
     +-output_column_list=
       +-$pipe_select.$col1#3 AS `$col1` [INT64]
-
 
 [REWRITTEN AST]
 QueryStmt
@@ -210,7 +206,6 @@ KeyValue     Value        STRING
 Table Alias  Columns
 \-----------  ----------
 KeyValue     Key, Value
-
 
 
 [REWRITTEN AST]
@@ -315,7 +310,6 @@ EnumTable    RowId        BYTES
 Table Alias  Columns                         Pseudo-columns
 \-----------  ------------------------------  ---------------
 EnumTable    key, TestEnum, AnotherTestEnum  Filename, RowId
-\
 ==
 
 # We see the input table schema, including pseudo-columns and a range variable,
@@ -393,7 +387,6 @@ Table Alias          Columns  Pseudo-columns
 TestExtraValueTable  <value>  Filename, RowId
 
 Result is a value table.
-\
 ==
 
 # Output propagates a value table.
@@ -417,7 +410,6 @@ SubpipelineStmt
     +-output_column_list=
     | +-TestExtraValueTable.value#1 AS `$value` [PROTO<googlesql_test.TestExtraPB>]
     +-is_value_table=TRUE
-
 
 [REWRITTEN AST]
 QueryStmt
@@ -468,7 +460,6 @@ SubpipelineStmt
     +-output_column_list=
     | +-$make_struct.$struct#4 AS `$struct` [STRUCT<STRUCT<INT64, STRING, INT64>>]
     +-is_value_table=TRUE
-
 
 [REWRITTEN AST]
 QueryStmt
@@ -530,7 +521,6 @@ SubpipelineStmt
       +-KeyValue.Key#1 AS Key [INT64]
       +-KeyValue.Value#2 AS Value [STRING]
 
-
 [REWRITTEN AST]
 QueryStmt
 +-output_column_list=
@@ -582,7 +572,6 @@ SubpipelineStmt
       +-KeyValue.Value#2 AS Value [STRING]
       +-EnumTable.TestEnum#4 AS TestEnum [ENUM<googlesql_test.TestEnum>]
       +-EnumTable.AnotherTestEnum#5 AS AnotherTestEnum [ENUM<googlesql_test.AnotherTestEnum>]
-
 
 [REWRITTEN AST]
 QueryStmt
@@ -652,7 +641,6 @@ SubpipelineStmt
       +-TestTable.KitchenSink#3 AS KitchenSink [PROTO<googlesql_test.KitchenSinkPB>]
       +-$array.repeated_int32_val#4 AS repeated_int32_val [INT32]
       +-$array.$unnest1#5 AS `$unnest1` [INT64]
-
 
 [REWRITTEN AST]
 QueryStmt
@@ -742,7 +730,6 @@ SubpipelineStmt
                   +-KeyValue.Value#2 AS value [STRING]
                   +-KeyValue.Value#2 AS value [STRING]
 
-
 [REWRITTEN AST]
 MultiStmt
 +-statement_list=
@@ -816,7 +803,6 @@ SubpipelineStmt
     +-output_column_list=
       +-$pipe_select.$col1#3 AS `$col1` [INT64]
 
-
 [REWRITTEN AST]
 MultiStmt
 +-statement_list=
@@ -880,7 +866,6 @@ SubpipelineStmt
                 +-input_scan=
                   +-SubpipelineInputScan(column_list=KeyValue.[Key#1, Value#2])
 
-
 [REWRITTEN AST]
 ExportDataStmt
 +-option_list=
@@ -922,7 +907,6 @@ SubpipelineStmt
     +-output_column_list=
       +-KeyValueNested.Key#1 AS Key [INT64]
       +-KeyValueNested.Value#2 AS Value [STRING]
-
 
 [REWRITTEN AST]
 QueryStmt
@@ -967,7 +951,6 @@ SubpipelineStmt
       +-KeyValue.Key#1 AS Key [INT64]
       +-KeyValue.Value#2 AS Value [STRING]
 
-
 [REWRITTEN AST]
 GeneralizedQueryStmt
 +-hint_list=
@@ -1006,7 +989,6 @@ SubpipelineStmt
     +-output_column_list=
       +-KeyValue.Key#1 AS Key [INT64]
       +-KeyValue.Value#2 AS Value [STRING]
-
 
 [REWRITTEN AST]
 QueryStmt

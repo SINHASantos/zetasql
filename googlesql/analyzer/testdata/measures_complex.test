@@ -186,6 +186,7 @@ QueryStmt
                               |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, column=WithTable.struct_for_measures_from_table_WithTable#23)
                               |   +-field_idx=0
                               +-field_idx=0
+
 [SQLBUILDER_OUTPUT]
 WITH
   WithTable AS (
@@ -416,6 +417,7 @@ QueryStmt
                               |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<quantity INT64, price INT64>, key_columns STRUCT<key INT64>>, column=WithTable.struct_for_measures_from_table_WithTable#28)
                               |   +-field_idx=0
                               +-field_idx=0
+
 [SQLBUILDER_OUTPUT]
 WITH
   WithTable AS (
@@ -679,6 +681,7 @@ QueryStmt
                               |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<quantity INT64, price INT64>, key_columns STRUCT<key INT64>>, column=WithTable2.struct_for_measures_from_table_WithTable2#32)
                               |   +-field_idx=0
                               +-field_idx=0
+
 [SQLBUILDER_OUTPUT]
 WITH
   WithTable1 AS (
@@ -936,6 +939,7 @@ QueryStmt
         |                               +-field_idx=0
         +-input_scan=
           +-WithRefScan(column_list=WithTable2.[struct_for_measures_from_table_WithTable2#26, measure_sum_quantity#18], with_query_name="WithTable2")
+
 [SQLBUILDER_OUTPUT]
 WITH
   WithTable1 AS (

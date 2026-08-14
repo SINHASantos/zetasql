@@ -673,9 +673,9 @@ ALTERNATION GROUPS:
     options(a=b),,options(y=z),as select 1 as x
     options(a=b),,options(y=z),
 --
-ERROR: Syntax error: Expected end of input but got keyword OPTIONS [at 12:1]
+ERROR: Syntax error: Duplicate OPTIONS clause [at 12:8]
 options(y=z)
-^
+       ^
 --
 ALTERNATION GROUP: or replace,temporary,,if not exists,returns table<x int64>,sql security invoker,options(a=b),language testlang,,as select 1 as x
 --

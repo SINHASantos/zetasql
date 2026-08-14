@@ -21,11 +21,13 @@
 #include <cstdint>
 #include <optional>
 #include <string>
+#include <utility>
 
 #include "googlesql/common/thread_stack.h"
 #include "googlesql/public/types/type.h"
 #include "googlesql/public/types/value_equality_check_options.h"
 #include "googlesql/public/types/value_representations.h"
+#include "absl/hash/hash.h"
 #include "googlesql/base/check.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
@@ -59,14 +61,22 @@ class ContainerType : public Type {
     const Type* type;
   };
 
+  // Helper wrapper struct to allow hashing nullable elements of a container
+  // Type.
+  template <bool ignore_floats>
   struct HashableNullableValueContent {
     const internal::NullableValueContent element;
     const Type* type;
 
     template <typename H>
     H Hash(H h) const {
-      type->HashValueContent(element.value_content(),
-                             absl::HashState::Create(&h));
+      if constexpr (ignore_floats) {
+        type->HashValueContentIgnoringFloat(element.value_content(),
+                                            absl::HashState::Create(&h));
+      } else {
+        type->HashValueContent(element.value_content(),
+                               absl::HashState::Create(&h));
+      }
       return h;
     }
 
@@ -77,12 +87,12 @@ class ContainerType : public Type {
     }
   };
 
+  template <bool ignore_floats>
   struct NullableValueContentHasher {
     explicit NullableValueContentHasher(const Type* type) : type(type) {}
 
     size_t operator()(const internal::NullableValueContent& x) const {
-      return absl::Hash<HashableNullableValueContent>()(
-          HashableNullableValueContent{x, type});
+      return absl::HashOf(HashableNullableValueContent<ignore_floats>{x, type});
     }
 
    private:

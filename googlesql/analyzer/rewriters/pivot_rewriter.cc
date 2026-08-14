@@ -41,6 +41,7 @@
 #include "googlesql/public/value.h"
 #include "googlesql/resolved_ast/column_factory.h"
 #include "googlesql/resolved_ast/resolved_ast.h"
+#include "googlesql/resolved_ast/resolved_ast_builder.h"
 #include "googlesql/resolved_ast/resolved_ast_deep_copy_visitor.h"
 #include "googlesql/resolved_ast/resolved_ast_enums.pb.h"
 #include "googlesql/resolved_ast/resolved_column.h"
@@ -742,6 +743,14 @@ PivotRewriterVisitor::MakeAggregateExpr(
 
   GOOGLESQL_RETURN_IF_ERROR(
       fn_builder_.PropagateAnnotationsAndProcessCollationList(new_call.get()));
+
+  // FunctionCallBuilder::If does not automatically propagate custom return type
+  // annotations from its then_case (b/282070695). Ensure new_call retains the
+  // original call's type annotation map if they differ after propagation.
+  if (!AnnotationMap::Equals(new_call->type_annotation_map(),
+                             call->type_annotation_map())) {
+    new_call->set_type_annotation_map(call->type_annotation_map());
+  }
 
   // Output annotations and collation lists should be identical to the original
   // function call.

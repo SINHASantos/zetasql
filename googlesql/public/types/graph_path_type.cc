@@ -258,7 +258,8 @@ absl::HashState GraphPathType::HashValueContent(const ValueContent& value,
                                                 absl::HashState state) const {
   const internal::ValueContentOrderedList* path = GetContainer(value);
   for (int i = 0; i < path->num_elements(); ++i) {
-    NullableValueContentHasher hasher(GetElementType(i));
+    NullableValueContentHasher</*ignore_floats=*/false> hasher(
+        GetElementType(i));
     state =
         absl::HashState::combine(std::move(state), hasher(path->element(i)));
   }

@@ -515,9 +515,6 @@ public final class TVFSignature implements Serializable {
         return Category.UNTYPED_NULL;
       }
       if (type.isArray() && value != null) {
-        if (value.isNull()) {
-          return Category.UNTYPED_EMPTY_ARRAY;
-        }
         return Category.TYPED_LITERAL;
       }
       // When value is null (Java null, NOT value with isNull=true),
@@ -663,7 +660,7 @@ public final class TVFSignature implements Serializable {
     }
 
     @Override
-    public String toString() {
+    public final String toString() {
       return "ANY GRAPH";
     }
   }

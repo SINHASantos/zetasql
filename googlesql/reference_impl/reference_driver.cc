@@ -102,6 +102,10 @@
 ABSL_FLAG(int32_t, reference_driver_query_eval_timeout_sec, 0,
           "Maximum statement evaluation timeout in seconds. A value of 0 "
           "means no maximum timeout is specified.");
+ABSL_FLAG(int64_t, reference_driver_max_intermediate_byte_size,
+          std::numeric_limits<int64_t>::max(),
+          "Maximum intermediate byte size allowed during evaluation in the "
+          "reference driver.");
 ABSL_FLAG(bool, force_reference_product_mode_external, false,
           "If true, ignore the provided product mode setting and force "
           "the reference to use PRODUCT_EXTERNAL.");
@@ -175,6 +179,10 @@ ReferenceDriver::ReferenceDriver(
   // not go through the public PreparedExpression/PreparedQuery interface, which
   // normally handles it.
   internal::EnableFullEvaluatorFeatures();
+  constant_evaluator_ = std::make_unique<PreparedExpressionConstantEvaluator>(
+      EvaluatorOptions{.type_factory = catalog_.type_factory(),
+                       .default_time_zone = default_time_zone_},
+      language_options_);
 }
 
 ReferenceDriver::~ReferenceDriver() = default;
@@ -384,6 +392,10 @@ absl::Status ReferenceDriver::SetStatementEvaluationTimeout(
 
 void ReferenceDriver::SetLanguageOptions(const LanguageOptions& options) {
   language_options_ = options;
+  constant_evaluator_ = std::make_unique<PreparedExpressionConstantEvaluator>(
+      EvaluatorOptions{.type_factory = catalog_.type_factory(),
+                       .default_time_zone = default_time_zone_},
+      language_options_);
   absl::Status status = catalog_.SetLanguageOptions(options);
   if (!status.ok()) {
     ABSL_LOG(WARNING) << "Failed to set TestDatabaseCatalog language options: "
@@ -405,6 +417,7 @@ absl::Status ReferenceDriver::AddSqlConstants(
   analyzer_options.set_default_time_zone(default_time_zone_);
   PreparedExpressionConstantEvaluator constant_evaluator(
       EvaluatorOptions{
+          .type_factory = catalog_.type_factory(),
           .default_time_zone = default_time_zone_,
       },
       language);
@@ -483,6 +496,9 @@ absl::StatusOr<AnalyzerOptions> ReferenceDriver::GetAnalyzerOptions(
   analyzer_options.set_error_message_mode(
       ErrorMessageMode::ERROR_MESSAGE_MULTI_LINE_WITH_CARET);
   analyzer_options.set_default_time_zone(default_time_zone_);
+  if (constant_evaluator_) {
+    analyzer_options.set_constant_evaluator(constant_evaluator_.get());
+  }
 
   for (const auto& p : parameters) {
     if (!p.second.type()->IsSupportedType(language_options_)) {
@@ -629,6 +645,12 @@ absl::StatusOr<Value> ReferenceDriver::ExecuteStatementForReferenceDriver(
       AnalyzerOptions analyzer_options,
       GetAnalyzerOptions(parameters, aux_output.uses_unsupported_type));
 
+  PreparedExpressionConstantEvaluator constant_evaluator(
+      EvaluatorOptions{.type_factory = catalog_.type_factory(),
+                       .default_time_zone = default_time_zone_},
+      language_options_);
+  analyzer_options.set_constant_evaluator(&constant_evaluator);
+
   GOOGLESQL_ASSIGN_OR_RETURN(MultiStmtResult result,
                    ExecuteStatementForReferenceDriverInternal(
                        sql, analyzer_options, parameters,
@@ -646,6 +668,12 @@ ReferenceDriver::ExecuteGeneralizedStatementForReferenceDriver(
   GOOGLESQL_ASSIGN_OR_RETURN(
       AnalyzerOptions analyzer_options,
       GetAnalyzerOptions(parameters, aux_output.uses_unsupported_type));
+
+  PreparedExpressionConstantEvaluator constant_evaluator(
+      EvaluatorOptions{.type_factory = catalog_.type_factory(),
+                       .default_time_zone = default_time_zone_},
+      language_options_);
+  analyzer_options.set_constant_evaluator(&constant_evaluator);
 
   return ExecuteStatementForReferenceDriverInternal(
       sql, analyzer_options, parameters,
@@ -974,7 +1002,7 @@ ReferenceDriver::ExecuteStatementForReferenceDriverInternal(
   // enough to avoid hard to debug OOM test failures.
   evaluation_options.max_value_byte_size = 256 * 1024 * 1024;  // 256Mb
   evaluation_options.max_intermediate_byte_size =
-      std::numeric_limits<int64_t>::max();
+      absl::GetFlag(FLAGS_reference_driver_max_intermediate_byte_size);
 
   EvaluationContext context(evaluation_options);
   context.SetDefaultTimeZone(default_time_zone_);
@@ -1370,6 +1398,11 @@ absl::Status ReferenceDriver::ExecuteScriptForReferenceDriverInternal(
   if (!analyzer_options.ok()) {
     return analyzer_options.status();
   }
+  PreparedExpressionConstantEvaluator constant_evaluator(
+      EvaluatorOptions{.type_factory = type_factory(),
+                       .default_time_zone = default_time_zone_},
+      language_options_);
+  analyzer_options->set_constant_evaluator(&constant_evaluator);
   ScriptExecutorOptions script_executor_options;
   script_executor_options.PopulateFromAnalyzerOptions(*analyzer_options);
   EvaluatorOptions evaluator_options;

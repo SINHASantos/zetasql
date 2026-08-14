@@ -52,7 +52,6 @@ With Templated SQL function call:
 containing resolved templated expression:
 FunctionCall(sample_functions:deprecation_warning() -> INT64)
 
-
 DEPRECATION WARNING:
 Function TEMPLATED_SQL_FUNCTION:UDF_CALLS_DEPRECATION_WARNING triggers a deprecation warning with kind PROTO3_FIELD_PRESENCE [at 1:8]
 select udf_calls_deprecation_warning()
@@ -87,7 +86,6 @@ With Templated SQL function call:
   Templated_SQL_Function:udf_calls_deprecation_warning() -> INT64 (1 deprecation warning)
 containing resolved templated expression:
 FunctionCall(sample_functions:deprecation_warning() -> INT64)
-
 
 DEPRECATION WARNING:
 Function TEMPLATED_SQL_FUNCTION:UDF_CALLS_DEPRECATION_WARNING triggers a deprecation warning with kind PROTO3_FIELD_PRESENCE [at 1:8]
@@ -900,6 +898,7 @@ With Templated SQL function call:
   Templated_SQL_Function:udf_any_and_string_args_return_string_arg(BOOL, STRING) -> STRING
 containing resolved templated expression:
 ArgumentRef(type=STRING, name="x")
+
 [UNDECLARED_PARAMETERS]
 untyped_param: STRING
 ==

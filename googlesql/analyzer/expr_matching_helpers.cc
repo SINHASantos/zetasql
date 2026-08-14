@@ -421,6 +421,12 @@ static const ResolvedExpr* UnwindFieldAccesses(
                       << resolved_expr->DebugString();
         break;
       }
+    } else if (resolved_expr->node_kind() == RESOLVED_GET_ROW_FIELD) {
+      const ResolvedGetRowField* get_row_field =
+          resolved_expr->GetAs<ResolvedGetRowField>();
+      name_path->mutable_name_path()->push_back(
+          id_string_pool->Make(get_row_field->column()->Name()));
+      resolved_expr = get_row_field->expr();
     } else {
       break;
     }
@@ -505,6 +511,18 @@ size_t FieldPathHash(const ResolvedExpr* expr) {
       return absl::Hash<std::pair<int, int>>()(std::make_pair(
           expr->node_kind(),
           expr->GetAs<ResolvedColumnRef>()->column().column_id()));
+    case RESOLVED_GET_ROW_FIELD: {
+      const ResolvedGetRowField* row_field = expr->GetAs<ResolvedGetRowField>();
+      return absl::Hash<std::tuple<int, int, std::string, size_t>>()(
+          std::make_tuple(
+              // Basic node properties.
+              expr->node_kind(), expr->type()->kind(),
+              // Column names in ResolvedGetRowField are normalized by the
+              // lookup, so OK to do a case-sensitive comparison.
+              row_field->column()->Name(),
+              // Expr from which the ROW field is extracted.
+              FieldPathHash(row_field->expr())));
+    }
     default:
       return absl::Hash<int>()(expr->node_kind());
   }
@@ -515,7 +533,8 @@ static bool IsContainerFieldAccess(const ResolvedNode* node) {
   return node->node_kind() == RESOLVED_GET_PROTO_FIELD ||
          node->node_kind() == RESOLVED_GET_STRUCT_FIELD ||
          node->node_kind() == RESOLVED_GET_JSON_FIELD ||
-         node->node_kind() == RESOLVED_GRAPH_GET_ELEMENT_PROPERTY;
+         node->node_kind() == RESOLVED_GRAPH_GET_ELEMENT_PROPERTY ||
+         node->node_kind() == RESOLVED_GET_ROW_FIELD;
 }
 
 // Returns true if the `column_ref_list` contains a equal pointer to

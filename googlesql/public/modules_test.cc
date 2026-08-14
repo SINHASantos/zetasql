@@ -1533,7 +1533,7 @@ CreateConstantStmt
         |   +-input_scan=
         |   | +-TVFScan
         |   |   +-column_list=[tvf.foo#1]
-        |   |   +-tvf=tvf((INT32 a) -> TABLE<foo DOUBLE>)
+        |   |   +-tvf=tvf
         |   |   +-signature=(literal INT32) -> TABLE<foo DOUBLE>
         |   |   +-argument_list=
         |   |   | +-FunctionArgument

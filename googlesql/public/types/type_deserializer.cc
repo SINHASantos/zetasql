@@ -162,7 +162,7 @@ TypeDeserializer::DeserializeDeclarativeTypeDescriptor(
   TypeId type_id = {
       .name_space = std::string(type_proto.type_id().name_space()),
       .local_id = std::string(type_proto.type_id().local_id()),
-      .counter = type_proto.type_id().counter()};
+      .version_id = std::string(type_proto.type_id().version_id())};
   // Deserialize the backing type. It is always required, but validation happens
   // when trying to create the type in the TypeFactory.
   const Type* backing_type = nullptr;

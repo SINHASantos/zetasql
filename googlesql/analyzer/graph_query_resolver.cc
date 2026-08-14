@@ -2925,6 +2925,12 @@ GraphTableQueryResolver::ResolveGqlOperator(
                                            local_scope.get(),
                                            std::move(inputs));
     }
+    case AST_GQL_SET: {
+      return MakeSqlErrorAt(gql_op) << "Graph SET is not supported";
+    }
+    case AST_GQL_REMOVE: {
+      return MakeSqlErrorAt(gql_op) << "Graph REMOVE is not supported";
+    }
     case AST_GQL_LET: {
       return ResolveGqlLet(*gql_op->GetAsOrDie<ASTGqlLet>(), local_scope.get(),
                            std::move(inputs));
@@ -3583,11 +3589,29 @@ absl::Status GraphTableQueryResolver::CheckGqlLinearQuery(
       }
       continue;
     }
+    // Terminal SET and REMOVE prevent all ops (including RETURN) from following
+    // them. This provides a user-facing error message instead of returning an
+    // Internal error.
+    if (primitive_ops[i]->Is<ASTGqlSet>() ||
+        primitive_ops[i]->Is<ASTGqlRemove>()) {
+      absl::string_view op_name =
+          primitive_ops[i]->Is<ASTGqlSet>() ? "SET" : "REMOVE";
+      if (primitive_ops[i + 1]->Is<ASTGqlReturn>()) {
+        return MakeSqlErrorAt(primitive_ops[i + 1])
+               << "RETURN after " << op_name
+               << " is not supported in a linear query";
+      }
+      return MakeSqlErrorAt(primitive_ops[i + 1])
+             << op_name
+             << " cannot be followed by other operators in a linear query";
+    }
     GOOGLESQL_RET_CHECK_FAIL() << "Unexpected op: " << primitive_ops[i]->DebugString();
   }
-  // The last op should be a RETURN or INSERT.
+  // The last op should be a RETURN or DML operator.
   GOOGLESQL_RET_CHECK(primitive_ops[size - 1]->Is<ASTGqlReturn>() ||
-            primitive_ops[size - 1]->Is<ASTGqlInsert>());
+            primitive_ops[size - 1]->Is<ASTGqlInsert>() ||
+            primitive_ops[size - 1]->Is<ASTGqlSet>() ||
+            primitive_ops[size - 1]->Is<ASTGqlRemove>());
 
   auto is_only_order_by = [](const ASTGqlOrderByAndPage* op) {
     return op != nullptr && op->order_by() != nullptr && op->page() == nullptr;

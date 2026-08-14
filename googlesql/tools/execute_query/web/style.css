@@ -357,3 +357,62 @@ hr {
 .source-range-highlight {
   background-color: #ff5;
 }
+
+/* Rewrite steps */
+.rewrite-container {
+  margin: 0 0 1rem 0;
+  border: 1px solid #c3e0f7;
+  border-radius: 0 6px 6px 6px;
+  background-color: #fff;
+  overflow: hidden;
+}
+
+.rewrite-steps {
+  margin: 0;
+  padding: 0.4rem 0.75rem;
+  background-color: #e8f4fd;
+  border-bottom: 1px solid #c3e0f7;
+  font-family: Roboto, Arial, sans-serif;
+  font-size: 0.95em;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.rewrite-step-label {
+  font-weight: 600;
+  margin-right: 0.5em;
+}
+
+.rewrite-step-link {
+  color: #0f73b5;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.rewrite-step-link:hover {
+  text-decoration: underline;
+}
+
+.rewrite-step-active {
+  font-weight: bold;
+  cursor: default;
+  text-decoration: none;
+  color: #111;
+}
+
+.rewrite-step-separator {
+  margin: 0 0.5em;
+  color: #666;
+}
+
+.rewrite-container pre.rewrite-ast-panel {
+  display: none;
+  margin: 0;
+  border: none;
+  border-radius: 0;
+}
+
+.rewrite-container pre.rewrite-ast-panel:last-of-type {
+  display: block;
+}

@@ -18,6 +18,7 @@
 
 #include <string>
 
+#include "googlesql/tools/execute_query/web/inline_js.html.h"
 #include "googlesql/tools/execute_query/web/page_body.html.h"
 #include "googlesql/tools/execute_query/web/page_template.html.h"
 #include "googlesql/tools/execute_query/web/style.css.h"
@@ -34,7 +35,8 @@ QueryWebTemplates::QueryWebTemplates()
     : page_template_(embedded_resources::kPageTemplate),
       style_css_(embedded_resources::kStyleCSS),
       page_body_(embedded_resources::kPageBody),
-      table_(embedded_resources::kTable) {}
+      table_(embedded_resources::kTable),
+      inline_js_(embedded_resources::kInlineJS) {}
 
 const std::string& QueryWebTemplates::GetWebPageContents() const {
   return page_template_;
@@ -49,5 +51,7 @@ const std::string& QueryWebTemplates::GetWebPageBody() const {
 }
 
 const std::string& QueryWebTemplates::GetTable() const { return table_; }
+
+const std::string& QueryWebTemplates::GetInlineJS() const { return inline_js_; }
 
 }  // namespace googlesql

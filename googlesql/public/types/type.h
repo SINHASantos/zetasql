@@ -705,6 +705,15 @@ class Type {
   Type(const TypeFactoryBase& factory, TypeKind kind);
   virtual ~Type() = default;
 
+  // Hashes the content of the value ignoring float/double values.
+  // This is used for multiset comparison in tests only.
+  // Default implementation is the same as HashValueContent(), i.e., strict
+  // hashing and NOT ignoring floats.
+  virtual absl::HashState HashValueContentIgnoringFloat(
+      const ValueContent& value, absl::HashState state) const {
+    return HashValueContent(value, std::move(state));
+  }
+
   bool EqualsImpl(const Type* other_type, bool equivalent) const {
     if (this == other_type) {
       return true;
@@ -901,7 +910,6 @@ class Type {
   friend class InternalValue;
   friend class ContainerType;
   friend class DeclarativeType;
-  friend struct HashableValueContentContainerElementIgnoringFloat;
 
   FRIEND_TEST(TypeTest, FormatValueContentArraySQLLiteralMode);
   FRIEND_TEST(TypeTest, FormatValueContentArraySQLExpressionMode);

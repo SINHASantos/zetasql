@@ -154,6 +154,7 @@ enum class FunctionKind {
   kIsNull,
   kIsTrue,
   kIsFalse,
+  kNullIfWithLambda,
   // Cast function
   kCast,
   kLike,
@@ -179,6 +180,9 @@ enum class FunctionKind {
   kBitCastToInt64,
   kBitCastToUint32,
   kBitCastToUint64,
+  kBitCastToFloat,
+  kBitCastToDouble,
+  kBitCastToBytes,
   // Bitwise functions
   kBitwiseNot,
   kBitwiseOr,
@@ -536,6 +540,7 @@ enum class FunctionKind {
 
   // Graph functions
   kPropertyExists,
+  kElementDefinitionNameIs,
   kSameGraphElement,
   kAllDifferentGraphElement,
   kIsSourceNode,
@@ -572,6 +577,12 @@ enum class FunctionKind {
   kL2Norm,
   kEditDistance,
 
+  // Vector functions
+  kEncodeVector,
+  kDecodeVector,
+  kVectorFloat32Length,
+  kVectorEncoding,
+
   // Map functions
   kMapFromArray,
   kMapEntriesSorted,
@@ -604,8 +615,8 @@ enum class FunctionKind {
   // Builtin TVFs
   kTumble,
   kHop,
-  kBatchVectorSearchTVFWithProtoOptions,
-
+  kVectorSearchTVF,
+  kKMeansTVF,
   // AI functions
   kAiIf,
 };
@@ -2467,6 +2478,30 @@ class EditDistanceFunction : public SimpleBuiltinScalarFunction {
                              EvaluationContext* context) const override;
 };
 
+class EncodeVectorFunction : public SimpleBuiltinScalarFunction {
+ public:
+  using SimpleBuiltinScalarFunction::SimpleBuiltinScalarFunction;
+  absl::StatusOr<Value> Eval(absl::Span<const TupleData* const> params,
+                             absl::Span<const Value> args,
+                             EvaluationContext* context) const override;
+};
+
+class DecodeVectorFunction : public SimpleBuiltinScalarFunction {
+ public:
+  using SimpleBuiltinScalarFunction::SimpleBuiltinScalarFunction;
+  absl::StatusOr<Value> Eval(absl::Span<const TupleData* const> params,
+                             absl::Span<const Value> args,
+                             EvaluationContext* context) const override;
+};
+
+class VectorFloat32LengthFunction : public SimpleBuiltinScalarFunction {
+ public:
+  using SimpleBuiltinScalarFunction::SimpleBuiltinScalarFunction;
+  absl::StatusOr<Value> Eval(absl::Span<const TupleData* const> params,
+                             absl::Span<const Value> args,
+                             EvaluationContext* context) const override;
+};
+
 // Evaluates the function calls to all the signatures of `ARRAY_ZIP`.
 class ArrayZipFunction : public SimpleBuiltinScalarFunction {
  public:
@@ -2549,6 +2584,20 @@ class ApplyFunction : public SimpleBuiltinScalarFunction {
   const InlineLambdaExpr* lambda_;
 };
 
+class NullIfLambdaFunction : public SimpleBuiltinScalarFunction {
+ public:
+  NullIfLambdaFunction(FunctionKind kind, const Type* output_type,
+                       const InlineLambdaExpr* lambda)
+      : SimpleBuiltinScalarFunction(kind, output_type), lambda_(lambda) {}
+
+  absl::StatusOr<Value> Eval(
+      absl::Span<const TupleData* const> params, absl::Span<const Value> args,
+      EvaluationContext* evaluation_context) const override;
+
+ private:
+  const InlineLambdaExpr* lambda_;
+};
+
 class TumbleTVF : public BuiltinTableValuedFunction {
  public:
   explicit TumbleTVF(FunctionKind kind) : BuiltinTableValuedFunction(kind) {}
@@ -2569,14 +2618,16 @@ class TumbleTVF : public BuiltinTableValuedFunction {
         std::vector<TVFSchemaColumn> output_columns,
         std::vector<bool> included_columns,
         ResolvedTimestampColumnPath timestamp_column_path,
-        googlesql::IntervalValue window_size, googlesql::PicoTime origin)
+        googlesql::IntervalValue window_size, googlesql::PicoTime origin,
+        std::unique_ptr<googlesql::TypeFactory> type_factory)
         : input_(std::move(input_iterator)),
           output_columns_(std::move(output_columns)),
           included_columns_(std::move(included_columns)),
           timestamp_column_path_(std::move(timestamp_column_path)),
           window_size_(std::move(window_size)),
           origin_(origin),
-          current_output_values_(output_columns_.size()) {}
+          current_output_values_(output_columns_.size()),
+          type_factory_(std::move(type_factory)) {}
 
     int NumColumns() const override {
       return static_cast<int>(output_columns_.size());
@@ -2611,6 +2662,7 @@ class TumbleTVF : public BuiltinTableValuedFunction {
     googlesql::PicoTime origin_;
     std::vector<Value> current_output_values_;
     absl::Status status_;
+    std::unique_ptr<googlesql::TypeFactory> type_factory_;
   };
 };
 
@@ -2632,17 +2684,20 @@ class HopTVF : public BuiltinTableValuedFunction {
     explicit HopResultIterator(
         std::unique_ptr<EvaluatorTableIterator> input_iterator,
         std::vector<TVFSchemaColumn> output_columns,
-        std::vector<bool> included_columns, int timestamp_column_index,
+        std::vector<bool> included_columns,
+        ResolvedTimestampColumnPath timestamp_column_path,
         googlesql::IntervalValue window_size,
-        googlesql::IntervalValue step_size, googlesql::PicoTime origin)
+        googlesql::IntervalValue step_size, googlesql::PicoTime origin,
+        std::unique_ptr<googlesql::TypeFactory> type_factory)
         : input_(std::move(input_iterator)),
           output_columns_(std::move(output_columns)),
           included_columns_(std::move(included_columns)),
-          timestamp_column_index_(timestamp_column_index),
+          timestamp_column_path_(std::move(timestamp_column_path)),
           window_size_(std::move(window_size)),
           step_size_(std::move(step_size)),
           origin_(origin),
-          current_output_values_(output_columns_.size()) {}
+          current_output_values_(output_columns_.size()),
+          type_factory_(std::move(type_factory)) {}
 
     int NumColumns() const override {
       return static_cast<int>(output_columns_.size());
@@ -2674,7 +2729,7 @@ class HopTVF : public BuiltinTableValuedFunction {
     std::unique_ptr<EvaluatorTableIterator> input_;
     std::vector<TVFSchemaColumn> output_columns_;
     std::vector<bool> included_columns_;
-    int timestamp_column_index_;
+    ResolvedTimestampColumnPath timestamp_column_path_;
     googlesql::IntervalValue window_size_;
     googlesql::IntervalValue step_size_;
     googlesql::PicoTime origin_;
@@ -2683,12 +2738,17 @@ class HopTVF : public BuiltinTableValuedFunction {
         pending_windows_;
     std::vector<Value> current_output_values_;
     absl::Status status_;
+    std::unique_ptr<googlesql::TypeFactory> type_factory_;
   };
 };
 
-class BatchVectorSearchTVFWithProtoOptions : public BuiltinTableValuedFunction {
+// Table-valued function (TVF) evaluator for `VECTOR_SEARCH`. Supports both
+// the batch vector search variant (finding nearest neighbors for a table of
+// query vectors) and the single vector search variant (finding nearest
+// neighbors for a single query vector).
+class VectorSearchTVF : public BuiltinTableValuedFunction {
  public:
-  explicit BatchVectorSearchTVFWithProtoOptions(FunctionKind kind)
+  explicit VectorSearchTVF(FunctionKind kind)
       : BuiltinTableValuedFunction(kind) {}
 
   absl::StatusOr<std::unique_ptr<EvaluatorTableIterator>> CreateEvaluator(
@@ -2698,6 +2758,19 @@ class BatchVectorSearchTVFWithProtoOptions : public BuiltinTableValuedFunction {
       EvaluationContext* context) override;
 
   std::string debug_name() const override { return "vector_search"; }
+};
+
+class KMeansTVF : public BuiltinTableValuedFunction {
+ public:
+  explicit KMeansTVF(FunctionKind kind) : BuiltinTableValuedFunction(kind) {}
+
+  absl::StatusOr<std::unique_ptr<EvaluatorTableIterator>> CreateEvaluator(
+      std::vector<TableValuedFunction::TvfEvaluatorArg> args,
+      std::shared_ptr<FunctionSignature> function_call_signature,
+      std::shared_ptr<const TVFSignature> tvf_signature,
+      EvaluationContext* context) override;
+
+  std::string debug_name() const override { return "kmeans"; }
 };
 
 class AiIfFunction : public SimpleBuiltinScalarFunction {

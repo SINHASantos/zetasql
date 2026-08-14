@@ -21,6 +21,7 @@
 #include <string>
 #include <vector>
 
+#include "googlesql/analyzer/rewriters/measure_dependency_graph.h"
 #include "googlesql/public/catalog.h"
 #include "googlesql/public/language_options.h"
 #include "googlesql/public/types/type_factory.h"
@@ -36,9 +37,6 @@
 
 namespace googlesql {
 
-inline constexpr int kReferencedColumnsFieldIndex = 0;
-inline constexpr int kKeyColumnsFieldIndex = 1;
-
 // Returns whether `expr` is a builtin function `AGG(MEASURE<T>) => T`.
 bool IsMeasureAggFunction(const ResolvedExpr* expr);
 
@@ -53,13 +51,33 @@ absl::StatusOr<ResolvedColumn> GetInvokedMeasureColumn(
 // the measure type rewriter.
 absl::Status HasUnsupportedQueryShape(const ResolvedNode* input,
                                       const LanguageOptions& language_options);
+class MeasureCollector;
+class MeasureType;
 
 struct RewriteMeasureExprResult {
+  // A scalar expression over constituent aggregates in
+  // `constituent_aggregate_list` that evaluates to the result of AGG(m).
   std::unique_ptr<const ResolvedExpr> rewritten_measure_expr;
+
+  // Aggregates that must be computed by the AggregateScan.
   std::vector<std::unique_ptr<const ResolvedComputedColumnBase>>
       constituent_aggregate_list;
+
+  // Computed columns representing the closure expressions of the transitive
+  // measure dependencies of the measure being rewritten.
+  //
+  // It is guaranteed that if a ResolvedComputedColumn `c` references another
+  // ResolvedComputedColumn `d` in this list, then `d` appears before `c` in
+  // this list.
+  //
+  // These columns will be added to the input_scan of the AggregateScan by
+  // wrapping the input_scan with ProjectScans.
+  std::vector<std::unique_ptr<const ResolvedComputedColumn>>
+      closure_computed_columns;
 };
 
+// Rewrites a measure expression.
+//
 // A measure expression is written as a scalar expression over zero or more
 // constituent aggregate functions (e.g. SUM(X) / SUM(Y) + (<scalar_subquery>)),
 // and so the resulting rewritten expression has 2 components to it:
@@ -78,14 +96,21 @@ struct RewriteMeasureExprResult {
 // themselves rewritten to use multi-level aggregation to grain-lock and avoid
 // overcounting.
 //
-// `closure_struct_ref`: A column ref to the closure struct column corresponding
-// to the measure being rewritten.
+// Input:
+// - `measure_type`: The measure type to rewrite. Must not be null.
+// - `closure_struct_ref`: A column reference to the closure struct column
+//     corresponding to the measure being rewritten. Must not be null.
+// - `measure_collector`: Used to look up info for the measure dependencies of
+//   `measure_type`.
+// - `any_value_fn`: The ANY_VALUE function definition. Must not be null.
+//
+// Returns the rewritten measure expression. See the comments for
+// `RewriteMeasureExprResult` for more details.
 absl::StatusOr<RewriteMeasureExprResult> RewriteMeasureExpr(
-    const ResolvedExpr* measure_expr,
+    const MeasureType* measure_type,
     const ResolvedColumnRef* closure_struct_ref,
-    const absl::btree_set<std::string, googlesql_base::CaseLess>&
-        row_identity_column_names,
-    const Function* any_value_fn, FunctionCallBuilder& function_call_builder,
+    const MeasureCollector& measure_collector, const Function* any_value_fn,
+    FunctionCallBuilder& function_call_builder,
     const LanguageOptions& language_options, ColumnFactory& column_factory,
     TypeFactory& type_factory);
 

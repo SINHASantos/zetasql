@@ -2685,7 +2685,7 @@ QueryStmt
     |           |           +-left_scan=
     |           |           | +-TVFScan
     |           |           |   +-column_list=[tvf_one_relation_arg_output_schema_is_input_schema.n#6]
-    |           |           |   +-tvf=tvf_one_relation_arg_output_schema_is_input_schema((ANY TABLE) -> ANY TABLE)
+    |           |           |   +-tvf=tvf_one_relation_arg_output_schema_is_input_schema
     |           |           |   +-signature=(TABLE<n DOUBLE>) -> TABLE<n DOUBLE>
     |           |           |   +-argument_list=
     |           |           |   | +-FunctionArgument
@@ -2695,7 +2695,7 @@ QueryStmt
     |           |           |   |   |   +-input_scan=
     |           |           |   |   |     +-TVFScan
     |           |           |   |   |       +-column_list=[tvf_one_relation_arg_output_schema_is_input_schema.n#5]
-    |           |           |   |   |       +-tvf=tvf_one_relation_arg_output_schema_is_input_schema((ANY TABLE) -> ANY TABLE)
+    |           |           |   |   |       +-tvf=tvf_one_relation_arg_output_schema_is_input_schema
     |           |           |   |   |       +-signature=(TABLE<n DOUBLE>) -> TABLE<n DOUBLE>
     |           |           |   |   |       +-argument_list=
     |           |           |   |   |       | +-FunctionArgument
@@ -2824,7 +2824,7 @@ QueryStmt
     |   +-input_scan=
     |     +-TVFScan
     |       +-column_list=[tvf_one_relation_arg_output_schema_is_input_schema.n#6]
-    |       +-tvf=tvf_one_relation_arg_output_schema_is_input_schema((ANY TABLE) -> ANY TABLE)
+    |       +-tvf=tvf_one_relation_arg_output_schema_is_input_schema
     |       +-signature=(TABLE<n INT64>) -> TABLE<n INT64>
     |       +-argument_list=
     |       | +-FunctionArgument

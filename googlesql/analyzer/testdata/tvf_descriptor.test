@@ -27,7 +27,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=tvf_one_descriptor_resolved_names_one_relation_arg.[column_bool#3, column_bytes#4]
-        +-tvf=tvf_one_descriptor_resolved_names_one_relation_arg((ANY DESCRIPTOR, TABLE<int64a INT64, int64b INT64>) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+        +-tvf=tvf_one_descriptor_resolved_names_one_relation_arg
         +-signature=(ANY DESCRIPTOR, TABLE<int64a INT64, int64b INT64>) -> TABLE<column_bool BOOL, column_bytes BYTES>
         +-argument_list=
         | +-FunctionArgument
@@ -57,7 +57,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=tvf_one_relation_arg_one_descriptor.[column_bool#2, column_bytes#3]
-        +-tvf=tvf_one_relation_arg_one_descriptor((TABLE<int64a INT64>, ANY DESCRIPTOR) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+        +-tvf=tvf_one_relation_arg_one_descriptor
         +-signature=(TABLE<int64a INT64>, ANY DESCRIPTOR) -> TABLE<column_bool BOOL, column_bytes BYTES>
         +-argument_list=
         | +-FunctionArgument
@@ -90,7 +90,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=tvf_two_relations_arg_two_descriptors_resolved_names.[column_bool#3, column_bytes#4]
-        +-tvf=tvf_two_relations_arg_two_descriptors_resolved_names((TABLE<int64a INT64>, TABLE<int64b INT64>, ANY DESCRIPTOR, ANY DESCRIPTOR) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+        +-tvf=tvf_two_relations_arg_two_descriptors_resolved_names
         +-signature=(TABLE<int64a INT64>, TABLE<int64b INT64>, ANY DESCRIPTOR, ANY DESCRIPTOR) -> TABLE<column_bool BOOL, column_bytes BYTES>
         +-argument_list=
         | +-FunctionArgument
@@ -134,7 +134,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=tvf_one_relation_arg_one_descriptor_resolved_names.[column_bool#2, column_bytes#3]
-        +-tvf=tvf_one_relation_arg_one_descriptor_resolved_names((TABLE<int64a INT64>, ANY DESCRIPTOR) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+        +-tvf=tvf_one_relation_arg_one_descriptor_resolved_names
         +-signature=(TABLE<int64a INT64>, ANY DESCRIPTOR) -> TABLE<column_bool BOOL, column_bytes BYTES>
         +-argument_list=
         | +-FunctionArgument
@@ -166,7 +166,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=tvf_one_descriptor_resolved_names_one_relation_arg.[column_bool#3, column_bytes#4]
-        +-tvf=tvf_one_descriptor_resolved_names_one_relation_arg((ANY DESCRIPTOR, TABLE<int64a INT64, int64b INT64>) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+        +-tvf=tvf_one_descriptor_resolved_names_one_relation_arg
         +-signature=(ANY DESCRIPTOR, TABLE<int64a INT64, int64b INT64>) -> TABLE<column_bool BOOL, column_bytes BYTES>
         +-argument_list=
         | +-FunctionArgument
@@ -199,7 +199,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=tvf_one_descriptor_resolved_names_one_relation_arg.[column_bool#3, column_bytes#4]
-        +-tvf=tvf_one_descriptor_resolved_names_one_relation_arg((ANY DESCRIPTOR, TABLE<int64a INT64, int64b INT64>) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+        +-tvf=tvf_one_descriptor_resolved_names_one_relation_arg
         +-signature=(ANY DESCRIPTOR, TABLE<int64a INT64, int64b INT64>) -> TABLE<column_bool BOOL, column_bytes BYTES>
         +-argument_list=
         | +-FunctionArgument
@@ -232,7 +232,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=tvf_one_descriptor_resolved_names_one_relation_arg.[column_bool#3, column_bytes#4]
-        +-tvf=tvf_one_descriptor_resolved_names_one_relation_arg((ANY DESCRIPTOR, TABLE<int64a INT64, int64b INT64>) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+        +-tvf=tvf_one_descriptor_resolved_names_one_relation_arg
         +-signature=(ANY DESCRIPTOR, TABLE<int64a INT64, int64b INT64>) -> TABLE<column_bool BOOL, column_bytes BYTES>
         +-argument_list=
         | +-FunctionArgument
@@ -273,7 +273,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=tvf_one_descriptor_resolved_names_one_relation_arg_one_descriptor_arg.[column_bool#2, column_bytes#3]
-        +-tvf=tvf_one_descriptor_resolved_names_one_relation_arg_one_descriptor_arg((ANY DESCRIPTOR, TABLE<int64a INT64>, ANY DESCRIPTOR) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+        +-tvf=tvf_one_descriptor_resolved_names_one_relation_arg_one_descriptor_arg
         +-signature=(ANY DESCRIPTOR, TABLE<int64a INT64>, ANY DESCRIPTOR) -> TABLE<column_bool BOOL, column_bytes BYTES>
         +-argument_list=
         | +-FunctionArgument

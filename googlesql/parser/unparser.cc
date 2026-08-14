@@ -566,6 +566,9 @@ void Unparser::visitASTCreateTableFunctionStatement(
     print("LANGUAGE");
     node->language()->Accept(this, data);
   }
+  if (node->with_connection_clause() != nullptr) {
+    node->with_connection_clause()->Accept(this, data);
+  }
   // TODO Improve the readability of the "OPTIONS" and "AS" clauses
   if (node->options_list() != nullptr) {
     println("OPTIONS");
@@ -901,8 +904,10 @@ void Unparser::visitASTCreateLiveTableStatement(
     print("OPTIONS");
     node->options_list()->Accept(this, data);
   }
-  println("AS");
-  node->query()->Accept(this, data);
+  if (node->query() != nullptr) {
+    println("AS");
+    node->query()->Accept(this, data);
+  }
 }
 
 void Unparser::visitASTCreateMaterializedViewStatement(
@@ -1468,6 +1473,12 @@ void Unparser::visitASTDropVectorIndexStatement(
 void Unparser::visitASTDropAiIndexStatement(const ASTDropAiIndexStatement* node,
                                             void* data) {
   print("DROP AI INDEX");
+  VisitASTDropIndexStatement(node, data);
+}
+
+void Unparser::visitASTDropIndexStatement(const ASTDropIndexStatement* node,
+                                          void* data) {
+  print("DROP INDEX");
   VisitASTDropIndexStatement(node, data);
 }
 
@@ -6004,6 +6015,61 @@ void Unparser::visitASTGraphInsertEdgePattern(
     print("]-");
   } else {
     print("]->");
+  }
+}
+
+void Unparser::visitASTGqlSetPropertyItem(const ASTGqlSetPropertyItem* node,
+                                          void* data) {
+  node->property_path()->Accept(this, data);
+  print("=");
+  node->value()->Accept(this, data);
+}
+
+void Unparser::visitASTGqlSetAllPropertiesItem(
+    const ASTGqlSetAllPropertiesItem* node, void* data) {
+  node->element_variable()->Accept(this, data);
+  print("=");
+  if (node->property_specification() != nullptr) {
+    node->property_specification()->Accept(this, data);
+  } else {
+    print("{}");
+  }
+}
+
+void Unparser::visitASTGqlSetLabelItem(const ASTGqlSetLabelItem* node,
+                                       void* data) {
+  node->element_variable()->Accept(this, data);
+  print("IS");
+  node->label_name()->Accept(this, data);
+}
+
+void Unparser::visitASTGqlSet(const ASTGqlSet* node, void* data) {
+  print("SET");
+  println();
+  {
+    Formatter::Indenter indenter(&formatter_);
+    UnparseVectorWithSeparator(node->items(), data, ",\n");
+  }
+}
+
+void Unparser::visitASTGqlRemovePropertyItem(
+    const ASTGqlRemovePropertyItem* node, void* data) {
+  node->property_path()->Accept(this, data);
+}
+
+void Unparser::visitASTGqlRemoveLabelItem(const ASTGqlRemoveLabelItem* node,
+                                          void* data) {
+  node->element_variable()->Accept(this, data);
+  print("IS");
+  node->label_name()->Accept(this, data);
+}
+
+void Unparser::visitASTGqlRemove(const ASTGqlRemove* node, void* data) {
+  print("REMOVE");
+  println();
+  {
+    Formatter::Indenter indenter(&formatter_);
+    UnparseVectorWithSeparator(node->items(), data, ",\n");
   }
 }
 

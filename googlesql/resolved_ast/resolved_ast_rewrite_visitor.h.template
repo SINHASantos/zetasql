@@ -27,6 +27,7 @@
 #include <vector>
 
 #include "googlesql/common/thread_stack.h"
+#include "googlesql/public/types/annotation.h"
 #include "googlesql/resolved_ast/resolved_ast.h"
 #include "googlesql/resolved_ast/resolved_ast_builder.h"
 #include "googlesql/resolved_ast/resolved_node.h"
@@ -157,7 +158,8 @@ class ResolvedASTRewriteVisitor {
       std::unique_ptr<const {{node.name}}> node);
 # endfor
   absl::StatusOr<ResolvedColumn> DefaultVisit(ResolvedColumn column);
-  absl::StatusOr<const Type*> DefaultVisit(const Type* type);
+  absl::StatusOr<AnnotatedType> DefaultVisit(
+      const Type* type, std::optional<const AnnotationMap*> annotation_map);
 
   template <typename TypeName>
   std::unique_ptr<const TypeName> CastUniquePtr(std::unique_ptr<const ResolvedNode> node) {
@@ -202,15 +204,36 @@ class ResolvedASTRewriteVisitor {
     return column;
   }
 
-  virtual absl::Status PreVisitType(const Type* type) {
+  // Pre-visits an AnnotatedType.
+  //
+  // This is called during the traversal of `type` fields.
+  //
+  // If the `type` is in a subclass of ResolvedExpr, `annotation_map` will
+  // contain its `type_notation_map` (which may be nullptr).
+  //
+  // Otherwise, `annotation_map` will be `std::nullopt`.
+  virtual absl::Status PreVisitAnnotatedType(
+      const Type* type,
+      std::optional<const AnnotationMap*> annotation_map) {
     return absl::OkStatus();
   }
 
-  // Rewrite a Type. The default behavior returns it as is.
-  // Overrides may be necessary when a visitor needs to remap columns.
-  // Note: This does not visit Types inside FunctionSignatures.
-  virtual absl::StatusOr<const Type*> PostVisitType(const Type* type) {
-    return type;
+  // Rewrites an AnnotatedType.
+  //
+  // This is called during the traversal of `type` fields.
+  //
+  // If the `type` is in a subclass of ResolvedExpr, `annotation_map` will
+  // contain the its `type_notation_map` (which may be nullptr).
+  //
+  // Otherwise, `annotation_map` will be `std::nullopt`, meaning this Type
+  // does not have an associated AnnotationMap.
+  //
+  // If `annotation_map` was `std::nullopt`, the returned `AnnotatedType` must
+  // have a nullptr `annotation_map`.
+  virtual absl::StatusOr<AnnotatedType> PostVisitAnnotatedType(
+      const Type* type,
+      std::optional<const AnnotationMap*> annotation_map) {
+    return AnnotatedType(type, annotation_map.value_or(nullptr));
   }
 };
 

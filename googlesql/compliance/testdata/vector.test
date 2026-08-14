@@ -1,0 +1,344 @@
+# TODO: Add tests for CREATE TABLE, CAST assertion on VECTOR type
+# parameters.
+[prepare_database]
+[default required_features=VECTOR_TYPE,DECLARATIVE_TYPE_FRAMEWORK]
+CREATE TEMP CONSTANT CVectorLength = 2;
+==
+
+#################
+# ENCODE_VECTOR #
+#################
+
+[name=vector_encode_empty]
+SELECT VECTOR_LENGTH(ENCODE_VECTOR(ARRAY<FLOAT>[]));
+--
+ERROR: generic::out_of_range: The input ARRAY to ENCODE_VECTOR must not be empty
+==
+
+[name=vector_encode_parameter_and_constant]
+[parameters=ARRAY<FLOAT>[1.0, 2.0] as param_arr]
+SELECT VECTOR_LENGTH(ENCODE_VECTOR(@param_arr, CVectorLength));
+--
+ARRAY<STRUCT<INT64>>[{2}]
+==
+
+[name=vector_encode_null_error]
+SELECT VECTOR_LENGTH(ENCODE_VECTOR(ARRAY<FLOAT>[1.0, NULL]));
+--
+ERROR: generic::out_of_range: NULL values are not permitted in ENCODE_VECTOR
+==
+
+[name=vector_encode_null_error_safe]
+[required_features=VECTOR_TYPE,DECLARATIVE_TYPE_FRAMEWORK,SAFE_FUNCTION_CALL]
+SELECT VECTOR_LENGTH(SAFE.ENCODE_VECTOR(ARRAY<FLOAT>[1.0, NULL]));
+--
+ARRAY<STRUCT<INT64>>[{NULL}]
+==
+
+[name=vector_encode_nan_error]
+SELECT VECTOR_LENGTH(ENCODE_VECTOR(ARRAY<FLOAT>[1.0, CAST('NaN' AS FLOAT)]));
+--
+ERROR: generic::out_of_range: NaN, +inf, or -inf values are not permitted in ENCODE_VECTOR
+==
+
+[name=vector_encode_nan_error_safe]
+[required_features=VECTOR_TYPE,DECLARATIVE_TYPE_FRAMEWORK,SAFE_FUNCTION_CALL]
+SELECT VECTOR_LENGTH(SAFE.ENCODE_VECTOR(ARRAY<FLOAT>[1.0, CAST('NaN' AS FLOAT)]));
+--
+ARRAY<STRUCT<INT64>>[{NULL}]
+==
+
+[name=vector_encode_inf_error]
+SELECT VECTOR_LENGTH(ENCODE_VECTOR(ARRAY<FLOAT>[1.0, CAST('+inf' AS FLOAT)]));
+--
+ERROR: generic::out_of_range: NaN, +inf, or -inf values are not permitted in ENCODE_VECTOR
+==
+
+[name=vector_encode_inf_error_safe]
+[required_features=VECTOR_TYPE,DECLARATIVE_TYPE_FRAMEWORK,SAFE_FUNCTION_CALL]
+SELECT VECTOR_LENGTH(SAFE.ENCODE_VECTOR(ARRAY<FLOAT>[1.0, CAST('+inf' AS FLOAT)]));
+--
+ARRAY<STRUCT<INT64>>[{NULL}]
+==
+
+[name=vector_encode_neg_inf_error]
+SELECT VECTOR_LENGTH(ENCODE_VECTOR(ARRAY<FLOAT>[1.0, CAST('-inf' AS FLOAT)]));
+--
+ERROR: generic::out_of_range: NaN, +inf, or -inf values are not permitted in ENCODE_VECTOR
+==
+
+[name=vector_encode_neg_inf_error_safe]
+[required_features=VECTOR_TYPE,DECLARATIVE_TYPE_FRAMEWORK,SAFE_FUNCTION_CALL]
+SELECT VECTOR_LENGTH(SAFE.ENCODE_VECTOR(ARRAY<FLOAT>[1.0, CAST('-inf' AS FLOAT)]));
+--
+ARRAY<STRUCT<INT64>>[{NULL}]
+==
+
+[name=vector_encode_mismatched_length]
+SELECT VECTOR_LENGTH(ENCODE_VECTOR(ARRAY<FLOAT>[1.0, 2.0, 3.0], 2));
+--
+ERROR: generic::out_of_range: Input ARRAY does not have a matching array_length (3) with the length (2)
+==
+
+[name=vector_encode_mismatched_length_safe]
+[required_features=VECTOR_TYPE,DECLARATIVE_TYPE_FRAMEWORK,SAFE_FUNCTION_CALL]
+SELECT VECTOR_LENGTH(SAFE.ENCODE_VECTOR(ARRAY<FLOAT>[1.0, 2.0, 3.0], 2));
+--
+ARRAY<STRUCT<INT64>>[{NULL}]
+==
+
+#################
+# DECODE_VECTOR #
+#################
+
+[name=vector_decode]
+SELECT DECODE_VECTOR(ENCODE_VECTOR(ARRAY<FLOAT>[1.0, 2.0, 3.0]));
+--
+ARRAY<STRUCT<ARRAY<>>>[{ARRAY<FLOAT>[known order:1, 2, 3]}]
+==
+
+[name=vector_decode_null]
+SELECT DECODE_VECTOR(CAST(NULL AS VECTOR));
+--
+ARRAY<STRUCT<ARRAY<>>>[{ARRAY<FLOAT>(NULL)}]
+==
+
+#################
+# VECTOR_LENGTH #
+#################
+
+[name=vector_length_null]
+SELECT VECTOR_LENGTH(CAST(NULL AS VECTOR));
+--
+ARRAY<STRUCT<INT64>>[{NULL}]
+==
+
+[name=vector_length_basic]
+SELECT VECTOR_LENGTH(ENCODE_VECTOR(ARRAY<FLOAT>[1.0, 2.0, 3.0]));
+--
+ARRAY<STRUCT<INT64>>[{3}]
+==
+
+[name=vector_length_cast_to_unannotated_vector]
+SELECT VECTOR_LENGTH(CAST(ENCODE_VECTOR(ARRAY<FLOAT>[1.0, 2.0, 3.0]) AS VECTOR));
+--
+ARRAY<STRUCT<INT64>>[{3}]
+==
+
+###############
+# DOT_PRODUCT #
+###############
+
+[name=vector_dot_product]
+[required_features=VECTOR_TYPE,DECLARATIVE_TYPE_FRAMEWORK,DOT_PRODUCT]
+SELECT DOT_PRODUCT(ENCODE_VECTOR(ARRAY<FLOAT>[1.0, 2.0, 3.0]), ENCODE_VECTOR(ARRAY<FLOAT>[4.0, 5.0, 6.0]));
+--
+ARRAY<STRUCT<DOUBLE>>[{32}]
+==
+
+[name=vector_dot_product_mismatched_length]
+[required_features=VECTOR_TYPE,DECLARATIVE_TYPE_FRAMEWORK,DOT_PRODUCT]
+SELECT DOT_PRODUCT(ENCODE_VECTOR(ARRAY<FLOAT>[1.0, 2.0]), ENCODE_VECTOR(ARRAY<FLOAT>[3.0, 4.0, 5.0]));
+--
+ERROR: generic::out_of_range: Array length mismatch: 2 and 3
+==
+
+###################
+# COSINE_DISTANCE #
+###################
+
+[name=vector_cosine_distance]
+SELECT COSINE_DISTANCE(ENCODE_VECTOR(ARRAY<FLOAT>[1.0, 2.0, 3.0]), ENCODE_VECTOR(ARRAY<FLOAT>[4.0, 5.0, 6.0]));
+--
+ARRAY<STRUCT<DOUBLE>>[{0.025368153802923787}]
+==
+
+[name=vector_cosine_distance_negative]
+SELECT COSINE_DISTANCE(ENCODE_VECTOR(ARRAY<FLOAT>[1.0, -2.0, 3.0]), ENCODE_VECTOR(ARRAY<FLOAT>[-4.0, 5.0, -6.0]));
+--
+ARRAY<STRUCT<DOUBLE>>[{1.9746318461970762}]
+==
+
+[name=vector_cosine_distance_zero_vector]
+SELECT COSINE_DISTANCE(ENCODE_VECTOR(ARRAY<FLOAT>[1.0, 2.0]), ENCODE_VECTOR(ARRAY<FLOAT>[0.0, 0.0]));
+--
+ERROR: generic::out_of_range: Cannot compute cosine distance against zero vector
+==
+
+[name=vector_cosine_distance_zero_vector_safe]
+[required_features=VECTOR_TYPE,DECLARATIVE_TYPE_FRAMEWORK,SAFE_FUNCTION_CALL]
+SELECT SAFE.COSINE_DISTANCE(ENCODE_VECTOR(ARRAY<FLOAT>[1.0, 2.0]), ENCODE_VECTOR(ARRAY<FLOAT>[0.0, 0.0]));
+--
+ARRAY<STRUCT<DOUBLE>>[{NULL}]
+==
+
+[name=vector_cosine_distance_mismatched_length]
+SELECT COSINE_DISTANCE(ENCODE_VECTOR(ARRAY<FLOAT>[1.0, 2.0]), ENCODE_VECTOR(ARRAY<FLOAT>[3.0, 4.0, 5.0]));
+--
+ERROR: generic::out_of_range: Array length mismatch: 2 and 3
+==
+
+[name=vector_cosine_distance_mismatched_length_safe]
+[required_features=VECTOR_TYPE,DECLARATIVE_TYPE_FRAMEWORK,SAFE_FUNCTION_CALL]
+SELECT SAFE.COSINE_DISTANCE(ENCODE_VECTOR(ARRAY<FLOAT>[1.0, 2.0]), ENCODE_VECTOR(ARRAY<FLOAT>[3.0, 4.0, 5.0]));
+--
+ARRAY<STRUCT<DOUBLE>>[{NULL}]
+==
+
+[name=vector_cosine_distance_null]
+SELECT COSINE_DISTANCE(ENCODE_VECTOR(CAST(NULL AS ARRAY<FLOAT>)), ENCODE_VECTOR(CAST(NULL AS ARRAY<FLOAT>)));
+--
+ARRAY<STRUCT<DOUBLE>>[{NULL}]
+==
+
+######################
+# EUCLIDEAN_DISTANCE #
+######################
+
+[name=vector_euclidean_distance]
+SELECT EUCLIDEAN_DISTANCE(ENCODE_VECTOR(ARRAY<FLOAT>[1.0, 2.0, 3.0]), ENCODE_VECTOR(ARRAY<FLOAT>[4.0, 5.0, 6.0]));
+--
+ARRAY<STRUCT<DOUBLE>>[{5.196152422706632}]
+==
+
+[name=vector_euclidean_distance_mismatched_length]
+SELECT EUCLIDEAN_DISTANCE(ENCODE_VECTOR(ARRAY<FLOAT>[1.0, 2.0]), ENCODE_VECTOR(ARRAY<FLOAT>[3.0, 4.0, 5.0]));
+--
+ERROR: generic::out_of_range: Array length mismatch: 2 and 3
+==
+
+[name=vector_euclidean_distance_mismatched_length_safe]
+[required_features=VECTOR_TYPE,DECLARATIVE_TYPE_FRAMEWORK,SAFE_FUNCTION_CALL]
+SELECT SAFE.EUCLIDEAN_DISTANCE(ENCODE_VECTOR(ARRAY<FLOAT>[1.0, 2.0]), ENCODE_VECTOR(ARRAY<FLOAT>[3.0, 4.0, 5.0]));
+--
+ARRAY<STRUCT<DOUBLE>>[{NULL}]
+==
+
+######################
+# MANHATTAN_DISTANCE #
+######################
+
+[name=vector_manhattan_distance]
+[required_features=VECTOR_TYPE,DECLARATIVE_TYPE_FRAMEWORK,MANHATTAN_DISTANCE]
+SELECT MANHATTAN_DISTANCE(ENCODE_VECTOR(ARRAY<FLOAT>[1.0, 2.0, 3.0]), ENCODE_VECTOR(ARRAY<FLOAT>[4.0, 5.0, 6.0]));
+--
+ARRAY<STRUCT<DOUBLE>>[{9}]
+==
+
+[name=vector_manhattan_distance_negative]
+[required_features=VECTOR_TYPE,DECLARATIVE_TYPE_FRAMEWORK,MANHATTAN_DISTANCE]
+SELECT MANHATTAN_DISTANCE(ENCODE_VECTOR(ARRAY<FLOAT>[1.0, -2.0, 3.0]), ENCODE_VECTOR(ARRAY<FLOAT>[-4.0, 5.0, -6.0]));
+--
+ARRAY<STRUCT<DOUBLE>>[{21}]
+==
+
+###########
+# L1_NORM #
+###########
+
+[name=vector_l1_norm]
+[required_features=VECTOR_TYPE,DECLARATIVE_TYPE_FRAMEWORK,L1_NORM]
+SELECT L1_NORM(ENCODE_VECTOR(ARRAY<FLOAT>[1.0, 2.0, 3.0]));
+--
+ARRAY<STRUCT<DOUBLE>>[{6}]
+==
+
+[name=vector_l1_norm_extreme_positive]
+[required_features=VECTOR_TYPE,DECLARATIVE_TYPE_FRAMEWORK,L1_NORM]
+SELECT L1_NORM(ENCODE_VECTOR(ARRAY<FLOAT>[CAST(3.402823e38 AS FLOAT), CAST(3.402823e38 AS FLOAT)]));
+--
+ARRAY<STRUCT<DOUBLE>>[{6.8056461214741931e+38}]
+==
+
+[name=vector_l1_norm_extreme_negative]
+[required_features=VECTOR_TYPE,DECLARATIVE_TYPE_FRAMEWORK,L1_NORM]
+SELECT L1_NORM(ENCODE_VECTOR(ARRAY<FLOAT>[CAST(-3.402823e38 AS FLOAT), CAST(-3.402823e38 AS FLOAT)]));
+--
+ARRAY<STRUCT<DOUBLE>>[{6.8056461214741931e+38}]
+==
+
+###########
+# L2_NORM #
+###########
+
+[name=vector_l2_norm]
+[required_features=VECTOR_TYPE,DECLARATIVE_TYPE_FRAMEWORK,L2_NORM]
+SELECT L2_NORM(ENCODE_VECTOR(ARRAY<FLOAT>[1.0, 2.0, 3.0]));
+--
+ARRAY<STRUCT<DOUBLE>>[{3.7416573867739413}]
+==
+
+[name=vector_l2_norm_zero]
+[required_features=VECTOR_TYPE,DECLARATIVE_TYPE_FRAMEWORK,L2_NORM]
+SELECT L2_NORM(ENCODE_VECTOR(ARRAY<FLOAT>[0.0, 0.0, 0.0]));
+--
+ARRAY<STRUCT<DOUBLE>>[{0}]
+==
+
+[name=vector_l2_norm_extreme_positive]
+[required_features=VECTOR_TYPE,DECLARATIVE_TYPE_FRAMEWORK,L2_NORM]
+SELECT L2_NORM(ENCODE_VECTOR(ARRAY<FLOAT>[CAST(3.402823e38 AS FLOAT), CAST(3.402823e38 AS FLOAT)]));
+--
+ARRAY<STRUCT<DOUBLE>>[{4.812318522850328e+38}]
+==
+
+#############################
+# GENERAL VECTOR EVALUATION #
+#############################
+
+[name=vector_is_null]
+SELECT ENCODE_VECTOR(ARRAY<FLOAT>[1.0, 2.0]) IS NULL, CAST(NULL AS VECTOR) IS NULL;
+--
+ARRAY<STRUCT<BOOL, BOOL>>[{false, true}]
+==
+
+[name=vector_select_from_struct]
+SELECT DECODE_VECTOR(STRUCT(ENCODE_VECTOR(ARRAY<FLOAT>[1.0, 2.0]) AS v).v);
+--
+ARRAY<STRUCT<ARRAY<>>>[{ARRAY<FLOAT>[known order:1, 2]}]
+==
+
+[name=vector_select_from_struct_null]
+SELECT STRUCT(CAST(NULL AS VECTOR) AS v).v;
+--
+ARRAY<STRUCT<v VECTOR>>[{NULL}]
+==
+
+###################
+# ARRAY OF VECTOR #
+###################
+
+[name=vector_array_construction_null]
+SELECT ARRAY<VECTOR>[CAST(NULL AS VECTOR)];
+--
+ARRAY<STRUCT<ARRAY<>>>[{ARRAY<VECTOR>[NULL]}]
+==
+
+[name=vector_array_length]
+SELECT ARRAY_LENGTH(ARRAY<VECTOR>[CAST(NULL AS VECTOR), ENCODE_VECTOR(ARRAY<FLOAT>[1.0])]);
+--
+ARRAY<STRUCT<INT64>>[{2}]
+==
+
+[name=vector_array_construction_invalid_element]
+SELECT ARRAY<VECTOR>[ENCODE_VECTOR(ARRAY<FLOAT>[1.0, NULL])];
+--
+ERROR: generic::out_of_range: NULL values are not permitted in ENCODE_VECTOR
+==
+
+[name=vector_encode_null_length]
+SELECT VECTOR_LENGTH(ENCODE_VECTOR(ARRAY<FLOAT>[1.0, 2.0, 3.0], NULL));
+--
+ARRAY<STRUCT<INT64>>[{3}]
+==
+
+[name=vector_array_element_length_null]
+SELECT VECTOR_LENGTH(ARRAY<VECTOR>[CAST(NULL AS VECTOR), ENCODE_VECTOR(ARRAY<FLOAT>[1.0])][OFFSET(0)]);
+--
+ARRAY<STRUCT<INT64>>[{NULL}]
+==
+
+[name=vector_array_element_length_valid]
+SELECT VECTOR_LENGTH(ARRAY<VECTOR>[CAST(NULL AS VECTOR), ENCODE_VECTOR(ARRAY<FLOAT>[1.0])][OFFSET(1)]);
+--
+ARRAY<STRUCT<INT64>>[{1}]

@@ -22,6 +22,7 @@
 #include <vector>
 
 #include "googlesql/testing/test_function.h"
+#include "absl/status/statusor.h"
 
 namespace googlesql {
 
@@ -287,7 +288,7 @@ std::vector<FunctionTestCall> GetFunctionTestsParseNumeric();
 
 std::vector<FunctionTestCall> GetFunctionTestsNet();
 
-std::vector<FunctionTestCall> GetFunctionTestsBitCast();
+absl::StatusOr<std::vector<FunctionTestCall>> GetFunctionTestsBitCast();
 
 std::vector<FunctionTestCall> GetFunctionTestsGenerateArray();
 std::vector<FunctionTestCall> GetFunctionTestsGenerateDateArray();

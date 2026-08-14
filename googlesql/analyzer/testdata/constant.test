@@ -215,7 +215,6 @@ QueryStmt
     +-input_scan=
       +-SingleRowScan
 
-
 DEPRECATION WARNING:
 Lateral column alias will shadow original target: ambiguous [at 1:32]
 SELECT 1 AS TestConstantProto, TestConstantProto, TestConstantProto.int64_key_1
@@ -346,7 +345,6 @@ QueryStmt
         | +-TestConstantString#1 := Literal(type=STRUCT<e INT64, f INT64>, value={e:1, f:2}, has_explicit_type=TRUE)
         +-input_scan=
           +-SingleRowScan
-
 
 DEPRECATION WARNING:
 Lateral column alias will shadow original target: STRUCT<e INT64, f INT64> ($subquery1.TestConstantString#1) [at 1:46]
@@ -720,7 +718,7 @@ QueryStmt
     +-expr_list=
     | +-TestConstantInt64#3 := Constant(TestConstantInt64, type=INT64, value=1)
     +-input_scan=
-      +-TVFScan(tvf=tvf_no_args(() -> TABLE<column_bool BOOL, column_bytes BYTES>), signature=() -> TABLE<column_bool BOOL, column_bytes BYTES>, function_call_signature=() -> TABLE<column_bool BOOL, column_bytes BYTES>)
+      +-TVFScan(tvf=tvf_no_args, signature=() -> TABLE<column_bool BOOL, column_bytes BYTES>, function_call_signature=() -> TABLE<column_bool BOOL, column_bytes BYTES>)
 --
 ALTERNATION GROUP: tvf_exactly_1_int64_arg(443)
 --
@@ -734,7 +732,7 @@ QueryStmt
     | +-TestConstantInt64#3 := Constant(TestConstantInt64, type=INT64, value=1)
     +-input_scan=
       +-TVFScan
-        +-tvf=tvf_exactly_1_int64_arg((INT64) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+        +-tvf=tvf_exactly_1_int64_arg
         +-signature=(literal INT64) -> TABLE<column_bool BOOL, column_bytes BYTES>
         +-argument_list=
         | +-FunctionArgument

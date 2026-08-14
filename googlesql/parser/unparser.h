@@ -323,6 +323,8 @@ class Unparser : public ParseTreeVisitor {
                                         void* data) override;
   void visitASTDropAiIndexStatement(const ASTDropAiIndexStatement* node,
                                     void* data) override;
+  void visitASTDropIndexStatement(const ASTDropIndexStatement* node,
+                                  void* data) override;
   void visitASTRenameStatement(const ASTRenameStatement* node,
                                void* data) override;
   void visitASTImportStatement(const ASTImportStatement* node,
@@ -486,6 +488,18 @@ class Unparser : public ParseTreeVisitor {
                                       void* data) override;
   void visitASTGraphInsertEdgePattern(const ASTGraphInsertEdgePattern* node,
                                       void* data) override;
+  void visitASTGqlSetPropertyItem(const ASTGqlSetPropertyItem* node,
+                                  void* data) override;
+  void visitASTGqlSetAllPropertiesItem(const ASTGqlSetAllPropertiesItem* node,
+                                       void* data) override;
+  void visitASTGqlSetLabelItem(const ASTGqlSetLabelItem* node,
+                               void* data) override;
+  void visitASTGqlSet(const ASTGqlSet* node, void* data) override;
+  void visitASTGqlRemovePropertyItem(const ASTGqlRemovePropertyItem* node,
+                                     void* data) override;
+  void visitASTGqlRemoveLabelItem(const ASTGqlRemoveLabelItem* node,
+                                  void* data) override;
+  void visitASTGqlRemove(const ASTGqlRemove* node, void* data) override;
   void visitASTGqlQuery(const ASTGqlQuery* node, void* data) override;
   void visitASTGqlGraphPatternQuery(const ASTGqlGraphPatternQuery* node,
                                     void* data) override;

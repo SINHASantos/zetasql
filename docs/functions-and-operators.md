@@ -394,6 +394,12 @@ ambiguity. For example:
 </tr>
 
 <tr>
+  <td><a href="#map_subscript_operator">Map subscript operator</a>
+</td>
+  <td>Gets the value in a map for a given key.</td>
+</tr>
+
+<tr>
   <td><a href="#struct_subscript_operator">Struct subscript operator</a>
 </td>
   <td>Gets the value of a field at a selected position in a struct.</td>
@@ -733,6 +739,141 @@ SELECT ["coffee", "tea", "milk"][OFFSET(6)] AS item_offset
 [array-first-function]: #array_first
 
 [array-last-function]: #array_last
+
+### Map subscript operator 
+<a id="map_subscript_operator"></a>
+
+```
+map_expression[map_subscript_specifier]
+
+map_subscript_specifier:
+  key_name | mode_keyword(key_name)
+
+mode_keyword:
+  { KEY | SAFE_KEY }
+```
+
+**Description**
+
+Returns the value in a [map][map-type] for a given key.
+
+Input values:
+
++   `map_expression`: A map.
++   `key_name`: When `key_name` is provided without a wrapping keyword,
+    it's the same as `SAFE_KEY(key_name)`. Note that `NULL` is a
+    valid key and can pair with non-`NULL` values. For example,
+    `MAP_FROM_ARRAY([NULL, 1])[NULL]` returns `1`.
++   `mode_keyword(key_name)`: Specifies whether to produce `NULL` or
+    an error if the key isn't present in the map.
+
+    +   `KEY(key_name)`: Returns an error if the key isn't present in the map.
+
+    +   `SAFE_KEY(key_name)`: Returns `NULL` if the key isn't present in the
+        map.
+
+**Return type**
+
+In the map, `V` as represented in `map<K,V>`.
+
+**Examples**
+
+In the following query, the map subscript operator returns the value when the
+key is present:
+
+```googlesql
+SELECT
+  input_map[KEY('B')] AS map_value
+FROM
+  MAP_FROM_ARRAY([('A', 1), ('B', 2), ('C', 3)]) AS input_map;
+
+/*-----------+
+ | map_value |
+ +-----------+
+ | 2         |
+ +-----------*/
+```
+
+In the following query, because the key doesn't exist in the map and `KEY`
+is used, an error is produced:
+
+```googlesql
+-- ERROR: Key not found in map: D
+SELECT
+  input_map[KEY('D')] AS map_value
+FROM
+  MAP_FROM_ARRAY([('A', 1), ('B', 2), ('C', 3)]) AS input_map;
+```
+
+In the following query, because the key doesn't exist in the map and
+`SAFE_KEY` is used, the map subscript operator returns `NULL`:
+
+```googlesql
+SELECT
+  input_map[SAFE_KEY('D')] AS safe_key_missing
+FROM
+  MAP_FROM_ARRAY([('A', 1), ('B', 2), ('C', 3)]) AS input_map;
+
+/*------------------+
+ | safe_key_missing |
+ +------------------+
+ | NULL             |
+ +------------------*/
+```
+
+In the following query, the subscript operator returns `NULL` when the map is
+`NULL`:
+
+```googlesql
+SELECT
+  input_map[KEY('A')] AS null_map
+FROM
+  MAP_FROM_ARRAY(CAST(NULL AS ARRAY<STRUCT<INT64, INT64>>)) AS input_map;
+
+/*-----------+
+ | null_map  |
+ +-----------+
+ | NULL      |
+ +-----------*/
+```
+
+In the following query, the subscript operator returns a non-`NULL` value for
+a `NULL` key because `NULL` is present in the map as a key:
+
+```googlesql
+SELECT
+  input_map[KEY(NULL)] AS map_value
+FROM
+  MAP_FROM_ARRAY([(NULL, -100), ('A', 1), ('B', 2)]) AS input_map;
+
+/*-----------+
+ | map_value |
+ +-----------+
+ | -100      |
+ +-----------*/
+```
+
+In the following query, because a key is used without `KEY()` or `SAFE_KEY()`,
+it has the same behavior as if `SAFE_KEY()` had been used: using keys that
+are present in the map returns the associated value, and keys not present
+return `NULL`.
+
+```googlesql
+SELECT
+  input_map['B'] AS present_key_value,
+  input_map['D'] AS missing_key_value,
+  input_map[NULL] AS missing_null_key_value
+FROM
+  MAP_FROM_ARRAY([('A', 1), ('B', 2), ('C', 3)]) AS input_map;
+
+/*----------------------------------------------------------------+
+ | present_key_value | missing_key_value | missing_null_key_value |
+ +-------------------|-------------------|------------------------+
+ | 2                 | NULL              | NULL                   |
+ +----------------------------------------------------------------*/
+```
+
+[map-type]: https://github.com/google/googlesql/blob/master/docs/data-types.md#map_type
 
 ### Struct subscript operator 
 <a id="struct_subscript_operator"></a>
@@ -5698,7 +5839,9 @@ window_specification:
 
 **Description**
 
-Returns an ARRAY of `expression` values.
+Returns an ARRAY of `expression` values. The order of elements
+in the returned array is arbitrary. To order
+the array elements, use an `ORDER BY` clause within the function call.
 
 To learn more about the optional aggregate clauses that you can pass
 into this function, see
@@ -6305,22 +6448,6 @@ distinct counts. For more information, see
 
 **Details**
 
-To count the number of distinct values of an expression for which a
-certain condition is satisfied, you can use the following recipe:
-
-```googlesql
-COUNT(DISTINCT IF(condition, expression, NULL))
-```
-
-`IF` returns the value of `expression` if `condition` is `TRUE`, or
-`NULL` otherwise. The surrounding `COUNT(DISTINCT ...)` ignores the `NULL`
-values, so it counts only the distinct values of `expression` for which
-`condition` is `TRUE`.
-
-To count the number of non-distinct values of an expression for which a
-certain condition is satisfied, consider using the
-[`COUNTIF`][countif] function.
-
 This function with `DISTINCT` supports specifying [collation][collation].
 
 [collation]: https://github.com/google/googlesql/blob/master/docs/collation-concepts.md
@@ -6388,7 +6515,7 @@ FROM UNNEST([1, 4, NULL, 4, 5]) AS x;
 The following query counts the number of distinct positive values of `x`:
 
 ```googlesql
-SELECT COUNT(DISTINCT IF(x > 0, x, NULL)) AS distinct_positive
+SELECT COUNT(DISTINCT x WHERE x > 0) AS distinct_positive
 FROM UNNEST([1, -2, 4, 1, -5, 4, 1, 3, -6, 1]) AS x;
 
 /*-------------------+
@@ -6416,7 +6543,7 @@ WITH Events AS (
   SELECT DATE '2021-01-04' AS event_date, 'FAILURE' AS event_type
 )
 SELECT
-  COUNT(DISTINCT IF(event_type = 'FAILURE', event_date, NULL))
+  COUNT(DISTINCT event_date WHERE event_type = 'FAILURE')
     AS distinct_dates_with_failures
 FROM Events;
 
@@ -6441,7 +6568,7 @@ WITH
     SELECT 2991, 'e' UNION ALL
     SELECT 4366, 'f')
 SELECT
-  COUNT(DISTINCT IF(id IN (SELECT id FROM customers), id, NULL)) AS result
+  COUNT(DISTINCT id WHERE id IN (SELECT id FROM customers)) AS result
 FROM vendors;
 
 /*--------+
@@ -11055,6 +11182,16 @@ GoogleSQL supports [casting][con-func-cast] to `ARRAY`. The
       
     </td>
   </tr>
+  <tr>
+    <td><code>NULL</code></td>
+    <td><code>ARRAY</code></td>
+    <td>
+      Casts a <code>NULL</code> value to a specific type of array. For example,
+      <code>CAST(NULL AS ARRAY&lt;DOUBLE&gt;)</code> returns
+      a <code>NULL</code> literal of type
+      <code>ARRAY&lt;DOUBLE&gt;</code>.
+    </td>
+  </tr>
 </table>
 
 ### CAST AS BIGNUMERIC 
@@ -11696,6 +11833,71 @@ FROM UNNEST([
  | P1Y2M3D            | 1-2 3 0:0:0        |
  | PT10H20M30,456S    | 0-0 0 10:20:30.456 |
  +--------------------+--------------------*/
+```
+
+### CAST AS MAP
+
+```googlesql
+CAST(expression AS MAP<key_type, value_type>)
+```
+
+**Description**
+
+GoogleSQL supports [casting][con-func-cast] to `MAP`. The
+`expression` parameter can represent an expression for these data types:
+
++ `MAP`
+
+**Conversion rules**
+
+<table>
+  <tr>
+    <th>From</th>
+    <th>To</th>
+    <th>Rule(s) when casting <code>x</code></th>
+  </tr>
+  <tr>
+    <td><code>MAP</code></td>
+    <td><code>MAP</code></td>
+    <td>
+      The key-value types of the input map must be castable to the key-value
+      types of the target map.
+      For example, casting from type
+      <code>MAP&lt;STRING,INT64&gt;</code> to
+      <code>MAP&lt;STRING,DOUBLE&gt;</code> or
+      <code>MAP&lt;STRING,STRING&gt;</code> is valid;
+      casting from type <code>MAP&lt;STRING,INT64&gt;</code>
+      to <code>MAP&lt;STRING,BYTES&gt;</code> isn't valid.
+    </td>
+  </tr>
+</table>
+
+**Examples**
+
+```googlesql
+SELECT
+  CAST(input_map AS MAP<BYTES, INT64>) AS results
+FROM
+  MAP_FROM_ARRAY([('x', 1), ('y', 2), ('z', 3)]) AS input_map;
+
+/*-----------------------------+
+ | results                     |
+ +-----------------------------+
+ | {b'x': 1, b'y': 2, b'z': 3} |
+ +-----------------------------*/
+```
+
+```googlesql
+SELECT
+  CAST(input_map AS MAP<STRING, STRING>) AS results
+FROM
+  MAP_FROM_ARRAY([(b'x', b'\x41'), (b'y', b'\x42')]) AS input_map;
+
+/*----------------------------+
+ | results                    |
+ +----------------------------+
+ | {"x": "\x41", "y": "\x42"} |
+ +----------------------------*/
 ```
 
 ### CAST AS NUMERIC 
@@ -32678,6 +32880,9 @@ RETURN TO_JSON(p) AS dana_json;</pre>
   </tbody>
 </table>
 
+ Note: `MAP` type doesn't have a JSON encoding, so it's
+not supported in any of the conversion functions. 
+
 ### JSONPath format 
 <a id="JSONPath_format"></a>
 
@@ -32797,6 +33002,887 @@ The JSONPath format supports these operators:
 
   </tbody>
 </table>
+
+## Map functions
+
+GoogleSQL supports the following map functions.
+
+### Function list
+
+<table>
+  <thead>
+    <tr>
+      <th>Name</th>
+      <th>Summary</th>
+    </tr>
+  </thead>
+  <tbody>
+
+<tr>
+  <td><a href="#map_cardinality"><code>MAP_CARDINALITY</code></a>
+</td>
+  <td>Gets the number of keys in a map.</td>
+</tr>
+
+<tr>
+  <td><a href="#map_contains_key"><code>MAP_CONTAINS_KEY</code></a>
+</td>
+  <td>Checks if a key is in a map.</td>
+</tr>
+
+<tr>
+  <td><a href="#map_delete"><code>MAP_DELETE</code></a>
+</td>
+  <td>Deletes one or more key-value pairs in a map.</td>
+</tr>
+
+<tr>
+  <td><a href="#map_empty"><code>MAP_EMPTY</code></a>
+</td>
+  <td>Checks if a map is empty.</td>
+</tr>
+
+<tr>
+  <td><a href="#map_entries_sorted"><code>MAP_ENTRIES_SORTED</code></a>
+</td>
+  <td>Gets an array of key-value pairs from a map, sorted in ascending order by key.</td>
+</tr>
+
+<tr>
+  <td><a href="#map_entries_unsorted"><code>MAP_ENTRIES_UNSORTED</code></a>
+</td>
+  <td>Gets an array of key-value pairs from a map, in no particular order.</td>
+</tr>
+
+<tr>
+  <td><a href="#map_filter"><code>MAP_FILTER</code></a>
+</td>
+  <td>Filters out unwanted key-value pairs in a map.</td>
+</tr>
+
+<tr>
+  <td><a href="#map_from_array"><code>MAP_FROM_ARRAY</code></a>
+</td>
+  <td>Converts an array into a map.</td>
+</tr>
+
+<tr>
+  <td><a href="#map_get"><code>MAP_GET</code></a>
+</td>
+  <td>Gets the value for a key in a map.</td>
+</tr>
+
+<tr>
+  <td><a href="#map_insert"><code>MAP_INSERT</code></a>
+</td>
+  <td>Inserts one or more key-value pairs in a map.</td>
+</tr>
+
+<tr>
+  <td><a href="#map_insert_or_replace"><code>MAP_INSERT_OR_REPLACE</code></a>
+</td>
+  <td>Inserts or replaces one or more key-value pairs in a map.</td>
+</tr>
+
+<tr>
+  <td><a href="#map_keys_sorted"><code>MAP_KEYS_SORTED</code></a>
+</td>
+  <td>Gets an array of keys from a map, sorted in ascending order.</td>
+</tr>
+
+<tr>
+  <td><a href="#map_keys_unsorted"><code>MAP_KEYS_UNSORTED</code></a>
+</td>
+  <td>Gets an array of keys from a map, in no particular order.</td>
+</tr>
+
+<tr>
+  <td><a href="#map_replace"><code>MAP_REPLACE</code></a>
+</td>
+  <td>Replaces one or more values in a map.</td>
+</tr>
+
+<tr>
+  <td><a href="#map_values_sorted"><code>MAP_VALUES_SORTED</code></a>
+</td>
+  <td>Gets an array of values from a map, sorted in ascending order.</td>
+</tr>
+
+<tr>
+  <td><a href="#map_values_sorted_by_key"><code>MAP_VALUES_SORTED_BY_KEY</code></a>
+</td>
+  <td>Gets an array of values from a map, sorted in ascending order by key.</td>
+</tr>
+
+<tr>
+  <td><a href="#map_values_unsorted"><code>MAP_VALUES_UNSORTED</code></a>
+</td>
+  <td>Gets an array of values from a map, in no particular order.</td>
+</tr>
+
+  </tbody>
+</table>
+
+### `MAP_CARDINALITY`
+
+```googlesql
+MAP_CARDINALITY(input_map)
+```
+
+**Description**
+
+Gets the number of keys in a map.
+
+**Definitions**
+
++   `input_map`: A `MAP<K,V>` value that represents the map.
+    If this value is `NULL`, the function returns `NULL`.
+
+**Return type**
+
+`INT64`
+
+**Examples**
+
+In the following query, the number of keys in a map called `input_map` is
+returned:
+
+```googlesql
+WITH t AS
+  (SELECT MAP_FROM_ARRAY([('color', 'red'), ('condition', 'good'), ('year', '2023')]) AS input_map)
+SELECT
+  MAP_CARDINALITY(input_map) AS results
+FROM t
+
+/*---------+
+ | results |
+ +---------+
+ | 3       |
+ +---------*/
+```
+
+### `MAP_CONTAINS_KEY`
+
+```googlesql
+MAP_CONTAINS_KEY(input_map, key_to_find)
+```
+
+**Description**
+
+Checks if a key is in a map. Returns `TRUE` if the key is found. Otherwise,
+returns `FALSE`.
+
+**Definitions**
+
++   `input_map`: A `MAP<K,V>` value that represents the map to search.
+    If this value is `NULL`, the function returns `NULL`.
++   `key_to_find`: The key to find in the map.
+
+**Return type**
+
+`BOOL`
+
+**Examples**
+
+```googlesql
+WITH t AS
+  (SELECT MAP_FROM_ARRAY([('color', 'red')]) AS input_map)
+SELECT
+  MAP_CONTAINS_KEY(input_map, 'color') AS color_key,
+  MAP_CONTAINS_KEY(input_map, 'shape') AS shape_key
+FROM t
+
+/*-----------+-----------+
+ | color_key | shape_key |
+ +-----------+-----------+
+ | true      | false     |
+ +-----------+-----------*/
+```
+
+### `MAP_DELETE`
+
+```googlesql
+MAP_DELETE(input_map, key[, ...])
+```
+
+**Description**
+
+Deletes one or more key-value pairs in a map.
+
+**Definitions**
+
++   `input_map`: A `MAP<K,V>` value that contains one or more key-value pairs to
+    delete. If this value is `NULL`, the function returns `NULL`.
++   `key`: A key to remove from the map. If the key isn't in `input_map`, it's
+    ignored.
+
+**Return type**
+
+`MAP<K,V>`
+
+**Examples**
+
+In the following query, the keys `c` and `b` are removed from a map called
+`input_map`. The key `d` is ignored because it's not in `input_map`:
+
+```googlesql
+WITH t AS
+  (SELECT MAP_FROM_ARRAY([('a', 1), ('b', 2), ('c', 3)]) AS input_map)
+SELECT
+  MAP_DELETE(
+    input_map,
+    'a', 'c', 'd'
+  ) AS results
+FROM t
+
+/*----------+
+ | results  |
+ +----------+
+ | {"b": 2} |
+ +----------*/
+```
+
+### `MAP_EMPTY`
+
+```googlesql
+MAP_EMPTY(input_map)
+```
+
+**Description**
+
+Checks if a map is empty. Returns `TRUE` if the map is empty, otherwise `FALSE`.
+
+**Definitions**
+
++   `input_map`: A `MAP<K,V>` value that represents the map to search.
+    If this value is `NULL`, the function returns `NULL`.
+
+**Return type**
+
+`BOOL`
+
+**Example**
+
+```googlesql
+WITH t AS
+  (SELECT MAP_FROM_ARRAY(CAST([] AS ARRAY<STRUCT<INT64, INT64>>)) AS input_map)
+SELECT
+  MAP_EMPTY(input_map) AS empty
+FROM t
+
+/*-------+
+ | empty |
+ +-------+
+ | true  |
+ +-------*/
+```
+
+### `MAP_ENTRIES_SORTED`
+
+```googlesql
+MAP_ENTRIES_SORTED(input_map)
+```
+
+**Description**
+
+Gets an array of key-value pairs from a map, sorted in ascending order by key.
+
+**Definitions**
+
++   `input_map`: A `MAP<K,V>` value that represents the map to query.
+    If this value is `NULL`, the function returns `NULL`.
+
+**Return type**
+
+`ARRAY<STRUCT<K,V>>`
+
+**Examples**
+
+The following query gets key-value pairs, sorted in ascending order by key, from
+a map created from an array:
+
+```googlesql
+WITH t AS
+  (SELECT MAP_FROM_ARRAY([('b', 1), ('a', 2), ('c', 3)]) AS input_map)
+SELECT MAP_ENTRIES_SORTED(input_map) AS results
+FROM t
+
+/*--------------------------------------------------------+
+ | results                                                |
+ +--------------------------------------------------------+
+ | [{a key, 2 value}, {b key, 1 value}, {c key, 3 value}] |
+ +--------------------------------------------------------*/
+```
+
+### `MAP_ENTRIES_UNSORTED`
+
+```googlesql
+MAP_ENTRIES_UNSORTED(input_map)
+```
+
+**Description**
+
+Gets an array of key-value pairs from a map, in no particular order.
+
+**Definitions**
+
++   `input_map`: A `MAP<K,V>` value that represents the map to query.
+    If this value is `NULL`, the function returns `NULL`.
+
+**Return type**
+
+`ARRAY<STRUCT<K,V>>`
+
+**Examples**
+
+The following query gets key-value pairs, in no particular order, from a map
+created from an array:
+
+```googlesql
+WITH t AS
+  (SELECT MAP_FROM_ARRAY([('b', 1), ('a', 2), ('c', 3)]) AS input_map)
+SELECT MAP_ENTRIES_UNSORTED(input_map) AS results
+FROM t
+
+/*--------------------------------------------------------+
+ | results                                                |
+ +--------------------------------------------------------+
+ | [{a key, 2 value}, {b key, 1 value}, {c key, 3 value}] |
+ +--------------------------------------------------------*/
+```
+
+### `MAP_FILTER`
+
+```googlesql
+MAP_FILTER(input_map, (k, v) -> condition)
+```
+
+**Description**
+
+Filters out unwanted key-value pairs in a map.
+
+**Definitions**
+
++   `input_map`: A `MAP<K,V>` value that represents the map to filter.
+    If this value is `NULL`, the function returns `NULL`.
++   `(k, v) -> condition`: A lambda expression that determines whether a
+    key-value pair should be removed from the resulting map. If the expression
+    evaluates to `FALSE` or `NULL`, the key-value pair is removed from the
+    resulting map.
+
+    + `k`: An alias that represents a key in a map.
+
+    + `v`: An alias that represents a value in a map.
+
+    + `condition`: A `BOOL` expression that represents the predicate that
+      filters the map.
+
+**Return type**
+
+`MAP<K,V>`
+
+**Examples**
+
+In the following query, some key-value pairs are filtered out of the resulting
+map. In `results_a`, the `NULL` key is removed. In `results_b`, all keys with
+values greater than `4` are removed. In `results_c`, all keys are removed.
+
+```googlesql
+WITH t AS
+  (SELECT MAP_FROM_ARRAY([('a', 1), (NULL, 3), ('c', 5)]) AS input_map)
+SELECT
+  MAP_FILTER(input_map, (k, v) -> k IS NOT NULL) AS results_a,
+  MAP_FILTER(input_map, (k, v) -> v < 4) AS results_b,
+  MAP_FILTER(input_map, (k, v) -> FALSE) AS results_c
+FROM t
+
+/*--------------------------------------------------+
+ | results_a        | results_b         | results_c |
+ +--------------------------------------------------+
+ | {"a": 1, "c": 5} | {NULL: 3, "a": 1} | {}        |
+ +--------------------------------------------------*/
+```
+
+### `MAP_FROM_ARRAY`
+
+```googlesql
+MAP_FROM_ARRAY(input_array)
+```
+
+**Description**
+
+Constructs a map from an array of struct pairs.
+
+**Definitions**
+
++   `input_array`: An `ARRAY<STRUCT<K,V>>` value that represents an array
+    of key-value pairs.
+
+**Details**
+
++   If `input_array` is `NULL`, the function returns `NULL`.
++   In `STRUCT<K,V>`, the field names are ignored.
++   Duplicate keys aren't allowed in `input_array`; an error is produced if
+    duplicates are present.
+
+**Return type**
+
+`MAP<K,V>`
+
+**Examples**
+
+In the following query, an array of key-value pairs is converted to a map and
+then the value for key `c` is returned.
+
+```googlesql
+WITH t AS
+  (SELECT MAP_FROM_ARRAY([('a', 1), ('b', 2), ('c', 3)]) AS input_map)
+SELECT
+  input_map['c'] AS value
+FROM t
+
+/*-------+
+ | value |
+ +-------+
+ | 3     |
+ +-------*/
+```
+
+### `MAP_GET`
+
+```googlesql
+MAP_GET(input_map, key_to_find[, backup_value])
+```
+
+**Description**
+
+Gets the value for a key in a map. If no key is found, returns the specified
+backup value.
+
+**Definitions**
+
++   `input_map`: A `MAP<K,V>` value that represents the map to search. If
+    `input_map` is `NULL`, the function returns `NULL`.
++   `key_to_find`: The key of type `K` to find in the map.
++   `backup_value`: The value of type `V` to return if `key_to_find` isn't in
+    the map. The default value is `NULL`.
+
+Note: Don't attempt to test for a key's presence in the map by using
+`MAP_GET(input_map, key) IS NULL`. It is possible for keys to be present
+that have `NULL` as their value. To avoid false negatives, test for key
+presence using the `MAP_CONTAINS_KEY` function instead.
+
+**Return type**
+
+`V`
+
+**Examples**
+
+In the following query, the value for a key is returned if the value is found,
+otherwise it returns a backup value:
+
+* In `results_a`, key `a` is found and its value `2` is returned.
+* In `results_b`, key `x` isn't found, so the `NULL` is returned.
+* In `result_c`, key `x` isn't found, so the backup value `-1` is returned.
+* In `result_d`, the key `NULL` is found, so the value `3` is returned and the
+  backup value is ignored.
+
+```googlesql
+WITH t AS
+  (SELECT MAP_FROM_ARRAY([('a', 2), (NULL, 3)]) AS input_map)
+SELECT
+  MAP_GET(input_map, 'a') AS results_a,
+  MAP_GET(input_map, 'x') AS results_b,
+  MAP_GET(input_map, 'x', -1) AS results_c,
+  MAP_GET(input_map, NULL, -2) AS results_d,
+FROM t
+
+/*-----------+-----------+-----------+-----------+
+ | results_a | results_b | results_c | results_d |
+ +-----------+-----------+-----------+-----------+
+ | 2         | NULL      | -1        | 3         |
+ +-----------+-----------+-----------+-----------*/
+```
+
+### `MAP_INSERT`
+
+```googlesql
+MAP_INSERT(input_map, key_value_pair[, ...])
+```
+
+**Description**
+
+Inserts one or more key-value pairs in a map.
+
+**Definitions**
+
++   `input_map`: A `MAP<K,V>` value that represents the map to update.
+    If this value is `NULL`, the function returns `NULL`.
++   `key_value_pair`: The key-value pair to insert in the map, using this
+    format: `key, value`. Attempting to insert a key that is already in the map
+    results in an error.
+
+**Return type**
+
+`MAP<K,V>`
+
+**Examples**
+
+In the following query, two new key-value pairs are added:
+
+```googlesql
+WITH t AS
+  (SELECT MAP_FROM_ARRAY([('a', 1), ('b', 2)]) AS input_map)
+SELECT
+  MAP_INSERT(input_map, 'x', 4, 'y', 5) AS results_a,
+FROM t
+
+/*----------------------------------+
+ | results_a                        |
+ +----------------------------------+
+ | {"a": 1, "b": 2, "x": 4, "y": 5} |
+ +----------------------------------*/
+ ```
+
+In the following query, the key `b` already exists in the map, so attempting
+to insert it results in an error:
+
+```googlesql
+-- Error: Key 'b' already exists in map
+WITH t AS
+  (SELECT MAP_FROM_ARRAY([('a', 1), ('b', 2)]) AS input_map)
+SELECT
+  MAP_INSERT(input_map, 'b', 99, 'x', 4) AS results_b,
+FROM t
+```
+
+### `MAP_INSERT_OR_REPLACE`
+
+```googlesql
+MAP_INSERT_OR_REPLACE(input_map, key_value_pair[, ...])
+```
+
+**Description**
+
+Inserts or replaces one or more key-value pairs in a map.
+
+**Definitions**
+
++   `input_map`: A `MAP<K,V>` value that represents the map to update.
+    If this value is `NULL`, the function returns `NULL`.
++   `key_value_pair`: The key-value pair to insert or replace in the map,
+    using this format: `key, value`. If the key is found in the map, the key's
+    value is updated.
+
+**Return type**
+
+`MAP<K,V>`
+
+**Examples**
+
+In the following query, key-value pairs are inserted in a map.
+In `results_a`, two new key-value pairs are added.
+In `results_b`, the existing key `b` is updated with a new value, and an
+additional key-value pair is added.
+
+```googlesql
+WITH t AS
+  (SELECT MAP_FROM_ARRAY([('a', 1), ('b', 2)]) AS input_map)
+SELECT
+  MAP_INSERT_OR_REPLACE(input_map, 'x', 4, 'y', 5) AS results_a,
+  MAP_INSERT_OR_REPLACE(input_map, 'b', 99, 'x', 4) AS results_b,
+FROM t
+
+/*--------------------------------------------------------------+
+ | results_a                        | results_b                 |
+ +--------------------------------------------------------------+
+ | {"a": 1, "b": 2, "x": 4, "y": 5} | {"a": 1, "b": 99, "x": 4} |
+ +--------------------------------------------------------------*/
+
+```
+
+### `MAP_KEYS_SORTED`
+
+```googlesql
+MAP_KEYS_SORTED(input_map)
+```
+
+**Description**
+
+Gets an array of keys from a map, sorted in ascending order.
+
+**Definitions**
+
++   `input_map`: A `MAP<K,V>` value that represents the map to query.
+    If this value is `NULL`, the function returns `NULL`.
+
+**Return type**
+
+`ARRAY<K>`
+
+**Examples**
+
+The following query gets a list of keys, sorted in ascending order, from
+a map created from an array:
+
+```googlesql
+WITH t AS
+  (SELECT MAP_FROM_ARRAY([('b', 1), ('a', 2), ('c', 3)]) AS input_map)
+SELECT MAP_KEYS_SORTED(input_map) AS results
+FROM t
+
+/*-----------+
+ | results   |
+ +-----------+
+ | [a, b, c] |
+ +-----------*/
+```
+
+### `MAP_KEYS_UNSORTED`
+
+```googlesql
+MAP_KEYS_UNSORTED(input_map)
+```
+
+**Description**
+
+Gets an array of keys from a map, in no particular order.
+
+**Definitions**
+
++   `input_map`: A `MAP<K,V>` value that represents the map to query.
+    If this value is `NULL`, the function returns `NULL`.
+
+**Return type**
+
+`ARRAY<K>`
+
+**Examples**
+
+The following query gets a list of keys, in no particular order, from
+a map created from an array:
+
+```googlesql
+WITH t AS
+  (SELECT MAP_FROM_ARRAY([('b', 1), ('a', 2), ('c', 3)]) AS input_map)
+SELECT MAP_KEYS_UNSORTED(input_map) AS results
+FROM t
+
+/*-----------+
+ | results   |
+ +-----------+
+ | [a, b, c] |
+ +-----------*/
+```
+
+### `MAP_REPLACE`
+
+```googlesql
+MAP_REPLACE(input_map, { key_value_pair[, ...] | key[, ...], (v) -> value_expression } )
+
+key_value_pair:
+  {
+    key, value
+  }
+
+```
+
+**Description**
+
+Replaces one or more values in a map.
+
+**Definitions**
+
++   `input_map`: A `MAP<K,V>` value that represents the map to update.
+    If this value is `NULL`, the function returns `NULL`.
++   `key_value_pair`: The key-value pair to update in the map.
+    For each pair, you can use a key with a value or a lambda value:
+
+    +   `key`: A key in the map. If `key` doesn't match any existing key,
+        an error is produced.
+
+    +   `value`: The new value for the key.
++   `v`: A lambda alias that represents an existing value in a map. When the
+    lambda expression is present, it is applied only to the keys provided.
++   `value_expression`: The predicate that updates the value for `v`.
+
+**Return type**
+
+`MAP<K,V>`
+
+**Examples**
+
+In the following query, the values for keys `a`, `b`, and `c` are updated for
+a map called `input_map`:
+
+```googlesql
+WITH t AS
+  (SELECT MAP_FROM_ARRAY([('a', 1), ('b', 2), ('c', 3)]) AS input_map)
+SELECT
+  MAP_REPLACE(
+    input_map,
+    'b', 40,
+    'a', 50,
+    'c', 60
+  ) AS results,
+FROM t
+
+/*-----------------------------------+
+ | results                           |
+ +-----------------------------------+
+ | {"a": 50, "b": 40, "c": 60}       |
+ +-----------------------------------*/
+```
+
+Here, a lambda expression is used to increment the values keyed by `a` and `c`
+by 100:
+
+```googlesql
+WITH t AS
+  (SELECT MAP_FROM_ARRAY([('a', 1), ('b', 2), ('c', 3)]) AS input_map)
+SELECT
+  MAP_REPLACE(
+    input_map,
+    'a',
+    'c',
+    (v) -> v + 100
+  ) AS results
+FROM t
+
+/*------------------------------------+
+ | results                            |
+ +------------------------------------+
+ | {"a": 101, "b": 2, "c": 103}       |
+ +------------------------------------*/
+```
+
+In the following query, an error is produced because key `x` doesn't exist
+in the map called `input_map`:
+
+```googlesql
+-- Error: x doesn't exist in input_map.
+WITH t AS
+  (SELECT MAP_FROM_ARRAY([('a', 1), ('b', 2), ('c', 3)]) AS input_map)
+SELECT
+  MAP_REPLACE(
+    input_map,
+    'x', 60
+  ) AS results,
+FROM t
+```
+
+### `MAP_VALUES_SORTED`
+
+```googlesql
+MAP_VALUES_SORTED(input_map)
+```
+
+**Description**
+
+Gets an array of values from a map, sorted in ascending order.
+
+**Definitions**
+
++   `input_map`: A `MAP<K,V>` value that represents the map to query. The value
+    type `V` must be orderable. If this value is `NULL`, the function returns
+    `NULL`.
+
+**Return type**
+
+`ARRAY<V>`
+
+**Examples**
+
+The following query gets the values, sorted in ascending order (`1`, `2`, `3`),
+from a map created from an array:
+
+```googlesql
+WITH t AS
+  (SELECT MAP_FROM_ARRAY([('b', 2), ('a', 3), ('c', 1)]) AS input_map)
+SELECT MAP_VALUES_SORTED(input_map) AS results
+FROM t
+
+/*-----------+
+ | results   |
+ +-----------+
+ | [1, 2, 3] |
+ +-----------*/
+```
+
+### `MAP_VALUES_SORTED_BY_KEY`
+
+```googlesql
+MAP_VALUES_SORTED_BY_KEY(input_map)
+```
+
+**Description**
+
+Gets an array of values from a map, sorted in ascending order by key.
+
+**Definitions**
+
++   `input_map`: A `MAP<K,V>` value that represents the map to query. The key
+    type `K` must be orderable. If this value is `NULL`, the function returns
+    `NULL`.
+
+**Return type**
+
+`ARRAY<V>`
+
+**Examples**
+
+The following query gets the values from a map created from an array,
+sorted in ascending order by key (`'a'`, `'b'`, `'c'`):
+
+```googlesql
+WITH t AS
+  (SELECT MAP_FROM_ARRAY([('b', 1), ('a', 2), ('c', 3)]) AS input_map)
+SELECT MAP_VALUES_SORTED_BY_KEY(input_map) AS results
+FROM t
+
+/*-----------+
+ | results   |
+ +-----------+
+ | [2, 1, 3] |
+ +-----------*/
+```
+
+### `MAP_VALUES_UNSORTED`
+
+```googlesql
+MAP_VALUES_UNSORTED(input_map)
+```
+
+**Description**
+
+Gets an array of values from a map, in no particular order.
+
+**Definitions**
+
++   `input_map`: A `MAP<K,V>` value that represents the map to query.
+    If this value is `NULL`, the function returns `NULL`.
+
+**Return type**
+
+`ARRAY<V>`
+
+**Examples**
+
+The following query gets the values, in no particular order, from
+a map created from an array:
+
+```googlesql
+WITH t AS
+  (SELECT MAP_FROM_ARRAY([('b', 1), ('a', 2), ('c', 3)]) AS input_map)
+SELECT MAP_VALUES_UNSORTED(input_map) AS results
+FROM t
+
+/*-----------+
+ | results   |
+ +-----------+
+ | [2, 1, 3] |
+ +-----------*/
+```
 
 ## Mathematical functions
 
@@ -36490,6 +37576,548 @@ behaves like `ROUND(X, N)`, but always rounds towards zero and never overflows.
 </tbody>
 
 </table>
+
+## Machine learning and AI functions
+
+GoogleSQL supports the following machine learning (ML) and AI functions.
+
+### Function list
+
+<table>
+  <thead>
+    <tr>
+      <th>Name</th>
+      <th>Summary</th>
+    </tr>
+  </thead>
+  <tbody>
+
+<tr>
+  <td><a href="#aiif"><code>AI.IF</code></a>
+</td>
+  <td> Evaluates a natural language condition. </td>
+</tr>
+
+<tr>
+  <td><a href="#kmeans"><code>KMEANS</code></a>
+</td>
+  <td>Clusters data using the <a href="https://en.wikipedia.org/wiki/K-means_clustering">k-means algorithm</a>
+ and returns the <a href="https://en.wikipedia.org/wiki/Centroid">centroids</a>.
+</td>
+</tr>
+
+  </tbody>
+</table>
+
+### `AI.IF`
+
+```googlesql
+AI.IF(
+  prompt
+  [, payload ]
+  [, model => { string_value | MODEL model_reference } ]
+  [, options => { JSON json_string | STRUCT( ... ) | string_value } ]
+)
+```
+
+**Description**
+
+Evaluates whether a condition described in natural language
+or structured data is `TRUE` or `FALSE`.
+
+You can use the `AI.IF` function to filter or join data based on conditions
+described in natural language or multimodal input. The following are example use
+cases:
+
+*   **Sentiment analysis**: Find customer reviews with negative sentiment.
+*   **Topic analysis**: Identify news articles related to a specific subject.
+*   **Image analysis**: Select images that contain a specific item.
+*   **Security**: Identify suspicious emails.
+
+**Definitions**
+
++   `prompt`: A `STRING` or `STRUCT` value that specifies the prompt sent to the
+    model.
+    +   `STRING`: Represents the prompt text sent to the model, for example,
+        `'Is Seattle a US city?'`.
+    +   `STRUCT`: Used to pass a structured prompt that delineates the primary
+        instruction from contextual data elements, maximizing the accuracy of
+        the underlying LLM. The first field of the `STRUCT` is interpreted as
+        the primary prompt instruction text (its field name is ignored), and
+        subsequent fields represent contextual data payload elements. Data
+        payload fields must be named; passing an anonymous (unnamed) payload
+        field produces an error. Use unique payload field names to help the LLM
+        model clearly distinguish distinct context elements.
++   `payload`: An optional argument of any type that specifies additional
+    contextual data sent to the model alongside a string `prompt`.
+    The `payload` argument is usable only when `prompt` is a `STRING`, because a
+    `STRUCT` inherently includes a data payload. If `prompt` is a `STRUCT`,
+    specifying `payload` is redundant and produces an error.
+    A scalar payload value is treated as a single payload value, whereas a
+    `STRUCT` or `JSON` object treats each top-level field as an individual
+    payload element.
++   `model`: An optional named argument with a `STRING`
+    value or `MODEL` reference. Specifies the model to
+    execute the prompt, such as a string literal
+    specifying an endpoint or system model name (for example,`'gemini-2.5-pro'`
+    or `'gemini-3-flash'`) or 
+    a `MODEL` object reference (for example, `MODEL my_dataset.my_model`).
+    If `model` is omitted, the default model
+    is used.
++   `options`: An optional named argument with a 
+    `JSON`, `STRUCT`, or `STRING`
+    value. Specifies configuration parameters for the database engine (such as
+    approximation or cost savings settings) or the underlying model (such as
+    model hyperparameter overrides). Explicitly specified options override
+    default engine or model parameters.
+
+**Details**
+
++   If any argument passed to `AI.IF` evaluates to `NULL`, the function returns
+    `NULL`. If `prompt` is an empty string (`''`), the function returns `NULL`.
++   This function returns `TRUE` or
+    `FALSE` based on model evaluation. If the model fails to return a valid
+    boolean response or encounters an execution error, the function returns
+    `NULL` or produces an error depending on engine configuration. 
++   This function is non-deterministic (`VOLATILE`). Different invocations or
+    executions over time might return different results depending on the
+    underlying model.
+
+**Return type**
+
+`BOOL`
+
+**Examples**
+
+For the first three examples that follow, add the following sample data at the
+top of each query:
+
+```googlesql
+-- Sample data for news and products tables
+WITH
+  news AS (
+    SELECT
+      1 AS article_id,
+      'Earthquake in Pacific' AS title,
+      'A magnitude 7.2 earthquake struck the Pacific Ocean today causing widespread tremors.' AS body,
+      'world' AS category
+    UNION ALL
+    SELECT
+      2 AS article_id,
+      'New Google Pixel Released' AS title,
+      'Google announced its newest Pixel smartphone with advanced AI features.' AS body,
+      'tech' AS category
+    UNION ALL
+    SELECT
+      3 AS article_id,
+      'Local Sports Team Wins Championship' AS title,
+      'The city team won the final game in overtime after a thrilling season.' AS body,
+      'sports' AS category
+    UNION ALL
+    SELECT
+      4 AS article_id,
+      'Google Cloud Expands AI Infrastructure' AS title,
+      'Google is building new data centers to power next-generation generative AI models.' AS body,
+      'tech' AS category
+  ),
+  products AS (
+    SELECT 'Pixel' AS product_name
+    UNION ALL
+    SELECT 'Chromebook' AS product_name
+    UNION ALL
+    SELECT 'Tennis Racket' AS product_name
+  )
+```
+
+The following query uses the `AI.IF` function to filter news stories to those
+that cover a natural disaster:
+
+```googlesql
+-- Filter text by topic.
+SELECT
+  title, body
+FROM
+  news
+WHERE
+  AI.IF(CONCAT(
+    'The following news story is about a natural disaster: ', body));
+
+/*-----------------------+---------------------------------------------------------------------------------------+
+ | title                 | body                                                                                  |
+ +-----------------------+---------------------------------------------------------------------------------------+
+ | Earthquake in Pacific | A magnitude 7.2 earthquake struck the Pacific Ocean today causing widespread tremors. |
+ +-----------------------+---------------------------------------------------------------------------------------*/
+```
+
+The following query joins tables based on whether the news is about a product:
+
+```googlesql
+-- Join tables based on semantic understanding.
+SELECT
+  news.title, news.body, products.product_name
+FROM
+  news
+JOIN products
+  ON
+    AI.IF(
+      CONCAT(
+        'Determine if the following news story is about product ',
+        products.product_name,
+        ': ',
+        news.body))
+WHERE
+  category = 'tech';
+
+/*---------------------------+-------------------------------------------------------------------------+--------------+
+ | title                     | body                                                                    | product_name |
+ +---------------------------+-------------------------------------------------------------------------+--------------+
+ | New Google Pixel Released | Google announced its newest Pixel smartphone with advanced AI features. | Pixel        |
+ +---------------------------+-------------------------------------------------------------------------+--------------*/
+```
+
+The following query filters customer reviews to find negative sentiment
+regarding shipping delays. The example uses the `payload` argument to pass
+review text:
+
+```googlesql
+WITH
+  CustomerReviews AS (
+    SELECT
+      201 AS customer_id,
+      'The product arrived two weeks late and the shipping box was damaged. Very unhappy with the delay.' AS review_text
+    UNION ALL
+    SELECT
+      202 AS customer_id,
+      'High quality item and fast 2-day shipping! Excellent customer service.' AS review_text
+    UNION ALL
+    SELECT
+      203 AS customer_id,
+      'I waited a month for delivery because it was backordered and shipping was painfully slow. Never again.' AS review_text
+  )
+-- Filter customer reviews.
+SELECT
+  customer_id, review_text
+FROM
+  CustomerReviews
+WHERE
+  AI.IF(
+    'Does this review express negative customer sentiment regarding shipping delays?',
+    payload => review_text
+  );
+
+/*-------------+---------------------------------------------------------------------------------------------------------+
+ | customer_id | review_text                                                                                             |
+ +-------------+---------------------------------------------------------------------------------------------------------+
+ | 201         | The product arrived two weeks late and the shipping box was damaged. Very unhappy with the delay.       |
+ | 203         | I waited a month for delivery because it was backordered and shipping was painfully slow. Never again.  |
+ +-------------+---------------------------------------------------------------------------------------------------------*/
+```
+
+The following query filters products to find those suitable for young children.
+The example uses a `STRUCT` prompt to separate the instruction from contextual
+data fields:
+
+```googlesql
+WITH
+  Products AS (
+    SELECT
+      101 AS product_id,
+      'Plush Teddy Bear' AS name,
+      'Soft stuffed teddy bear suitable for infants and toddlers.' AS description,
+      'None' AS safety_warnings
+    UNION ALL
+    SELECT
+      102 AS product_id,
+      'Chef Kitchen Knife' AS name,
+      '8-inch professional stainless steel kitchen knife.' AS description,
+      'Sharp blade. Keep away from children.' AS safety_warnings
+    UNION ALL
+    SELECT
+      103 AS product_id,
+      'Wooden Building Blocks' AS name,
+      'Set of 50 smooth wooden building blocks.' AS description,
+      'Choking hazard - small parts.' AS safety_warnings
+    UNION ALL
+    SELECT
+      104 AS product_id,
+      'Infant Teething Ring' AS name,
+      'BPA-free silicone teething ring for babies.' AS description,
+      'None' AS safety_warnings
+  )
+-- Filter products by age suitability.
+SELECT
+  product_id, name, description
+FROM
+  Products
+WHERE
+  AI.IF(
+    STRUCT(
+      'Is this product suitable for children under 5 years old?' AS prompt,
+      description AS product_description,
+      safety_warnings AS warnings));
+
+/*------------+----------------------+------------------------------------------------------------+
+ | product_id | name                 | description                                                |
+ +------------+----------------------+------------------------------------------------------------+
+ | 101        | Plush Teddy Bear     | Soft stuffed teddy bear suitable for infants and toddlers. |
+ | 104        | Infant Teething Ring | BPA-free silicone teething ring for babies.                |
+ +------------+----------------------+------------------------------------------------------------*/
+```
+
+The following query filters articles to find those discussing quantum computing
+advances. The example specifies the
+`model` and `options` named arguments to
+configure model execution:
+
+```googlesql
+WITH
+  Articles AS (
+    SELECT
+      'A101' AS article_id,
+      'Researchers achieve breakthrough in superconducting qubit coherence times for scalable quantum computers.' AS summary
+    UNION ALL
+    SELECT
+      'A102' AS article_id,
+      'A comprehensive review of classic relational database indexing algorithms and query optimization.' AS summary
+    UNION ALL
+    SELECT
+      'A103' AS article_id,
+      'New quantum error correction protocol demonstrates fault-tolerant logical qubit operations in silicon.' AS summary
+  )
+-- Filter articles by topic.
+SELECT
+  article_id, summary
+FROM
+  Articles
+WHERE
+  AI.IF(
+    'Is this article discussing quantum computing advances?',
+    payload => summary,
+    model => 'gemini-2.5-pro',
+    options => JSON '{"temperature": 0.0}'
+  );
+
+/*--------------+-----------------------------------------------------------------------------------------------------------+
+ | article_id   | summary                                                                                                   |
+ +--------------+-----------------------------------------------------------------------------------------------------------+
+ | A101         | Researchers achieve breakthrough in superconducting qubit coherence times for scalable quantum computers. |
+ | A103         | New quantum error correction protocol demonstrates fault-tolerant logical qubit operations in silicon.    |
+ +--------------+-----------------------------------------------------------------------------------------------------------*/
+```
+
+### `KMEANS`
+
+```googlesql
+KMEANS(
+  input_table ANY TABLE,
+  vectors_column STRING,
+  [k INT64,]
+  [options => kmeans_options_proto]
+)
+```
+
+**Description**
+
+Clusters data using the [k-means algorithm][kmeans-clustering]{: .external} and
+returns the [centroids][centroid]{: .external}. The `KMEANS` function is a
+table-valued function (TVF) that groups rows from an input table into a
+predefined number of clusters (`k`) based on the similarity of vector data in a
+specified column.
+
+The function returns a table containing exactly `k` rows, representing the
+computed centroids for the `k` clusters.
+
+To find the nearest centroid for each row in your original dataset, you can
+calculate the distance between your row's vector embedding and the returned
+`cluster_vector` centroids. For example, you could find the nearest centroid by
+using a subquery and distance functions.
+
+**Definitions:**
+
++   `input_table`: The input relation (table or subquery) containing the data to
+    cluster.
++   `vectors_column`: A compile-time constant `STRING` representing the name of
+    the column in `input_table` containing the vector embeddings. The column
+    type must be `ARRAY<DOUBLE>` or `ARRAY<FLOAT>`. All arrays must have the
+    same length, and `NULL` vectors are ignored.
++   `k`: An optional `INT64` value specifying the number of clusters to
+    generate. The value must be a positive integer. At least `k` non-null
+    distinct vectors must be present in the input. The default value is `10`.
++   `options`: An optional `KMeansOptions` protocol buffer containing parameters
+    to tune the clustering algorithm. If not specified, default options are
+    used.
+
+**KMeansOptions fields**
+
+The following parameters are supported in the `KMeansOptions` proto:
+
+| Field name               | Type    | Default     | Description     |
+| :----------------------- | :------ | :---------- | :-------------- |
+| `num_iterations`         | `INT64` | `10`        | Maximum number  |
+:                          :         :             : of k-means      :
+:                          :         :             : iterations to   :
+:                          :         :             : run. Must       :
+:                          :         :             : be >= 1.        :
+| `distance_type`          | `ENUM`  | `EUCLIDEAN` | Distance metric |
+:                          :         :             : to calculate    :
+:                          :         :             : similarity.     :
+:                          :         :             : Supported       :
+:                          :         :             : values\:        :
+:                          :         :             : `EUCLIDEAN`.    :
+| `num_restarts`           | `INT64` | `1`         | Number of times |
+:                          :         :             : to run the      :
+:                          :         :             : clustering      :
+:                          :         :             : process with    :
+:                          :         :             : different       :
+:                          :         :             : random initial  :
+:                          :         :             : centroids.      :
+:                          :         :             : Retains only    :
+:                          :         :             : the best        :
+:                          :         :             : centroids       :
+:                          :         :             : (minimizing     :
+:                          :         :             : average         :
+:                          :         :             : vector-centroid :
+:                          :         :             : distance).      :
+| `min_relative_progress`  | `FLOAT` | `0.01`      | Minimum         |
+:                          :         :             : relative        :
+:                          :         :             : progress        :
+:                          :         :             : (reduction in   :
+:                          :         :             : average         :
+:                          :         :             : distance to     :
+:                          :         :             : centroids)      :
+:                          :         :             : required to     :
+:                          :         :             : continue        :
+:                          :         :             : iterations. For :
+:                          :         :             : example, 0.01   :
+:                          :         :             : indicates at    :
+:                          :         :             : least 1%        :
+:                          :         :             : improvement.    :
+| `init_method`            | `ENUM`  | `RANDOM`    | Initialization  |
+:                          :         :             : method to       :
+:                          :         :             : select initial  :
+:                          :         :             : centroids.      :
+:                          :         :             : Supported       :
+:                          :         :             : values\:        :
+:                          :         :             : `RANDOM`        :
+:                          :         :             : (randomly       :
+:                          :         :             : select `k`      :
+:                          :         :             : points) and     :
+:                          :         :             : `KMEANSPP`      :
+:                          :         :             : (k-means++      :
+:                          :         :             : algorithm).     :
+| `fail_on_invalid_vector` | `BOOL`  | `TRUE`      | If `TRUE`, the  |
+:                          :         :             : function fails  :
+:                          :         :             : on invalid      :
+:                          :         :             : elements in     :
+:                          :         :             : vectors (for    :
+:                          :         :             : example,        :
+:                          :         :             : `NULL`, `NaN`,  :
+:                          :         :             : `+inf` or       :
+:                          :         :             : `-inf`, or all  :
+:                          :         :             : zeros). If      :
+:                          :         :             : `FALSE`, such   :
+:                          :         :             : vectors are     :
+:                          :         :             : ignored.        :
+
+**Return type**
+
+A table representing the cluster centroids, with the following columns:
+
+| Column name      | Type              | Description                          |
+| :--------------- | :---------------- | :----------------------------------- |
+| `cluster_id`     | `INT64`           | The cluster ID, ranging from one to  |
+:                  :                   : `k`.                                 :
+| `cluster_vector` | `ARRAY<FLOAT>` or | The centroid vector for the cluster. |
+:                  : `ARRAY<DOUBLE>`   : The array type matches the input     :
+:                  :                   : `vectors_column` type and length.    :
+
+**Examples**
+
+For the examples that follow, a sample dataset `Songs` contains
+three-dimensional vector embeddings of various songs. The vector embeddings
+represent semantic meaning, and songs within the same genre have similar
+embedding values.
+
+The following query computes exactly `3` centroids over the `Songs` dataset
+using `KMEANS`:
+
+```googlesql
+WITH Songs AS (
+  SELECT 1 AS song_id, 'Bohemian Rhapsody' AS title, 'Queen' AS artist, 'Rock' AS genre, [0.1, 0.9, 0.2] AS song_embedding
+  UNION ALL
+  SELECT 2, 'Like a Rolling Stone' AS title, 'Bob Dylan' AS artist, 'Rock' AS genre, [0.2, 0.8, 0.3] AS song_embedding
+  UNION ALL
+  SELECT 3, 'Stairway to Heaven' AS title, 'Led Zeppelin' AS artist, 'Rock' AS genre, [0.15, 0.85, 0.25] AS song_embedding
+  UNION ALL
+  SELECT 4, 'What a Wonderful World' AS title, 'Louis Armstrong' AS artist, 'Jazz' AS genre, [0.8, 0.1, 0.9] AS song_embedding
+  UNION ALL
+  SELECT 5, 'So What' AS title, 'Miles Davis' AS artist, 'Jazz' AS genre, [0.9, 0.2, 0.8] AS song_embedding
+  UNION ALL
+  SELECT 6, 'Hallelujah' AS title, 'Leonard Cohen' AS artist, 'Folk' AS genre, [0.5, 0.5, 0.5] AS song_embedding
+)
+SELECT
+  cluster_id,
+  cluster_vector
+FROM KMEANS(TABLE Songs, 'song_embedding', k => 3)
+ORDER BY cluster_id;
+
+/*------------+--------------------+
+ | cluster_id | cluster_vector     |
+ +------------+--------------------+
+ | 1          | [0.15, 0.85, 0.25] | -- Centroid for Rock songs
+ | 2          | [0.5, 0.5, 0.5]    | -- Centroid for Folk songs
+ | 3          | [0.85, 0.15, 0.85] | -- Centroid for Jazz songs
+ +------------+--------------------*/
+```
+
+The following query clusters the `Songs` dataset and maps each song back to its
+closest centroid ID using the native `EUCLIDEAN_DISTANCE` function:
+
+```googlesql
+WITH Songs AS (
+  SELECT 1 AS song_id, 'Bohemian Rhapsody' AS title, 'Queen' AS artist, 'Rock' AS genre, [0.1, 0.9, 0.2] AS song_embedding
+  UNION ALL
+  SELECT 2, 'Like a Rolling Stone' AS title, 'Bob Dylan' AS artist, 'Rock' AS genre, [0.2, 0.8, 0.3] AS song_embedding
+  UNION ALL
+  SELECT 3, 'Stairway to Heaven' AS title, 'Led Zeppelin' AS artist, 'Rock' AS genre, [0.15, 0.85, 0.25] AS song_embedding
+  UNION ALL
+  SELECT 4, 'What a Wonderful World' AS title, 'Louis Armstrong' AS artist, 'Jazz' AS genre, [0.8, 0.1, 0.9] AS song_embedding
+  UNION ALL
+  SELECT 5, 'So What' AS title, 'Miles Davis' AS artist, 'Jazz' AS genre, [0.9, 0.2, 0.8] AS song_embedding
+  UNION ALL
+  SELECT 6, 'Hallelujah' AS title, 'Leonard Cohen' AS artist, 'Folk' AS genre, [0.5, 0.5, 0.5] AS song_embedding
+),
+Centroids AS (
+  SELECT * FROM KMEANS(TABLE Songs, 'song_embedding', k => 3)
+)
+SELECT
+  T.title,
+  T.artist,
+  T.genre,
+  (
+    SELECT c.cluster_id
+    FROM Centroids AS c
+    ORDER BY EUCLIDEAN_DISTANCE(T.song_embedding, c.cluster_vector)
+    LIMIT 1
+  ) AS closest_centroid_id
+FROM Songs AS T
+ORDER BY closest_centroid_id, T.title;
+
+/*------------------------+-----------------+-------+---------------------+
+ | title                  | artist          | genre | closest_centroid_id |
+ +------------------------+-----------------+-------+---------------------+
+ | Bohemian Rhapsody      | Queen           | Rock  | 1                   |
+ | Like a Rolling Stone   | Bob Dylan       | Rock  | 1                   |
+ | Stairway to Heaven     | Led Zeppelin    | Rock  | 1                   |
+ | Hallelujah             | Leonard Cohen   | Folk  | 2                   |
+ | So What                | Miles Davis     | Jazz  | 3                   |
+ | What a Wonderful World | Louis Armstrong | Jazz  | 3                   |
+ +------------------------+-----------------+-------+---------------------*/
+```
+
+[kmeans-clustering]: https://en.wikipedia.org/wiki/K-means_clustering
+
+[centroid]: https://en.wikipedia.org/wiki/Centroid
 
 ## Navigation functions
 

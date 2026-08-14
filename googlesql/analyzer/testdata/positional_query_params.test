@@ -40,6 +40,7 @@ QueryStmt
             | +-field_descriptor=bool_val
             | +-default_value=false
             +-Parameter(parse_location=53-54, type=BOOL, position=1)
+
 [UNDECLARED_PARAMETERS]
 BOOL
 ==
@@ -89,6 +90,7 @@ QueryStmt
     |     +-Parameter(parse_location=11-12, type=INT64, position=1, is_untyped=TRUE)
     +-input_scan=
       +-SingleRowScan
+
 [UNDECLARED_PARAMETERS]
 INT64
 ==
@@ -115,6 +117,7 @@ QueryStmt
         |     +-SingleRowScan
         +-filter_expr=
           +-Parameter(parse_location=36-37, type=BOOL, position=1)
+
 [UNDECLARED_PARAMETERS]
 BOOL
 ==
@@ -213,6 +216,7 @@ QueryStmt
             | +-e#5 := Parameter(parse_location=79-80, type=INT64, position=5, is_untyped=TRUE)
             +-input_scan=
               +-SingleRowScan
+
 [UNDECLARED_PARAMETERS]
 INT64
 INT64
@@ -239,6 +243,7 @@ QueryStmt
         | +-TableScan(table=KeyValue)
         +-group_by_list=
           +-$groupbycol1#3 := Parameter(parse_location=32-33, type=INT64, position=1, is_untyped=TRUE)
+
 [UNDECLARED_PARAMETERS]
 INT64
 ==
@@ -262,6 +267,7 @@ QueryStmt
         +-group_by_list=
           +-$col1#3 := Parameter(parse_location=7-8, type=INT64, position=1, is_untyped=TRUE)
           +-$col2#4 := Parameter(parse_location=10-11, type=INT64, position=2, is_untyped=TRUE)
+
 [UNDECLARED_PARAMETERS]
 INT64
 INT64
@@ -289,6 +295,7 @@ QueryStmt
           +-$agg1#3 :=
             +-AggregateFunctionCall(GoogleSQL:sum(INT64) -> INT64)
               +-Parameter(parse_location=14-15, type=INT64, position=2, is_untyped=TRUE)
+
 [UNDECLARED_PARAMETERS]
 INT64
 INT64
@@ -333,6 +340,7 @@ QueryStmt
     | +-Parameter(parse_location=40-41, type=INT64, position=3, is_untyped=TRUE)
     +-offset=
       +-Parameter(parse_location=49-50, type=INT64, position=4, is_untyped=TRUE)
+
 [UNDECLARED_PARAMETERS]
 INT64
 INT64
@@ -361,6 +369,7 @@ QueryStmt
         | +-TableScan(column_list=[KeyValue.Key#1], table=KeyValue, column_index_list=[0])
         +-group_by_list=
           +-key#3 := ColumnRef(type=INT64, column=KeyValue.Key#1)
+
 [UNDECLARED_PARAMETERS]
 INT64
 ==
@@ -705,6 +714,7 @@ UpdateStmt
       +-DMLValue
         +-value=
           +-Parameter(parse_location=37-38, type=STRING, position=2)
+
 [UNDECLARED_PARAMETERS]
 INT64
 STRING
@@ -1002,6 +1012,7 @@ QueryStmt
     |       +-Parameter(parse_location=26-27, type=INT64, position=1, is_untyped=TRUE)
     +-input_scan=
       +-SingleRowScan
+
 [UNDECLARED_PARAMETERS]
 INT64
 ==

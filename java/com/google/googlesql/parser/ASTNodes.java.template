@@ -88,7 +88,7 @@ public class ASTNodes {
 
 {# static deserialize method #}
 {# For abstract classes, call deserialize() for the subclass, which may be abstract or final. #}
-  # if node.is_abstract
+  # if node.is_abstract or node.allow_non_final_concrete_class_for_legacy_migration
     public static {{node.name}} deserialize(
         {{node.proto_field_type}} proto) {
       switch (proto.getNodeCase()) {
@@ -97,11 +97,19 @@ public class ASTNodes {
           return {{root_child_node.name}}.deserialize(
               proto.get{{root_child_node.node_kind|upper_camel_case}}Node());
    # endfor
+   {# For non-final concrete classes, deserialization of the base class #}
+   {# itself is supported.                                              #}
+   # if node.allow_non_final_concrete_class_for_legacy_migration
+        case {{node.node_kind}}_NODE:
+          return {{node.name}}.deserialize(
+              proto.get{{node.node_kind|upper_camel_case}}Node());
+   # endif
         default:
           throw new IllegalArgumentException("Invalid Node kind: " + proto.getNodeCase());
       }
     }
-  # else
+  # endif
+  # if not node.is_abstract
 {# final classes are instantiated directly. #}
     public static {{node.name}} deserialize(
         {{node.proto_type}} proto) {
@@ -110,7 +118,7 @@ public class ASTNodes {
 
 {{ blank_line }}
     @Override
-    public final String nodeKindString() {
+    public {% if not node.allow_non_final_concrete_class_for_legacy_migration %}final {% endif %}String nodeKindString() {
       return "{{node.node_kind_name}}";
     }
   # endif
@@ -121,7 +129,7 @@ public class ASTNodes {
    # if field.javadoc
 {{field.javadoc}}
    # endif
-    public final {{field.full_java_type}} get{{field.name|upper_camel_case}}() {
+    public {% if not node.allow_non_final_concrete_class_for_legacy_migration %}final {% endif %}{{field.full_java_type}} get{{field.name|upper_camel_case}}() {
       return {{field.name|lower_camel_case}};
     }
   # endfor

@@ -979,7 +979,7 @@ QueryStmt
     +-right_scan=
     | +-TVFScan
     |   +-column_list=tvf_one_relation_arg_with_fixed_output.[column_bool#6, column_bytes#7]
-    |   +-tvf=tvf_one_relation_arg_with_fixed_output((ANY TABLE) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+    |   +-tvf=tvf_one_relation_arg_with_fixed_output
     |   +-signature=(TABLE<key INT32, TestEnum ENUM<googlesql_test.TestEnum>, KitchenSink PROTO<googlesql_test.KitchenSinkPB>>) -> TABLE<column_bool BOOL, column_bytes BYTES>
     |   +-argument_list=
     |   | +-FunctionArgument
@@ -1115,7 +1115,7 @@ QueryStmt
       +-SampleScan
         +-column_list=tvf_no_args.[column_bool#3, column_bytes#4]
         +-input_scan=
-        | +-TVFScan(column_list=tvf_no_args.[column_bool#3, column_bytes#4], tvf=tvf_no_args(() -> TABLE<column_bool BOOL, column_bytes BYTES>), signature=() -> TABLE<column_bool BOOL, column_bytes BYTES>, column_index_list=[0, 1], function_call_signature=() -> TABLE<column_bool BOOL, column_bytes BYTES>)
+        | +-TVFScan(column_list=tvf_no_args.[column_bool#3, column_bytes#4], tvf=tvf_no_args, signature=() -> TABLE<column_bool BOOL, column_bytes BYTES>, column_index_list=[0, 1], function_call_signature=() -> TABLE<column_bool BOOL, column_bytes BYTES>)
         +-method="bernoulli"
         +-size=
         | +-Literal(type=INT64, value=5)

@@ -264,6 +264,24 @@ void GetGraphFunctions(TypeFactory* type_factory,
               }));
 
   InsertFunction(
+      functions, options, "element_definition_name_is", Function::SCALAR,
+      {{bool_type,
+        {{ARG_KIND_EXPR_GRAPH_ELEMENT, string_type}},
+        FN_ELEMENT_DEFINITION_NAME_IS}},
+      FunctionOptions()
+          .AddRequiredLanguageFeature(LanguageFeature::FEATURE_SQL_GRAPH)
+          .set_supports_safe_error_mode(false)
+          .set_sql_name("ELEMENT_DEFINITION_NAME_IS")
+          .set_get_sql_callback(
+              [](std::vector<std::string> inputs) -> std::string {
+                ABSL_DCHECK_EQ(inputs.size(), 2);
+                std::string table_name = inputs[1];
+                ParseStringLiteral(inputs[1], &table_name).IgnoreError();
+                return absl::StrCat("ELEMENT_DEFINITION_NAME_IS(", inputs[0],
+                                    ",", table_name, ")");
+              }));
+
+  InsertFunction(
       functions, options, "labels", Function::SCALAR,
       {{string_array_type,
         {{ARG_KIND_EXPR_GRAPH_ELEMENT}},

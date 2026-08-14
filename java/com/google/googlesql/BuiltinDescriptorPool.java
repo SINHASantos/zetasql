@@ -34,6 +34,7 @@ import com.google.googlesql.functions.GoogleSQLArrayZipMode.ArrayZipEnums.ArrayZ
 import com.google.googlesql.functions.GoogleSQLBitwiseAggMode.BitwiseAggEnums.BitwiseAggMode;
 import com.google.googlesql.functions.GoogleSQLDateTime.DateTimestampPart;
 import com.google.googlesql.functions.GoogleSQLDifferentialPrivacy;
+import com.google.googlesql.functions.GoogleSQLEndianness.Endianness;
 import com.google.googlesql.functions.GoogleSQLNormalizeMode.NormalizeMode;
 import com.google.googlesql.functions.GoogleSQLRangeSessionizeMode.RangeSessionizeEnums.RangeSessionizeMode;
 import com.google.googlesql.functions.GoogleSQLRankType.RankTypeEnums.RankType;
@@ -52,6 +53,7 @@ final class BuiltinDescriptorPool {
   private static final ImmutableDescriptorPool instance =
       ImmutableDescriptorPool.builder()
           .importFileDescriptor(DateTimestampPart.getDescriptor().getFile())
+          .importFileDescriptor(Endianness.getDescriptor().getFile())
           .importFileDescriptor(NormalizeMode.getDescriptor().getFile())
           .importFileDescriptor(RoundingMode.getDescriptor().getFile())
           .importFileDescriptor(UnsupportedFields.getDescriptor().getFile())

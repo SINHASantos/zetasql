@@ -2799,7 +2799,6 @@ QueryStmt
             +-analytic_function_list=
               +-$analytic1#4 := AnalyticFunctionCall(GoogleSQL:row_number() -> INT64)
 
-
 DEPRECATION WARNING:
 Ordinals in the order clause are deprecated [at 1:37]
 select row_number() over ( ORDER BY 2)
@@ -2839,7 +2838,6 @@ QueryStmt
             |         +-ColumnRef(type=INT64, column=$orderby.$orderbycol1#6)
             +-analytic_function_list=
               +-$analytic1#4 := AnalyticFunctionCall(GoogleSQL:row_number() -> INT64)
-
 
 DEPRECATION WARNING:
 Ordinals in the order clause are deprecated [at 1:40]

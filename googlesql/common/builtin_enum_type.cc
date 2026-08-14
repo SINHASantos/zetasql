@@ -42,6 +42,12 @@ absl::Status GetStandaloneBuiltinEnumTypes(
     GOOGLESQL_ASSIGN_OR_RETURN(const Type* rank_type_type, types::RankTypeEnumType());
     GOOGLESQL_RETURN_IF_ERROR(InsertType(types, options, rank_type_type));
   }
+  if (options.language_options.LanguageFeatureEnabled(
+          FEATURE_BIT_CAST_BYTES_FUNCTIONS) &&
+      options.language_options.product_mode() == PRODUCT_INTERNAL) {
+    GOOGLESQL_ASSIGN_OR_RETURN(const Type* endianness_type, types::EndiannessEnumType());
+    GOOGLESQL_RETURN_IF_ERROR(InsertType(types, options, endianness_type));
+  }
   return absl::OkStatus();
 }
 

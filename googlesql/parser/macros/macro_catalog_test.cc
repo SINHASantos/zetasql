@@ -19,6 +19,7 @@
 #include <memory>
 
 #include "googlesql/base/testing/status_matchers.h"
+#include "googlesql/parser/ast_enums.pb.h"
 #include "googlesql/parser/parse_tree.h"
 #include "googlesql/parser/parser.h"
 #include "googlesql/parser/parser_mode.h"

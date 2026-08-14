@@ -1,4 +1,7 @@
 [default language_features=MAXIMUM,+DECLARATIVE_TYPE_FRAMEWORK,+VECTOR_TYPE]
+########################
+# Casting and Coercion #
+########################
 
 # VECTOR disallows casting from its backing type, BYTES.
 SELECT dot_product(b"abc", b"def")
@@ -12,7 +15,7 @@ ERROR: No matching signature for function DOT_PRODUCT
   Signature: DOT_PRODUCT(ARRAY<DOUBLE>, ARRAY<DOUBLE>)
     Argument 1: Unable to coerce type BYTES to expected type ARRAY<DOUBLE>
   Signature: DOT_PRODUCT(VECTOR, VECTOR)
-    Argument 1: Unable to coerce type BYTES to expected type VECTOR [at 2:8]
+    Argument 1: Unable to coerce type BYTES to expected type VECTOR [at 6:8]
 SELECT dot_product(b"abc", b"def")
        ^
 ==
@@ -113,6 +116,65 @@ SELECT CAST([NULL] AS ARRAY<VECTOR>) AS cast_array_with_null_element
             ^
 ==
 
+# Casting to VECTOR without type parameters
+SELECT CAST(ENCODE_VECTOR([1.0, 2.0]) AS VECTOR)
+--
+QueryStmt
++-output_column_list=
+| +-$query.$col1#1 AS `$col1` [VECTOR]
++-query=
+  +-ProjectScan
+    +-column_list=[$query.$col1#1]
+    +-expr_list=
+    | +-$col1#1 :=
+    |   +-FunctionCall(GoogleSQL:encode_vector(ARRAY<FLOAT>, optional(0) INT64, optional(0) STRING) -> VECTOR)
+    |     +-Literal(type=ARRAY<FLOAT>, value=[1, 2])
+    +-input_scan=
+      +-SingleRowScan
+==
+
+# Casting to parameterized VECTOR with length only
+SELECT CAST(ENCODE_VECTOR([1.0, 2.0]) AS VECTOR(2))
+--
+QueryStmt
++-output_column_list=
+| +-$query.$col1#1 AS `$col1` [VECTOR]
++-query=
+  +-ProjectScan
+    +-column_list=[$query.$col1#1]
+    +-expr_list=
+    | +-$col1#1 :=
+    |   +-Cast(VECTOR -> VECTOR)
+    |     +-FunctionCall(GoogleSQL:encode_vector(ARRAY<FLOAT>, optional(0) INT64, optional(0) STRING) -> VECTOR)
+    |     | +-Literal(type=ARRAY<FLOAT>, value=[1, 2])
+    |     +-type_modifiers=type_parameters:(length=2)
+    +-input_scan=
+      +-SingleRowScan
+==
+
+# Casting with parameterized VECTOR with encoding
+SELECT CAST(ENCODE_VECTOR([1.0, 2.0]) AS VECTOR(2, 'FLOAT32'))
+--
+QueryStmt
++-output_column_list=
+| +-$query.$col1#1 AS `$col1` [VECTOR]
++-query=
+  +-ProjectScan
+    +-column_list=[$query.$col1#1]
+    +-expr_list=
+    | +-$col1#1 :=
+    |   +-Cast(VECTOR -> VECTOR)
+    |     +-FunctionCall(GoogleSQL:encode_vector(ARRAY<FLOAT>, optional(0) INT64, optional(0) STRING) -> VECTOR)
+    |     | +-Literal(type=ARRAY<FLOAT>, value=[1, 2])
+    |     +-type_modifiers=type_parameters:(length=2, encoding=FLOAT32)
+    +-input_scan=
+      +-SingleRowScan
+==
+
+#############################
+# VECTOR Returning Strategy #
+#############################
+
 # VECTOR type is returnable.
 SELECT
   ENCODE_VECTOR([1.0, 2.0]),
@@ -136,6 +198,10 @@ QueryStmt
     +-input_scan=
       +-SingleRowScan
 ==
+
+###############################################################
+# VECTOR comparison, ordering, and grouping are not supported #
+###############################################################
 
 # An ARRAY with an untyped NULL literal (e.g. `[NULL]`) is typed as `ARRAY<INT64>` by default.
 # Since there is no common supertype between INT64 and VECTOR, array concatenation fails.
@@ -355,65 +421,382 @@ SELECT v1 FROM t GROUP BY v1
                           ^
 ==
 
-# Basic concrete VECTOR functions
-SELECT DECODE_VECTOR(ENCODE_VECTOR([1.0, 2.0])),
-       VECTOR_LENGTH(ENCODE_VECTOR([1.0, 2.0])),
-       VECTOR_ENCODING(ENCODE_VECTOR([1.0, 2.0])),
-       COSINE_DISTANCE(ENCODE_VECTOR([1.0, 2.0]), ENCODE_VECTOR([3.0, 4.0])),
-       DOT_PRODUCT(ENCODE_VECTOR([1.0, 2.0]), ENCODE_VECTOR([3.0, 4.0])),
-       MANHATTAN_DISTANCE(ENCODE_VECTOR([1.0, 2.0]), ENCODE_VECTOR([3.0, 4.0])),
-       L1_NORM(ENCODE_VECTOR([1.0, 2.0])),
-       L2_NORM(ENCODE_VECTOR([1.0, 2.0]))
+
+#################
+# ENCODE_VECTOR #
+#################
+
+SELECT ENCODE_VECTOR([1.0, 2.0])
 --
 QueryStmt
 +-output_column_list=
-| +-$query.$col1#1 AS `$col1` [ARRAY<FLOAT>]
-| +-$query.$col2#2 AS `$col2` [INT64]
-| +-$query.$col3#3 AS `$col3` [STRING]
-| +-$query.$col4#4 AS `$col4` [DOUBLE]
-| +-$query.$col5#5 AS `$col5` [DOUBLE]
-| +-$query.$col6#6 AS `$col6` [DOUBLE]
-| +-$query.$col7#7 AS `$col7` [DOUBLE]
-| +-$query.$col8#8 AS `$col8` [DOUBLE]
+| +-$query.$col1#1 AS `$col1` [VECTOR]
 +-query=
   +-ProjectScan
-    +-column_list=$query.[$col1#1, $col2#2, $col3#3, $col4#4, $col5#5, $col6#6, $col7#7, $col8#8]
+    +-column_list=[$query.$col1#1]
     +-expr_list=
     | +-$col1#1 :=
-    | | +-FunctionCall(GoogleSQL:decode_vector(VECTOR) -> ARRAY<FLOAT>)
-    | |   +-FunctionCall(GoogleSQL:encode_vector(ARRAY<FLOAT>, optional(0) INT64, optional(0) STRING) -> VECTOR)
-    | |     +-Literal(type=ARRAY<FLOAT>, value=[1, 2])
-    | +-$col2#2 :=
-    | | +-FunctionCall(GoogleSQL:vector_length(VECTOR) -> INT64)
-    | |   +-FunctionCall(GoogleSQL:encode_vector(ARRAY<FLOAT>, optional(0) INT64, optional(0) STRING) -> VECTOR)
-    | |     +-Literal(type=ARRAY<FLOAT>, value=[1, 2])
-    | +-$col3#3 :=
-    | | +-FunctionCall(GoogleSQL:vector_encoding(VECTOR) -> STRING)
-    | |   +-FunctionCall(GoogleSQL:encode_vector(ARRAY<FLOAT>, optional(0) INT64, optional(0) STRING) -> VECTOR)
-    | |     +-Literal(type=ARRAY<FLOAT>, value=[1, 2])
-    | +-$col4#4 :=
-    | | +-FunctionCall(GoogleSQL:cosine_distance(VECTOR, VECTOR) -> DOUBLE)
-    | |   +-FunctionCall(GoogleSQL:encode_vector(ARRAY<FLOAT>, optional(0) INT64, optional(0) STRING) -> VECTOR)
-    | |   | +-Literal(type=ARRAY<FLOAT>, value=[1, 2])
-    | |   +-FunctionCall(GoogleSQL:encode_vector(ARRAY<FLOAT>, optional(0) INT64, optional(0) STRING) -> VECTOR)
-    | |     +-Literal(type=ARRAY<FLOAT>, value=[3, 4])
-    | +-$col5#5 :=
-    | | +-FunctionCall(GoogleSQL:dot_product(VECTOR, VECTOR) -> DOUBLE)
-    | |   +-FunctionCall(GoogleSQL:encode_vector(ARRAY<FLOAT>, optional(0) INT64, optional(0) STRING) -> VECTOR)
-    | |   | +-Literal(type=ARRAY<FLOAT>, value=[1, 2])
-    | |   +-FunctionCall(GoogleSQL:encode_vector(ARRAY<FLOAT>, optional(0) INT64, optional(0) STRING) -> VECTOR)
-    | |     +-Literal(type=ARRAY<FLOAT>, value=[3, 4])
-    | +-$col6#6 :=
-    | | +-FunctionCall(GoogleSQL:manhattan_distance(VECTOR, VECTOR) -> DOUBLE)
-    | |   +-FunctionCall(GoogleSQL:encode_vector(ARRAY<FLOAT>, optional(0) INT64, optional(0) STRING) -> VECTOR)
-    | |   | +-Literal(type=ARRAY<FLOAT>, value=[1, 2])
-    | |   +-FunctionCall(GoogleSQL:encode_vector(ARRAY<FLOAT>, optional(0) INT64, optional(0) STRING) -> VECTOR)
-    | |     +-Literal(type=ARRAY<FLOAT>, value=[3, 4])
-    | +-$col7#7 :=
-    | | +-FunctionCall(GoogleSQL:l1_norm(VECTOR) -> DOUBLE)
-    | |   +-FunctionCall(GoogleSQL:encode_vector(ARRAY<FLOAT>, optional(0) INT64, optional(0) STRING) -> VECTOR)
-    | |     +-Literal(type=ARRAY<FLOAT>, value=[1, 2])
-    | +-$col8#8 :=
+    |   +-FunctionCall(GoogleSQL:encode_vector(ARRAY<FLOAT>, optional(0) INT64, optional(0) STRING) -> VECTOR)
+    |     +-Literal(type=ARRAY<FLOAT>, value=[1, 2])
+    +-input_scan=
+      +-SingleRowScan
+==
+
+SELECT ENCODE_VECTOR([1.0, 2.0], 2, 'FLOAT32')
+--
+QueryStmt
++-output_column_list=
+| +-$query.$col1#1 AS `$col1` [VECTOR]
++-query=
+  +-ProjectScan
+    +-column_list=[$query.$col1#1]
+    +-expr_list=
+    | +-$col1#1 :=
+    |   +-FunctionCall(GoogleSQL:encode_vector(ARRAY<FLOAT>, optional(1) INT64, optional(1) STRING) -> VECTOR)
+    |     +-Literal(type=ARRAY<FLOAT>, value=[1, 2])
+    |     +-Literal(type=INT64, value=2)
+    |     +-Literal(type=STRING, value="FLOAT32")
+    +-input_scan=
+      +-SingleRowScan
+==
+
+#################
+# VECTOR_LENGTH #
+#################
+
+SELECT VECTOR_LENGTH(ENCODE_VECTOR([1.0, 2.0]))
+--
+QueryStmt
++-output_column_list=
+| +-$query.$col1#1 AS `$col1` [INT64]
++-query=
+  +-ProjectScan
+    +-column_list=[$query.$col1#1]
+    +-expr_list=
+    | +-$col1#1 :=
+    |   +-FunctionCall(GoogleSQL:vector_length(VECTOR) -> INT64)
+    |     +-FunctionCall(GoogleSQL:encode_vector(ARRAY<FLOAT>, optional(0) INT64, optional(0) STRING) -> VECTOR)
+    |       +-Literal(type=ARRAY<FLOAT>, value=[1, 2])
+    +-input_scan=
+      +-SingleRowScan
+==
+
+SELECT VECTOR_LENGTH(ENCODE_VECTOR([1.0, 2.0], 2, 'FLOAT32'))
+--
+QueryStmt
++-output_column_list=
+| +-$query.$col1#1 AS `$col1` [INT64]
++-query=
+  +-ProjectScan
+    +-column_list=[$query.$col1#1]
+    +-expr_list=
+    | +-$col1#1 :=
+    |   +-FunctionCall(GoogleSQL:vector_length(VECTOR) -> INT64)
+    |     +-FunctionCall(GoogleSQL:encode_vector(ARRAY<FLOAT>, optional(1) INT64, optional(1) STRING) -> VECTOR)
+    |       +-Literal(type=ARRAY<FLOAT>, value=[1, 2])
+    |       +-Literal(type=INT64, value=2)
+    |       +-Literal(type=STRING, value="FLOAT32")
+    +-input_scan=
+      +-SingleRowScan
+==
+
+###################
+# VECTOR_ENCODING #
+###################
+
+SELECT VECTOR_ENCODING(ENCODE_VECTOR([1.0, 2.0]))
+--
+QueryStmt
++-output_column_list=
+| +-$query.$col1#1 AS `$col1` [STRING]
++-query=
+  +-ProjectScan
+    +-column_list=[$query.$col1#1]
+    +-expr_list=
+    | +-$col1#1 :=
+    |   +-FunctionCall(GoogleSQL:vector_encoding(VECTOR) -> STRING)
+    |     +-FunctionCall(GoogleSQL:encode_vector(ARRAY<FLOAT>, optional(0) INT64, optional(0) STRING) -> VECTOR)
+    |       +-Literal(type=ARRAY<FLOAT>, value=[1, 2])
+    +-input_scan=
+      +-SingleRowScan
+==
+
+SELECT VECTOR_ENCODING(ENCODE_VECTOR([1.0, 2.0], 2, 'FLOAT32'))
+--
+QueryStmt
++-output_column_list=
+| +-$query.$col1#1 AS `$col1` [STRING]
++-query=
+  +-ProjectScan
+    +-column_list=[$query.$col1#1]
+    +-expr_list=
+    | +-$col1#1 :=
+    |   +-FunctionCall(GoogleSQL:vector_encoding(VECTOR) -> STRING)
+    |     +-FunctionCall(GoogleSQL:encode_vector(ARRAY<FLOAT>, optional(1) INT64, optional(1) STRING) -> VECTOR)
+    |       +-Literal(type=ARRAY<FLOAT>, value=[1, 2])
+    |       +-Literal(type=INT64, value=2)
+    |       +-Literal(type=STRING, value="FLOAT32")
+    +-input_scan=
+      +-SingleRowScan
+==
+
+# ENCODE_VECTOR does not allow passing ARRAY<DOUBLE> as input.
+SELECT VECTOR_LENGTH(ENCODE_VECTOR(ARRAY<DOUBLE>[1.7e308]));
+--
+ERROR: No matching signature for function ENCODE_VECTOR
+  Argument types: ARRAY<DOUBLE>
+  Signature: ENCODE_VECTOR(ARRAY<FLOAT>, [INT64], [STRING])
+    Argument 1: Unable to coerce type ARRAY<DOUBLE> to expected type ARRAY<FLOAT> [at 1:22]
+SELECT VECTOR_LENGTH(ENCODE_VECTOR(ARRAY<DOUBLE>[1.7e308]));
+                     ^
+==
+
+# ENCODE_VECTOR with an array literal containing an overflowed float32.
+SELECT ENCODE_VECTOR([1.7e308]);
+--
+ERROR: Could not cast literal [1.7e+308] to type ARRAY<FLOAT> [at 1:22]
+SELECT ENCODE_VECTOR([1.7e308]);
+                     ^
+==
+
+###################
+# COSINE_DISTANCE #
+###################
+
+SELECT COSINE_DISTANCE(ENCODE_VECTOR([1.0, 2.0]), ENCODE_VECTOR([3.0, 4.0]))
+--
+QueryStmt
++-output_column_list=
+| +-$query.$col1#1 AS `$col1` [DOUBLE]
++-query=
+  +-ProjectScan
+    +-column_list=[$query.$col1#1]
+    +-expr_list=
+    | +-$col1#1 :=
+    |   +-FunctionCall(GoogleSQL:cosine_distance(VECTOR, VECTOR) -> DOUBLE)
+    |     +-FunctionCall(GoogleSQL:encode_vector(ARRAY<FLOAT>, optional(0) INT64, optional(0) STRING) -> VECTOR)
+    |     | +-Literal(type=ARRAY<FLOAT>, value=[1, 2])
+    |     +-FunctionCall(GoogleSQL:encode_vector(ARRAY<FLOAT>, optional(0) INT64, optional(0) STRING) -> VECTOR)
+    |       +-Literal(type=ARRAY<FLOAT>, value=[3, 4])
+    +-input_scan=
+      +-SingleRowScan
+==
+
+SELECT COSINE_DISTANCE(ENCODE_VECTOR([1.0, 2.0], 2, 'FLOAT32'), ENCODE_VECTOR([3.0, 4.0], 2, 'FLOAT32'))
+--
+QueryStmt
++-output_column_list=
+| +-$query.$col1#1 AS `$col1` [DOUBLE]
++-query=
+  +-ProjectScan
+    +-column_list=[$query.$col1#1]
+    +-expr_list=
+    | +-$col1#1 :=
+    |   +-FunctionCall(GoogleSQL:cosine_distance(VECTOR, VECTOR) -> DOUBLE)
+    |     +-FunctionCall(GoogleSQL:encode_vector(ARRAY<FLOAT>, optional(1) INT64, optional(1) STRING) -> VECTOR)
+    |     | +-Literal(type=ARRAY<FLOAT>, value=[1, 2])
+    |     | +-Literal(type=INT64, value=2)
+    |     | +-Literal(type=STRING, value="FLOAT32")
+    |     +-FunctionCall(GoogleSQL:encode_vector(ARRAY<FLOAT>, optional(1) INT64, optional(1) STRING) -> VECTOR)
+    |       +-Literal(type=ARRAY<FLOAT>, value=[3, 4])
+    |       +-Literal(type=INT64, value=2)
+    |       +-Literal(type=STRING, value="FLOAT32")
+    +-input_scan=
+      +-SingleRowScan
+==
+
+###############
+# DOT_PRODUCT #
+###############
+
+SELECT DOT_PRODUCT(ENCODE_VECTOR([1.0, 2.0]), ENCODE_VECTOR([3.0, 4.0]))
+--
+QueryStmt
++-output_column_list=
+| +-$query.$col1#1 AS `$col1` [DOUBLE]
++-query=
+  +-ProjectScan
+    +-column_list=[$query.$col1#1]
+    +-expr_list=
+    | +-$col1#1 :=
+    |   +-FunctionCall(GoogleSQL:dot_product(VECTOR, VECTOR) -> DOUBLE)
+    |     +-FunctionCall(GoogleSQL:encode_vector(ARRAY<FLOAT>, optional(0) INT64, optional(0) STRING) -> VECTOR)
+    |     | +-Literal(type=ARRAY<FLOAT>, value=[1, 2])
+    |     +-FunctionCall(GoogleSQL:encode_vector(ARRAY<FLOAT>, optional(0) INT64, optional(0) STRING) -> VECTOR)
+    |       +-Literal(type=ARRAY<FLOAT>, value=[3, 4])
+    +-input_scan=
+      +-SingleRowScan
+==
+
+SELECT DOT_PRODUCT(ENCODE_VECTOR([1.0, 2.0], 2, 'FLOAT32'), ENCODE_VECTOR([3.0, 4.0], 2, 'FLOAT32'))
+--
+QueryStmt
++-output_column_list=
+| +-$query.$col1#1 AS `$col1` [DOUBLE]
++-query=
+  +-ProjectScan
+    +-column_list=[$query.$col1#1]
+    +-expr_list=
+    | +-$col1#1 :=
+    |   +-FunctionCall(GoogleSQL:dot_product(VECTOR, VECTOR) -> DOUBLE)
+    |     +-FunctionCall(GoogleSQL:encode_vector(ARRAY<FLOAT>, optional(1) INT64, optional(1) STRING) -> VECTOR)
+    |     | +-Literal(type=ARRAY<FLOAT>, value=[1, 2])
+    |     | +-Literal(type=INT64, value=2)
+    |     | +-Literal(type=STRING, value="FLOAT32")
+    |     +-FunctionCall(GoogleSQL:encode_vector(ARRAY<FLOAT>, optional(1) INT64, optional(1) STRING) -> VECTOR)
+    |       +-Literal(type=ARRAY<FLOAT>, value=[3, 4])
+    |       +-Literal(type=INT64, value=2)
+    |       +-Literal(type=STRING, value="FLOAT32")
+    +-input_scan=
+      +-SingleRowScan
+==
+
+######################
+# MANHATTAN_DISTANCE #
+######################
+
+SELECT MANHATTAN_DISTANCE(ENCODE_VECTOR([1.0, 2.0]), ENCODE_VECTOR([3.0, 4.0]))
+--
+QueryStmt
++-output_column_list=
+| +-$query.$col1#1 AS `$col1` [DOUBLE]
++-query=
+  +-ProjectScan
+    +-column_list=[$query.$col1#1]
+    +-expr_list=
+    | +-$col1#1 :=
+    |   +-FunctionCall(GoogleSQL:manhattan_distance(VECTOR, VECTOR) -> DOUBLE)
+    |     +-FunctionCall(GoogleSQL:encode_vector(ARRAY<FLOAT>, optional(0) INT64, optional(0) STRING) -> VECTOR)
+    |     | +-Literal(type=ARRAY<FLOAT>, value=[1, 2])
+    |     +-FunctionCall(GoogleSQL:encode_vector(ARRAY<FLOAT>, optional(0) INT64, optional(0) STRING) -> VECTOR)
+    |       +-Literal(type=ARRAY<FLOAT>, value=[3, 4])
+    +-input_scan=
+      +-SingleRowScan
+==
+
+SELECT MANHATTAN_DISTANCE(ENCODE_VECTOR([1.0, 2.0], 2, 'FLOAT32'), ENCODE_VECTOR([3.0, 4.0], 2, 'FLOAT32'))
+--
+QueryStmt
++-output_column_list=
+| +-$query.$col1#1 AS `$col1` [DOUBLE]
++-query=
+  +-ProjectScan
+    +-column_list=[$query.$col1#1]
+    +-expr_list=
+    | +-$col1#1 :=
+    |   +-FunctionCall(GoogleSQL:manhattan_distance(VECTOR, VECTOR) -> DOUBLE)
+    |     +-FunctionCall(GoogleSQL:encode_vector(ARRAY<FLOAT>, optional(1) INT64, optional(1) STRING) -> VECTOR)
+    |     | +-Literal(type=ARRAY<FLOAT>, value=[1, 2])
+    |     | +-Literal(type=INT64, value=2)
+    |     | +-Literal(type=STRING, value="FLOAT32")
+    |     +-FunctionCall(GoogleSQL:encode_vector(ARRAY<FLOAT>, optional(1) INT64, optional(1) STRING) -> VECTOR)
+    |       +-Literal(type=ARRAY<FLOAT>, value=[3, 4])
+    |       +-Literal(type=INT64, value=2)
+    |       +-Literal(type=STRING, value="FLOAT32")
+    +-input_scan=
+      +-SingleRowScan
+==
+
+######################
+# EUCLIDEAN_DISTANCE #
+######################
+
+SELECT EUCLIDEAN_DISTANCE(ENCODE_VECTOR([1.0, 2.0]), ENCODE_VECTOR([3.0, 4.0]))
+--
+QueryStmt
++-output_column_list=
+| +-$query.$col1#1 AS `$col1` [DOUBLE]
++-query=
+  +-ProjectScan
+    +-column_list=[$query.$col1#1]
+    +-expr_list=
+    | +-$col1#1 :=
+    |   +-FunctionCall(GoogleSQL:euclidean_distance(VECTOR, VECTOR) -> DOUBLE)
+    |     +-FunctionCall(GoogleSQL:encode_vector(ARRAY<FLOAT>, optional(0) INT64, optional(0) STRING) -> VECTOR)
+    |     | +-Literal(type=ARRAY<FLOAT>, value=[1, 2])
+    |     +-FunctionCall(GoogleSQL:encode_vector(ARRAY<FLOAT>, optional(0) INT64, optional(0) STRING) -> VECTOR)
+    |       +-Literal(type=ARRAY<FLOAT>, value=[3, 4])
+    +-input_scan=
+      +-SingleRowScan
+==
+
+SELECT EUCLIDEAN_DISTANCE(ENCODE_VECTOR([1.0, 2.0], 2, 'FLOAT32'), ENCODE_VECTOR([3.0, 4.0], 2, 'FLOAT32'))
+--
+QueryStmt
++-output_column_list=
+| +-$query.$col1#1 AS `$col1` [DOUBLE]
++-query=
+  +-ProjectScan
+    +-column_list=[$query.$col1#1]
+    +-expr_list=
+    | +-$col1#1 :=
+    |   +-FunctionCall(GoogleSQL:euclidean_distance(VECTOR, VECTOR) -> DOUBLE)
+    |     +-FunctionCall(GoogleSQL:encode_vector(ARRAY<FLOAT>, optional(1) INT64, optional(1) STRING) -> VECTOR)
+    |     | +-Literal(type=ARRAY<FLOAT>, value=[1, 2])
+    |     | +-Literal(type=INT64, value=2)
+    |     | +-Literal(type=STRING, value="FLOAT32")
+    |     +-FunctionCall(GoogleSQL:encode_vector(ARRAY<FLOAT>, optional(1) INT64, optional(1) STRING) -> VECTOR)
+    |       +-Literal(type=ARRAY<FLOAT>, value=[3, 4])
+    |       +-Literal(type=INT64, value=2)
+    |       +-Literal(type=STRING, value="FLOAT32")
+    +-input_scan=
+      +-SingleRowScan
+==
+
+###########
+# L1_NORM #
+###########
+
+SELECT L1_NORM(ENCODE_VECTOR([1.0, 2.0]))
+--
+QueryStmt
++-output_column_list=
+| +-$query.$col1#1 AS `$col1` [DOUBLE]
++-query=
+  +-ProjectScan
+    +-column_list=[$query.$col1#1]
+    +-expr_list=
+    | +-$col1#1 :=
+    |   +-FunctionCall(GoogleSQL:l1_norm(VECTOR) -> DOUBLE)
+    |     +-FunctionCall(GoogleSQL:encode_vector(ARRAY<FLOAT>, optional(0) INT64, optional(0) STRING) -> VECTOR)
+    |       +-Literal(type=ARRAY<FLOAT>, value=[1, 2])
+    +-input_scan=
+      +-SingleRowScan
+==
+
+SELECT L1_NORM(ENCODE_VECTOR([1.0, 2.0], 2, 'FLOAT32'))
+--
+QueryStmt
++-output_column_list=
+| +-$query.$col1#1 AS `$col1` [DOUBLE]
++-query=
+  +-ProjectScan
+    +-column_list=[$query.$col1#1]
+    +-expr_list=
+    | +-$col1#1 :=
+    |   +-FunctionCall(GoogleSQL:l1_norm(VECTOR) -> DOUBLE)
+    |     +-FunctionCall(GoogleSQL:encode_vector(ARRAY<FLOAT>, optional(1) INT64, optional(1) STRING) -> VECTOR)
+    |       +-Literal(type=ARRAY<FLOAT>, value=[1, 2])
+    |       +-Literal(type=INT64, value=2)
+    |       +-Literal(type=STRING, value="FLOAT32")
+    +-input_scan=
+      +-SingleRowScan
+==
+
+###########
+# L2_NORM #
+###########
+
+SELECT L2_NORM(ENCODE_VECTOR([1.0, 2.0]))
+--
+QueryStmt
++-output_column_list=
+| +-$query.$col1#1 AS `$col1` [DOUBLE]
++-query=
+  +-ProjectScan
+    +-column_list=[$query.$col1#1]
+    +-expr_list=
+    | +-$col1#1 :=
     |   +-FunctionCall(GoogleSQL:l2_norm(VECTOR) -> DOUBLE)
     |     +-FunctionCall(GoogleSQL:encode_vector(ARRAY<FLOAT>, optional(0) INT64, optional(0) STRING) -> VECTOR)
     |       +-Literal(type=ARRAY<FLOAT>, value=[1, 2])
@@ -421,104 +804,28 @@ QueryStmt
       +-SingleRowScan
 ==
 
-# CAST VECTOR to STRING is disallowed.
-SELECT CAST(ENCODE_VECTOR([1.0, 2.0]) AS STRING)
---
-ERROR: Invalid cast from VECTOR to STRING [at 1:13]
-SELECT CAST(ENCODE_VECTOR([1.0, 2.0]) AS STRING)
-            ^
-==
-
-# FORMAT with VECTOR is disallowed.
-SELECT FORMAT("%t", CAST(NULL AS VECTOR))
---
-ERROR: generic::unimplemented: Cannot format type VECTOR [at 1:8]
-SELECT FORMAT("%t", CAST(NULL AS VECTOR))
-       ^
-==
-
-# CAST to parameterized VECTOR(3) handles type parameter constraint check
-# will be an evaluation error instead of analysis error.
-SELECT DECODE_VECTOR(CAST(ENCODE_VECTOR([1.0, 2.0]) AS VECTOR(3)))
+SELECT L2_NORM(ENCODE_VECTOR([1.0, 2.0], 2, 'FLOAT32'))
 --
 QueryStmt
 +-output_column_list=
-| +-$query.$col1#1 AS `$col1` [ARRAY<FLOAT>]
+| +-$query.$col1#1 AS `$col1` [DOUBLE]
 +-query=
   +-ProjectScan
     +-column_list=[$query.$col1#1]
     +-expr_list=
     | +-$col1#1 :=
-    |   +-FunctionCall(GoogleSQL:decode_vector(VECTOR) -> ARRAY<FLOAT>)
-    |     +-Cast(VECTOR -> VECTOR)
-    |       +-FunctionCall(GoogleSQL:encode_vector(ARRAY<FLOAT>, optional(0) INT64, optional(0) STRING) -> VECTOR)
-    |       | +-Literal(type=ARRAY<FLOAT>, value=[1, 2])
-    |       +-type_modifiers=type_parameters:(length=3)
+    |   +-FunctionCall(GoogleSQL:l2_norm(VECTOR) -> DOUBLE)
+    |     +-FunctionCall(GoogleSQL:encode_vector(ARRAY<FLOAT>, optional(1) INT64, optional(1) STRING) -> VECTOR)
+    |       +-Literal(type=ARRAY<FLOAT>, value=[1, 2])
+    |       +-Literal(type=INT64, value=2)
+    |       +-Literal(type=STRING, value="FLOAT32")
     +-input_scan=
       +-SingleRowScan
 ==
 
-# CAST to parameterized VECTOR(2) handles type is valid.
-# will be an evaluation error instead of analysis error.
-SELECT DECODE_VECTOR(CAST(ENCODE_VECTOR([1.0, 2.0]) AS VECTOR(2)))
---
-QueryStmt
-+-output_column_list=
-| +-$query.$col1#1 AS `$col1` [ARRAY<FLOAT>]
-+-query=
-  +-ProjectScan
-    +-column_list=[$query.$col1#1]
-    +-expr_list=
-    | +-$col1#1 :=
-    |   +-FunctionCall(GoogleSQL:decode_vector(VECTOR) -> ARRAY<FLOAT>)
-    |     +-Cast(VECTOR -> VECTOR)
-    |       +-FunctionCall(GoogleSQL:encode_vector(ARRAY<FLOAT>, optional(0) INT64, optional(0) STRING) -> VECTOR)
-    |       | +-Literal(type=ARRAY<FLOAT>, value=[1, 2])
-    |       +-type_modifiers=type_parameters:(length=2)
-    +-input_scan=
-      +-SingleRowScan
-==
-
-# DECODE_VECTOR with NULL and untyped parameters
-SELECT DECODE_VECTOR(NULL), DECODE_VECTOR(CAST(NULL AS VECTOR))
---
-QueryStmt
-+-output_column_list=
-| +-$query.$col1#1 AS `$col1` [ARRAY<FLOAT>]
-| +-$query.$col2#2 AS `$col2` [ARRAY<FLOAT>]
-+-query=
-  +-ProjectScan
-    +-column_list=$query.[$col1#1, $col2#2]
-    +-expr_list=
-    | +-$col1#1 :=
-    | | +-FunctionCall(GoogleSQL:decode_vector(VECTOR) -> ARRAY<FLOAT>)
-    | |   +-Literal(type=VECTOR, value=NULL)
-    | +-$col2#2 :=
-    |   +-FunctionCall(GoogleSQL:decode_vector(VECTOR) -> ARRAY<FLOAT>)
-    |     +-Literal(type=VECTOR, value=NULL, has_explicit_type=TRUE)
-    +-input_scan=
-      +-SingleRowScan
-==
-
-# DECODE_VECTOR with untyped parameter
-[allow_undeclared_parameters]
-SELECT DECODE_VECTOR(@test_param)
---
-QueryStmt
-+-output_column_list=
-| +-$query.$col1#1 AS `$col1` [ARRAY<FLOAT>]
-+-query=
-  +-ProjectScan
-    +-column_list=[$query.$col1#1]
-    +-expr_list=
-    | +-$col1#1 :=
-    |   +-FunctionCall(GoogleSQL:decode_vector(VECTOR) -> ARRAY<FLOAT>)
-    |     +-Parameter(parse_location=21-32, type=VECTOR, name="test_param")
-    +-input_scan=
-      +-SingleRowScan
-[UNDECLARED_PARAMETERS]
-test_param: VECTOR
-==
+#################
+# DECODE_VECTOR #
+#################
 
 # DECODE_VECTOR with empty array literal
 SELECT DECODE_VECTOR([])
@@ -531,18 +838,92 @@ SELECT DECODE_VECTOR([])
        ^
 ==
 
-# TODO: Support parameterized declarative types (like VECTOR(3)) in
-# DDL column schemas.
-# CREATE TABLE with ARRAY of parameterized VECTOR currently fails.
-CREATE TABLE t (v ARRAY<VECTOR(3)>)
+# DECODE_VECTOR with array literal
+SELECT DECODE_VECTOR([1.0, 2.0])
 --
-ERROR: Type VECTOR does not support type parameters [at 1:31]
-CREATE TABLE t (v ARRAY<VECTOR(3)>)
-                              ^
+ERROR: No matching signature for function DECODE_VECTOR
+  Argument types: ARRAY<DOUBLE>
+  Signature: DECODE_VECTOR(VECTOR)
+    Argument 1: Unable to coerce type ARRAY<DOUBLE> to expected type VECTOR [at 1:8]
+SELECT DECODE_VECTOR([1.0, 2.0])
+       ^
 ==
 
-# TODO: Add returning support to Vector type.
-CREATE TABLE t (v VECTOR)
+# DECODE_VECTOR with VECTOR literal
+SELECT DECODE_VECTOR(ENCODE_VECTOR([1.0, 2.0]))
+--
+QueryStmt
++-output_column_list=
+| +-$query.$col1#1 AS `$col1` [ARRAY<FLOAT>]
++-query=
+  +-ProjectScan
+    +-column_list=[$query.$col1#1]
+    +-expr_list=
+    | +-$col1#1 :=
+    |   +-FunctionCall(GoogleSQL:decode_vector(VECTOR) -> ARRAY<FLOAT>)
+    |     +-FunctionCall(GoogleSQL:encode_vector(ARRAY<FLOAT>, optional(0) INT64, optional(0) STRING) -> VECTOR)
+    |       +-Literal(type=ARRAY<FLOAT>, value=[1, 2])
+    +-input_scan=
+      +-SingleRowScan
+==
+
+########
+# CAST #
+########
+
+SELECT CAST(ENCODE_VECTOR([1.0, 2.0], 2, 'FLOAT32') AS VECTOR(2, 'FLOAT32'))
+--
+QueryStmt
++-output_column_list=
+| +-$query.$col1#1 AS `$col1` [VECTOR]
++-query=
+  +-ProjectScan
+    +-column_list=[$query.$col1#1]
+    +-expr_list=
+    | +-$col1#1 :=
+    |   +-Cast(VECTOR -> VECTOR)
+    |     +-FunctionCall(GoogleSQL:encode_vector(ARRAY<FLOAT>, optional(1) INT64, optional(1) STRING) -> VECTOR)
+    |     | +-Literal(type=ARRAY<FLOAT>, value=[1, 2])
+    |     | +-Literal(type=INT64, value=2)
+    |     | +-Literal(type=STRING, value="FLOAT32")
+    |     +-type_modifiers=type_parameters:(length=2, encoding=FLOAT32)
+    +-input_scan=
+      +-SingleRowScan
+==
+
+
+SELECT CAST(ENCODE_VECTOR([1.0, 2.0], 2, 'FLOAT32') AS VECTOR)
+--
+QueryStmt
++-output_column_list=
+| +-$query.$col1#1 AS `$col1` [VECTOR]
++-query=
+  +-ProjectScan
+    +-column_list=[$query.$col1#1]
+    +-expr_list=
+    | +-$col1#1 :=
+    |   +-FunctionCall(GoogleSQL:encode_vector(ARRAY<FLOAT>, optional(1) INT64, optional(1) STRING) -> VECTOR)
+    |     +-Literal(type=ARRAY<FLOAT>, value=[1, 2])
+    |     +-Literal(type=INT64, value=2)
+    |     +-Literal(type=STRING, value="FLOAT32")
+    +-input_scan=
+      +-SingleRowScan
+==
+
+######################
+# ARRAY<VECTOR(...)> #
+######################
+
+# Parameterized declarative types are not supported in array literal construction.
+# TODO: Support parameterized declarative types in ARRAY literal value construction.
+
+
+#######
+# DDL #
+#######
+
+# 1. VECTOR column without type parameters
+CREATE TABLE t(v VECTOR)
 --
 CreateTableStmt
 +-name_path=t
@@ -550,17 +931,8 @@ CreateTableStmt
   +-ColumnDefinition(name="v", type=VECTOR, column=t.v#1)
 ==
 
+# 2. VECTOR column with a length type parameter
 # TODO: Support parameterized declarative types (like VECTOR) in DDL column schemas.
-# CREATE TABLE with parameterized VECTOR with invalid length fails.
-CREATE TABLE t(v VECTOR(0))
---
-ERROR: Type VECTOR does not support type parameters [at 1:24]
-CREATE TABLE t(v VECTOR(0))
-                       ^
-==
-
-# TODO: Support parameterized declarative types (like VECTOR) in DDL column schemas.
-# CREATE TABLE with parameterized VECTOR with valid length.
 CREATE TABLE t(v VECTOR(128))
 --
 ERROR: Type VECTOR does not support type parameters [at 1:24]
@@ -568,12 +940,76 @@ CREATE TABLE t(v VECTOR(128))
                        ^
 ==
 
+CREATE TABLE t(v VECTOR(0))
+--
+ERROR: Type VECTOR does not support type parameters [at 1:24]
+CREATE TABLE t(v VECTOR(0))
+                       ^
+==
+
+# 3. VECTOR column with both length and encoding type parameters
 # TODO: Support parameterized declarative types (like VECTOR) in DDL column schemas.
-# CREATE TABLE with generated column of type VECTOR(3).
-CREATE TABLE t(arr ARRAY<FLOAT>, v VECTOR(3) AS (ENCODE_VECTOR(arr, 3)))
+CREATE TABLE t(v VECTOR(128, 'FLOAT32'))
+--
+ERROR: Type VECTOR does not support type parameters [at 1:24]
+CREATE TABLE t(v VECTOR(128, 'FLOAT32'))
+                       ^
+==
+
+# 4. Table with ARRAY<VECTOR>, with or without type parameters
+# TODO: Support parameterized declarative types (like VECTOR) in DDL column schemas.
+CREATE TABLE t(v ARRAY<VECTOR>)
+--
+CreateTableStmt
++-name_path=t
++-column_definition_list=
+  +-ColumnDefinition(name="v", type=ARRAY<VECTOR>, column=t.v#1)
+==
+
+CREATE TABLE t(v ARRAY<VECTOR(3)>)
+--
+ERROR: Type VECTOR does not support type parameters [at 1:30]
+CREATE TABLE t(v ARRAY<VECTOR(3)>)
+                             ^
+==
+
+CREATE TABLE t(v ARRAY<VECTOR(3, 'FLOAT32')>)
+--
+ERROR: Type VECTOR does not support type parameters [at 1:30]
+CREATE TABLE t(v ARRAY<VECTOR(3, 'FLOAT32')>)
+                             ^
+==
+
+# 5. Table with STRUCT of VECTOR, with or without type parameters
+# TODO: Support parameterized declarative types (like VECTOR) in DDL column schemas.
+CREATE TABLE t(v STRUCT<v VECTOR>)
+--
+CreateTableStmt
++-name_path=t
++-column_definition_list=
+  +-ColumnDefinition(name="v", type=STRUCT<v VECTOR>, column=t.v#1)
+==
+
+CREATE TABLE t(v STRUCT<v VECTOR(3)>)
+--
+ERROR: Type VECTOR does not support type parameters [at 1:33]
+CREATE TABLE t(v STRUCT<v VECTOR(3)>)
+                                ^
+==
+
+CREATE TABLE t(v STRUCT<v VECTOR(3, 'FLOAT32')>)
+--
+ERROR: Type VECTOR does not support type parameters [at 1:33]
+CREATE TABLE t(v STRUCT<v VECTOR(3, 'FLOAT32')>)
+                                ^
+==
+
+# Table with generated column of VECTOR
+CREATE TABLE t(arr ARRAY<FLOAT>, v VECTOR(3, 'FLOAT32') AS (ENCODE_VECTOR(arr, 3, 'FLOAT32')))
 --
 ERROR: Type VECTOR does not support type parameters [at 1:42]
-CREATE TABLE t(arr ARRAY<FLOAT>, v VECTOR(3) AS (ENCODE_VECTOR(arr, 3)))
+CREATE TABLE t(arr ARRAY<FLOAT>, v VECTOR(3, 'FLOAT32') AS (ENCODE_VECTOR(arr...
                                          ^
 ==
+
 

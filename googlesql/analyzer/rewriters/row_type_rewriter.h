@@ -21,7 +21,7 @@
 
 namespace googlesql {
 
-const Rewriter* GetRowTypeTableScanRewriter();
+const Rewriter* GetRowTypeRewriter();
 
 }  // namespace googlesql
 

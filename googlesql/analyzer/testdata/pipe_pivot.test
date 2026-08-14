@@ -159,7 +159,7 @@ QueryStmt
 +-query=
   +-TVFScan
     +-column_list=tvf_one_relation_arg_output_schema_is_input_schema.[x#8, y#9]
-    +-tvf=tvf_one_relation_arg_output_schema_is_input_schema((ANY TABLE) -> ANY TABLE)
+    +-tvf=tvf_one_relation_arg_output_schema_is_input_schema
     +-signature=(TABLE<x INT64, y INT64>) -> TABLE<x INT64, y INT64>
     +-argument_list=
     | +-FunctionArgument

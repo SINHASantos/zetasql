@@ -713,6 +713,16 @@ absl::HashState ProtoType::HashValueContent(const ValueContent& value,
   return absl::HashState::combine(std::move(state), 0);
 }
 
+absl::HashState ProtoType::HashValueContentIgnoringFloat(
+    const ValueContent& value, absl::HashState state) const {
+  if (HasFloatingPointFields()) {
+    return absl::HashState::combine(std::move(state), TYPE_PROTO, true);
+  }
+
+  state = absl::HashState::combine(std::move(state), false);
+  return HashValueContent(value, std::move(state));
+}
+
 bool ProtoType::ValueContentEquals(
     const ValueContent& x, const ValueContent& y,
     const ValueEqualityCheckOptions& options) const {

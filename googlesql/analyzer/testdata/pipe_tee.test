@@ -57,7 +57,6 @@ GeneralizedQueryStmt
               +-KeyValue.Key#1 AS Key [INT64]
               +-KeyValue.Value#2 AS Value [STRING]
 
-
 [REWRITTEN AST]
 MultiStmt
 +-statement_list=
@@ -137,7 +136,6 @@ ExplainStmt
                       +-KeyValue.Key#1 AS Key [INT64]
                       +-KeyValue.Value#2 AS Value [STRING]
                       +-$pipe_extend.dval#3 AS dval [DOUBLE]
-
 
 [REWRITTEN AST]
 ExplainStmt
@@ -243,7 +241,6 @@ GeneralizedQueryStmt
             +-output_column_list=
               +-KeyValue.Key#1 AS Key [INT64]
               +-KeyValue.Value#2 AS Value [STRING]
-
 
 [REWRITTEN AST]
 MultiStmt
@@ -362,7 +359,6 @@ GeneralizedQueryStmt
               +-KeyValue.Value#2 AS Value [STRING]
               +-$pipe_extend.k1000#3 AS k1000 [INT64]
 
-
 [REWRITTEN AST]
 MultiStmt
 +-statement_list=
@@ -470,7 +466,6 @@ GeneralizedQueryStmt
                       +-KeyValue.Key#1 AS Key [INT64]
                       +-KeyValue.Value#2 AS Value [STRING]
 
-
 [REWRITTEN AST]
 MultiStmt
 +-statement_list=
@@ -560,7 +555,6 @@ GeneralizedQueryStmt
       +-FunctionCall(GoogleSQL:$equal(INT64, INT64) -> BOOL)
         +-ColumnRef(type=INT64, column=KeyValue.Key#1)
         +-Literal(type=INT64, value=1)
-
 
 [REWRITTEN AST]
 MultiStmt
@@ -742,7 +736,6 @@ GeneralizedQueryStmt
         |   +-ColumnRef(type=STRING, column=cte.Value#8)
         +-has_using=TRUE
 
-
 [REWRITTEN AST]
 MultiStmt
 +-statement_list=
@@ -902,7 +895,6 @@ GeneralizedQueryStmt
       +-FunctionCall(GoogleSQL:$equal(INT64, INT64) -> BOOL)
         +-ColumnRef(type=INT64, column=KeyValue.Key#1)
         +-Literal(type=INT64, value=10)
-
 
 [REWRITTEN AST]
 MultiStmt
@@ -1077,7 +1069,6 @@ GeneralizedQueryStmt
     +-limit=
       +-Literal(type=INT64, value=10)
 
-
 [REWRITTEN AST]
 MultiStmt
 +-statement_list=
@@ -1197,7 +1188,6 @@ GeneralizedQueryStmt
             | +-KeyValue.Value#2 AS `$value_column` [STRING]
             +-is_value_table=TRUE
 
-
 [REWRITTEN AST]
 MultiStmt
 +-statement_list=
@@ -1276,7 +1266,6 @@ GeneralizedQueryStmt
                 +-output_column_list=
                 | +-TestExtraValueTable.value#1 AS `$value` [PROTO<googlesql_test.TestExtraPB>]
                 +-is_value_table=TRUE
-
 
 [REWRITTEN AST]
 MultiStmt
@@ -1385,7 +1374,6 @@ GeneralizedQueryStmt
             +-output_column_list=
               +-TestExtraValueTable.RowId#3 AS RowId [BYTES]
 
-
 [REWRITTEN AST]
 MultiStmt
 +-statement_list=
@@ -1488,7 +1476,6 @@ GeneralizedQueryStmt
               +-KeyValue.Key#1 AS Key [INT64]
               +-KeyValue.Value#2 AS Value [STRING]
 
-
 [REWRITTEN AST]
 MultiStmt
 +-statement_list=
@@ -1574,7 +1561,6 @@ GeneralizedQueryStmt
     |             +-KeyValue.Value#2 AS Value [STRING]
     +-limit=
       +-Literal(type=INT64, value=2)
-
 
 [REWRITTEN AST]
 MultiStmt
@@ -1666,7 +1652,6 @@ GeneralizedQueryStmt
                         +-output_column_list=
                           +-KeyValue.Key#1 AS key [INT64]
 
-
 [REWRITTEN AST]
 MultiStmt
 +-statement_list=
@@ -1708,7 +1693,6 @@ QueryStmt
         +-condition=
         | +-Literal(type=BOOL, value=false)
         +-subpipeline_sql="(\n     |> TEE ( |> SELECT key )\n   )"
-
 
 [REWRITTEN AST]
 QueryStmt
@@ -1775,7 +1759,6 @@ GeneralizedQueryStmt
     +-filter_expr=
       +-Literal(type=BOOL, value=false)
 
-
 [REWRITTEN AST]
 MultiStmt
 +-statement_list=
@@ -1830,7 +1813,6 @@ QueryStmt
     |       +-subpipeline_sql="(\n     |> TEE ( |> WHERE true )\n   )"
     +-filter_expr=
       +-Literal(type=BOOL, value=false)
-
 
 [REWRITTEN AST]
 QueryStmt
@@ -1928,7 +1910,6 @@ GeneralizedQueryStmt
             +-output_column_list=
               +-$pipe_select.$col1#3 AS `$col1` [DOUBLE]
 
-
 [REWRITTEN AST]
 MultiStmt
 +-statement_list=
@@ -2025,7 +2006,6 @@ GeneralizedQueryStmt
                       +-OutputSchema
                         +-output_column_list=
                           +-KeyValue.Value#2 AS value [STRING]
-
 
 [REWRITTEN AST]
 MultiStmt
@@ -2150,7 +2130,6 @@ GeneralizedQueryStmt
           +-OutputSchema
             +-output_column_list=
               +-KeyValue.Key#1 AS key [INT64]
-
 
 [REWRITTEN AST]
 MultiStmt
@@ -2299,7 +2278,6 @@ GeneralizedQueryStmt
         +-output_column_list=
           +-$pipe_select.$col1#3 AS `$col1` [BOOL]
 
-
 [REWRITTEN AST]
 MultiStmt
 +-statement_list=
@@ -2405,7 +2383,6 @@ GeneralizedQueryStmt
                         +-query=
                           +-SubpipelineInputScan(column_list=KeyValue.[Key#1, Value#2])
 
-
 [REWRITTEN AST]
 MultiStmt
 +-statement_list=
@@ -2503,7 +2480,6 @@ GeneralizedQueryStmt
                                 +-input_scan=
                                   +-SubpipelineInputScan(column_list=KeyValue.[Key#1, Value#2])
 
-
 [REWRITTEN AST]
 MultiStmt
 +-statement_list=
@@ -2582,7 +2558,6 @@ GeneralizedQueryStmt
             +-output_column_list=
               +-KeyValue.Value#2 AS value [STRING]
 
-
 [REWRITTEN AST]
 MultiStmt
 +-hint_list=
@@ -2643,7 +2618,6 @@ GeneralizedQueryStmt
                       +-FunctionCall(GoogleSQL:$less(INT64, INT64) -> BOOL)
                         +-ColumnRef(type=INT64, column=KeyValue.Key#1)
                         +-Literal(type=INT64, value=100)
-
 
 [REWRITTEN AST]
 MultiStmt
@@ -2712,7 +2686,6 @@ GeneralizedQueryStmt
         +-filter_expr=
           +-FunctionCall(GoogleSQL:$is_null(STRING) -> BOOL)
             +-ColumnRef(type=STRING, column=KeyValue.Value#2)
-
 
 [REWRITTEN AST]
 MultiStmt

@@ -124,9 +124,15 @@ DROP LIVE TABLE IF EXISTS my_path.`{INSTANCE<>prod}`.utmtable.Sink
 
 CREATE LIVE TABLE t OPTIONS(x=1)
 --
-ERROR: Syntax error: Expected keyword AS but got end of statement [at 1:33]
-CREATE LIVE TABLE t OPTIONS(x=1)
-                                ^
+CreateLiveTableStatement [0-32] [CREATE LIVE...OPTIONS(x=1)]
+  PathExpression [18-19] [t]
+    Identifier(t) [18-19] [t]
+  OptionsList [27-32] [(x=1)]
+    OptionsEntry [28-31] [x=1]
+      Identifier(x) [28-29] [x]
+      IntLiteral(1) [30-31] [1]
+--
+CREATE LIVE TABLE t OPTIONS(x = 1)
 ==
 
 CREATE LIVE TABLE AS SELECT 1
@@ -245,7 +251,7 @@ SELECT
 [language_features=NONE,+TTL]
 CREATE LIVE TABLE t ROW DELETION POLICY (x > 1000) AS SELECT 1, 2 as x
 --
-ERROR: Syntax error: Expected keyword AS but got keyword ROW [at 1:21]
+ERROR: Syntax error: Expected end of input but got keyword ROW [at 1:21]
 CREATE LIVE TABLE t ROW DELETION POLICY (x > 1000) AS SELECT 1, 2 as x
                     ^
 ==
@@ -268,3 +274,559 @@ CreateLiveTableStatement [0-49] [CREATE LIVE...AS SELECT 1]
 CREATE LIVE TABLE t WITH CONNECTION c AS
 SELECT
   1
+==
+
+CREATE OR REPLACE LIVE TABLE IF NOT EXISTS t
+--
+CreateLiveTableStatement(is_or_replace, is_if_not_exists) [0-44] [CREATE OR...NOT EXISTS t]
+  PathExpression [43-44] [t]
+    Identifier(t) [43-44] [t]
+--
+CREATE OR REPLACE LIVE TABLE IF NOT EXISTS t
+==
+
+CREATE TEMP LIVE TABLE t
+--
+ERROR: Syntax error: TEMP, TEMPORARY, PUBLIC, or PRIVATE modifiers are not supported for LIVE TABLE [at 1:8]
+CREATE TEMP LIVE TABLE t
+       ^
+==
+
+CREATE LIVE TABLE t OPTIONS() AS SELECT 1
+--
+CreateLiveTableStatement [0-41] [CREATE LIVE...AS SELECT 1]
+  PathExpression [18-19] [t]
+    Identifier(t) [18-19] [t]
+  OptionsList [27-29] [()]
+  Query [33-41] [SELECT 1]
+    Select [33-41] [SELECT 1]
+      SelectList [40-41] [1]
+        SelectColumn [40-41] [1]
+          IntLiteral(1) [40-41] [1]
+--
+CREATE LIVE TABLE t OPTIONS() AS
+SELECT
+  1
+==
+
+CREATE LIVE TABLE t AS SELECT AS VALUE STRUCT(1 AS id)
+--
+CreateLiveTableStatement [0-54] [CREATE LIVE...STRUCT(1 AS id)]
+  PathExpression [18-19] [t]
+    Identifier(t) [18-19] [t]
+  Query [23-54] [SELECT AS...STRUCT(1 AS id)]
+    Select [23-54] [SELECT AS...STRUCT(1 AS id)]
+      SelectAs(as_mode=VALUE) [30-38] [AS VALUE]
+      SelectList [39-54] [STRUCT(1 AS id)]
+        SelectColumn [39-54] [STRUCT(1 AS id)]
+          StructConstructorWithKeyword [39-54] [STRUCT(1 AS id)]
+            StructConstructorArg [46-53] [1 AS id]
+              IntLiteral(1) [46-47] [1]
+              Alias [48-53] [AS id]
+                Identifier(id) [51-53] [id]
+--
+CREATE LIVE TABLE t AS
+SELECT AS VALUE
+  STRUCT(1 AS id)
+==
+
+CREATE LIVE TABLE t (a INT64) OPTIONS(x=1) AS SELECT 1 AS a
+--
+CreateLiveTableStatement [0-59] [CREATE LIVE...SELECT 1 AS a]
+  PathExpression [18-19] [t]
+    Identifier(t) [18-19] [t]
+  TableElementList [20-29] [(a INT64)]
+    ColumnDefinition [21-28] [a INT64]
+      Identifier(a) [21-22] [a]
+      SimpleColumnSchema [23-28] [INT64]
+        PathExpression [23-28] [INT64]
+          Identifier(INT64) [23-28] [INT64]
+  OptionsList [37-42] [(x=1)]
+    OptionsEntry [38-41] [x=1]
+      Identifier(x) [38-39] [x]
+      IntLiteral(1) [40-41] [1]
+  Query [46-59] [SELECT 1 AS a]
+    Select [46-59] [SELECT 1 AS a]
+      SelectList [53-59] [1 AS a]
+        SelectColumn [53-59] [1 AS a]
+          IntLiteral(1) [53-54] [1]
+          Alias [55-59] [AS a]
+            Identifier(a) [58-59] [a]
+--
+CREATE LIVE TABLE t
+(
+  a INT64
+) OPTIONS(x = 1) AS
+SELECT
+  1 AS a
+==
+
+CREATE LIVE TABLE dynamic_data_table OPTIONS (refresh_interval = '10m') AS SELECT 1 AS id, CURRENT_TIMESTAMP() AS last_refresh_time
+--
+CreateLiveTableStatement [0-131] [CREATE LIVE...ast_refresh_time]
+  PathExpression [18-36] [dynamic_data_table]
+    Identifier(dynamic_data_table) [18-36] [dynamic_data_table]
+  OptionsList [45-71] [(refresh_interval = '10m')]
+    OptionsEntry [46-70] [refresh_interval = '10m']
+      Identifier(refresh_interval) [46-62] [refresh_interval]
+      StringLiteral [65-70] ['10m']
+        StringLiteralComponent('10m') [65-70] ['10m']
+  Query [75-131] [SELECT 1 AS...ast_refresh_time]
+    Select [75-131] [SELECT 1 AS...ast_refresh_time]
+      SelectList [82-131] [1 AS id, CURRENT_...fresh_time]
+        SelectColumn [82-89] [1 AS id]
+          IntLiteral(1) [82-83] [1]
+          Alias [84-89] [AS id]
+            Identifier(id) [87-89] [id]
+        SelectColumn [91-131] [CURRENT_TIMESTAMP...fresh_time]
+          FunctionCall [91-110] [CURRENT_TIMESTAMP()]
+            PathExpression [91-108] [CURRENT_TIMESTAMP]
+              Identifier(`CURRENT_TIMESTAMP`) [91-108] [CURRENT_TIMESTAMP]
+          Alias [111-131] [AS last_refresh_time]
+            Identifier(last_refresh_time) [114-131] [last_refresh_time]
+--
+CREATE LIVE TABLE dynamic_data_table OPTIONS(refresh_interval = '10m') AS
+SELECT
+  1 AS id,
+  `CURRENT_TIMESTAMP`() AS last_refresh_time
+==
+
+CREATE LIVE TABLE filtered_user_events PARTITION BY event_date CLUSTER BY user_id AS SELECT user_id, event_date, event_name FROM user_events WHERE event_date >= '2026-01-01'
+--
+CreateLiveTableStatement [0-173] [CREATE LIVE...2026-01-01']
+  PathExpression [18-38] [filtered_user_events]
+    Identifier(filtered_user_events) [18-38] [filtered_user_events]
+  PartitionBy [39-62] [PARTITION BY event_date]
+    PathExpression [52-62] [event_date]
+      Identifier(event_date) [52-62] [event_date]
+  ClusterBy [63-81] [CLUSTER BY user_id]
+    PathExpression [74-81] [user_id]
+      Identifier(user_id) [74-81] [user_id]
+  Query [85-173] [SELECT user_id...2026-01-01']
+    Select [85-173] [SELECT user_id...2026-01-01']
+      SelectList [92-123] [user_id, event_da...event_name]
+        SelectColumn [92-99] [user_id]
+          PathExpression [92-99] [user_id]
+            Identifier(user_id) [92-99] [user_id]
+        SelectColumn [101-111] [event_date]
+          PathExpression [101-111] [event_date]
+            Identifier(event_date) [101-111] [event_date]
+        SelectColumn [113-123] [event_name]
+          PathExpression [113-123] [event_name]
+            Identifier(event_name) [113-123] [event_name]
+      FromClause [124-140] [FROM user_events]
+        TablePathExpression [129-140] [user_events]
+          PathExpression [129-140] [user_events]
+            Identifier(user_events) [129-140] [user_events]
+      WhereClause [141-173] [WHERE event_date...2026-01-01']
+        BinaryExpression(>=) [147-173] [event_date >= '2026-01-01']
+          PathExpression [147-157] [event_date]
+            Identifier(event_date) [147-157] [event_date]
+          StringLiteral [161-173] ['2026-01-01']
+            StringLiteralComponent('2026-01-01') [161-173] ['2026-01-01']
+--
+CREATE LIVE TABLE filtered_user_events PARTITION BY event_date CLUSTER BY user_id AS
+SELECT
+  user_id,
+  event_date,
+  event_name
+FROM
+  user_events
+WHERE
+  event_date >= '2026-01-01'
+==
+
+CREATE LIVE TABLE user_summary (user_id INT64, total_purchases DOUBLE, PRIMARY KEY(user_id)) AS SELECT user_id, SUM(price) FROM purchases GROUP BY user_id
+--
+CreateLiveTableStatement [0-154] [CREATE LIVE...BY user_id]
+  PathExpression [18-30] [user_summary]
+    Identifier(user_summary) [18-30] [user_summary]
+  TableElementList [31-92] [(user_id INT64...(user_id))]
+    ColumnDefinition [32-45] [user_id INT64]
+      Identifier(user_id) [32-39] [user_id]
+      SimpleColumnSchema [40-45] [INT64]
+        PathExpression [40-45] [INT64]
+          Identifier(INT64) [40-45] [INT64]
+    ColumnDefinition [47-69] [total_purchases DOUBLE]
+      Identifier(total_purchases) [47-62] [total_purchases]
+      SimpleColumnSchema [63-69] [DOUBLE]
+        PathExpression [63-69] [DOUBLE]
+          Identifier(DOUBLE) [63-69] [DOUBLE]
+    PrimaryKey(ENFORCED) [71-91] [PRIMARY KEY(user_id)]
+      PrimaryKeyElementList [82-91] [(user_id)]
+        PrimaryKeyElement(ASC) [83-90] [user_id]
+          Identifier(user_id) [83-90] [user_id]
+  Query [96-154] [SELECT user_id...BY user_id]
+    Select [96-154] [SELECT user_id...BY user_id]
+      SelectList [103-122] [user_id, SUM(price)]
+        SelectColumn [103-110] [user_id]
+          PathExpression [103-110] [user_id]
+            Identifier(user_id) [103-110] [user_id]
+        SelectColumn [112-122] [SUM(price)]
+          FunctionCall [112-122] [SUM(price)]
+            PathExpression [112-115] [SUM]
+              Identifier(SUM) [112-115] [SUM]
+            PathExpression [116-121] [price]
+              Identifier(price) [116-121] [price]
+      FromClause [123-137] [FROM purchases]
+        TablePathExpression [128-137] [purchases]
+          PathExpression [128-137] [purchases]
+            Identifier(purchases) [128-137] [purchases]
+      GroupBy [138-154] [GROUP BY user_id]
+        GroupingItem [147-154] [user_id]
+          PathExpression [147-154] [user_id]
+            Identifier(user_id) [147-154] [user_id]
+--
+CREATE LIVE TABLE user_summary
+(
+  user_id INT64,
+  total_purchases DOUBLE,
+  PRIMARY KEY(user_id)
+) AS
+SELECT
+  user_id,
+  SUM(price)
+FROM
+  purchases
+GROUP BY user_id
+==
+
+CREATE LIVE TABLE empty_schema_table (id INT64, name STRING, status STRING OPTIONS(description="user status"))
+--
+CreateLiveTableStatement [0-110] [CREATE LIVE...status"))]
+  PathExpression [18-36] [empty_schema_table]
+    Identifier(empty_schema_table) [18-36] [empty_schema_table]
+  TableElementList [37-110] [(id INT64,...status"))]
+    ColumnDefinition [38-46] [id INT64]
+      Identifier(id) [38-40] [id]
+      SimpleColumnSchema [41-46] [INT64]
+        PathExpression [41-46] [INT64]
+          Identifier(INT64) [41-46] [INT64]
+    ColumnDefinition [48-59] [name STRING]
+      Identifier(name) [48-52] [name]
+      SimpleColumnSchema [53-59] [STRING]
+        PathExpression [53-59] [STRING]
+          Identifier(STRING) [53-59] [STRING]
+    ColumnDefinition [61-109] [status STRING...user status")]
+      Identifier(status) [61-67] [status]
+      SimpleColumnSchema [68-109] [STRING OPTIONS...user status")]
+        PathExpression [68-74] [STRING]
+          Identifier(STRING) [68-74] [STRING]
+        OptionsList [82-109] [(description="user status")]
+          OptionsEntry [83-108] [description="user status"]
+            Identifier(description) [83-94] [description]
+            StringLiteral [95-108] ["user status"]
+              StringLiteralComponent("user status") [95-108] ["user status"]
+--
+CREATE LIVE TABLE empty_schema_table
+(
+  id INT64,
+  name STRING,
+  status STRING OPTIONS(description = "user status")
+)
+==
+
+CREATE LIVE TABLE empty_table_with_constraints (id INT64, email STRING, CONSTRAINT email_unique UNIQUE(email) NOT ENFORCED)
+--
+ERROR: Syntax error: Expected ")" or "," but got keyword UNIQUE [at 1:97]
+...id INT64, email STRING, CONSTRAINT email_unique UNIQUE(email) NOT ENFORCED)
+                                                   ^
+==
+
+CREATE LIVE TABLE t
+--
+CreateLiveTableStatement [0-19] [CREATE LIVE TABLE t]
+  PathExpression [18-19] [t]
+    Identifier(t) [18-19] [t]
+--
+CREATE LIVE TABLE t
+==
+
+CREATE LIVE TABLE t (x INT64)
+--
+CreateLiveTableStatement [0-29] [CREATE LIVE TABLE t (x INT64)]
+  PathExpression [18-19] [t]
+    Identifier(t) [18-19] [t]
+  TableElementList [20-29] [(x INT64)]
+    ColumnDefinition [21-28] [x INT64]
+      Identifier(x) [21-22] [x]
+      SimpleColumnSchema [23-28] [INT64]
+        PathExpression [23-28] [INT64]
+          Identifier(INT64) [23-28] [INT64]
+--
+CREATE LIVE TABLE t
+(
+  x INT64
+)
+==
+
+CREATE LIVE TABLE t OPTIONS (x=1)
+--
+CreateLiveTableStatement [0-33] [CREATE LIVE...OPTIONS (x=1)]
+  PathExpression [18-19] [t]
+    Identifier(t) [18-19] [t]
+  OptionsList [28-33] [(x=1)]
+    OptionsEntry [29-32] [x=1]
+      Identifier(x) [29-30] [x]
+      IntLiteral(1) [31-32] [1]
+--
+CREATE LIVE TABLE t OPTIONS(x = 1)
+==
+
+CREATE LIVE TABLE IF NOT EXISTS t
+--
+CreateLiveTableStatement(is_if_not_exists) [0-33] [CREATE LIVE...NOT EXISTS t]
+  PathExpression [32-33] [t]
+    Identifier(t) [32-33] [t]
+--
+CREATE LIVE TABLE IF NOT EXISTS t
+==
+
+CREATE LIVE TABLE t CLUSTER BY x
+--
+CreateLiveTableStatement [0-32] [CREATE LIVE...CLUSTER BY x]
+  PathExpression [18-19] [t]
+    Identifier(t) [18-19] [t]
+  ClusterBy [20-32] [CLUSTER BY x]
+    PathExpression [31-32] [x]
+      Identifier(x) [31-32] [x]
+--
+CREATE LIVE TABLE t CLUSTER BY x
+==
+
+CREATE LIVE TABLE t1.t2.t3
+--
+CreateLiveTableStatement [0-26] [CREATE LIVE TABLE t1.t2.t3]
+  PathExpression [18-26] [t1.t2.t3]
+    Identifier(t1) [18-20] [t1]
+    Identifier(t2) [21-23] [t2]
+    Identifier(t3) [24-26] [t3]
+--
+CREATE LIVE TABLE t1.t2.t3
+==
+
+CREATE LIVE TABLE t WITH CONNECTION c
+--
+CreateLiveTableStatement [0-37] [CREATE LIVE...CONNECTION c]
+  PathExpression [18-19] [t]
+    Identifier(t) [18-19] [t]
+  WithConnectionClause [20-37] [WITH CONNECTION c]
+    ConnectionClause [25-37] [CONNECTION c]
+      PathExpression [36-37] [c]
+        Identifier(c) [36-37] [c]
+--
+CREATE LIVE TABLE t WITH CONNECTION c
+==
+
+CREATE LIVE TABLE t OPTIONS()
+--
+CreateLiveTableStatement [0-29] [CREATE LIVE TABLE t OPTIONS()]
+  PathExpression [18-19] [t]
+    Identifier(t) [18-19] [t]
+  OptionsList [27-29] [()]
+--
+CREATE LIVE TABLE t OPTIONS()
+==
+
+CREATE LIVE TABLE t (a INT64) OPTIONS(x=1)
+--
+CreateLiveTableStatement [0-42] [CREATE LIVE...OPTIONS(x=1)]
+  PathExpression [18-19] [t]
+    Identifier(t) [18-19] [t]
+  TableElementList [20-29] [(a INT64)]
+    ColumnDefinition [21-28] [a INT64]
+      Identifier(a) [21-22] [a]
+      SimpleColumnSchema [23-28] [INT64]
+        PathExpression [23-28] [INT64]
+          Identifier(INT64) [23-28] [INT64]
+  OptionsList [37-42] [(x=1)]
+    OptionsEntry [38-41] [x=1]
+      Identifier(x) [38-39] [x]
+      IntLiteral(1) [40-41] [1]
+--
+CREATE LIVE TABLE t
+(
+  a INT64
+) OPTIONS(x = 1)
+==
+
+CREATE LIVE TABLE t PARTITION BY x
+--
+CreateLiveTableStatement [0-34] [CREATE LIVE...PARTITION BY x]
+  PathExpression [18-19] [t]
+    Identifier(t) [18-19] [t]
+  PartitionBy [20-34] [PARTITION BY x]
+    PathExpression [33-34] [x]
+      Identifier(x) [33-34] [x]
+--
+CREATE LIVE TABLE t PARTITION BY x
+==
+
+CREATE LIVE TABLE t DEFAULT COLLATE 'und:ci'
+--
+CreateLiveTableStatement [0-44] [CREATE LIVE...COLLATE 'und:ci']
+  PathExpression [18-19] [t]
+    Identifier(t) [18-19] [t]
+  Collate [28-44] [COLLATE 'und:ci']
+    StringLiteral [36-44] ['und:ci']
+      StringLiteralComponent('und:ci') [36-44] ['und:ci']
+--
+CREATE LIVE TABLE t DEFAULT COLLATE 'und:ci'
+==
+
+
+CREATE LIVE TABLE t (x INT64) DEFAULT COLLATE 'und:ci' PARTITION BY x CLUSTER BY x WITH CONNECTION c OPTIONS(y=1) AS SELECT 1 AS x
+--
+CreateLiveTableStatement [0-130] [CREATE LIVE...SELECT 1 AS x]
+  PathExpression [18-19] [t]
+    Identifier(t) [18-19] [t]
+  TableElementList [20-29] [(x INT64)]
+    ColumnDefinition [21-28] [x INT64]
+      Identifier(x) [21-22] [x]
+      SimpleColumnSchema [23-28] [INT64]
+        PathExpression [23-28] [INT64]
+          Identifier(INT64) [23-28] [INT64]
+  Collate [38-54] [COLLATE 'und:ci']
+    StringLiteral [46-54] ['und:ci']
+      StringLiteralComponent('und:ci') [46-54] ['und:ci']
+  PartitionBy [55-69] [PARTITION BY x]
+    PathExpression [68-69] [x]
+      Identifier(x) [68-69] [x]
+  ClusterBy [70-82] [CLUSTER BY x]
+    PathExpression [81-82] [x]
+      Identifier(x) [81-82] [x]
+  WithConnectionClause [83-100] [WITH CONNECTION c]
+    ConnectionClause [88-100] [CONNECTION c]
+      PathExpression [99-100] [c]
+        Identifier(c) [99-100] [c]
+  OptionsList [108-113] [(y=1)]
+    OptionsEntry [109-112] [y=1]
+      Identifier(y) [109-110] [y]
+      IntLiteral(1) [111-112] [1]
+  Query [117-130] [SELECT 1 AS x]
+    Select [117-130] [SELECT 1 AS x]
+      SelectList [124-130] [1 AS x]
+        SelectColumn [124-130] [1 AS x]
+          IntLiteral(1) [124-125] [1]
+          Alias [126-130] [AS x]
+            Identifier(x) [129-130] [x]
+--
+CREATE LIVE TABLE t
+(
+  x INT64
+) DEFAULT COLLATE 'und:ci' PARTITION BY x CLUSTER BY x WITH CONNECTION c OPTIONS(y = 1) AS
+SELECT
+  1 AS x
+==
+
+
+
+
+CREATE LIVE TABLE t (a INT64, b STRING OPTIONS(description="b"))
+--
+CreateLiveTableStatement [0-64] [CREATE LIVE...escription="b"))]
+  PathExpression [18-19] [t]
+    Identifier(t) [18-19] [t]
+  TableElementList [20-64] [(a INT64,...description="b"))]
+    ColumnDefinition [21-28] [a INT64]
+      Identifier(a) [21-22] [a]
+      SimpleColumnSchema [23-28] [INT64]
+        PathExpression [23-28] [INT64]
+          Identifier(INT64) [23-28] [INT64]
+    ColumnDefinition [30-63] [b STRING OPTIONS...iption="b")]
+      Identifier(b) [30-31] [b]
+      SimpleColumnSchema [32-63] [STRING OPTIONS...cription="b")]
+        PathExpression [32-38] [STRING]
+          Identifier(STRING) [32-38] [STRING]
+        OptionsList [46-63] [(description="b")]
+          OptionsEntry [47-62] [description="b"]
+            Identifier(description) [47-58] [description]
+            StringLiteral [59-62] ["b"]
+              StringLiteralComponent("b") [59-62] ["b"]
+--
+CREATE LIVE TABLE t
+(
+  a INT64,
+  b STRING OPTIONS(description = "b")
+)
+==
+
+CREATE LIVE TABLE t PARTITION BY (a, b) CLUSTER BY (c, d)
+--
+CreateLiveTableStatement [0-57] [CREATE LIVE...BY (c, d)]
+  PathExpression [18-19] [t]
+    Identifier(t) [18-19] [t]
+  PartitionBy [20-39] [PARTITION BY (a, b)]
+    StructConstructorWithParens [33-39] [(a, b)]
+      PathExpression [34-35] [a]
+        Identifier(a) [34-35] [a]
+      PathExpression [37-38] [b]
+        Identifier(b) [37-38] [b]
+  ClusterBy [40-57] [CLUSTER BY (c, d)]
+    StructConstructorWithParens [51-57] [(c, d)]
+      PathExpression [52-53] [c]
+        Identifier(c) [52-53] [c]
+      PathExpression [55-56] [d]
+        Identifier(d) [55-56] [d]
+--
+CREATE LIVE TABLE t PARTITION BY (a, b) CLUSTER BY (c, d)
+==
+
+CREATE LIVE TABLE t PARTITION BY EXTRACT(YEAR FROM a) CLUSTER BY b
+--
+CreateLiveTableStatement [0-66] [CREATE LIVE...CLUSTER BY b]
+  PathExpression [18-19] [t]
+    Identifier(t) [18-19] [t]
+  PartitionBy [20-53] [PARTITION...YEAR FROM a)]
+    ExtractExpression [33-53] [EXTRACT(YEAR FROM a)]
+      PathExpression [41-45] [YEAR]
+        Identifier(YEAR) [41-45] [YEAR]
+      PathExpression [51-52] [a]
+        Identifier(a) [51-52] [a]
+  ClusterBy [54-66] [CLUSTER BY b]
+    PathExpression [65-66] [b]
+      Identifier(b) [65-66] [b]
+--
+CREATE LIVE TABLE t PARTITION BY EXTRACT(YEAR FROM a) CLUSTER BY b
+==
+
+CREATE LIVE TABLE t (a INT64) DEFAULT COLLATE 'und:ci' PARTITION BY a CLUSTER BY a WITH CONNECTION c OPTIONS(x=1)
+--
+CreateLiveTableStatement [0-113] [CREATE LIVE...OPTIONS(x=1)]
+  PathExpression [18-19] [t]
+    Identifier(t) [18-19] [t]
+  TableElementList [20-29] [(a INT64)]
+    ColumnDefinition [21-28] [a INT64]
+      Identifier(a) [21-22] [a]
+      SimpleColumnSchema [23-28] [INT64]
+        PathExpression [23-28] [INT64]
+          Identifier(INT64) [23-28] [INT64]
+  Collate [38-54] [COLLATE 'und:ci']
+    StringLiteral [46-54] ['und:ci']
+      StringLiteralComponent('und:ci') [46-54] ['und:ci']
+  PartitionBy [55-69] [PARTITION BY a]
+    PathExpression [68-69] [a]
+      Identifier(a) [68-69] [a]
+  ClusterBy [70-82] [CLUSTER BY a]
+    PathExpression [81-82] [a]
+      Identifier(a) [81-82] [a]
+  WithConnectionClause [83-100] [WITH CONNECTION c]
+    ConnectionClause [88-100] [CONNECTION c]
+      PathExpression [99-100] [c]
+        Identifier(c) [99-100] [c]
+  OptionsList [108-113] [(x=1)]
+    OptionsEntry [109-112] [x=1]
+      Identifier(x) [109-110] [x]
+      IntLiteral(1) [111-112] [1]
+--
+CREATE LIVE TABLE t
+(
+  a INT64
+) DEFAULT COLLATE 'und:ci' PARTITION BY a CLUSTER BY a WITH CONNECTION c OPTIONS(x = 1)
+==
+
+CREATE LIVE TABLE t OPTIONS(x=1) AS
+--
+ERROR: Syntax error: Unexpected end of statement [at 1:36]
+CREATE LIVE TABLE t OPTIONS(x=1) AS
+                                   ^

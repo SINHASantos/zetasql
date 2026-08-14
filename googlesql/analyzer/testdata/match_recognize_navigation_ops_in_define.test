@@ -170,6 +170,7 @@ QueryStmt
             +-match_number_column=$match_recognize.$match_number#24
             +-match_row_number_column=$match_recognize.$match_row_number#25
             +-classifier_column=$match_recognize.$classifier#26
+
 [UNDECLARED_PARAMETERS]
 ==
 
@@ -333,6 +334,7 @@ QueryStmt
             +-match_number_column=$match_recognize.$match_number#23
             +-match_row_number_column=$match_recognize.$match_row_number#24
             +-classifier_column=$match_recognize.$classifier#25
+
 [UNDECLARED_PARAMETERS]
 p: INT64
 ==

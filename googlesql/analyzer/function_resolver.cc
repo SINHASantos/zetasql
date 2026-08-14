@@ -1777,7 +1777,8 @@ absl::Status FunctionResolver::ResolveGeneralFunctionCall(
     const ASTNode* ast_location,
     const std::vector<const ASTNode*>& arg_locations,
     bool match_internal_signatures,
-    absl::Span<const std::string> function_name_path, bool is_analytic,
+    absl::Span<const std::string> function_name_path,
+    ClauseRequirement clause_requirement,
     std::vector<std::unique_ptr<const ResolvedExpr>> arguments,
     std::vector<NamedArgumentInfo> named_arguments,
     const Type* expected_result_type,
@@ -1790,8 +1791,8 @@ absl::Status FunctionResolver::ResolveGeneralFunctionCall(
       &error_mode));
   return ResolveGeneralFunctionCall(
       ast_location, arg_locations, match_internal_signatures, function,
-      error_mode, is_analytic, std::move(arguments), std::move(named_arguments),
-      expected_result_type,
+      error_mode, clause_requirement, std::move(arguments),
+      std::move(named_arguments), expected_result_type,
       /*name_scope=*/nullptr, resolved_expr_out);
 }
 
@@ -1799,7 +1800,7 @@ absl::Status FunctionResolver::ResolveGeneralFunctionCall(
     const ASTNode* ast_location,
     const std::vector<const ASTNode*>& arg_locations,
     bool match_internal_signatures, absl::string_view function_name,
-    bool is_analytic,
+    ClauseRequirement clause_requirement,
     std::vector<std::unique_ptr<const ResolvedExpr>> arguments,
     std::vector<NamedArgumentInfo> named_arguments,
     const Type* expected_result_type,
@@ -1808,7 +1809,7 @@ absl::Status FunctionResolver::ResolveGeneralFunctionCall(
       std::string(function_name)};
   return ResolveGeneralFunctionCall(
       ast_location, arg_locations, match_internal_signatures,
-      function_name_path, is_analytic, std::move(arguments),
+      function_name_path, clause_requirement, std::move(arguments),
       std::move(named_arguments), expected_result_type, resolved_expr_out);
 }
 
@@ -2028,7 +2029,8 @@ absl::Status FunctionResolver::ResolveGeneralFunctionCall(
     const ASTNode* ast_location,
     const std::vector<const ASTNode*>& arg_locations_in,
     bool match_internal_signatures, const Function* function,
-    ResolvedFunctionCallBase::ErrorMode error_mode, bool is_analytic,
+    ResolvedFunctionCallBase::ErrorMode error_mode,
+    ClauseRequirement clause_requirement,
     std::vector<std::unique_ptr<const ResolvedExpr>> arguments,
     std::vector<NamedArgumentInfo> named_arguments,
     const Type* expected_result_type, const NameScope* name_scope,
@@ -2059,10 +2061,22 @@ absl::Status FunctionResolver::ResolveGeneralFunctionCall(
   // rather than the base argument.
   const bool include_leftmost_child = false;
 
-  if (is_analytic && !function->SupportsOverClause()) {
-    return MakeSqlErrorAtLocalNode(ast_location)
-           << function->QualifiedSQLName(/*capitalize_qualifier=*/true)
-           << " does not support an OVER clause";
+  switch (clause_requirement) {
+    case ClauseRequirement::kNone:
+      break;
+    case ClauseRequirement::kOver:
+      if (!function->SupportsOverClause()) {
+        return MakeSqlErrorAtLocalNode(ast_location)
+               << function->QualifiedSQLName(/*capitalize_qualifier=*/true)
+               << " does not support an OVER clause";
+      }
+      break;
+    case ClauseRequirement::kWithin:
+      if (!function->SupportsWithinClause()) {
+        return MakeSqlErrorAtLocalNode(ast_location)
+               << function->QualifiedSQLName(/*capitalize_qualifier=*/true)
+               << " does not support a WITHIN clause";
+      }
   }
 
   // We do not determined the actual signature and its argument types yet, so
@@ -2388,7 +2402,9 @@ absl::Status FunctionResolver::ResolveGeneralFunctionCall(
         idx, concrete_argument, arguments[idx].get(), BadArgErrorPrefix));
 
     if (IsSqlFunction(function)) {
-      if (arguments[idx]->type_annotation_map() != nullptr &&
+      if (!resolver_->language().LanguageFeatureEnabled(
+              FEATURE_ALL_TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS) &&
+          arguments[idx]->type_annotation_map() != nullptr &&
           !arguments[idx]->type_annotation_map()->Empty()) {
         const std::vector<std::string>& arg_names =
             function->Is<SQLFunctionInterface>()
@@ -2398,16 +2414,12 @@ absl::Status FunctionResolver::ResolveGeneralFunctionCall(
         std::unique_ptr<AnnotationMap> annotations_to_block =
             arguments[idx]->type_annotation_map()->Clone();
         // Allow collation if the flag is on. If the flag is off, block all
-        // annotations.
+        // annotations. This exemption won't be needed once the two flags are
+        // merged.
         if (resolver_->language().LanguageFeatureEnabled(
                 FEATURE_TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS)) {
           annotations_to_block
               ->UnsetAnnotationRecursively<CollationAnnotation>();
-          if (CollationAnnotation::ExistsIn(
-                  arguments[idx]->type_annotation_map())) {
-            resolver_->analyzer_output_properties_.AddFeatureLabel(
-                Resolver::kCollationPropagatedToSqlFunctionFeatureLabel);
-          }
         }
 
         if (!annotations_to_block->Empty()) {
@@ -2416,6 +2428,12 @@ absl::Status FunctionResolver::ResolveGeneralFunctionCall(
                     "supported, but found annotations on argument "
                  << arg_names[idx];
         }
+      }
+
+      if (CollationAnnotation::ExistsIn(
+              arguments[idx]->type_annotation_map())) {
+        resolver_->analyzer_output_properties_.AddFeatureLabel(
+            Resolver::kCollationPropagatedToSqlFunctionFeatureLabel);
       }
     }
 
@@ -2566,22 +2584,12 @@ absl::Status FunctionResolver::ResolveGeneralFunctionCall(
       analyzer_options.mutable_find_options()->set_cycle_detector(
           &owned_cycle_detector);
     }
-    const absl::Status resolve_status = ResolveTemplatedSQLFunctionCall(
-        ast_location, *sql_function, analyzer_options, input_argument_types,
-        arguments, *result_signature, &function_call_info);
 
-    if (!resolve_status.ok()) {
-      // The Resolve method returned an error status that reflects the
-      // <analyzer_options> ErrorMessageMode.  We want to return an error
-      // status here that indicates that the function is invalid along with
-      // the function call location, so create a new error status with an
-      // ErrorSource based on the <resolve_status>.
-      return WrapNestedErrorStatus(
-          ast_location, absl::StrCat("Invalid function ", sql_function->Name()),
-          resolve_status, analyzer_options.error_message_mode());
-    }
-    std::unique_ptr<FunctionSignature> new_signature =
-        std::make_unique<FunctionSignature>(*result_signature);
+    GOOGLESQL_RETURN_IF_ERROR(ResolveTemplatedSQLFunctionCall(
+        ast_location, *sql_function, analyzer_options, input_argument_types,
+        arguments, *result_signature, &function_call_info));
+
+    auto new_signature = std::make_unique<FunctionSignature>(*result_signature);
     new_signature->SetConcreteResultType(
         function_call_info->GetAs<TemplatedSQLFunctionCall>()->expr()->type(),
         original_result_kind);
@@ -2713,6 +2721,30 @@ absl::Status FunctionResolver::ResolveGeneralFunctionCall(
     GOOGLESQL_RETURN_IF_ERROR(ReResolveLambdasIfNecessary(result_signature.get(),
                                                 name_scope, lambda_ast_nodes,
                                                 resolved_expr_out->get()));
+  } else if (function->Is<SQLFunction>()) {
+    // For non-templated SQL functions, we do not accept annotations on
+    // arguments unless we have the SQL of the function, to re-resolve it with
+    // annotated arguments just as we do with TemplatedSQLFunctions.
+
+    // Lambdas are not yet allowed on any SQL functions.
+    GOOGLESQL_RET_CHECK(resolved_expr_out->get()->generic_argument_list().empty());
+
+    GOOGLESQL_ASSIGN_OR_RETURN(
+        bool args_annotations_differ_from_signature,
+        resolver_->FunctionCallHasDifferentArgumentAnnotations(
+            resolved_expr_out->get()->argument_list(), *result_signature));
+
+    if (args_annotations_differ_from_signature) {
+      // The SQL function must be re-resolvable.
+      const SQLFunction* sql_function = function->GetAs<SQLFunction>();
+
+      GOOGLESQL_RET_CHECK(sql_function != nullptr);
+      GOOGLESQL_RETURN_IF_ERROR(ReResolveAnnotatedSQLFunctionCall(
+          ast_location, *sql_function, resolver_->analyzer_options(),
+          input_argument_types, resolved_expr_out->get()->argument_list(),
+          *result_signature, &function_call_info));
+      resolved_expr_out->get()->set_function_call_info(function_call_info);
+    }
   }
 
   if (!IsSqlFunction(function) &&
@@ -2780,12 +2812,12 @@ absl::Status FunctionResolver::ResolveGeneralFunctionCall(
 // new error forwarding any nested errors in 'status' obtained from the
 // nested parsing or analysis.
 absl::Status FunctionResolver::ForwardNestedResolutionAnalysisError(
-    const TemplatedSQLFunction& function, const absl::Status& status,
+    const Function& function, const absl::Status& status,
+    const ParseResumeLocation& parse_resume_location,
     ErrorMessageOptions options) {
   if (status.ok() || ShouldPropagateError(status)) {
     return status;
   }
-  ParseResumeLocation parse_resume_location = function.GetParseResumeLocation();
   absl::Status new_status;
   if (HasErrorLocation(status)) {
     new_status = MakeFunctionExprAnalysisError(function, "");
@@ -2820,18 +2852,94 @@ absl::Status FunctionResolver::ResolveTemplatedSQLFunctionCall(
     absl::Span<const std::unique_ptr<const ResolvedExpr>> argument_list,
     const FunctionSignature& concrete_signature,
     std::shared_ptr<ResolvedFunctionCallInfo>* function_call_info_out) {
+  return ResolveTemplatedOrAnnotatedSQLFunctionCall(
+      ast_location, function, function.GetArgumentNames(),
+      function.GetParseResumeLocation(), function.resolution_catalog(),
+      analyzer_options, actual_arguments, argument_list, concrete_signature,
+      function_call_info_out);
+}
+
+absl::Status FunctionResolver::ReResolveAnnotatedSQLFunctionCall(
+    const ASTNode* ast_location, const SQLFunction& function,
+    const AnalyzerOptions& analyzer_options,
+    absl::Span<const InputArgumentType> actual_arguments,
+    absl::Span<const std::unique_ptr<const ResolvedExpr>> argument_list,
+    const FunctionSignature& concrete_signature,
+    std::shared_ptr<ResolvedFunctionCallInfo>* function_call_info_out) {
+  if (!function.GetParseResumeLocation().has_value()) {
+    // SQL functions need the body SQL to re-resolve and ensure proper
+    // annotation propagation. If the catalog does not provide the body
+    // SQL, we cannot re-resolve the function and thus cannot propagate
+    // annotations.
+    return MakeSqlErrorAt(ast_location)
+           << "SQL function " << function.Name()
+           << " does not support annotations on arguments because the body "
+              "SQL is not available";
+  }
+  return ResolveTemplatedOrAnnotatedSQLFunctionCall(
+      ast_location, function, function.GetArgumentNames(),
+      *function.GetParseResumeLocation(), function.resolution_catalog(),
+      analyzer_options, actual_arguments, argument_list, concrete_signature,
+      function_call_info_out);
+}
+
+absl::Status FunctionResolver::ResolveTemplatedOrAnnotatedSQLFunctionCall(
+    const ASTNode* ast_location, const Function& function,
+    absl::Span<const std::string> argument_names,
+    const ParseResumeLocation& parse_resume_location,
+    Catalog* resolution_catalog, const AnalyzerOptions& analyzer_options,
+    absl::Span<const InputArgumentType> actual_arguments,
+    absl::Span<const std::unique_ptr<const ResolvedExpr>> argument_list,
+    const FunctionSignature& concrete_signature,
+    std::shared_ptr<ResolvedFunctionCallInfo>* function_call_info_out) {
+  const absl::Status resolve_status =
+      ResolveTemplatedOrAnnotatedSQLFunctionCallInternal(
+          ast_location, function, argument_names, parse_resume_location,
+          resolution_catalog, analyzer_options, actual_arguments, argument_list,
+          concrete_signature, function_call_info_out);
+
+  if (!resolve_status.ok()) {
+    // The Resolve method returned an error status that reflects the
+    // <analyzer_options> ErrorMessageMode.  We want to return an error
+    // status here that indicates that the function is invalid along with
+    // the function call location, so create a new error status with an
+    // ErrorSource based on the <resolve_status>.
+    return WrapNestedErrorStatus(
+        ast_location, absl::StrCat("Invalid function ", function.Name()),
+        resolve_status, analyzer_options.error_message_mode());
+  }
+  return absl::OkStatus();
+}
+
+absl::Status
+FunctionResolver::ResolveTemplatedOrAnnotatedSQLFunctionCallInternal(
+    const ASTNode* ast_location, const Function& function,
+    absl::Span<const std::string> argument_names,
+    const ParseResumeLocation& parse_resume_location,
+    Catalog* resolution_catalog, const AnalyzerOptions& analyzer_options,
+    absl::Span<const InputArgumentType> actual_arguments,
+    absl::Span<const std::unique_ptr<const ResolvedExpr>> argument_list,
+    const FunctionSignature& concrete_signature,
+    std::shared_ptr<ResolvedFunctionCallInfo>* function_call_info_out) {
+  CycleDetector owned_cycle_detector;
+  AnalyzerOptions analyzer_options_with_detector = analyzer_options;
+  if (analyzer_options_with_detector.find_options().cycle_detector() ==
+      nullptr) {
+    analyzer_options_with_detector.mutable_find_options()->set_cycle_detector(
+        &owned_cycle_detector);
+  }
   // Check if this function calls itself. If so, return an error. Otherwise, add
   // a pointer to this class to the cycle detector in the analyzer options.
   CycleDetector::ObjectInfo object(
       function.FullName(), &function,
-      analyzer_options.find_options().cycle_detector());
+      analyzer_options_with_detector.find_options().cycle_detector());
   // TODO: Attach proper error locations to the returned Status.
   GOOGLESQL_RETURN_IF_ERROR(object.DetectCycle("function"));
 
   // Build the arg_info directly from the concrete signature, preserving full
   // lambda signatures which would otherwise be lost in a ResolvedArgumentRef.
   auto arg_info = std::make_unique<FunctionArgumentInfo>();
-  GOOGLESQL_RET_CHECK_EQ(function.GetArgumentNames().size(), actual_arguments.size());
+  GOOGLESQL_RET_CHECK_EQ(argument_names.size(), actual_arguments.size());
   // Templated SQL functions only support one signature for now.
   GOOGLESQL_RET_CHECK_EQ(1, function.NumSignatures());
   GOOGLESQL_RET_CHECK_GE(function.signatures()[0].arguments().size(),
@@ -2844,7 +2952,8 @@ absl::Status FunctionResolver::ResolveTemplatedSQLFunctionCall(
     GOOGLESQL_RET_CHECK_NE(argument_original_kind,
                  __SignatureArgumentKind__switch_must_have_a_default__);
     const IdString arg_name =
-        analyzer_options.id_string_pool()->Make(function.GetArgumentNames()[i]);
+        analyzer_options_with_detector.id_string_pool()->Make(
+            argument_names[i]);
 
     if (arg_info->HasArg(arg_name)) {
       return MakeFunctionExprAnalysisError(
@@ -2880,12 +2989,18 @@ absl::Status FunctionResolver::ResolveTemplatedSQLFunctionCall(
             !argument_list[i]->type_annotation_map()->Empty()) {
           std::unique_ptr<AnnotationMap> annotations_to_block =
               argument_list[i]->type_annotation_map()->Clone();
-          // Allow collation if the flag is on. If the flag is off, block all
-          // annotations.
           if (resolver_->language().LanguageFeatureEnabled(
                   FEATURE_TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS)) {
-            annotations_to_block
-                ->UnsetAnnotationRecursively<CollationAnnotation>();
+            if (resolver_->language().LanguageFeatureEnabled(
+                    FEATURE_ALL_TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS)) {
+              // Nothing to block. Allow all.
+              annotations_to_block =
+                  AnnotationMap::Create(argument_list[i]->type());
+            } else {
+              // Only collation is allowed.
+              annotations_to_block
+                  ->UnsetAnnotationRecursively<CollationAnnotation>();
+            }
             if (CollationAnnotation::ExistsIn(
                     argument_list[i]->type_annotation_map())) {
               resolver_->analyzer_output_properties_.AddFeatureLabel(
@@ -2901,6 +3016,12 @@ absl::Status FunctionResolver::ResolveTemplatedSQLFunctionCall(
                     "supported, but found annotations on argument ",
                     arg_name.ToStringView()));
           }
+        }
+
+        if (CollationAnnotation::ExistsIn(
+                argument_list[i]->type_annotation_map())) {
+          resolver_->analyzer_output_properties_.AddFeatureLabel(
+              Resolver::kCollationPropagatedToSqlFunctionFeatureLabel);
         }
         annotation_map = argument_list[i]->type_annotation_map();
       }
@@ -2933,21 +3054,22 @@ absl::Status FunctionResolver::ResolveTemplatedSQLFunctionCall(
     // messages, so we're making a copy and setting it up like the old defaults
     // from ParseExpression.
     ParserOptions function_body_parser_options =
-        analyzer_options.GetParserOptions();
+        analyzer_options_with_detector.GetParserOptions();
     ErrorMessageOptions& error_opts =
         function_body_parser_options.mutable_error_message_options();
     error_opts.attach_error_location_payload = true;
     error_opts.mode = ERROR_MESSAGE_WITH_PAYLOAD;
     GOOGLESQL_RETURN_IF_ERROR(ForwardNestedResolutionAnalysisError(
         function,
-        ParseExpression(function.GetParseResumeLocation(),
-                        function_body_parser_options, &parser_output_storage),
-        analyzer_options.error_message_options()));
+        ParseExpression(parse_resume_location, function_body_parser_options,
+                        &parser_output_storage),
+        parse_resume_location,
+        analyzer_options_with_detector.error_message_options()));
     expression = parser_output_storage->expression();
   }
   Catalog* catalog = catalog_;
-  if (function.resolution_catalog() != nullptr) {
-    catalog = function.resolution_catalog();
+  if (resolution_catalog != nullptr) {
+    catalog = resolution_catalog;
   }
 
   // Create a separate new resolver and resolve the function's SQL expression,
@@ -2963,8 +3085,9 @@ absl::Status FunctionResolver::ResolveTemplatedSQLFunctionCall(
   // This can result in incorrect resolution behavior, where a name 'user'
   // resolves to an expression generated via a callback, when in fact 'user' is
   // present in the argument list of the CREATE FUNCTION statement.
-  AnalyzerOptions options_for_template_analysis = analyzer_options;
-  if (analyzer_options
+  AnalyzerOptions options_for_template_analysis =
+      analyzer_options_with_detector;
+  if (analyzer_options_with_detector
           .GetSuspendLookupExpressionCallbackWhenResolvingTemplatedFunction()) {
     InternalAnalyzerOptions::SetLookupExpressionCallback(
         options_for_template_analysis, nullptr);
@@ -2989,8 +3112,9 @@ absl::Status FunctionResolver::ResolveTemplatedSQLFunctionCall(
   GOOGLESQL_RETURN_IF_ERROR(ForwardNestedResolutionAnalysisError(
       function,
       resolver->ResolveExprWithFunctionArguments(
-          function.GetParseResumeLocation().input(), expression,
-          std::move(arg_info), expr_resolution_info.get(), &resolved_sql_body),
+          parse_resume_location.input(), expression, std::move(arg_info),
+          expr_resolution_info.get(), &resolved_sql_body),
+      parse_resume_location,
       options_for_template_analysis.error_message_options()));
 
   if (function.IsAggregate()) {
@@ -3005,6 +3129,7 @@ absl::Status FunctionResolver::ResolveTemplatedSQLFunctionCall(
       }
       return ForwardNestedResolutionAnalysisError(
           function, MakeFunctionExprAnalysisError(function, status.message()),
+          parse_resume_location,
           options_for_template_analysis.error_message_options());
     }
   }
@@ -3013,6 +3138,10 @@ absl::Status FunctionResolver::ResolveTemplatedSQLFunctionCall(
       !resolved_sql_body->type_annotation_map()->Empty()) {
     if (!resolver->language().LanguageFeatureEnabled(
             FEATURE_TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS)) {
+      GOOGLESQL_RET_CHECK(!resolver->language().LanguageFeatureEnabled(
+          FEATURE_ALL_TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS))
+          << "Cannot enable propagation of all annotations to SQL functions "
+             "without also enabling collation propagation";
       // The flag is off, so not even collation is allowed.
       GOOGLESQL_RETURN_IF_ERROR(resolver_->ThrowErrorIfExprHasCollation(
           /*error_node=*/nullptr,
@@ -3025,9 +3154,16 @@ absl::Status FunctionResolver::ResolveTemplatedSQLFunctionCall(
           Resolver::kCollationPropagatedToSqlFunctionFeatureLabel);
     }
 
-    std::unique_ptr<AnnotationMap> annotations_to_block =
-        resolved_sql_body->type_annotation_map()->Clone();
-    annotations_to_block->UnsetAnnotationRecursively<CollationAnnotation>();
+    std::unique_ptr<AnnotationMap> annotations_to_block;
+    if (resolver->language().LanguageFeatureEnabled(
+            FEATURE_ALL_TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS)) {
+      // Nothing to block. All are allowed.
+      annotations_to_block = AnnotationMap::Create(resolved_sql_body->type());
+    } else {
+      // Only collation is allowed (We already checked it above)
+      annotations_to_block = resolved_sql_body->type_annotation_map()->Clone();
+      annotations_to_block->UnsetAnnotationRecursively<CollationAnnotation>();
+    }
 
     // The flag is on, so we allow collation on arguments, but not other
     // annotations. Create a copy without annotations and produce an error if
@@ -3051,11 +3187,10 @@ absl::Status FunctionResolver::ResolveTemplatedSQLFunctionCall(
       function.signatures()[0].result_type();
   if (expected_type.kind() == ARG_KIND_EXPR_FIXED) {
     GOOGLESQL_RET_CHECK(expression != nullptr);
+    GOOGLESQL_RET_CHECK(expected_type.type_modifiers().has_value());
     if (absl::Status status = resolver_->CoerceExprToType(
-            expression, expected_type.type(),
-            // In the future, add type modifiers when we have them declared on
-            // function signatures.
-            TypeModifiers(), Resolver::kImplicitCoercion,
+            expression, expected_type.type(), *expected_type.type_modifiers(),
+            Resolver::kImplicitCoercion,
             "Function declared to return $0 but the function body produces "
             "incompatible type $1",
             &resolved_sql_body);

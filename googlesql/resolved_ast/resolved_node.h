@@ -31,6 +31,7 @@
 #include "googlesql/resolved_ast/resolved_ast.pb.h"
 #include "googlesql/resolved_ast/resolved_node_kind.pb.h"
 #include "googlesql/resolved_ast/serialization.pb.h"
+#include "absl/flags/declare.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
@@ -38,11 +39,15 @@
 #include "google/protobuf/descriptor.h"
 #include "googlesql/base/status.h"
 
+ABSL_DECLARE_FLAG(bool,
+                  googlesql_omit_tvf_signatures_in_resolved_ast_debug_string);
+
 namespace googlesql {
 
 // Using forward declarations here to avoid circular includes.
 class ResolvedASTVisitor;
 class ResolvedColumn;
+class ResolvedScan;
 
 // This is the base class for the resolved AST.
 // Subclasses are in the generated file resolved_ast.h.
@@ -183,6 +188,17 @@ class ResolvedNode {
     // If set to true, the debug string will use box glyphs like "├─",  instead
     // of ASCII characters like "+-".
     bool use_box_glyphs = false;
+
+    // If set to true, sequences of scans are rendered linearly, like pipe
+    // syntax, instead of as a nested tree. Each scan's "pipe input" (see
+    // ResolvedScan::GetPipeInputScan) is printed first, then the scan itself
+    // is stacked below it at the same indent level with a "|>" prefix.
+    bool linear_mode = false;
+
+    // If true, in linear_mode, the scan field that was consumed as the pipe
+    // input is omitted from the operator's fields. If false, it's shown with
+    // a placeholder value like "input_scan=<pipe_input>".
+    bool omit_pipe_input_scan_field = true;
   };
 
   // Returns a string representation of this tree and all descendants, for
@@ -435,14 +451,42 @@ class ResolvedNode {
   enum class ConstructorOverload { NEW_CONSTRUCTOR };
 
  private:
-  // Print the tree recursively.
-  // annotations specifies additional annotations to display for specific nodes
-  // prefix1 is the indentation to attach to child nodes.
-  // prefix2 is the indentation to attach to the root of this tree.
+  // Dispatches DebugString rendering for `node`.
+  // If `config.linear_mode` is enabled and `node` is a linear scan chain, this
+  // delegates to `DebugStringLinearScanChain` using `stem` and
+  // `node_connector`. Otherwise, it delegates to `DebugStringNodeBody` with
+  // `name_prefix` constructed as `absl::StrCat(stem, node_connector)` and
+  // `field_prefix` constructed as `absl::StrCat(stem, field_value_indent)`.
+  //
+  // `stem`: Indentation prefix prior to the tree connector.
+  // `node_connector`: Tree connector for this node's header line (e.g. "├─" or
+  //   "└─").
+  // `field_value_indent`: Indentation added to `stem` for this node's fields
+  //   (e.g. "│ " or "  ").
+  // `pipe_input_to_elide`: When non-null (in linear mode), the scan field
+  //   consumed as pipe input to either omit or display as "<pipe_input>".
   static void DebugStringImpl(const ResolvedNode* node,
                               const DebugStringConfig& config,
-                              absl::string_view prefix1,
-                              absl::string_view prefix2, std::string* output);
+                              absl::string_view stem,
+                              absl::string_view node_connector,
+                              absl::string_view field_value_indent,
+                              std::string* output,
+                              const ResolvedScan* pipe_input_to_elide);
+
+  // Renders a ResolvedScan and its pipe input chain in linear mode.
+  static void DebugStringLinearScanChain(const ResolvedScan* top_scan,
+                                         const DebugStringConfig& config,
+                                         absl::string_view stem,
+                                         absl::string_view connector,
+                                         std::string* output);
+
+  // Renders a single node's name line and its fields.
+  static void DebugStringNodeBody(const ResolvedNode* node,
+                                  const DebugStringConfig& config,
+                                  absl::string_view name_prefix,
+                                  absl::string_view field_prefix,
+                                  std::string* output,
+                                  const ResolvedScan* pipe_input_to_elide);
 
   static void AppendAnnotations(const ResolvedNode* node,
                                 absl::Span<const NodeAnnotation> annotations,

@@ -30,12 +30,15 @@ message KMeansOptions {
 
   enum DistanceType {
     DISTANCE_TYPE_UNSPECIFIED = 0;
-    COSINE = 1;
     EUCLIDEAN = 2;
-    DOT_PRODUCT = 3;
+
+    // COSINE (1) and DOT_PRODUCT (3) were removed as distance types because
+    // they are no longer supported. We reserve their tags to avoid reuse and
+    // maintain backward compatibility.
+    reserved 1, 3;
+    reserved COSINE, DOT_PRODUCT;
   }
-  // The Distance type to use for similarity calculation. In the case of
-  // DOT_PRODUCT, the vectors need to be normalized first.
+  // The Distance type to use for similarity calculation.
   DistanceType distance_type = 2;
 
   // Run the clustering these many times and retain the clusters which minimize

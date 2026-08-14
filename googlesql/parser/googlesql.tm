@@ -247,6 +247,8 @@ SCRIPT_LABEL {absl::string_view}:
 "]" (RBRACK){absl::string_view}: /\]/
 "@" (ATSIGN): /@/
 "@@" (KW_DOUBLE_AT): /@@/
+"::" (KW_DOUBLE_COLON): /::/
+"?::" (KW_DOUBLE_COLON_QUESTION): /\?::/
 "||" (KW_CONCAT_OP): /\|\|/
 "+" (PLUS): /+/
 "-" (MINUS) {absl::string_view}: /-/
@@ -1105,6 +1107,24 @@ catch_all: /./ -100 {
 // It is resolved in favor of the column_list_spec_constructor, which is the
 // desired behavior.
 //
+// AMBIGUOUS CASE 20: FUNCTION and MAP templated types
+// ---------------------------------------------------
+// The FUNCTION and MAP keywords are non-reserved and can be used as
+// identifiers. When a type name is the suffix of an expression, such as happens
+// in the `::` operator, the `<` following `MAP` or `FUNCTION` could either be
+// opening a type template block (shift case) or be a less-than operator (reduce
+// the keyword as identifier case). Textmapper's default resolution is for
+// shift, which is the desired resolution in this case.
+//
+// AMBIGUOUS CASE 21: type_name followed by "."
+// --------------------------------------------------------------
+// When a type name is the suffix of an expression, such as happens in the `::`
+// operator, the `.` following a complete path expression could either be
+// continuing the type name (the shift case) or starting a field access on the
+// result of the `::` operator (reducing the path expression as a type name).
+// Textmapper's default resolution is for shift, which is the desired resolution
+// in this case.
+//
 // Total expected shift/reduce conflicts as described above:
 //   1: SAFE CAST
 //   2: CREATE TABLE CONSTRAINTS
@@ -1125,7 +1145,10 @@ catch_all: /./ -100 {
 //   2: CALL PER()
 //   1: INTERVAL expression identifier TO
 //   1: VALUE { ... }
-%expect 35;
+//   1: Graph SET
+//   2: FUNCTION and MAP templated types
+//   1: type_name followed by "."
+%expect 39;
 
 // Precedence for operator tokens. The operator precedence is defined by the
 // order of the declarations here, with tokens specified in the same declaration
@@ -1152,6 +1175,7 @@ catch_all: /./ -100 {
 %left "||";
 %left "*" "/";
 %nonassoc UNARY_PRECEDENCE;      // For all unary operators
+%left "::" "?::";
 %nonassoc DOUBLE_AT_PRECEDENCE;  // Needs to appear before "."
 
 // The RUN statement in `next_statement_kind_without_hint` experiences a
@@ -1203,9 +1227,9 @@ catch_all: /./ -100 {
 
 // The set of tokens that can start a graph operation block.
 %generate GraphOperationBlockFirst =
-    // TODO: b/474135498 - Remove SET, REMOVE, and DELETE once those graph
-    //     operators are implemented in the parser.
-    set(first graph_operation_block | "SET" | "REMOVE" | "DELETE");
+    // TODO: b/474135498 - Remove DELETE once that graph operator is implemented
+    //     in the parser.
+    set(first graph_operation_block | "DELETE");
 
 // The set of tokens that can follow "TABLE FUNCTION" as a schema object. In
 // some of the no-eoi rules we need one more token after
@@ -2445,6 +2469,17 @@ remote_with_connection_clause {std::pair<bool, ASTWithConnectionClause*>}:
     }
 ;
 
+model_remote_with_connection_clause {std::pair<bool, ASTWithConnectionClause*>}:
+    "REMOTE"[remote] with_connection_clause?
+    {
+      $$ = std::make_pair(true, $with_connection_clause.value_or(nullptr));
+    }
+  | with_connection_clause
+    {
+      $$ = std::make_pair(false, $with_connection_clause);
+    }
+;
+
 language_or_remote_with_connection {std::tuple<ASTIdentifier*, bool, ASTWithConnectionClause*>}:
     "LANGUAGE" identifier remote_with_connection_clause[connection]?
     {
@@ -2648,13 +2683,6 @@ alter_data_policy_statement {ASTNode*}:
         node->set_is_if_exists($if_exists);
         $$ = node;
       } else {
-        // Check if there is any SET CONDITION action in the list.
-        const ASTAlterActionList* action_list = $actions->GetAsOrDie<ASTAlterActionList>();
-        for (const ASTAlterAction* action : action_list->actions()) {
-          if (action->node_kind() == AST_SET_CONDITION_ACTION) {
-            return MakeSyntaxError(action->location(), "SET CONDITION is not supported.");
-          }
-        }
         auto* entity_type = node_factory.MakeIdentifier(@2, "DATA_POLICY");
         auto* node = MakeNode<ASTAlterEntityStatement>(@$, entity_type, $name, $actions);
         node->set_is_if_exists($if_exists);
@@ -3323,15 +3351,20 @@ create_snapshot_statement {ASTNode*}:
     }
 ;
 
-unordered_language_options {std::pair<ASTIdentifier*, ASTNode*>}:
-    language options?
+tvf_declaration_option {ASTNode*}:
+    language { $$ = $1; }
+  | with_connection_clause { $$ = $1; }
+  | options { $$ = $1; }
+;
+
+tvf_declaration_options {googlesql::parser::internal::TVFDeclarationOptions}:
+    (tvf_declaration_option)+[list]
     {
-      $$ = std::make_pair($language, $options.value_or(nullptr));
-    }
-  | options language?
-    {
-      // This production is deprecated (with no warning YET).
-      $$ = std::make_pair($language.value_or(nullptr), $options);
+      auto options_or = googlesql::parser::internal::ProcessTVFDeclarationOptions($list);
+      if (!options_or.ok()) {
+        return options_or.status();
+      }
+      $$ = std::move(options_or).value();
     }
 ;
 
@@ -3340,7 +3373,7 @@ create_table_function_statement {ASTNode*}:
     // for backwards compatibility (no deprecation warning YET).
     "CREATE" opt_or_replace opt_create_scope "TABLE" .TableFunction KW_FUNCTION_IN_TABLE_FUNCTION
         opt_if_not_exists path_expression opt_function_parameters returns?
-        sql_security? unordered_language_options[ulo]? opt_as_query_or_string[body]
+        sql_security? tvf_declaration_options[ulo]? opt_as_query_or_string[body]
     {
       if ($opt_function_parameters == nullptr) {
         // Missing function argument list.
@@ -3355,10 +3388,18 @@ create_table_function_statement {ASTNode*}:
       auto* fn_decl = MakeNode<ASTFunctionDeclaration>(
           MakeLocationRange(@path_expression, @opt_function_parameters),
           $path_expression, $opt_function_parameters);
-      auto [language, options] =
-          $ulo.has_value() ? *$ulo : std::make_pair(nullptr, nullptr);
+
+      ASTIdentifier* language = nullptr;
+      ASTWithConnectionClause* connection = nullptr;
+      ASTOptionsList* options = nullptr;
+      if ($ulo.has_value()) {
+        language = $ulo->language;
+        connection = $ulo->connection;
+        options = $ulo->options;
+      }
+
       auto* create = MakeNode<ASTCreateTableFunctionStatement>(
-          @$, fn_decl, $returns, options, language, $body);
+          @$, fn_decl, $returns, options, language, connection, $body);
       create->set_is_or_replace($opt_or_replace);
       create->set_scope($opt_create_scope);
       create->set_is_if_not_exists($opt_if_not_exists);
@@ -3411,7 +3452,7 @@ create_live_table_statement {ASTNode*}:
     opt_default_collate_clause opt_partition_by_clause_no_hint
     opt_cluster_by_clause_no_hint
     opt_with_connection_clause
-    opt_options_list as_query
+    opt_options_list opt_as_query
     {
       if ($opt_create_scope != ASTCreateStatement::DEFAULT_SCOPE) {
         return MakeSyntaxError(@opt_create_scope,
@@ -3422,7 +3463,7 @@ create_live_table_statement {ASTNode*}:
           $opt_default_collate_clause,
           $opt_partition_by_clause_no_hint, $opt_cluster_by_clause_no_hint,
           $opt_with_connection_clause,
-          $opt_options_list, $as_query);
+          $opt_options_list, $opt_as_query);
       create->set_is_or_replace($opt_or_replace);
       create->set_scope($opt_create_scope);
       create->set_is_if_not_exists($opt_if_not_exists);
@@ -3608,7 +3649,7 @@ create_entity_statement {ASTNode*}:
 create_model_statement {ASTNode*}:
     "CREATE" opt_or_replace opt_create_scope "MODEL" opt_if_not_exists
     path_expression input_output_clause? transform_clause?
-    remote_with_connection_clause[remote]? options?
+    model_remote_with_connection_clause[remote]? options?
     as_query_or_aliased_query_list[queries]?
     {
       auto [is_remote, connection] =
@@ -3633,9 +3674,9 @@ opt_table_element_list {ASTNode*}:
 ;
 
 table_element_list {ASTNode*}:
-    "(" (table_element separator ",")+[elements] ","? ")"
+    table_element_list_prefix ")"
     {
-      $$ = MakeNode<ASTTableElementList>(@$, $elements);
+      $$ = WithEndLocation($1, @$);
     }
   | "(" ")"
     {
@@ -3644,6 +3685,23 @@ table_element_list {ASTNode*}:
         return MakeSyntaxError(@2, "A table must define at least one column.");
       }
       $$ = MakeNode<ASTTableElementList>(@$);
+    }
+;
+
+table_element_list_prefix {ASTNode*}:
+    "(" table_element
+    {
+      $$ = MakeNode<ASTTableElementList>(@$, $2);
+    }
+  | table_element_list_prefix "," table_element
+    {
+      $$ = ExtendNodeRight($1, $3);
+    }
+    # This is buggy because it allows an arbitrary number of commas between
+    # table elements. Some customers depend on this bug.
+  | table_element_list_prefix ","
+    {
+      $$ = WithEndLocation($1, @$);
     }
 ;
 
@@ -7668,6 +7726,73 @@ graph_insert_operator {ASTGqlInsert*}:
 
 graph_dml_operator {ASTNode*}:
     graph_insert_operator
+  | graph_set_operator
+  | graph_remove_operator
+;
+
+graph_set_operator {ASTGqlSet*}:
+    "SET" (graph_set_item separator ",")+[items]
+    {
+      $$ = MakeNode<ASTGqlSet>(@$, $items);
+    }
+;
+
+graph_set_item {ASTGqlSetItem*}:
+    graph_set_property_item
+  | graph_set_all_properties_item
+  | graph_set_label_item
+;
+
+graph_set_property_item {ASTGqlSetPropertyItem*}:
+    path_expression[path] "=" expression[val]
+    {
+      $$ = MakeNode<ASTGqlSetPropertyItem>(@$, $path, $val);
+    }
+;
+
+graph_set_all_properties_item {ASTGqlSetAllPropertiesItem*}:
+    identifier[elem] "=" graph_property_specification[spec]
+    {
+      $$ = MakeNode<ASTGqlSetAllPropertiesItem>(
+          @$, $elem, $spec->GetAsOrDie<ASTGraphPropertySpecification>());
+    }
+    | identifier[elem] "=" "{" "}"
+    {
+      $$ = MakeNode<ASTGqlSetAllPropertiesItem>(@$, $elem);
+    }
+;
+
+graph_set_label_item {ASTGqlSetLabelItem*}:
+    identifier[elem] ("IS" | ":") identifier[label]
+    {
+      $$ = MakeNode<ASTGqlSetLabelItem>(@$, $elem, $label);
+    }
+;
+
+graph_remove_operator {ASTGqlRemove*}:
+    "REMOVE" (graph_remove_item separator ",")+[items]
+    {
+      $$ = MakeNode<ASTGqlRemove>(@$, $items);
+    }
+;
+
+graph_remove_item {ASTGqlRemoveItem*}:
+    graph_remove_property_item
+  | graph_remove_label_item
+;
+
+graph_remove_property_item {ASTGqlRemovePropertyItem*}:
+    path_expression[path]
+    {
+      $$ = MakeNode<ASTGqlRemovePropertyItem>(@$, $path);
+    }
+;
+
+graph_remove_label_item {ASTGqlRemoveLabelItem*}:
+    identifier[elem] ("IS" | ":") identifier[label]
+    {
+      $$ = MakeNode<ASTGqlRemoveLabelItem>(@$, $elem, $label);
+    }
 ;
 
 graph_dml_linear_operation {ASTNode*}:
@@ -10959,6 +11084,25 @@ cast_expression {ASTExpression*}:
       cast->set_is_safe_cast(@safe.has_value());
       $$ = cast;
     }
+  |  expression_higher_prec_than_and[expr] ( "::" | "?::"[safe]) raw_type type_parameters?
+    {
+      // Disallow "??::" because it is confusing and should instead be written
+      // with separating whitespace as "? ?:: <type>".
+      if ($expr->node_kind() == AST_PARAMETER_EXPR &&
+          $expr->GetAs<ASTParameterExpr>()->position() > 0 &&
+          @safe.has_value() &&
+          @expr.end().GetByteOffset() == @safe->start().GetByteOffset())
+      {
+         return MakeSyntaxError(
+          @safe,
+          "Syntax error: ?:: must be separated by whitespace or comments");
+      }
+      auto* type = ExtendNodeRight($raw_type, @$.end(), $type_parameters);
+      auto* cast = MakeNode<ASTCastExpression>(@$, $expr, type);
+      cast->set_is_safe_cast(@safe.has_value());
+      cast->set_is_cast_operator(true);
+      $$ = cast;
+    }
   | "CAST" "(" "SELECT"
     {
       return MakeSyntaxError(
@@ -12881,6 +13025,7 @@ drop_statement {ASTNode*}:
                          SchemaObjectKindToName($kind)));
       }
       if (@parent_name.has_value() &&
+          $kind != SchemaObjectKind::kIndex &&
           $kind != SchemaObjectKind::kSearchIndex &&
           $kind != SchemaObjectKind::kVectorIndex &&
           $kind != SchemaObjectKind::kAiIndex) {
@@ -12928,6 +13073,18 @@ drop_statement {ASTNode*}:
           $$ = drop;
           return absl::OkStatus();
         }
+        case SchemaObjectKind::kIndex:
+          if (@parent_name.has_value()) {
+            auto* drop =
+                MakeNode<ASTDropIndexStatement>(@$, $name, $parent_name);
+            drop->set_is_if_exists(@if_exists.has_value());
+            $$ = drop;
+            return absl::OkStatus();
+          }
+          // TODO: The DROP INDEX statement without a trailing ON
+          // clause produces the old AST node (ASTDropStatement) for backwards
+          // compatibility until it is migrated.
+          [[fallthrough]];
         default: {
           auto* drop = MakeNode<ASTDropStatement>(@$, $name);
           drop->set_schema_object_kind($kind);
@@ -13462,7 +13619,8 @@ next_statement_kind_without_hint {ASTNodeKind}:
     {
       $$ = ASTDropEntityStatement::kConcreteNodeKind;
     }
-  | "DROP" schema_object_kind[kind] set(FollowsTableFunction)
+  | "DROP" schema_object_kind[kind] if_exists? path_expression ("ON"[on])?
+    set(";" | eoi | "IF" | first path_expression | "(" | "CASCADE" | "RESTRICT")
     {
       switch ($kind) {
         case SchemaObjectKind::kFunction:
@@ -13479,6 +13637,16 @@ next_statement_kind_without_hint {ASTNodeKind}:
           break;
         case SchemaObjectKind::kAiIndex:
           $$ = ASTDropAiIndexStatement::kConcreteNodeKind;
+          break;
+        case SchemaObjectKind::kIndex:
+          if (@on.has_value()) {
+            $$ = ASTDropIndexStatement::kConcreteNodeKind;
+          } else {
+            // TODO: The DROP INDEX statement without a trailing
+            // ON clause produces the old AST node (ASTDropStatement) for
+            // backwards compatibility until it is migrated.
+            $$ = ASTDropStatement::kConcreteNodeKind;
+          }
           break;
         default:
           $$ = ASTDropStatement::kConcreteNodeKind;
@@ -13700,8 +13868,14 @@ next_statement_kind_without_hint {ASTNodeKind}:
     {
       $$ = ASTCreateSequenceStatement::kConcreteNodeKind;
     }
-  | "CREATE" next_statement_kind_create_modifiers "LIVE" "TABLE"
+  | "CREATE" next_statement_kind_create_modifiers "LIVE" "TABLE" opt_if_not_exists
+      maybe_dashed_path_expression opt_table_element_list
+      opt_default_collate_clause opt_partition_by_clause_no_hint
+      opt_cluster_by_clause_no_hint opt_with_connection_clause opt_options_list
+      ("AS"[as_for_query] | semicolon_or_eoi)
     {
+      ast_statement_properties->is_create_table_as_select =
+          @as_for_query.has_value();
       $$ = ASTCreateLiveTableStatement::kConcreteNodeKind;
     }
   | "CREATE" next_statement_kind_create_modifiers "MODEL"

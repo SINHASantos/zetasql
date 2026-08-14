@@ -919,13 +919,13 @@ FROM
 --
 ALTERNATION GROUP: w,
 --
-ERROR: Syntax error: Expected keyword INSERT or keyword RETURN but got identifier "w" [at 4:15]
+ERROR: Syntax error: Expected keyword INSERT or keyword REMOVE or keyword RETURN or keyword SET but got identifier "w" [at 4:15]
   WITH weight w 
               ^
 --
 ALTERNATION GROUP: w,REPEATABLE (1234)
 --
-ERROR: Syntax error: Expected keyword INSERT or keyword RETURN but got identifier "w" [at 4:15]
+ERROR: Syntax error: Expected keyword INSERT or keyword REMOVE or keyword RETURN or keyword SET but got identifier "w" [at 4:15]
   WITH weight w REPEATABLE (1234)
               ^
 --

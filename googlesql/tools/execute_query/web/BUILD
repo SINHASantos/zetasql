@@ -25,6 +25,12 @@ gen_string_constant_header_file(
 )
 
 gen_string_constant_header_file(
+    name = "inline_js_h",
+    src = "inline_js.html",
+    variable = "kInlineJS",
+)
+
+gen_string_constant_header_file(
     name = "page_body_h",
     src = "page_body.html",
     variable = "kPageBody",
@@ -46,6 +52,7 @@ cc_library(
     name = "embedded_resources",
     srcs = [
         "embedded_resources.cc",
+        "inline_js.html.h",
         "page_body.html.h",
         "page_template.html.h",
         "style.css.h",

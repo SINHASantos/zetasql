@@ -19,7 +19,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=UnaryAbTableArgWithScalarArgsTempl.[a#4, b#5, c#6]
-        +-tvf=UnaryAbTableArgWithScalarArgsTempl((ANY TYPE x, ANY TABLE arg0, ANY TYPE y) -> ANY TABLE)
+        +-tvf=UnaryAbTableArgWithScalarArgsTempl
         +-signature=(literal INT64, TABLE<a INT64, b STRING, c DATE>, literal STRING) -> TABLE<a INT64, b STRING, c DATE>
         +-argument_list=
         | +-FunctionArgument
@@ -146,7 +146,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=CallsUnaryAbTableArgWithScalarArgsTempl.[a#1, b#2, c#3]
-        +-tvf=CallsUnaryAbTableArgWithScalarArgsTempl((ANY TYPE ignored_param) -> ANY TABLE)
+        +-tvf=CallsUnaryAbTableArgWithScalarArgsTempl
         +-signature=(literal DATE) -> TABLE<a INT64, b STRING, c DATE>
         +-argument_list=
         | +-FunctionArgument
@@ -169,7 +169,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=UnaryAbTableArgWithScalarArgsTempl.[a#4, b#5, c#6]
-        +-tvf=UnaryAbTableArgWithScalarArgsTempl((ANY TYPE x, ANY TABLE arg0, ANY TYPE y) -> ANY TABLE)
+        +-tvf=UnaryAbTableArgWithScalarArgsTempl
         +-signature=(literal INT64, TABLE<a INT64, b STRING, c DATE>, literal STRING) -> TABLE<a INT64, b STRING, c DATE>
         +-argument_list=
         | +-FunctionArgument
@@ -261,10 +261,10 @@ QueryStmt
                 |   +-with_query_name="$inlined_UnaryAbTableArgWithScalarArgsTempl_scalar_args"
                 |   +-with_subquery=
                 |     +-ProjectScan
-                |       +-column_list=$inlined_UnaryAbTableArgWithScalarArgsTempl.[x#8, y#9]
+                |       +-column_list=$inlined_UnaryAbTableArgWithScalarArgsTempl.[x#9, y#10]
                 |       +-expr_list=
-                |       | +-x#8 := Literal(type=INT64, value=1)
-                |       | +-y#9 := Literal(type=STRING, value="b")
+                |       | +-x#9 := Literal(type=INT64, value=1)
+                |       | +-y#10 := Literal(type=STRING, value="b")
                 |       +-input_scan=
                 |         +-SingleRowScan
                 +-query=
@@ -284,9 +284,9 @@ QueryStmt
                             |   +-subquery_type=SCALAR
                             |   +-subquery=
                             |     +-ProjectScan
-                            |       +-column_list=[$inlined_UnaryAbTableArgWithScalarArgsTempl.x#10]
+                            |       +-column_list=[$inlined_UnaryAbTableArgWithScalarArgsTempl.x#11]
                             |       +-input_scan=
-                            |         +-WithRefScan(column_list=$inlined_UnaryAbTableArgWithScalarArgsTempl.[x#10, y#11], with_query_name="$inlined_UnaryAbTableArgWithScalarArgsTempl_scalar_args")
+                            |         +-WithRefScan(column_list=$inlined_UnaryAbTableArgWithScalarArgsTempl.[x#11, y#12], with_query_name="$inlined_UnaryAbTableArgWithScalarArgsTempl_scalar_args")
                             +-FunctionCall(GoogleSQL:$equal(STRING, STRING) -> BOOL)
                               +-ColumnRef(type=STRING, column=CallsUnaryAbTableArgWithScalarArgsTempl.b#2)
                               +-SubqueryExpr
@@ -294,9 +294,9 @@ QueryStmt
                                 +-subquery_type=SCALAR
                                 +-subquery=
                                   +-ProjectScan
-                                    +-column_list=[$inlined_UnaryAbTableArgWithScalarArgsTempl.y#13]
+                                    +-column_list=[$inlined_UnaryAbTableArgWithScalarArgsTempl.y#14]
                                     +-input_scan=
-                                      +-WithRefScan(column_list=$inlined_UnaryAbTableArgWithScalarArgsTempl.[x#12, y#13], with_query_name="$inlined_UnaryAbTableArgWithScalarArgsTempl_scalar_args")
+                                      +-WithRefScan(column_list=$inlined_UnaryAbTableArgWithScalarArgsTempl.[x#13, y#14], with_query_name="$inlined_UnaryAbTableArgWithScalarArgsTempl_scalar_args")
 ==
 
 [no_run_sqlbuilder]
@@ -312,7 +312,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=definer_rights_templated_tvf.[Key#2, Value#3]
-        +-tvf=definer_rights_templated_tvf((ANY TYPE) -> ANY TABLE)
+        +-tvf=definer_rights_templated_tvf
         +-signature=(INT64) -> TABLE<Key INT64, Value STRING>
         +-argument_list=
         | +-FunctionArgument
@@ -349,7 +349,6 @@ QueryStmt
           +-FunctionCall(GoogleSQL:$equal(INT64, INT64) -> BOOL)
             +-ColumnRef(type=INT64, column=KeyValue.Key#1)
             +-ArgumentRef(type=INT64, name="x")
-
 
 [REWRITTEN AST]
 QueryStmt
@@ -405,7 +404,7 @@ QueryStmt
             |                 +-input_scan=
             |                   +-WithRefScan(column_list=[$inlined_definer_rights_templated_tvf.x#7], with_query_name="$inlined_definer_rights_templated_tvf_scalar_args")
             +-original_inlined_view=<null>
-            +-original_inlined_tvf=definer_rights_templated_tvf((ANY TYPE) -> ANY TABLE)
+            +-original_inlined_tvf=definer_rights_templated_tvf
 ==
 
 # TODO: b/404355265 - Turn on the rewrite once the bug is fixed.
@@ -421,7 +420,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=[tvf_templated_select_relation_arg_columns_unused.result#3]
-        +-tvf=tvf_templated_select_relation_arg_columns_unused((ANY TABLE) -> ANY TABLE)
+        +-tvf=tvf_templated_select_relation_arg_columns_unused
         +-signature=(TABLE<key INT64, value INT64>) -> TABLE<result INT64>
         +-argument_list=
         | +-FunctionArgument

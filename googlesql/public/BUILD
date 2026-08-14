@@ -447,6 +447,7 @@ cc_test(
         "module_factory_test.cc",
         "modules_test.cc",
     ],
+    args = ["--googlesql_omit_tvf_signatures_in_resolved_ast_debug_string=true"],
     data = [
         "//googlesql/testdata:test_files",
         "//googlesql/testdata:test_proto3_proto",
@@ -1539,11 +1540,6 @@ cc_proto_library(
     deps = [":type_annotation_proto"],
 )
 
-java_proto_library(
-    name = "type_annotation_java_proto",
-    deps = [":type_annotation_proto"],
-)
-
 proto_library(
     name = "value_proto",
     srcs = ["value.proto"],
@@ -1565,7 +1561,10 @@ java_proto_library(
 proto_library(
     name = "type_parameters_proto",
     srcs = ["type_parameters.proto"],
-    deps = [":simple_value_proto"],
+    deps = [
+        ":simple_value_proto",
+        "//googlesql/public/proto:vector_encoding_id_proto",
+    ],
 )
 
 cc_proto_library(
@@ -1928,7 +1927,6 @@ cc_library(
         "//googlesql/base:case",
         "//googlesql/base:check",
         "//googlesql/base:map_util",
-        "//googlesql/base:status",
         "//googlesql/proto:function_cc_proto",
         "//googlesql/public/types",
         "//googlesql/resolved_ast:resolved_ast_enums_cc_proto",
@@ -1940,8 +1938,8 @@ cc_library(
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/types:optional",
         "@com_google_absl//absl/types:span",
+        "@com_google_googletest//:gtest",
     ],
 )
 
@@ -2003,8 +2001,8 @@ cc_library(
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/types:optional",
         "@com_google_absl//absl/types:span",
+        "@com_google_googletest//:gtest",
         "@com_google_protobuf//:protobuf",
         "@com_googlesource_code_re2//:re2",
     ],
@@ -3184,11 +3182,6 @@ proto_library(
 
 cc_proto_library(
     name = "simple_token_list_cc_proto",
-    deps = [":simple_token_list_proto"],
-)
-
-java_proto_library(
-    name = "simple_token_list_java_proto",
     deps = [":simple_token_list_proto"],
 )
 

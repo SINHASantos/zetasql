@@ -55,6 +55,7 @@ java_library(
         "//googlesql/public:type_proto_java_proto",
         "//googlesql/public/functions:rounding_mode_java_proto",
         "//googlesql/public:type_parameters_java_proto",
+        "//googlesql/public/proto:vector_encoding_id_java_proto",
         "//googlesql/public:value_java_proto",
         "//googlesql/public/proto:type_annotation_java_proto",
         "//googlesql/resolved_ast:resolved_node_kind_java_proto",  # buildcleaner: keep

@@ -88,6 +88,15 @@ static absl::Status CheckAndPropagateAnnotationsImpl(
         GOOGLESQL_RETURN_IF_ERROR(annotation_spec->CheckAndPropagateForColumnRef(
             *column_ref, annotation_map));
       } break;
+      case RESOLVED_ARGUMENT_REF: {
+        // ResolvedArgRef passes through all annotations.
+        // We should have already propagated them all directly, instead of
+        // hitting this logic.
+        // TODO: ResolvedColumnRef and probably CAST() to same type
+        // (or same slot if part of a STRUCT if no associated type annotation
+        // should be the same.)
+        GOOGLESQL_RET_CHECK_FAIL() << "Should have propagated all annotations on ArgRef";
+      }
       case RESOLVED_GET_STRUCT_FIELD: {
         auto* get_struct_field = resolved_node->GetAs<ResolvedGetStructField>();
         GOOGLESQL_RETURN_IF_ERROR(annotation_spec->CheckAndPropagateForGetStructField(
@@ -119,6 +128,12 @@ static absl::Status CheckAndPropagateAnnotationsImpl(
       case RESOLVED_ANALYTIC_FUNCTION_CALL: {
         auto* function_call =
             resolved_node->GetAs<ResolvedAnalyticFunctionCall>();
+        GOOGLESQL_RETURN_IF_ERROR(annotation_spec->CheckAndPropagateForFunctionCallBase(
+            *function_call, annotation_map));
+      } break;
+      case RESOLVED_ESTIMATOR_FUNCTION_CALL: {
+        auto* function_call =
+            resolved_node->GetAs<ResolvedEstimatorFunctionCall>();
         GOOGLESQL_RETURN_IF_ERROR(annotation_spec->CheckAndPropagateForFunctionCallBase(
             *function_call, annotation_map));
       } break;
@@ -178,7 +193,8 @@ static absl::Status PropagateAnnotationsForSqlFunctionCall(ResolvedExpr& expr) {
                                   ->FunctionExpression()
                                   ->annotated_type();
   } else {
-    GOOGLESQL_RET_CHECK(function->Is<TemplatedSQLFunction>());
+    GOOGLESQL_RET_CHECK(function->Is<TemplatedSQLFunction>() ||
+              function->Is<SQLFunction>());
     resolved_annotated_type =
         function_call_info->GetAs<TemplatedSQLFunctionCall>()
             ->expr()

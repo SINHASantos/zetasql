@@ -1,24 +1,384 @@
-[default language_features=NONE]
+# CREATE PROPERTY GRAPH TYPE resolves to a ResolvedCreatePropertyGraphTypeStmt:
+# the logical shape only (element types, their default labels and the property
+# declarations exposed by those labels), with no physical table bindings.
 
-# This CL adds only the PARSER for CREATE/DROP PROPERTY GRAPH TYPE; the resolver
-# is deferred to a later CL. These cases lock in the analyzer invariant that
-# everything the parser accepts is handled -- here, the resolver has no case for
-# AST_CREATE_PROPERTY_GRAPH_TYPE_STATEMENT, so it falls to the default and
-# returns a clean "Statement not supported" error rather than crashing or
-# silently ignoring the statement. The node/edge type names need not exist in
-# the catalog: the error fires at statement dispatch, before name resolution.
+# Node types only, each with property declarations. Each element type's name is
+# also the name of its default label.
 create property graph type pgt
-node types(Person)
+node types(
+  Person properties(name string, age int64),
+  Account properties(id int64)
+)
 --
-ERROR: Statement not supported: CreatePropertyGraphTypeStatement [at 8:1]
-create property graph type pgt
-^
+CreatePropertyGraphTypeStmt
++-name_path=pgt
++-node_type_list=
+| +-GraphElementType(name="Person", label_name_list=[Person])
+| +-GraphElementType(name="Account", label_name_list=[Account])
++-label_list=
+| +-GraphElementLabel(parse_location=45-51, name="Person", property_declaration_name_list=[name, age])
+| +-GraphElementLabel(parse_location=90-97, name="Account", property_declaration_name_list=[id])
++-property_declaration_list=
+  +-GraphPropertyDeclaration(parse_location=63-74, name="name", type=STRING)
+  +-GraphPropertyDeclaration(parse_location=76-85, name="age", type=INT64)
+  +-GraphPropertyDeclaration(parse_location=109-117, name="id", type=INT64)
 ==
 
-create property graph type pgt
-node types(Person, Account)
-edge types(Knows from Person to Account)
+
+# Node and edge types. The edge type's FROM/TO become source/dest node type
+# references and must point at declared node types.
+create property graph type social
+node types(
+  Person properties(name string),
+  Account properties(id int64)
+)
+edge types(
+  Owns from Person to Account properties(since date)
+)
 --
-ERROR: Statement not supported: CreatePropertyGraphTypeStatement [at 1:1]
-create property graph type pgt
-^
+CreatePropertyGraphTypeStmt
++-name_path=social
++-node_type_list=
+| +-GraphElementType(name="Person", label_name_list=[Person])
+| +-GraphElementType(name="Account", label_name_list=[Account])
++-edge_type_list=
+| +-GraphElementType(name="Owns", label_name_list=[Owns], source_node_type="Person", dest_node_type="Account")
++-label_list=
+| +-GraphElementLabel(parse_location=48-54, name="Person", property_declaration_name_list=[name])
+| +-GraphElementLabel(parse_location=82-89, name="Account", property_declaration_name_list=[id])
+| +-GraphElementLabel(parse_location=127-131, name="Owns", property_declaration_name_list=[since])
++-property_declaration_list=
+  +-GraphPropertyDeclaration(parse_location=66-77, name="name", type=STRING)
+  +-GraphPropertyDeclaration(parse_location=101-109, name="id", type=INT64)
+  +-GraphPropertyDeclaration(parse_location=166-176, name="since", type=DATE)
+==
+
+
+# An edge type may declare FROM, TO, both, or neither. An omitted endpoint is
+# left unset, meaning any node type is allowed there.
+create property graph type one_ended
+node types(Person, Account)
+edge types(
+  Owns {{from Person |}}{{to Account|}}
+)
+--
+ALTERNATION GROUP: from Person ,to Account
+--
+CreatePropertyGraphTypeStmt
++-name_path=one_ended
++-node_type_list=
+| +-GraphElementType(name="Person", label_name_list=[Person])
+| +-GraphElementType(name="Account", label_name_list=[Account])
++-edge_type_list=
+| +-GraphElementType(name="Owns", label_name_list=[Owns], source_node_type="Person", dest_node_type="Account")
++-label_list=
+  +-GraphElementLabel(parse_location=48-54, name="Person")
+  +-GraphElementLabel(parse_location=56-63, name="Account")
+  +-GraphElementLabel(parse_location=79-83, name="Owns")
+--
+ALTERNATION GROUP: from Person ,
+--
+CreatePropertyGraphTypeStmt
++-name_path=one_ended
++-node_type_list=
+| +-GraphElementType(name="Person", label_name_list=[Person])
+| +-GraphElementType(name="Account", label_name_list=[Account])
++-edge_type_list=
+| +-GraphElementType(name="Owns", label_name_list=[Owns], source_node_type="Person")
++-label_list=
+  +-GraphElementLabel(parse_location=48-54, name="Person")
+  +-GraphElementLabel(parse_location=56-63, name="Account")
+  +-GraphElementLabel(parse_location=79-83, name="Owns")
+--
+ALTERNATION GROUP: to Account
+--
+CreatePropertyGraphTypeStmt
++-name_path=one_ended
++-node_type_list=
+| +-GraphElementType(name="Person", label_name_list=[Person])
+| +-GraphElementType(name="Account", label_name_list=[Account])
++-edge_type_list=
+| +-GraphElementType(name="Owns", label_name_list=[Owns], dest_node_type="Account")
++-label_list=
+  +-GraphElementLabel(parse_location=48-54, name="Person")
+  +-GraphElementLabel(parse_location=56-63, name="Account")
+  +-GraphElementLabel(parse_location=79-83, name="Owns")
+--
+ALTERNATION GROUP: <empty>
+--
+CreatePropertyGraphTypeStmt
++-name_path=one_ended
++-node_type_list=
+| +-GraphElementType(name="Person", label_name_list=[Person])
+| +-GraphElementType(name="Account", label_name_list=[Account])
++-edge_type_list=
+| +-GraphElementType(name="Owns", label_name_list=[Owns])
++-label_list=
+  +-GraphElementLabel(parse_location=48-54, name="Person")
+  +-GraphElementLabel(parse_location=56-63, name="Account")
+  +-GraphElementLabel(parse_location=79-83, name="Owns")
+==
+
+
+# An edge type may connect a node type to itself (a self-loop): FROM and TO name
+# the same node type.
+create property graph type self_loop
+node types(Person properties(name string))
+edge types(Likes from Person to Person properties(weight double))
+--
+CreatePropertyGraphTypeStmt
++-name_path=self_loop
++-node_type_list=
+| +-GraphElementType(name="Person", label_name_list=[Person])
++-edge_type_list=
+| +-GraphElementType(name="Likes", label_name_list=[Likes], source_node_type="Person", dest_node_type="Person")
++-label_list=
+| +-GraphElementLabel(parse_location=48-54, name="Person", property_declaration_name_list=[name])
+| +-GraphElementLabel(parse_location=91-96, name="Likes", property_declaration_name_list=[weight])
++-property_declaration_list=
+  +-GraphPropertyDeclaration(parse_location=66-77, name="name", type=STRING)
+  +-GraphPropertyDeclaration(parse_location=130-143, name="weight", type=DOUBLE)
+==
+
+
+# FROM/TO references are matched to node types case-insensitively, so 'PERSON'
+# and 'person' both resolve to the declared 'Person' node type. The stored
+# source/dest string preserves the casing written in the FROM/TO clause.
+create property graph type ci_ref
+node types(Person properties(name string))
+edge types(Loops from PERSON to person)
+--
+CreatePropertyGraphTypeStmt
++-name_path=ci_ref
++-node_type_list=
+| +-GraphElementType(name="Person", label_name_list=[Person])
++-edge_type_list=
+| +-GraphElementType(name="Loops", label_name_list=[Loops], source_node_type="PERSON", dest_node_type="person")
++-label_list=
+| +-GraphElementLabel(parse_location=45-51, name="Person", property_declaration_name_list=[name])
+| +-GraphElementLabel(parse_location=88-93, name="Loops")
++-property_declaration_list=
+  +-GraphPropertyDeclaration(parse_location=63-74, name="name", type=STRING)
+==
+
+
+# Element type names are compared case-insensitively, so a node type 'Person' and
+# an edge type 'PERSON' are a duplicate.
+create property graph type ci_dup
+node types(Person properties(name string))
+edge types(PERSON from Person to Person)
+--
+ERROR: Duplicate element type name 'PERSON' [at 3:12]
+edge types(PERSON from Person to Person)
+           ^
+==
+
+
+# A property name shared across element types is collected once at graph-type
+# scope, as long as the declared type is consistent.
+create property graph type shared_props
+node types(
+  Person properties(id int64, name string),
+  Account properties(id int64)
+)
+--
+CreatePropertyGraphTypeStmt
++-name_path=shared_props
++-node_type_list=
+| +-GraphElementType(name="Person", label_name_list=[Person])
+| +-GraphElementType(name="Account", label_name_list=[Account])
++-label_list=
+| +-GraphElementLabel(parse_location=54-60, name="Person", property_declaration_name_list=[id, name])
+| +-GraphElementLabel(parse_location=98-105, name="Account", property_declaration_name_list=[id])
++-property_declaration_list=
+  +-GraphPropertyDeclaration(parse_location=72-80, name="id", type=INT64)
+  +-GraphPropertyDeclaration(parse_location=82-93, name="name", type=STRING)
+==
+
+
+# NODE TYPES() may be empty.
+create property graph type empty
+node types()
+--
+CreatePropertyGraphTypeStmt(name_path=empty)
+==
+
+
+# OR REPLACE / IF NOT EXISTS and OPTIONS.
+create or replace property graph type pgt
+node types(Person properties(name string))
+options(description = 'a graph type')
+--
+CreatePropertyGraphTypeStmt
++-name_path=pgt
++-create_mode=CREATE_OR_REPLACE
++-node_type_list=
+| +-GraphElementType(name="Person", label_name_list=[Person])
++-label_list=
+| +-GraphElementLabel(parse_location=53-59, name="Person", property_declaration_name_list=[name])
++-property_declaration_list=
+| +-GraphPropertyDeclaration(parse_location=71-82, name="name", type=STRING)
++-option_list=
+  +-description := Literal(type=STRING, value="a graph type")
+==
+
+
+# Negative: an edge TO references an undeclared node type.
+create property graph type bad_to
+node types(Person properties(name string))
+edge types(Knows from Person to Company)
+--
+ERROR: Edge type 'Knows' references undefined node type 'Company' [at 3:33]
+edge types(Knows from Person to Company)
+                                ^
+==
+
+
+# Negative: an edge FROM references an undeclared node type.
+create property graph type bad_from
+node types(Person properties(name string))
+edge types(Knows from Company to Person)
+--
+ERROR: Edge type 'Knows' references undefined node type 'Company' [at 3:23]
+edge types(Knows from Company to Person)
+                      ^
+==
+
+
+# Negative: duplicate element type name across node and edge types.
+create property graph type dup_name
+node types(Person properties(name string))
+edge types(Person from Person to Person)
+--
+ERROR: Duplicate element type name 'Person' [at 3:12]
+edge types(Person from Person to Person)
+           ^
+==
+
+
+# Negative: FROM/TO node type references are not allowed on a node type. The
+# grammar shares the element type production between node and edge types, so this
+# is caught in the resolver rather than the parser.
+create property graph type node_with_from
+node types(Person from Account)
+--
+ERROR: FROM/TO node type references are not allowed on node type 'Person' [at 2:19]
+node types(Person from Account)
+                  ^
+==
+
+
+# Negative: a property name reused with a conflicting type across element types.
+create property graph type conflict
+node types(
+  Person properties(id int64),
+  Account properties(id string)
+)
+--
+ERROR: The property declaration of 'id' has type conflicts. There is an existing declaration of type STRING. There is a conflicting one of type INT64 [at 4:22]
+  Account properties(id string)
+                     ^
+==
+
+
+# Negative: duplicate property name within a single element type.
+create property graph type dup_prop
+node types(Person properties(name string, name int64))
+--
+ERROR: Duplicate property name 'name' in element type 'Person' [at 2:43]
+node types(Person properties(name string, name int64))
+                                          ^
+==
+
+
+# Negative: OPTIONS on a property declaration are not supported yet.
+create property graph type prop_options
+node types(Person properties(name string options(x = 1)))
+--
+ERROR: OPTIONS clause is not supported for the graph type property declaration [at 2:49]
+node types(Person properties(name string options(x = 1)))
+                                                ^
+==
+
+
+# Negative: default-label OPTIONS on an element type are not supported in this
+# statement, even with SQL_GRAPH_DEFAULT_LABEL_AND_PROPERTY_DEFINITION_OPTIONS
+# enabled: the resolved label would carry an option list that the SQLBuilder
+# round-trip cannot reconstruct.
+[language_features=NONE,+SQL_GRAPH_DEFAULT_LABEL_AND_PROPERTY_DEFINITION_OPTIONS]
+create property graph type lbl_opts
+node types(Person options(a = 1, b = 'x') properties(name string))
+--
+ERROR: OPTIONS clause is not supported for the graph type default label [at 2:26]
+node types(Person options(a = 1, b = 'x') properties(name string))
+                         ^
+==
+
+
+# Negative: the same holds when the feature is off; without it a resolved label
+# option list would also fail internal validation.
+[language_features=NONE]
+create property graph type lbl_opts_off
+node types(Person options(a = 1) properties(name string))
+--
+ERROR: OPTIONS clause is not supported for the graph type default label [at 2:26]
+node types(Person options(a = 1) properties(name string))
+                         ^
+==
+
+
+# Negative: the name collides with an existing property graph. A property graph
+# type shares a single catalog namespace with property graphs and tables, so the
+# name must be unique across all three ('aml' is a property graph in the sample
+# catalog).
+create property graph type aml
+node types(Person properties(name string))
+--
+ERROR: The property graph type's name is used by a property graph under the same name. Please use a different name [at 1:28]
+create property graph type aml
+                           ^
+==
+
+
+# Negative: the name collides with an existing table ('Transfer' is a table in
+# the sample catalog; catalog names are case-insensitive).
+create property graph type transfer
+node types(Person properties(name string))
+--
+ERROR: The property graph type's name is used by a table under the same name. Please use a different name [at 1:28]
+create property graph type transfer
+                           ^
+==
+
+
+# Negative: CREATE OR REPLACE does not rescue a cross-kind clash with a property
+# graph. REPLACE only applies to an existing property graph type; a name used by
+# a property graph is rejected regardless of create mode.
+create or replace property graph type aml
+node types(Person properties(name string))
+--
+ERROR: The property graph type's name is used by a property graph under the same name. Please use a different name [at 1:39]
+create or replace property graph type aml
+                                      ^
+==
+
+
+# Negative: likewise, CREATE OR REPLACE does not rescue a cross-kind clash with
+# a table.
+create or replace property graph type transfer
+node types(Person properties(name string))
+--
+ERROR: The property graph type's name is used by a table under the same name. Please use a different name [at 1:39]
+create or replace property graph type transfer
+                                      ^
+==
+
+
+# Negative: CREATE IF NOT EXISTS does not rescue a cross-kind clash either; the
+# name is still reserved by an existing table.
+create property graph type if not exists transfer
+node types(Person properties(name string))
+--
+ERROR: The property graph type's name is used by a table under the same name. Please use a different name [at 1:42]
+create property graph type if not exists transfer
+                                         ^

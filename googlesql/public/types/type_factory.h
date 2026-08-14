@@ -703,6 +703,12 @@ const EnumType* DatePartEnumType();
 // library, rather than as a part of the public GoogleSQL API.
 const EnumType* NormalizeModeEnumType();
 
+// Accessor for the GoogleSQL enum Type (functions::Endianness)
+// that represents the endianness in BIT_CAST functions. Intended to be used
+// primarily within the GoogleSQL library, rather than as a part of the public
+// GoogleSQL API.
+absl::StatusOr<const EnumType*> EndiannessEnumType();
+
 // Accessor for the GoogleSQL enum Type (functions::RoundingMode)
 // that represents the rounding mode to be used as the third optional
 // argument of the ROUND function, which determines how the input value

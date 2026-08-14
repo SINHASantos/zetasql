@@ -191,7 +191,7 @@ QueryStmt
                   | +-column_list=tvf_one_relation_arg_with_fixed_output.[column_bool#3, column_bytes#4]
                   | +-hint_list=
                   | | +-hint := Literal(type=INT64, value=1)
-                  | +-tvf=tvf_one_relation_arg_with_fixed_output((ANY TABLE) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+                  | +-tvf=tvf_one_relation_arg_with_fixed_output
                   | +-signature=(TABLE<b BOOL>) -> TABLE<column_bool BOOL, column_bytes BYTES>
                   | +-argument_list=
                   | | +-FunctionArgument
@@ -318,7 +318,7 @@ QueryStmt
                   |   +-SingleRowScan
                   +-TVFScan
                   | +-column_list=[tvf_one_relation_arg_output_schema_is_input_schema.x#2]
-                  | +-tvf=tvf_one_relation_arg_output_schema_is_input_schema((ANY TABLE) -> ANY TABLE)
+                  | +-tvf=tvf_one_relation_arg_output_schema_is_input_schema
                   | +-signature=(TABLE<x GRAPH_NODE(aml)<age UINT32, balance UINT64, birthday DATE, data BYTES, id INT64, name STRING, syndicateData ARRAY<INT64>, syndicateId INT64, syndicateName STRING>>) -> TABLE<x GRAPH_NODE(aml)<age UINT32, balance UINT64, birthday DATE, data BYTES, id INT64, name STRING, syndicateData ARRAY<INT64>, syndicateId INT64, syndicateName STRING>>
                   | +-argument_list=
                   | | +-FunctionArgument
@@ -390,7 +390,7 @@ QueryStmt
                   |   +-SingleRowScan
                   +-TVFScan
                   | +-column_list=[tvf_one_relation_arg_output_schema_is_input_schema.x#2]
-                  | +-tvf=tvf_one_relation_arg_output_schema_is_input_schema((ANY TABLE) -> ANY TABLE)
+                  | +-tvf=tvf_one_relation_arg_output_schema_is_input_schema
                   | +-signature=(TABLE<x GRAPH_NODE(aml)<age UINT32, balance UINT64, birthday DATE, data BYTES, id INT64, name STRING, syndicateData ARRAY<INT64>, syndicateId INT64, syndicateName STRING>>) -> TABLE<x GRAPH_NODE(aml)<age UINT32, balance UINT64, birthday DATE, data BYTES, id INT64, name STRING, syndicateData ARRAY<INT64>, syndicateId INT64, syndicateName STRING>>
                   | +-argument_list=
                   | | +-FunctionArgument
@@ -490,7 +490,7 @@ QueryStmt
                 +-scan_list=
                   +-TVFScan
                   | +-column_list=tvf_two_relation_args.[column_bool#5, column_bytes#6]
-                  | +-tvf=tvf_two_relation_args((ANY TABLE, ANY TABLE) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+                  | +-tvf=tvf_two_relation_args
                   | +-signature=(TABLE<name STRING>, TABLE<Key INT64, Value STRING>) -> TABLE<column_bool BOOL, column_bytes BYTES>
                   | +-argument_list=
                   | | +-FunctionArgument
@@ -562,7 +562,7 @@ QueryStmt
                   |   +-SingleRowScan
                   +-TVFScan
                   | +-column_list=tvf_model_evaluation_args.[column_bool#2, column_bytes#3]
-                  | +-tvf=tvf_model_evaluation_args((ANY MODEL, optional ANY TABLE, optional <struct>) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+                  | +-tvf=tvf_model_evaluation_args
                   | +-signature=(ANY MODEL, TABLE<x GRAPH_NODE(aml)<age UINT32, balance UINT64, birthday DATE, data BYTES, id INT64, name STRING, syndicateData ARRAY<INT64>, syndicateId INT64, syndicateName STRING>>) -> TABLE<column_bool BOOL, column_bytes BYTES>
                   | +-argument_list=
                   | | +-FunctionArgument
@@ -646,7 +646,7 @@ QueryStmt
                   |   +-SingleRowScan
                   +-TVFScan
                   | +-column_list=tvf_model_optional_table_named_string_default.[column_bool#2, column_bytes#3]
-                  | +-tvf=tvf_model_optional_table_named_string_default((ANY MODEL, optional ANY TABLE, optional STRING {default_value: "default"} foobar) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+                  | +-tvf=tvf_model_optional_table_named_string_default
                   | +-signature=(ANY MODEL, TABLE<x GRAPH_NODE(aml)<age UINT32, balance UINT64, birthday DATE, data BYTES, id INT64, name STRING, syndicateData ARRAY<INT64>, syndicateId INT64, syndicateName STRING>>, literal STRING) -> TABLE<column_bool BOOL, column_bytes BYTES>
                   | +-argument_list=
                   | | +-FunctionArgument
@@ -746,7 +746,7 @@ QueryStmt
                   |   +-GraphRefScan(column_list=[$element_table.x#1])
                   +-TVFScan
                   | +-column_list=tvf_one_relation_arg_int64_string_input_columns.[column_bool#6, column_bytes#7]
-                  | +-tvf=tvf_one_relation_arg_int64_string_input_columns((TABLE<int64 INT64, string STRING>) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+                  | +-tvf=tvf_one_relation_arg_int64_string_input_columns
                   | +-signature=(TABLE<int64 INT64, string STRING>) -> TABLE<column_bool BOOL, column_bytes BYTES>
                   | +-argument_list=
                   | | +-FunctionArgument
@@ -875,7 +875,7 @@ QueryStmt
                   |   +-SingleRowScan
                   +-TVFScan
                   | +-column_list=[tvf_expect_a_b_c.z#9]
-                  | +-tvf=tvf_expect_a_b_c((TABLE<a INT64, b STRING, c DOUBLE> t) -> TABLE<z INT64>)
+                  | +-tvf=tvf_expect_a_b_c
                   | +-signature=(TABLE<a INT64, b STRING, c DOUBLE>) -> TABLE<z INT64>
                   | +-argument_list=
                   | | +-FunctionArgument
@@ -982,7 +982,7 @@ from graph_table(aml
 --
 ALTERNATION GROUP: column_bool OR column_bool
 --
-ERROR: Syntax error: Expected keyword INSERT or keyword RETURN but got keyword OR [at 4:73]
+ERROR: Syntax error: Expected keyword INSERT or keyword REMOVE or keyword RETURN or keyword SET but got keyword OR [at 4:73]
 ...g_with_fixed_output() YIELD column_bool OR column_bool AS y
                                            ^
 --
@@ -1028,7 +1028,7 @@ QueryStmt
                   |   +-SingleRowScan
                   +-TVFScan
                   | +-column_list=tvf_one_relation_arg_with_fixed_output.[column_bool#2, column_bytes#3]
-                  | +-tvf=tvf_one_relation_arg_with_fixed_output((ANY TABLE) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+                  | +-tvf=tvf_one_relation_arg_with_fixed_output
                   | +-signature=(TABLE<x INT64>) -> TABLE<column_bool BOOL, column_bytes BYTES>
                   | +-argument_list=
                   | | +-FunctionArgument
@@ -1071,7 +1071,7 @@ QueryStmt
                   |   +-SingleRowScan
                   +-TVFScan
                   | +-column_list=tvf_one_relation_arg_with_fixed_output.[column_bool#2, column_bytes#3]
-                  | +-tvf=tvf_one_relation_arg_with_fixed_output((ANY TABLE) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+                  | +-tvf=tvf_one_relation_arg_with_fixed_output
                   | +-signature=(TABLE<x INT64>) -> TABLE<column_bool BOOL, column_bytes BYTES>
                   | +-argument_list=
                   | | +-FunctionArgument
@@ -1123,7 +1123,7 @@ QueryStmt
                   |   +-SingleRowScan
                   +-TVFScan
                   | +-column_list=tvf_one_relation_arg_with_fixed_output.[column_bool#2, column_bytes#3]
-                  | +-tvf=tvf_one_relation_arg_with_fixed_output((ANY TABLE) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+                  | +-tvf=tvf_one_relation_arg_with_fixed_output
                   | +-signature=(TABLE<column_bool STRING>) -> TABLE<column_bool BOOL, column_bytes BYTES>
                   | +-argument_list=
                   | | +-FunctionArgument
@@ -1238,7 +1238,7 @@ QueryStmt
                   | +-subquery=
                   | | +-TVFScan
                   | |   +-column_list=tvf_one_relation_arg_with_fixed_output.[column_bool#4, column_bytes#5]
-                  | |   +-tvf=tvf_one_relation_arg_with_fixed_output((ANY TABLE) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+                  | |   +-tvf=tvf_one_relation_arg_with_fixed_output
                   | |   +-signature=(TABLE<Key INT64, Value STRING>) -> TABLE<column_bool BOOL, column_bytes BYTES>
                   | |   +-argument_list=
                   | |   | +-FunctionArgument
@@ -1331,7 +1331,7 @@ QueryStmt
               |   +-SingleRowScan
               +-TVFScan
               | +-column_list=tvf_optional_table_default_mandatory_string.[column_bool#2, column_bytes#3]
-              | +-tvf=tvf_optional_table_default_mandatory_string((optional ANY TABLE, optional STRING {default_value: "default"} foobar) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+              | +-tvf=tvf_optional_table_default_mandatory_string
               | +-signature=(TABLE<a INT64>, literal STRING) -> TABLE<column_bool BOOL, column_bytes BYTES>
               | +-argument_list=
               | | +-FunctionArgument
@@ -1379,7 +1379,7 @@ QueryStmt
               |   +-SingleRowScan
               +-TVFScan
               | +-column_list=tvf_optional_table_default_mandatory_string.[column_bool#2, column_bytes#3]
-              | +-tvf=tvf_optional_table_default_mandatory_string((optional ANY TABLE, optional STRING {default_value: "default"} foobar) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+              | +-tvf=tvf_optional_table_default_mandatory_string
               | +-signature=(TABLE<$a INT64>, literal STRING) -> TABLE<column_bool BOOL, column_bytes BYTES>
               | +-argument_list=
               | | +-FunctionArgument
@@ -1427,7 +1427,7 @@ QueryStmt
               |   +-SingleRowScan
               +-TVFScan
               | +-column_list=[tvf_append_no_column.where#2]
-              | +-tvf=tvf_append_no_column((ANY TABLE) -> ANY TABLE)
+              | +-tvf=tvf_append_no_column
               | +-signature=(TABLE<where INT64>) -> TABLE<where INT64>
               | +-argument_list=
               | | +-FunctionArgument
@@ -1502,7 +1502,7 @@ QueryStmt
             |   |     |   +-SingleRowScan
             |   |     +-TVFScan
             |   |     | +-column_list=tvf_optional_table_default_mandatory_string.[column_bool#4, column_bytes#5]
-            |   |     | +-tvf=tvf_optional_table_default_mandatory_string((optional ANY TABLE, optional STRING {default_value: "default"} foobar) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+            |   |     | +-tvf=tvf_optional_table_default_mandatory_string
             |   |     | +-signature=(TABLE<x INT64>, literal STRING) -> TABLE<column_bool BOOL, column_bytes BYTES>
             |   |     | +-argument_list=
             |   |     | | +-FunctionArgument
@@ -1516,7 +1516,7 @@ QueryStmt
             |   |     | +-function_call_signature=(optional(1) ANY TABLE, optional(1) STRING foobar) -> TABLE<column_bool BOOL, column_bytes BYTES>
             |   |     +-TVFScan
             |   |     | +-column_list=tvf_optional_table_default_mandatory_string.[column_bool#6, column_bytes#7]
-            |   |     | +-tvf=tvf_optional_table_default_mandatory_string((optional ANY TABLE, optional STRING {default_value: "default"} foobar) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+            |   |     | +-tvf=tvf_optional_table_default_mandatory_string
             |   |     | +-signature=(TABLE<column_bytes BYTES>, literal STRING) -> TABLE<column_bool BOOL, column_bytes BYTES>
             |   |     | +-argument_list=
             |   |     | | +-FunctionArgument
@@ -1616,7 +1616,7 @@ QueryStmt
             |   |     |   +-GraphRefScan(column_list=[$element_table.x#2])
             |   |     +-TVFScan
             |   |     | +-column_list=tvf_one_relation_arg_int64_string_input_columns.[column_bool#7, column_bytes#8]
-            |   |     | +-tvf=tvf_one_relation_arg_int64_string_input_columns((TABLE<int64 INT64, string STRING>) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+            |   |     | +-tvf=tvf_one_relation_arg_int64_string_input_columns
             |   |     | +-signature=(TABLE<int64 INT64, string STRING>) -> TABLE<column_bool BOOL, column_bytes BYTES>
             |   |     | +-argument_list=
             |   |     | | +-FunctionArgument
@@ -1637,7 +1637,7 @@ QueryStmt
             |   |     |   +-GraphRefScan(column_list=tvf_one_relation_arg_int64_string_input_columns.[column_bool#7, column_bytes#8])
             |   |     +-TVFScan
             |   |     | +-column_list=tvf_one_relation_arg_int64_string_input_columns.[column_bool#11, column_bytes#12]
-            |   |     | +-tvf=tvf_one_relation_arg_int64_string_input_columns((TABLE<int64 INT64, string STRING>) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+            |   |     | +-tvf=tvf_one_relation_arg_int64_string_input_columns
             |   |     | +-signature=(TABLE<int64 INT64, string STRING>) -> TABLE<column_bool BOOL, column_bytes BYTES>
             |   |     | +-argument_list=
             |   |     | | +-FunctionArgument

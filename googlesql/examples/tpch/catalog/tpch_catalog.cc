@@ -17,6 +17,7 @@
 #include "googlesql/examples/tpch/catalog/tpch_catalog.h"
 
 #include <cstdint>
+#include <iterator>
 #include <memory>
 #include <optional>
 #include <string>
@@ -487,7 +488,7 @@ absl::StatusOr<std::unique_ptr<SimpleCatalog>> MakeTpchCatalog(
       {kCreatePart, embedded_resources::kTpchData_part},
       {kCreatePartSupp, embedded_resources::kTpchData_partsupp},
   };
-  static const int kNumTables = ABSL_ARRAYSIZE(kTableDefinitions);
+  static const int kNumTables = std::size(kTableDefinitions);
   static ParsedTpchTableDataHolder* const parsed_datas =
       new ParsedTpchTableDataHolder[kNumTables];
 

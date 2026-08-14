@@ -369,7 +369,7 @@ TEST(DeclarativeTypeTest, DeclarativeTypeCounterEquality) {
       t1, type_factory.MakeDeclarativeType(
               DeclarativeTypeDescriptor()
                   .set_type_id(TypeId{
-                      .name_space = "NS", .local_id = "T1", .counter = 1})
+                      .name_space = "NS", .local_id = "T1", .version_id = "v1"})
                   .set_display_name("t1")
                   .set_backing_type(type_factory.get_int64())));
 
@@ -378,7 +378,7 @@ TEST(DeclarativeTypeTest, DeclarativeTypeCounterEquality) {
       t2, type_factory.MakeDeclarativeType(
               DeclarativeTypeDescriptor()
                   .set_type_id(TypeId{
-                      .name_space = "NS", .local_id = "T1", .counter = 2})
+                      .name_space = "NS", .local_id = "T1", .version_id = "v2"})
                   .set_display_name("t1")
                   .set_backing_type(type_factory.get_int64())));
 
@@ -501,33 +501,22 @@ TEST(DeclarativeTypeTest, DescriptorValidation) {
                       .set_backing_type(type_factory.get_int64())),
               StatusIs(absl::StatusCode::kInternal, HasSubstr("local_id")));
 
-  // Negative counter
-  EXPECT_THAT(
-      type_factory.MakeDeclarativeType(
-          DeclarativeTypeDescriptor()
-              .set_type_id(TypeId{
-                  .name_space = "NS", .local_id = "local_id", .counter = -1})
-              .set_display_name("t1")
-              .set_backing_type(type_factory.get_int64())),
-      StatusIs(absl::StatusCode::kInternal, HasSubstr("counter")));
-
-  // Non-zero counter for GoogleSQL built-in type
+  // Non-empty version_id for GoogleSQL built-in type
   EXPECT_THAT(type_factory.MakeDeclarativeType(
                   DeclarativeTypeDescriptor()
                       .set_type_id(TypeId{.name_space = std::string(
                                               TypeId::kGoogleSqlNamespace),
                                           .local_id = "local_id",
-                                          .counter = 1})
+                                          .version_id = "v1"})
                       .set_display_name("t1")
                       .set_backing_type(type_factory.get_int64())),
-              StatusIs(absl::StatusCode::kInternal, HasSubstr("counter")));
+              StatusIs(absl::StatusCode::kInternal, HasSubstr("version_id")));
 
   // Empty display_name
   EXPECT_THAT(
       type_factory.MakeDeclarativeType(
           DeclarativeTypeDescriptor()
-              .set_type_id(TypeId{
-                  .name_space = "NS", .local_id = "local_id", .counter = 0})
+              .set_type_id(TypeId{.name_space = "NS", .local_id = "local_id"})
               .set_display_name("")
               .set_backing_type(type_factory.get_int64())),
       StatusIs(absl::StatusCode::kInternal, HasSubstr("display_name")));
@@ -537,7 +526,7 @@ TEST(DeclarativeTypeTest, DescriptorValidation) {
       type_factory.MakeDeclarativeType(
           DeclarativeTypeDescriptor()
               .set_type_id(TypeId{
-                  .name_space = "NS", .local_id = "local_id", .counter = 0})
+                  .name_space = "NS", .local_id = "local_id", .version_id = ""})
               .set_display_name("t1")
               .set_backing_type(nullptr)),
       StatusIs(absl::StatusCode::kInternal, HasSubstr("backing_type")));
@@ -618,20 +607,20 @@ TEST(DeclarativeTypeTest, ValidationOfRequiredFieldsUponDeserialization) {
   }
 }
 
-TEST(DeclarativeTypeTest, DeclarativeTypeCounterCannotBeSetForBuiltinTypes) {
+TEST(DeclarativeTypeTest, DeclarativeTypeVersionIdCannotBeSetForBuiltinTypes) {
   TypeFactory type_factory;
 
   auto descriptor =
       DeclarativeTypeDescriptor()
-          .set_type_id({std::string(TypeId::kGoogleSqlNamespace), "BT", 1})
+          .set_type_id({std::string(TypeId::kGoogleSqlNamespace), "BT", "v1"})
           .set_display_name("builtin_type")
           .set_backing_type(types::Int32Type());
 
   EXPECT_THAT(type_factory.MakeDeclarativeType(descriptor),
-              StatusIs(absl::StatusCode::kInternal, HasSubstr("counter")));
+              StatusIs(absl::StatusCode::kInternal, HasSubstr("version_id")));
 
-  // Use a proper descriptor with a counter set to 0 to generate a valid proto.
-  descriptor.set_type_id({std::string(TypeId::kGoogleSqlNamespace), "BT", 0});
+  // Use a proper descriptor with an empty version_id to generate a valid proto.
+  descriptor.set_type_id({std::string(TypeId::kGoogleSqlNamespace), "BT", ""});
   GOOGLESQL_ASSERT_OK_AND_ASSIGN(const Type* declarative_type,
                        type_factory.MakeDeclarativeType(descriptor));
   TypeProto type_proto;
@@ -639,11 +628,12 @@ TEST(DeclarativeTypeTest, DeclarativeTypeCounterCannotBeSetForBuiltinTypes) {
   GOOGLESQL_ASSERT_OK(declarative_type->SerializeToProtoAndDistinctFileDescriptors(
       &type_proto, &file_descriptor_set_map));
 
-  type_proto.mutable_declarative_type()->mutable_type_id()->set_counter(1);
+  type_proto.mutable_declarative_type()->mutable_type_id()->set_version_id(
+      "v1");
 
   TypeDeserializer deserializer(&type_factory);
   EXPECT_THAT(deserializer.Deserialize(type_proto),
-              StatusIs(absl::StatusCode::kInternal, HasSubstr("counter")));
+              StatusIs(absl::StatusCode::kInternal, HasSubstr("version_id")));
 }
 
 TEST(DeclarativeTypeTest,

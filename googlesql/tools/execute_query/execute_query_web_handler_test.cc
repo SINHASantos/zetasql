@@ -51,20 +51,24 @@ namespace {
 
 class FakeQueryWebTemplates : public QueryWebTemplates {
  public:
-  FakeQueryWebTemplates(std::string contents, std::string css, std::string body)
+  FakeQueryWebTemplates(std::string contents, std::string css, std::string body,
+                        std::string inline_js = "")
       : contents_(std::move(contents)),
         css_(std::move(css)),
-        body_(std::move(body)) {}
+        body_(std::move(body)),
+        inline_js_(std::move(inline_js)) {}
   ~FakeQueryWebTemplates() override = default;
 
   const std::string& GetWebPageContents() const override { return contents_; }
   const std::string& GetWebPageCSS() const override { return css_; }
   const std::string& GetWebPageBody() const override { return body_; }
+  const std::string& GetInlineJS() const override { return inline_js_; }
 
  private:
   std::string contents_;
   std::string css_;
   std::string body_;
+  std::string inline_js_;
 };
 
 bool HandleRequest(const ExecuteQueryWebRequest& request,
@@ -428,32 +432,40 @@ TEST(ExecuteQueryWebHandlerTest, TestFlagDefaults) {
       .enabled_ast_rewrites = none_rewrites.options};
   absl::SetFlag(&FLAGS_enabled_ast_rewrites, enabled_ast_rewrites);
 
+  absl::SetFlag(&FLAGS_linear_resolved_ast, true);
+
   std::string result;
-  EXPECT_TRUE(
-      HandleRequest(ExecuteQueryWebRequest(
-                        /*str_modes=*/{""}, ExecuteQueryConfig::SqlMode::kQuery,
-                        SQLBuilder::TargetSyntaxMode::kStandard, /*query=*/"",
-                        /*catalog=*/"", /*enabled_language_features=*/"",
-                        /*enabled_language_features_text=*/"",
-                        /*enabled_ast_rewrites=*/"",
-                        /*enabled_ast_rewrites_text=*/""),
-                    FakeQueryWebTemplates("{{> body}}", "",
-                                          "Catalog: "
-                                          "{{#catalogs}}"
-                                          "{{name}}-{{selected}} "
-                                          "{{/catalogs}}\n"
-                                          "Features: "
-                                          "{{#language_features}}"
-                                          "{{name}}-{{selected}} "
-                                          "{{/language_features}}\n"
-                                          "Rewrites: "
-                                          "{{#ast_rewrites}}"
-                                          "{{name}}-{{selected}} "
-                                          "{{/ast_rewrites}}"),
-                    result));
+  EXPECT_TRUE(HandleRequest(
+      ExecuteQueryWebRequest(
+          /*str_modes=*/{""}, ExecuteQueryConfig::SqlMode::kQuery,
+          SQLBuilder::TargetSyntaxMode::kStandard, /*query=*/"",
+          /*catalog=*/"", /*enabled_language_features=*/"",
+          /*enabled_language_features_text=*/"",
+          /*enabled_ast_rewrites=*/"",
+          /*enabled_ast_rewrites_text=*/""),
+      FakeQueryWebTemplates("{{> body}}", "",
+                            "Catalog: "
+                            "{{#catalogs}}"
+                            "{{name}}-{{selected}} "
+                            "{{/catalogs}}\n"
+                            "Features: "
+                            "{{#language_features}}"
+                            "{{name}}-{{selected}} "
+                            "{{/language_features}}\n"
+                            "Rewrites: "
+                            "{{#ast_rewrites}}"
+                            "{{name}}-{{selected}} "
+                            "{{/ast_rewrites}}\n"
+                            "RenderMode: "
+                            "{{#resolved_ast_render_mode_linear}}linear{{/"
+                            "resolved_ast_render_mode_linear}}"
+                            "{{#resolved_ast_render_mode_tree}}tree{{/"
+                            "resolved_ast_render_mode_tree}}"),
+      result));
   EXPECT_THAT(result, ContainsRegex("Catalog:.* sample-selected"));
   EXPECT_THAT(result, ContainsRegex("Features:.* DEV-selected "));
   EXPECT_THAT(result, ContainsRegex("Rewrites:.* NONE-selected "));
+  EXPECT_THAT(result, ContainsRegex("RenderMode: linear"));
 }
 
 TEST(ExecuteQueryWebHandlerTest, TestRequestOverrides) {
@@ -473,6 +485,7 @@ TEST(ExecuteQueryWebHandlerTest, TestRequestOverrides) {
   internal::EnabledAstRewrites enabled_ast_rewrites = {
       .enabled_ast_rewrites = all_minus_dev_rewrites.options};
   absl::SetFlag(&FLAGS_enabled_ast_rewrites, enabled_ast_rewrites);
+  absl::SetFlag(&FLAGS_linear_resolved_ast, true);
 
   std::string result;
   EXPECT_TRUE(HandleRequest(
@@ -480,7 +493,8 @@ TEST(ExecuteQueryWebHandlerTest, TestRequestOverrides) {
           /*str_modes=*/{""}, ExecuteQueryConfig::SqlMode::kQuery,
           SQLBuilder::TargetSyntaxMode::kStandard, /*query=*/"",
           /*catalog=*/"none", /*enabled_language_features=*/"MAXIMUM", "",
-          /*enabled_ast_rewrites=*/"ALL_MINUS_DEV", ""),
+          /*enabled_ast_rewrites=*/"ALL_MINUS_DEV", "",
+          /*resolved_ast_render_mode=*/"tree"),
       FakeQueryWebTemplates("{{> body}}", "",
                             "Catalog: "
                             "{{#catalogs}}"
@@ -493,11 +507,17 @@ TEST(ExecuteQueryWebHandlerTest, TestRequestOverrides) {
                             "Rewrites: "
                             "{{#ast_rewrites}}"
                             "{{name}}-{{selected}} "
-                            "{{/ast_rewrites}}"),
+                            "{{/ast_rewrites}}\n"
+                            "RenderMode: "
+                            "{{#resolved_ast_render_mode_linear}}linear{{/"
+                            "resolved_ast_render_mode_linear}}"
+                            "{{#resolved_ast_render_mode_tree}}tree{{/"
+                            "resolved_ast_render_mode_tree}}"),
       result));
   EXPECT_THAT(result, ContainsRegex("Catalog:.* none-selected .*"));
   EXPECT_THAT(result, ContainsRegex("Features:.* MAXIMUM-selected .*"));
   EXPECT_THAT(result, ContainsRegex("Rewrites:.* ALL_MINUS_DEV-selected "));
+  EXPECT_THAT(result, ContainsRegex("RenderMode: tree"));
 }
 
 TEST(ExecuteQueryWebHandlerTest, TestEnabledLanguageFeaturesTextAddsFeature) {
@@ -599,18 +619,17 @@ TEST(ExecuteQueryWebHandlerTest, TestEnabledAstRewritesTextAddSubtract) {
       ExecuteQueryWebRequest({"analyze"}, ExecuteQueryConfig::SqlMode::kQuery,
                              SQLBuilder::TargetSyntaxMode::kStandard, query,
                              "none", "MAXIMUM", "", "NONE", "+FLATTEN"),
-      FakeQueryWebTemplates(
-          "{{> body}}", "",
-          "{{#statements}}"
-          "{{#has_rewrites}}"
-          "rewrites applied: "
-          "final={{final_rewriter_name}}:{{{result_analyzed_final}}}"
-          "{{#result_analyzed_rewrites}}{{rewriter_name}}:{{{ast}}}{{/"
-          "result_analyzed_rewrites}}"
-          "{{/has_rewrites}}"
-          "{{/statements}}"),
+      FakeQueryWebTemplates("{{> body}}", "",
+                            "{{#statements}}"
+                            "{{#has_rewrites}}"
+                            "rewrites applied: "
+                            "{{#result_analyzed_rewrites}}{{step_index}}={{"
+                            "rewriter_name}}:{{{ast}}}{{/"
+                            "result_analyzed_rewrites}}"
+                            "{{/has_rewrites}}"
+                            "{{/statements}}"),
       result));
-  EXPECT_THAT(result, HasSubstr("rewrites applied: final=FlattenRewriter:"));
+  EXPECT_THAT(result, HasSubstr("1=FlattenRewriter:"));
   EXPECT_THAT(result, Not(HasSubstr(expected_text_without_rewrite)));
 
   EXPECT_TRUE(HandleRequest(
@@ -629,6 +648,22 @@ TEST(ExecuteQueryWebHandlerTest, TestEnabledAstRewritesTextAddSubtract) {
       result));
   EXPECT_THAT(result, Not(HasSubstr("rewrites applied!")));
   EXPECT_THAT(result, HasSubstr(expected_text_without_rewrite));
+}
+
+TEST(ExecuteQueryWebHandlerTest, TestAstRewritesDefaultTemplateMarkup) {
+  std::string result;
+  std::string query =
+      "SELECT FLATTEN(a1.a2) FROM (SELECT ARRAY<STRUCT<a2 "
+      "ARRAY<INT64>>>[STRUCT([1]), STRUCT([1])] AS a1)";
+  EXPECT_TRUE(HandleRequest(
+      ExecuteQueryWebRequest({"analyze"}, ExecuteQueryConfig::SqlMode::kQuery,
+                             SQLBuilder::TargetSyntaxMode::kStandard, query,
+                             "none", "MAXIMUM", "", "NONE", "+FLATTEN"),
+      QueryWebTemplates::Default(), result));
+  EXPECT_THAT(result, HasSubstr("data-step=\"0\""));
+  EXPECT_THAT(result, HasSubstr("data-step=\"1\""));
+  EXPECT_THAT(result, HasSubstr("rewrite-step-item"));
+  EXPECT_THAT(result, HasSubstr("rewrite-ast-panel"));
 }
 
 TEST(ExecuteQueryWebHandlerTest, TestEnabledAstRewritesTextError) {

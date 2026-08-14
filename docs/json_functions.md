@@ -9110,6 +9110,9 @@ RETURN TO_JSON(p) AS dana_json;</pre>
   </tbody>
 </table>
 
+ Note: `MAP` type doesn't have a JSON encoding, so it's
+not supported in any of the conversion functions. 
+
 ### JSONPath format 
 <a id="JSONPath_format"></a>
 

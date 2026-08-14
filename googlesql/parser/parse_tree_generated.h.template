@@ -39,9 +39,10 @@ namespace googlesql {
  # endif
 class {{node.name}} {{node.class_final}}: public {{node.parent}} {
  public:
- # if node.is_abstract
+ # if node.is_abstract or node.allow_non_final_concrete_class_for_legacy_migration
   explicit {{node.name}}(ASTNodeKind kind) : {{node.parent}}(kind) {}
- # else
+ # endif
+ # if not node.is_abstract
   static constexpr ASTNodeKind kConcreteNodeKind = {{node.node_kind}};
 {{blank_line}}
   {{node.name}}() : {{node.parent}}(kConcreteNodeKind) {}
@@ -158,7 +159,7 @@ class {{node.name}} {{node.class_final}}: public {{node.parent}} {
 {{blank_line}}
  private:
   # if node.gen_init_fields
-  absl::Status InitFields() final {
+  absl::Status InitFields() {% if node.allow_non_final_concrete_class_for_legacy_migration %}override{% else %}final{% endif %} {
     FieldLoader fl(this);
    # for field in node.init_fields
     # if field.field_loader == 'REQUIRED'

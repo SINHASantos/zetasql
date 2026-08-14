@@ -2676,7 +2676,7 @@ QueryStmt
                   | +-subquery=
                   | | +-TVFScan
                   | |   +-column_list=tvf_exactly_1_int64_arg.[column_bool#11, column_bytes#12]
-                  | |   +-tvf=tvf_exactly_1_int64_arg((INT64) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+                  | |   +-tvf=tvf_exactly_1_int64_arg
                   | |   +-signature=(INT64) -> TABLE<column_bool BOOL, column_bytes BYTES>
                   | |   +-argument_list=
                   | |   | +-FunctionArgument
@@ -2817,7 +2817,7 @@ QueryStmt
                   | +-subquery=
                   | | +-TVFScan
                   | |   +-column_list=tvf_exactly_1_int64_arg.[column_bool#11, column_bytes#12]
-                  | |   +-tvf=tvf_exactly_1_int64_arg((INT64) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+                  | |   +-tvf=tvf_exactly_1_int64_arg
                   | |   +-signature=(INT64) -> TABLE<column_bool BOOL, column_bytes BYTES>
                   | |   +-argument_list=
                   | |   | +-FunctionArgument
@@ -2893,7 +2893,7 @@ QueryStmt
                   | +-subquery=
                   | | +-TVFScan
                   | |   +-column_list=tvf_exactly_1_int64_arg.[column_bool#2, column_bytes#3]
-                  | |   +-tvf=tvf_exactly_1_int64_arg((INT64) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+                  | |   +-tvf=tvf_exactly_1_int64_arg
                   | |   +-signature=(INT64) -> TABLE<column_bool BOOL, column_bytes BYTES>
                   | |   +-argument_list=
                   | |   | +-FunctionArgument
@@ -2949,7 +2949,7 @@ QueryStmt
                   | +-subquery=
                   | | +-TVFScan
                   | |   +-column_list=tvf_exactly_1_int64_arg.[column_bool#2, column_bytes#3]
-                  | |   +-tvf=tvf_exactly_1_int64_arg((INT64) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+                  | |   +-tvf=tvf_exactly_1_int64_arg
                   | |   +-signature=(INT64) -> TABLE<column_bool BOOL, column_bytes BYTES>
                   | |   +-argument_list=
                   | |   | +-FunctionArgument
@@ -3011,7 +3011,7 @@ QueryStmt
                   | +-subquery=
                   | | +-TVFScan
                   | |   +-column_list=tvf_exactly_1_int64_arg.[column_bool#2, column_bytes#3]
-                  | |   +-tvf=tvf_exactly_1_int64_arg((INT64) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+                  | |   +-tvf=tvf_exactly_1_int64_arg
                   | |   +-signature=(INT64) -> TABLE<column_bool BOOL, column_bytes BYTES>
                   | |   +-argument_list=
                   | |   | +-FunctionArgument
@@ -3063,7 +3063,7 @@ QueryStmt
                   | +-subquery=
                   | | +-TVFScan
                   | |   +-column_list=tvf_exactly_1_int64_arg.[column_bool#2, column_bytes#3]
-                  | |   +-tvf=tvf_exactly_1_int64_arg((INT64) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+                  | |   +-tvf=tvf_exactly_1_int64_arg
                   | |   +-signature=(INT64) -> TABLE<column_bool BOOL, column_bytes BYTES>
                   | |   +-argument_list=
                   | |   | +-FunctionArgument
@@ -3251,7 +3251,7 @@ QueryStmt
     |             |             | +-subquery=
     |             |             | | +-TVFScan
     |             |             | |   +-column_list=tvf_exactly_1_int64_arg.[column_bool#3, column_bytes#4]
-    |             |             | |   +-tvf=tvf_exactly_1_int64_arg((INT64) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+    |             |             | |   +-tvf=tvf_exactly_1_int64_arg
     |             |             | |   +-signature=(INT64) -> TABLE<column_bool BOOL, column_bytes BYTES>
     |             |             | |   +-argument_list=
     |             |             | |   | +-FunctionArgument
@@ -3344,7 +3344,7 @@ QueryStmt
     |             |             | +-subquery=
     |             |             | | +-TVFScan
     |             |             | |   +-column_list=tvf_exactly_1_int64_arg.[column_bool#3, column_bytes#4]
-    |             |             | |   +-tvf=tvf_exactly_1_int64_arg((INT64) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+    |             |             | |   +-tvf=tvf_exactly_1_int64_arg
     |             |             | |   +-signature=(INT64) -> TABLE<column_bool BOOL, column_bytes BYTES>
     |             |             | |   +-argument_list=
     |             |             | |   | +-FunctionArgument
@@ -3459,7 +3459,7 @@ QueryStmt
                   | |             | +-subquery=
                   | |             | | +-TVFScan
                   | |             | |   +-column_list=tvf_exactly_1_int64_arg.[column_bool#3, column_bytes#4]
-                  | |             | |   +-tvf=tvf_exactly_1_int64_arg((INT64) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+                  | |             | |   +-tvf=tvf_exactly_1_int64_arg
                   | |             | |   +-signature=(INT64) -> TABLE<column_bool BOOL, column_bytes BYTES>
                   | |             | |   +-argument_list=
                   | |             | |   | +-FunctionArgument
@@ -3562,7 +3562,7 @@ QueryStmt
                   | |             | +-subquery=
                   | |             | | +-TVFScan
                   | |             | |   +-column_list=tvf_exactly_1_int64_arg.[column_bool#3, column_bytes#4]
-                  | |             | |   +-tvf=tvf_exactly_1_int64_arg((INT64) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+                  | |             | |   +-tvf=tvf_exactly_1_int64_arg
                   | |             | |   +-signature=(INT64) -> TABLE<column_bool BOOL, column_bytes BYTES>
                   | |             | |   +-argument_list=
                   | |             | |   | +-FunctionArgument
@@ -3638,7 +3638,7 @@ QueryStmt
                   | +-subquery=
                   | | +-TVFScan
                   | |   +-column_list=tvf_exactly_1_int64_arg.[column_bool#2, column_bytes#3]
-                  | |   +-tvf=tvf_exactly_1_int64_arg((INT64) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+                  | |   +-tvf=tvf_exactly_1_int64_arg
                   | |   +-signature=(literal INT64) -> TABLE<column_bool BOOL, column_bytes BYTES>
                   | |   +-argument_list=
                   | |   | +-FunctionArgument
@@ -3686,7 +3686,7 @@ QueryStmt
                   | +-subquery=
                   | | +-TVFScan
                   | |   +-column_list=tvf_exactly_1_int64_arg.[column_bool#2, column_bytes#3]
-                  | |   +-tvf=tvf_exactly_1_int64_arg((INT64) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+                  | |   +-tvf=tvf_exactly_1_int64_arg
                   | |   +-signature=(literal INT64) -> TABLE<column_bool BOOL, column_bytes BYTES>
                   | |   +-argument_list=
                   | |   | +-FunctionArgument
@@ -3743,7 +3743,7 @@ QueryStmt
                   | +-subquery=
                   | | +-TVFScan
                   | |   +-column_list=tvf_exactly_1_int64_arg.[column_bool#1, column_bytes#2]
-                  | |   +-tvf=tvf_exactly_1_int64_arg((INT64) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+                  | |   +-tvf=tvf_exactly_1_int64_arg
                   | |   +-signature=(literal INT64) -> TABLE<column_bool BOOL, column_bytes BYTES>
                   | |   +-argument_list=
                   | |   | +-FunctionArgument
@@ -3804,7 +3804,7 @@ DeleteStmt
                       | +-subquery=
                       | | +-TVFScan
                       | |   +-column_list=tvf_exactly_1_int64_arg.[column_bool#3, column_bytes#4]
-                      | |   +-tvf=tvf_exactly_1_int64_arg((INT64) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+                      | |   +-tvf=tvf_exactly_1_int64_arg
                       | |   +-signature=(INT64) -> TABLE<column_bool BOOL, column_bytes BYTES>
                       | |   +-argument_list=
                       | |   | +-FunctionArgument
@@ -4361,7 +4361,7 @@ QueryStmt
                   | +-subquery=
                   | | +-TVFScan
                   | |   +-column_list=tvf_graph.[column_bool#1, column_bytes#2]
-                  | |   +-tvf=tvf_graph((ANY GRAPH) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+                  | |   +-tvf=tvf_graph
                   | |   +-signature=(ANY GRAPH) -> TABLE<column_bool BOOL, column_bytes BYTES>
                   | |   +-argument_list=
                   | |   | +-FunctionArgument(graph=aml)
@@ -4474,7 +4474,7 @@ QueryStmt
                 |                   | +-subquery=
                 |                   | | +-TVFScan
                 |                   | |   +-column_list=tvf_graph.[column_bool#1, column_bytes#2]
-                |                   | |   +-tvf=tvf_graph((ANY GRAPH) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+                |                   | |   +-tvf=tvf_graph
                 |                   | |   +-signature=(ANY GRAPH) -> TABLE<column_bool BOOL, column_bytes BYTES>
                 |                   | |   +-argument_list=
                 |                   | |   | +-FunctionArgument(graph=aml)
@@ -4537,7 +4537,7 @@ QueryStmt
                 |                   | +-subquery=
                 |                   | | +-TVFScan
                 |                   | |   +-column_list=tvf_graph.[column_bool#1, column_bytes#2]
-                |                   | |   +-tvf=tvf_graph((ANY GRAPH) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+                |                   | |   +-tvf=tvf_graph
                 |                   | |   +-signature=(ANY GRAPH) -> TABLE<column_bool BOOL, column_bytes BYTES>
                 |                   | |   +-argument_list=
                 |                   | |   | +-FunctionArgument(graph=aml)
@@ -4600,7 +4600,7 @@ QueryStmt
                 |                   | +-subquery=
                 |                   | | +-TVFScan
                 |                   | |   +-column_list=tvf_graph.[column_bool#1, column_bytes#2]
-                |                   | |   +-tvf=tvf_graph((ANY GRAPH) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+                |                   | |   +-tvf=tvf_graph
                 |                   | |   +-signature=(ANY GRAPH) -> TABLE<column_bool BOOL, column_bytes BYTES>
                 |                   | |   +-argument_list=
                 |                   | |   | +-FunctionArgument(graph=aml)
@@ -4670,7 +4670,7 @@ QueryStmt
                           | +-subquery=
                           | | +-TVFScan
                           | |   +-column_list=tvf_graph.[column_bool#2, column_bytes#3]
-                          | |   +-tvf=tvf_graph((ANY GRAPH) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+                          | |   +-tvf=tvf_graph
                           | |   +-signature=(ANY GRAPH) -> TABLE<column_bool BOOL, column_bytes BYTES>
                           | |   +-argument_list=
                           | |   | +-FunctionArgument(graph=aml)
@@ -4730,7 +4730,7 @@ QueryStmt
             | | |     | +-subquery=
             | | |     | | +-TVFScan
             | | |     | |   +-column_list=tvf_graph.[column_bool#1, column_bytes#2]
-            | | |     | |   +-tvf=tvf_graph((ANY GRAPH) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+            | | |     | |   +-tvf=tvf_graph
             | | |     | |   +-signature=(ANY GRAPH) -> TABLE<column_bool BOOL, column_bytes BYTES>
             | | |     | |   +-argument_list=
             | | |     | |   | +-FunctionArgument(graph=aml)
@@ -4787,7 +4787,7 @@ QueryStmt
             | | |     | +-subquery=
             | | |     | | +-TVFScan
             | | |     | |   +-column_list=tvf_graph.[column_bool#1, column_bytes#2]
-            | | |     | |   +-tvf=tvf_graph((ANY GRAPH) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+            | | |     | |   +-tvf=tvf_graph
             | | |     | |   +-signature=(ANY GRAPH) -> TABLE<column_bool BOOL, column_bytes BYTES>
             | | |     | |   +-argument_list=
             | | |     | |   | +-FunctionArgument(graph=aml)
@@ -4813,7 +4813,7 @@ QueryStmt
             |   |     | +-subquery=
             |   |     | | +-TVFScan
             |   |     | |   +-column_list=tvf_graph.[column_bool#4, column_bytes#5]
-            |   |     | |   +-tvf=tvf_graph((ANY GRAPH) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+            |   |     | |   +-tvf=tvf_graph
             |   |     | |   +-signature=(ANY GRAPH) -> TABLE<column_bool BOOL, column_bytes BYTES>
             |   |     | |   +-argument_list=
             |   |     | |   | +-FunctionArgument(graph=aml)
@@ -4858,7 +4858,7 @@ QueryStmt
             | | |     | +-subquery=
             | | |     | | +-TVFScan
             | | |     | |   +-column_list=tvf_graph.[column_bool#1, column_bytes#2]
-            | | |     | |   +-tvf=tvf_graph((ANY GRAPH) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+            | | |     | |   +-tvf=tvf_graph
             | | |     | |   +-signature=(ANY GRAPH) -> TABLE<column_bool BOOL, column_bytes BYTES>
             | | |     | |   +-argument_list=
             | | |     | |   | +-FunctionArgument(graph=aml)
@@ -4915,7 +4915,7 @@ QueryStmt
             | | |     | +-subquery=
             | | |     | | +-TVFScan
             | | |     | |   +-column_list=tvf_graph.[column_bool#1, column_bytes#2]
-            | | |     | |   +-tvf=tvf_graph((ANY GRAPH) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+            | | |     | |   +-tvf=tvf_graph
             | | |     | |   +-signature=(ANY GRAPH) -> TABLE<column_bool BOOL, column_bytes BYTES>
             | | |     | |   +-argument_list=
             | | |     | |   | +-FunctionArgument(graph=aml)
@@ -4941,7 +4941,7 @@ QueryStmt
             |   |     | +-subquery=
             |   |     | | +-TVFScan
             |   |     | |   +-column_list=tvf_graph.[column_bool#4, column_bytes#5]
-            |   |     | |   +-tvf=tvf_graph((ANY GRAPH) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+            |   |     | |   +-tvf=tvf_graph
             |   |     | |   +-signature=(ANY GRAPH) -> TABLE<column_bool BOOL, column_bytes BYTES>
             |   |     | |   +-argument_list=
             |   |     | |   | +-FunctionArgument(graph=aml)
@@ -4987,7 +4987,7 @@ QueryStmt
             | | |     | +-subquery=
             | | |     | | +-TVFScan
             | | |     | |   +-column_list=tvf_graph.[column_bool#1, column_bytes#2]
-            | | |     | |   +-tvf=tvf_graph((ANY GRAPH) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+            | | |     | |   +-tvf=tvf_graph
             | | |     | |   +-signature=(ANY GRAPH) -> TABLE<column_bool BOOL, column_bytes BYTES>
             | | |     | |   +-argument_list=
             | | |     | |   | +-FunctionArgument(graph=aml)
@@ -5044,7 +5044,7 @@ QueryStmt
             | | |     | +-subquery=
             | | |     | | +-TVFScan
             | | |     | |   +-column_list=tvf_graph.[column_bool#1, column_bytes#2]
-            | | |     | |   +-tvf=tvf_graph((ANY GRAPH) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+            | | |     | |   +-tvf=tvf_graph
             | | |     | |   +-signature=(ANY GRAPH) -> TABLE<column_bool BOOL, column_bytes BYTES>
             | | |     | |   +-argument_list=
             | | |     | |   | +-FunctionArgument(graph=aml)
@@ -5070,7 +5070,7 @@ QueryStmt
             |   |     | +-subquery=
             |   |     | | +-TVFScan
             |   |     | |   +-column_list=tvf_graph.[column_bool#4, column_bytes#5]
-            |   |     | |   +-tvf=tvf_graph((ANY GRAPH) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+            |   |     | |   +-tvf=tvf_graph
             |   |     | |   +-signature=(ANY GRAPH) -> TABLE<column_bool BOOL, column_bytes BYTES>
             |   |     | |   +-argument_list=
             |   |     | |   | +-FunctionArgument(graph=aml)
@@ -5121,7 +5121,7 @@ QueryStmt
         |             | +-subquery=
         |             | | +-TVFScan
         |             | |   +-column_list=tvf_graph.[column_bool#1, column_bytes#2]
-        |             | |   +-tvf=tvf_graph((ANY GRAPH) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+        |             | |   +-tvf=tvf_graph
         |             | |   +-signature=(ANY GRAPH) -> TABLE<column_bool BOOL, column_bytes BYTES>
         |             | |   +-argument_list=
         |             | |   | +-FunctionArgument(graph=aml)
@@ -5152,7 +5152,7 @@ QueryStmt
                       | +-subquery=
                       | | +-TVFScan
                       | |   +-column_list=tvf_graph.[column_bool#4, column_bytes#5]
-                      | |   +-tvf=tvf_graph((ANY GRAPH) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+                      | |   +-tvf=tvf_graph
                       | |   +-signature=(ANY GRAPH) -> TABLE<column_bool BOOL, column_bytes BYTES>
                       | |   +-argument_list=
                       | |   | +-FunctionArgument(graph=aml)
@@ -5226,7 +5226,7 @@ QueryStmt
               | |             | +-subquery=
               | |             | | +-TVFScan
               | |             | |   +-column_list=tvf_graph.[column_bool#1, column_bytes#2]
-              | |             | |   +-tvf=tvf_graph((ANY GRAPH) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+              | |             | |   +-tvf=tvf_graph
               | |             | |   +-signature=(ANY GRAPH) -> TABLE<column_bool BOOL, column_bytes BYTES>
               | |             | |   +-argument_list=
               | |             | |   | +-FunctionArgument(graph=aml)
@@ -5286,7 +5286,7 @@ QueryStmt
               | +-subquery=
               | | +-TVFScan
               | |   +-column_list=tvf_graph_with_named_arg.[column_bool#1, column_bytes#2]
-              | |   +-tvf=tvf_graph_with_named_arg((ANY GRAPH, STRING name) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+              | |   +-tvf=tvf_graph_with_named_arg
               | |   +-signature=(ANY GRAPH, literal STRING) -> TABLE<column_bool BOOL, column_bytes BYTES>
               | |   +-argument_list=
               | |   | +-FunctionArgument(graph=aml)

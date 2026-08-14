@@ -136,6 +136,7 @@ QueryStmt
     |     +-Literal(type=STRING, value=NULL)
     +-input_scan=
       +-SingleRowScan
+
 [UNDECLARED_PARAMETERS]
 ==
 
@@ -162,6 +163,7 @@ QueryStmt
         +-array_expr_list=
         | +-Literal(type=ARRAY<INT64>, value=[1])
         +-element_column_list=[$array.x#1]
+
 [UNDECLARED_PARAMETERS]
 param: STRING
 ==
@@ -184,6 +186,7 @@ QueryStmt
     |     +-Parameter(parse_location=17-18, type=STRING, position=2)
     +-input_scan=
       +-SingleRowScan
+
 [UNDECLARED_PARAMETERS]
 STRING
 STRING
@@ -206,6 +209,7 @@ QueryStmt
     |     +-Literal(type=BYTES, value=b"b")
     +-input_scan=
       +-SingleRowScan
+
 [UNDECLARED_PARAMETERS]
 param: BYTES
 ==
@@ -228,6 +232,7 @@ QueryStmt
     |     +-Literal(type=BYTES, value=b"b")
     +-input_scan=
       +-SingleRowScan
+
 [UNDECLARED_PARAMETERS]
 BYTES
 ==

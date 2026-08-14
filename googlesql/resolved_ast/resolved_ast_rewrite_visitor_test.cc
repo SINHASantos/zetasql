@@ -17,6 +17,7 @@
 #include "googlesql/resolved_ast/resolved_ast_rewrite_visitor.h"
 
 #include <memory>
+#include <optional>
 #include <string>
 #include <utility>
 #include <vector>
@@ -32,10 +33,13 @@
 #include "googlesql/public/options.pb.h"
 #include "googlesql/public/simple_catalog.h"
 #include "googlesql/public/type.h"
+#include "googlesql/public/types/annotation.h"
+#include "googlesql/public/types/simple_value.h"
 #include "googlesql/public/value.h"
 #include "googlesql/resolved_ast/resolved_ast.h"
 #include "googlesql/resolved_ast/resolved_ast_builder.h"
 #include "googlesql/resolved_ast/resolved_ast_deep_copy_visitor.h"
+#include "googlesql/resolved_ast/resolved_ast_visitor.h"
 #include "googlesql/resolved_ast/resolved_column.h"
 #include "googlesql/resolved_ast/resolved_node.h"
 #include "gmock/gmock.h"
@@ -486,6 +490,283 @@ TEST_F(ResolvedASTRewriteVisitorTest, TestVisitOrder) {
   EXPECT_THAT(visitor.hint_stack_, testing::IsEmpty());
   EXPECT_THAT(visitor.full_hint_stack_,
               testing::ElementsAre("A", "B", "C", "D"));
+}
+
+// Extraction visitor that finds a ResolvedExpr and captures its
+// type_annotation_map during traversal.
+class AnnotationExtractorVisitor : public ResolvedASTVisitor {
+ public:
+  const AnnotationMap* type_annotation_map() const {
+    return type_annotation_map_;
+  }
+
+ private:
+  absl::Status DefaultVisit(const ResolvedNode* node) override {
+    if (node->Is<ResolvedExpr>()) {
+      const ResolvedExpr* expr = node->GetAs<ResolvedExpr>();
+      if (expr->type_annotation_map() != nullptr) {
+        type_annotation_map_ = expr->type_annotation_map();
+      }
+    }
+    return ResolvedASTVisitor::DefaultVisit(node);
+  }
+
+  const AnnotationMap* type_annotation_map_ = nullptr;
+};
+
+// Verifies that a default identity copy visitor preserves the collation
+// annotation map on ResolvedExpr nodes (such as literals).
+TEST_F(ResolvedASTRewriteVisitorTest, PreservesCollationAnnotation) {
+  options_.mutable_language()->EnableLanguageFeature(
+      FEATURE_ANNOTATION_FRAMEWORK);
+  options_.mutable_language()->EnableLanguageFeature(FEATURE_COLLATION_SUPPORT);
+  const std::string input_sql = "SELECT COLLATE('test_string', 'und:ci')";
+
+  SimpleCatalog local_catalog("Local", nullptr);
+  local_catalog.AddBuiltinFunctions(
+      BuiltinFunctionOptions(options_.language()));
+
+  std::unique_ptr<const AnalyzerOutput> analyzed;
+  GOOGLESQL_ASSERT_OK(AnalyzeStatement(input_sql, options_, &local_catalog,
+                             &type_factory_, &analyzed));
+
+  AnnotationExtractorVisitor original_extractor;
+  GOOGLESQL_ASSERT_OK(analyzed->resolved_statement()->Accept(&original_extractor));
+  ASSERT_NE(original_extractor.type_annotation_map(), nullptr);
+
+  ResolvedASTRewriteVisitor identity_visitor;
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(
+      std::unique_ptr<ResolvedNode> deep_copy,
+      ResolvedASTDeepCopyVisitor::Copy(analyzed->resolved_statement()));
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(
+      std::unique_ptr<const ResolvedNode> rewritten_copy,
+      identity_visitor.VisitAll<ResolvedNode>(std::move(deep_copy)));
+
+  AnnotationExtractorVisitor copy_extractor;
+  GOOGLESQL_ASSERT_OK(rewritten_copy->Accept(&copy_extractor));
+  ASSERT_NE(copy_extractor.type_annotation_map(), nullptr);
+  EXPECT_TRUE(copy_extractor.type_annotation_map()->Equals(
+      *original_extractor.type_annotation_map()));
+}
+
+// Visitor that overrides PostVisitAnnotatedType to modify the type annotation
+// map on all string types.
+class CollationRewriterVisitor : public ResolvedASTRewriteVisitor {
+ public:
+  explicit CollationRewriterVisitor(const AnnotationMap* target_annotation)
+      : target_annotation_(target_annotation) {}
+
+ private:
+  absl::StatusOr<AnnotatedType> PostVisitAnnotatedType(
+      const Type* type,
+      std::optional<const AnnotationMap*> annotation_map) override {
+    if (type->IsString() && annotation_map.has_value()) {
+      return AnnotatedType(type, target_annotation_);
+    }
+    return AnnotatedType(type, annotation_map.value_or(nullptr));
+  }
+
+  const AnnotationMap* target_annotation_;
+};
+
+// Verifies that custom visitors can override PostVisitAnnotatedType to inject
+// or modify type annotation maps.
+TEST_F(ResolvedASTRewriteVisitorTest, RewritesCollationAnnotation) {
+  options_.mutable_language()->EnableLanguageFeature(
+      FEATURE_ANNOTATION_FRAMEWORK);
+  options_.mutable_language()->EnableLanguageFeature(FEATURE_COLLATION_SUPPORT);
+  const std::string input_sql = "SELECT 'test_string'";
+  std::unique_ptr<const AnalyzerOutput> analyzed;
+  GOOGLESQL_ASSERT_OK(AnalyzeStatement(input_sql, options_, &catalog_, &type_factory_,
+                             &analyzed));
+
+  std::unique_ptr<AnnotationMap> target_annotation =
+      AnnotationMap::Create(types::StringType());
+  target_annotation->SetAnnotation(static_cast<int>(AnnotationKind::kCollation),
+                                   SimpleValue::String("und:ci"));
+
+  CollationRewriterVisitor visitor(target_annotation.get());
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(
+      std::unique_ptr<ResolvedNode> deep_copy,
+      ResolvedASTDeepCopyVisitor::Copy(analyzed->resolved_statement()));
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(std::unique_ptr<const ResolvedNode> rewritten_copy,
+                       visitor.VisitAll<ResolvedNode>(std::move(deep_copy)));
+
+  AnnotationExtractorVisitor copy_extractor;
+  GOOGLESQL_ASSERT_OK(rewritten_copy->Accept(&copy_extractor));
+  ASSERT_NE(copy_extractor.type_annotation_map(), nullptr);
+  EXPECT_TRUE(copy_extractor.type_annotation_map()->Equals(*target_annotation));
+}
+
+// Visitor that overrides PostVisitAnnotatedType to return annotations
+// even when they are not supported (i.e. annotation_map is nullopt).
+class BadTypeRewriterVisitor : public ResolvedASTRewriteVisitor {
+ public:
+  explicit BadTypeRewriterVisitor(const AnnotationMap* target_annotation)
+      : target_annotation_(target_annotation) {}
+
+ private:
+  absl::StatusOr<AnnotatedType> PostVisitAnnotatedType(
+      const Type* type,
+      std::optional<const AnnotationMap*> annotation_map) override {
+    // Always return annotations.
+    return AnnotatedType(type, target_annotation_);
+  }
+
+  const AnnotationMap* target_annotation_;
+};
+
+// Verifies that returning annotations in a Type-only context (like
+// ResolvedColumnDefinition which doesn't have type_annotation_map field)
+// triggers a GOOGLESQL_RET_CHECK failure.
+TEST_F(ResolvedASTRewriteVisitorTest, TypeOnlyContextFailsOnAnnotations) {
+  options_.mutable_language()->EnableLanguageFeature(
+      FEATURE_ANNOTATION_FRAMEWORK);
+  options_.mutable_language()->AddSupportedStatementKind(
+      RESOLVED_CREATE_TABLE_STMT);
+  const std::string input_sql = "CREATE TABLE T (x STRING)";
+  std::unique_ptr<const AnalyzerOutput> analyzed;
+  GOOGLESQL_ASSERT_OK(AnalyzeStatement(input_sql, options_, &catalog_, &type_factory_,
+                             &analyzed));
+
+  std::unique_ptr<AnnotationMap> target_annotation =
+      AnnotationMap::Create(types::StringType());
+  target_annotation->SetAnnotation(static_cast<int>(AnnotationKind::kCollation),
+                                   SimpleValue::String("und:ci"));
+
+  BadTypeRewriterVisitor visitor(target_annotation.get());
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(
+      std::unique_ptr<ResolvedNode> deep_copy,
+      ResolvedASTDeepCopyVisitor::Copy(analyzed->resolved_statement()));
+
+  absl::StatusOr<std::unique_ptr<const ResolvedNode>> result =
+      visitor.VisitAll<ResolvedNode>(std::move(deep_copy));
+  EXPECT_FALSE(result.ok());
+  EXPECT_THAT(
+      result.status().message(),
+      testing::HasSubstr("new_annotated_type.annotation_map == nullptr"));
+}
+
+class TypeChangingVisitor : public ResolvedASTRewriteVisitor {
+ private:
+  absl::StatusOr<AnnotatedType> PostVisitAnnotatedType(
+      const Type* type,
+      std::optional<const AnnotationMap*> annotation_map) override {
+    if (type->IsString()) {
+      return AnnotatedType(types::BytesType(), nullptr);
+    }
+    return AnnotatedType(type, annotation_map.value_or(nullptr));
+  }
+};
+
+// Verifies that a visitor can rewrite a Type in a type-only context (where
+// annotations are not supported) without triggering a GOOGLESQL_RET_CHECK failure,
+// as long as it does not attempt to add annotations.
+TEST_F(ResolvedASTRewriteVisitorTest, TypeOnlyContextSucceeds) {
+  options_.mutable_language()->EnableLanguageFeature(
+      FEATURE_ANNOTATION_FRAMEWORK);
+  options_.mutable_language()->AddSupportedStatementKind(
+      RESOLVED_CREATE_TABLE_STMT);
+  const std::string input_sql = "CREATE TABLE T (x STRING)";
+  std::unique_ptr<const AnalyzerOutput> analyzed;
+  GOOGLESQL_ASSERT_OK(AnalyzeStatement(input_sql, options_, &catalog_, &type_factory_,
+                             &analyzed));
+
+  TypeChangingVisitor visitor;
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(
+      std::unique_ptr<ResolvedNode> deep_copy,
+      ResolvedASTDeepCopyVisitor::Copy(analyzed->resolved_statement()));
+
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(std::unique_ptr<const ResolvedNode> rewritten_copy,
+                       visitor.VisitAll<ResolvedNode>(std::move(deep_copy)));
+
+  class ColumnDefinitionExtractor : public ResolvedASTVisitor {
+   public:
+    const ResolvedColumnDefinition* col_def_ = nullptr;
+
+   private:
+    absl::Status DefaultVisit(const ResolvedNode* node) override {
+      if (node->Is<ResolvedColumnDefinition>()) {
+        col_def_ = node->GetAs<ResolvedColumnDefinition>();
+      }
+      return ResolvedASTVisitor::DefaultVisit(node);
+    }
+  } extractor;
+
+  GOOGLESQL_ASSERT_OK(rewritten_copy->Accept(&extractor));
+  ASSERT_NE(extractor.col_def_, nullptr);
+  EXPECT_TRUE(extractor.col_def_->type()->IsBytes());
+}
+
+// Verifies that a custom visitor can modify an existing type annotation map
+// (e.g. changing collation from 'und:ci' to 'binary').
+TEST_F(ResolvedASTRewriteVisitorTest, ModifiesExistingCollationAnnotation) {
+  options_.mutable_language()->EnableLanguageFeature(
+      FEATURE_ANNOTATION_FRAMEWORK);
+  options_.mutable_language()->EnableLanguageFeature(FEATURE_COLLATION_SUPPORT);
+  const std::string input_sql = "SELECT COLLATE('test_string', 'und:ci')";
+
+  SimpleCatalog local_catalog("Local", nullptr);
+  local_catalog.AddBuiltinFunctions(
+      BuiltinFunctionOptions(options_.language()));
+
+  std::unique_ptr<const AnalyzerOutput> analyzed;
+  GOOGLESQL_ASSERT_OK(AnalyzeStatement(input_sql, options_, &local_catalog,
+                             &type_factory_, &analyzed));
+
+  std::unique_ptr<AnnotationMap> target_annotation =
+      AnnotationMap::Create(types::StringType());
+  target_annotation->SetAnnotation(static_cast<int>(AnnotationKind::kCollation),
+                                   SimpleValue::String("binary"));
+
+  CollationRewriterVisitor visitor(target_annotation.get());
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(
+      std::unique_ptr<ResolvedNode> deep_copy,
+      ResolvedASTDeepCopyVisitor::Copy(analyzed->resolved_statement()));
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(std::unique_ptr<const ResolvedNode> rewritten_copy,
+                       visitor.VisitAll<ResolvedNode>(std::move(deep_copy)));
+
+  AnnotationExtractorVisitor copy_extractor;
+  GOOGLESQL_ASSERT_OK(rewritten_copy->Accept(&copy_extractor));
+  ASSERT_NE(copy_extractor.type_annotation_map(), nullptr);
+  EXPECT_TRUE(copy_extractor.type_annotation_map()->Equals(*target_annotation));
+}
+
+class CollationRemovingVisitor : public ResolvedASTRewriteVisitor {
+ private:
+  absl::StatusOr<AnnotatedType> PostVisitAnnotatedType(
+      const Type* type,
+      std::optional<const AnnotationMap*> annotation_map) override {
+    return AnnotatedType(type, nullptr);
+  }
+};
+
+// Verifies that a custom visitor can remove an existing type annotation map
+// by returning a nullptr annotation map in AnnotatedType.
+TEST_F(ResolvedASTRewriteVisitorTest, RemovesCollationAnnotation) {
+  options_.mutable_language()->EnableLanguageFeature(
+      FEATURE_ANNOTATION_FRAMEWORK);
+  options_.mutable_language()->EnableLanguageFeature(FEATURE_COLLATION_SUPPORT);
+  const std::string input_sql = "SELECT COLLATE('test_string', 'und:ci')";
+
+  SimpleCatalog local_catalog("Local", nullptr);
+  local_catalog.AddBuiltinFunctions(
+      BuiltinFunctionOptions(options_.language()));
+
+  std::unique_ptr<const AnalyzerOutput> analyzed;
+  GOOGLESQL_ASSERT_OK(AnalyzeStatement(input_sql, options_, &local_catalog,
+                             &type_factory_, &analyzed));
+
+  CollationRemovingVisitor visitor;
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(
+      std::unique_ptr<ResolvedNode> deep_copy,
+      ResolvedASTDeepCopyVisitor::Copy(analyzed->resolved_statement()));
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(std::unique_ptr<const ResolvedNode> rewritten_copy,
+                       visitor.VisitAll<ResolvedNode>(std::move(deep_copy)));
+
+  AnnotationExtractorVisitor copy_extractor;
+  GOOGLESQL_ASSERT_OK(rewritten_copy->Accept(&copy_extractor));
+  EXPECT_EQ(copy_extractor.type_annotation_map(), nullptr);
 }
 
 }  // namespace googlesql

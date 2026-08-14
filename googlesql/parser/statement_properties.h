@@ -31,8 +31,9 @@ struct ASTStatementProperties {
   // The parse node kind of the statement.
   ASTNodeKind node_kind = kUnknownASTNodeKind;
 
-  // Whether or not the statement is CREATE TABLE AS SELECT.  Only applies
-  // if <node_kind> is AST_CREATE_TABLE_STATEMENT.
+  // Whether or not the statement is CREATE TABLE AS SELECT or CREATE LIVE
+  // TABLE AS SELECT. Only applies if <node_kind> is AST_CREATE_TABLE_STATEMENT
+  // or AST_CREATE_LIVE_TABLE_STATEMENT.
   bool is_create_table_as_select = false;
 
   // Whether or not the statement is a top-level GRAPH statement syntax.

@@ -12,6 +12,7 @@ QueryStmt
     | +-$col1#1 := Parameter(parse_location=7-9, type=INT64, name="p", is_untyped=TRUE)
     +-input_scan=
       +-SingleRowScan
+
 [UNDECLARED_PARAMETERS]
 p: INT64
 ==
@@ -31,6 +32,7 @@ QueryStmt
     |     +-Literal(type=STRING, value="bar")
     +-input_scan=
       +-SingleRowScan
+
 [UNDECLARED_PARAMETERS]
 p: STRING
 ==
@@ -50,6 +52,7 @@ QueryStmt
     |     +-Literal(type=INT64, value=1)
     +-input_scan=
       +-SingleRowScan
+
 [UNDECLARED_PARAMETERS]
 p: INT64
 ==
@@ -73,6 +76,7 @@ QueryStmt
     |       +-Literal(type=INT64, value=2)
     +-input_scan=
       +-SingleRowScan
+
 [UNDECLARED_PARAMETERS]
 p: INT64
 ==
@@ -92,6 +96,7 @@ QueryStmt
     |     +-Parameter(parse_location=23-25, type=ARRAY<STRING>, name="p")
     +-input_scan=
       +-SingleRowScan
+
 [UNDECLARED_PARAMETERS]
 p: ARRAY<STRING>
 ==
@@ -113,6 +118,7 @@ QueryStmt
     |       +-Literal(type=STRING, value="bar")
     +-input_scan=
       +-SingleRowScan
+
 [UNDECLARED_PARAMETERS]
 p: STRING
 ==
@@ -141,6 +147,7 @@ QueryStmt
     |       +-Parameter(parse_location=44-46, type=STRING, name="q")
     +-input_scan=
       +-SingleRowScan
+
 [UNDECLARED_PARAMETERS]
 p: STRING
 q: STRING
@@ -163,6 +170,7 @@ QueryStmt
     |       +-Parameter(parse_location=41-43, type=STRING, name="q")
     +-input_scan=
       +-SingleRowScan
+
 [UNDECLARED_PARAMETERS]
 p: STRING
 q: STRING
@@ -183,6 +191,7 @@ QueryStmt
     |     +-Parameter(parse_location=25-27, type=STRING, name="q")
     +-input_scan=
       +-SingleRowScan
+
 [UNDECLARED_PARAMETERS]
 p: STRING
 q: STRING
@@ -203,6 +212,7 @@ QueryStmt
     |     +-Literal(type=ARRAY<STRING>, value=["a"])
     +-input_scan=
       +-SingleRowScan
+
 [UNDECLARED_PARAMETERS]
 p: STRING
 ==
@@ -223,6 +233,7 @@ QueryStmt
     |     +-Parameter(parse_location=24-26, type=BYTES, name="q")
     +-input_scan=
       +-SingleRowScan
+
 [UNDECLARED_PARAMETERS]
 p: BYTES
 q: BYTES
@@ -244,6 +255,7 @@ QueryStmt
     |     +-Literal(type=DOUBLE, value=5)
     +-input_scan=
       +-SingleRowScan
+
 [UNDECLARED_PARAMETERS]
 p: DOUBLE
 ==
@@ -263,6 +275,7 @@ QueryStmt
     |     +-Literal(type=INT64, value=NULL)
     +-input_scan=
       +-SingleRowScan
+
 [UNDECLARED_PARAMETERS]
 p: INT64
 ==
@@ -282,6 +295,7 @@ QueryStmt
     |     +-Parameter(parse_location=16-18, type=INT64, name="p", is_untyped=TRUE)
     +-input_scan=
       +-SingleRowScan
+
 [UNDECLARED_PARAMETERS]
 p: INT64
 ==
@@ -335,6 +349,7 @@ QueryStmt
     |           +-SingleRowScan
     +-input_scan=
       +-SingleRowScan
+
 [UNDECLARED_PARAMETERS]
 p: STRING
 q: DOUBLE
@@ -394,6 +409,7 @@ QueryStmt
     |             +-output_column_list=[$union_all2_cast.$col1#4]
     +-input_scan=
       +-SingleRowScan
+
 [UNDECLARED_PARAMETERS]
 p: STRING
 q: INT64
@@ -420,6 +436,7 @@ QueryStmt
     |     +-Parameter(parse_location=7-9, type=BOOL, name="p")
     +-input_scan=
       +-SingleRowScan
+
 [UNDECLARED_PARAMETERS]
 p: BOOL
 ==
@@ -439,6 +456,7 @@ QueryStmt
     |     +-Parameter(parse_location=20-22, type=ARRAY<INT64>, name="q")
     +-input_scan=
       +-SingleRowScan
+
 [UNDECLARED_PARAMETERS]
 p: INT64
 q: ARRAY<INT64>
@@ -459,6 +477,7 @@ QueryStmt
     |     +-Literal(type=DOUBLE, value=1)
     +-input_scan=
       +-SingleRowScan
+
 [UNDECLARED_PARAMETERS]
 p: DOUBLE
 ==
@@ -478,6 +497,7 @@ QueryStmt
     |     +-Parameter(parse_location=28-30, type=DOUBLE, name="q")
     +-input_scan=
       +-SingleRowScan
+
 [UNDECLARED_PARAMETERS]
 p: DOUBLE
 q: DOUBLE
@@ -499,6 +519,7 @@ QueryStmt
     |     +-Literal(type=INT64, value=1)
     +-input_scan=
       +-SingleRowScan
+
 [UNDECLARED_PARAMETERS]
 p: DOUBLE
 ==
@@ -526,6 +547,7 @@ QueryStmt
     |     +-Literal(type=DOUBLE, value=1)
     +-input_scan=
       +-SingleRowScan
+
 [UNDECLARED_PARAMETERS]
 p_double: DOUBLE
 p_int64: INT64
@@ -616,6 +638,7 @@ QueryStmt
     |       +-default_value=[]
     +-input_scan=
       +-TableScan(column_list=[TestTable.KitchenSink#3], table=TestTable, column_index_list=[2])
+
 [UNDECLARED_PARAMETERS]
 enum1: ENUM<googlesql_test.TestEnum>
 enum2: ENUM<googlesql_test.TestEnum>
@@ -657,6 +680,7 @@ DeleteStmt
     | +-field_descriptor=int32_val
     | +-default_value=77
     +-Parameter(parse_location=47-49, type=INT32, name="p")
+
 [UNDECLARED_PARAMETERS]
 p: INT32
 ==
@@ -686,6 +710,7 @@ InsertStmt
 |       +-value=
 |         +-Literal(type=STRING, value="two")
 +-column_access_list=WRITE,WRITE
+
 [UNDECLARED_PARAMETERS]
 one: STRING
 two: INT64
@@ -724,6 +749,7 @@ UpdateStmt
       +-DMLValue
         +-value=
           +-Parameter(parse_location=44-56, type=STRING, name="stringvalue")
+
 [UNDECLARED_PARAMETERS]
 anotherint: INT64
 int64param: INT64
@@ -757,6 +783,7 @@ QueryStmt
         +-column_list=[KeyValue.Key#1]
         +-input_scan=
           +-TableScan(column_list=[KeyValue.Key#1], table=KeyValue, column_index_list=[0])
+
 [UNDECLARED_PARAMETERS]
 p: STRING
 q: DOUBLE
@@ -779,6 +806,7 @@ QueryStmt
     |     +-Literal(type=STRUCT<>, value={})
     +-input_scan=
       +-SingleRowScan
+
 [UNDECLARED_PARAMETERS]
 p: STRUCT<>
 ==
@@ -798,6 +826,7 @@ QueryStmt
     |     +-Parameter(parse_location=12-14, type=INT64, name="q", is_untyped=TRUE)
     +-input_scan=
       +-SingleRowScan
+
 [UNDECLARED_PARAMETERS]
 p: INT64
 q: INT64
@@ -823,6 +852,7 @@ QueryStmt
         |     +-SingleRowScan
         +-group_by_list=
           +-x#2 := Parameter(parse_location=7-9, type=INT64, name="p", is_untyped=TRUE)
+
 [UNDECLARED_PARAMETERS]
 p: INT64
 ==
@@ -847,6 +877,7 @@ QueryStmt
         |     +-SingleRowScan
         +-filter_expr=
           +-Parameter(parse_location=36-39, type=BOOL, name="p0")
+
 [UNDECLARED_PARAMETERS]
 p0: BOOL
 ==
@@ -888,6 +919,7 @@ QueryStmt
         |     +-x#2 := ColumnRef(type=INT64, column=$subquery1.x#1)
         +-filter_expr=
           +-Parameter(parse_location=58-61, type=BOOL, name="p0")
+
 [UNDECLARED_PARAMETERS]
 p0: BOOL
 ==
@@ -931,6 +963,7 @@ QueryStmt
         |     +-x#2 := ColumnRef(type=INT64, column=$subquery1.x#1)
         +-filter_expr=
           +-Parameter(parse_location=48-51, type=BOOL, name="p0")
+
 [UNDECLARED_PARAMETERS]
 p0: BOOL
 ==
@@ -965,6 +998,7 @@ QueryStmt
         |     +-SingleRowScan
         +-join_expr=
           +-Parameter(parse_location=69-72, type=BOOL, name="p0")
+
 [UNDECLARED_PARAMETERS]
 p0: BOOL
 ==
@@ -981,6 +1015,7 @@ DeleteStmt
     +-FunctionCall(GoogleSQL:$greater(INT64, INT64) -> BOOL)
       +-Parameter(parse_location=31-34, type=INT64, name="p1", is_untyped=TRUE)
       +-Literal(type=INT64, value=5)
+
 [UNDECLARED_PARAMETERS]
 p0: BOOL
 p1: INT64
@@ -1017,6 +1052,7 @@ UpdateStmt
       +-DMLValue
         +-value=
           +-Literal(type=STRING, value="a")
+
 [UNDECLARED_PARAMETERS]
 p0: BOOL
 p1: INT64
@@ -1047,6 +1083,7 @@ QueryStmt
         |     +-SingleRowScan
         +-group_by_list=
           +-key#2 := ColumnRef(type=INT64, column=$subquery1.key#1)
+
 [UNDECLARED_PARAMETERS]
 p: INT64
 ==
@@ -1091,6 +1128,7 @@ QueryStmt
             +-Cast(INT64 -> DOUBLE)
             | +-ColumnRef(type=INT64, column=$aggregate.$agg1#4)
             +-Literal(type=DOUBLE, value=5.3)
+
 [UNDECLARED_PARAMETERS]
 p: INT64
 ==
@@ -1108,6 +1146,7 @@ QueryStmt
     | +-$col1#1 := Literal(type=INT64, value=1)
     +-input_scan=
       +-SingleRowScan
+
 [UNDECLARED_PARAMETERS]
 ==
 
@@ -1132,6 +1171,7 @@ FunctionCall(GoogleSQL:$greater(DOUBLE, DOUBLE) -> BOOL)
   +-Parameter(parse_location=8-10, type=BOOL, name="b")
   +-Literal(type=DOUBLE, value=1)
   +-Parameter(parse_location=17-19, type=DOUBLE, name="q")
+
 [UNDECLARED_PARAMETERS]
 b: BOOL
 p: DOUBLE

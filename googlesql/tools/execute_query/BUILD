@@ -60,6 +60,7 @@ cc_library(
 cc_test(
     name = "execute_query_tool_test",
     srcs = ["execute_query_tool_test.cc"],
+    args = ["--googlesql_omit_tvf_signatures_in_resolved_ast_debug_string=true"],
     data = [
         "//googlesql/tools/execute_query/testdata:KitchenSinkPB.textproto",
         "//googlesql/tools/execute_query/testdata:execute_query_tool.test",

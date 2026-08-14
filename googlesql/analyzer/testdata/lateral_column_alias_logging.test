@@ -159,7 +159,6 @@ QueryStmt
         +-input_scan=
           +-SingleRowScan
 
-
 DEPRECATION WARNING:
 Lateral column alias will shadow original target: STRUCT<x INT64, y INT64> (outer_t.s#1) [at 7:15]
     ANY_VALUE(s) AS s2,
@@ -318,7 +317,6 @@ QueryStmt
         +-input_scan=
           +-SingleRowScan
 
-
 DEPRECATION WARNING:
 Lateral column alias will shadow original target: STRUCT<x INT64, y INT64> (outer_t.s#1) [at 5:15]
     ANY_VALUE(s) OVER() AS s2,
@@ -391,7 +389,6 @@ QueryStmt
         +-input_scan=
           +-SingleRowScan
 
-
 DEPRECATION WARNING:
 Lateral column alias will shadow original target: INT64 (outer_t.a#1) [at 5:4]
    a + 1 AS b
@@ -458,7 +455,6 @@ QueryStmt
         | +-d#1 := Literal(type=INT64, value=1)
         +-input_scan=
           +-SingleRowScan
-
 
 DEPRECATION WARNING:
 Lateral column alias will shadow original target: INT64 ($subquery1.d#1) [at 5:15]

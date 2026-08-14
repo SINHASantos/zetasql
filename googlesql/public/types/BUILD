@@ -40,6 +40,7 @@ filegroup(
         "type_modifiers.h",
         "type_parameters.h",
         "value_equality_check_options.h",
+        "vector_type_util.h",
     ],
 )
 
@@ -103,11 +104,13 @@ cc_library(
         "//googlesql/public:value_content",
         "//googlesql/public/functions:date_time_util",
         "//googlesql/public/functions:rounding_mode_cc_proto",
+        "//googlesql/public/proto:vector_encoding_id_cc_proto",
         "@com_google_absl//absl/base:core_headers",
         "@com_google_absl//absl/base:no_destructor",
         "@com_google_absl//absl/base:nullability",
         "@com_google_absl//absl/container:flat_hash_map",
         "@com_google_absl//absl/container:flat_hash_set",
+        "@com_google_absl//absl/container:inlined_vector",
         "@com_google_absl//absl/container:node_hash_map",
         "@com_google_absl//absl/container:node_hash_set",
         "@com_google_absl//absl/functional:overload",
@@ -215,6 +218,7 @@ cc_library(
         "//googlesql/public/functions:convert_proto",
         "//googlesql/public/functions:datetime_cc_proto",
         "//googlesql/public/functions:differential_privacy_cc_proto",
+        "//googlesql/public/functions:endianness_cc_proto",
         "//googlesql/public/functions:normalize_mode_cc_proto",
         "//googlesql/public/functions:range_sessionize_mode_cc_proto",
         "//googlesql/public/functions:rank_type_cc_proto",
@@ -257,6 +261,7 @@ cc_library(
         ":type",
         ":type_factory",
         ":value_representations",
+        ":vector_type_util",
         "//googlesql/base",
         "//googlesql/base:case",
         "//googlesql/base:check",
@@ -318,6 +323,19 @@ cc_library(
         "@com_google_absl//absl/types:optional",
         "@com_google_absl//absl/types:span",
         "@com_google_absl//absl/types:variant",
+    ],
+)
+
+cc_library(
+    name = "vector_type_util",
+    srcs = ["vector_type_util.cc"],
+    hdrs = ["vector_type_util.h"],
+    deps = [
+        ":type",
+        ":type_factory",
+        "//googlesql/public:options_cc_proto",
+        "@com_google_absl//absl/status:statusor",
+        "@com_google_absl//absl/strings:string_view",
     ],
 )
 

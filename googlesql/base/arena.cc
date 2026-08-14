@@ -231,7 +231,7 @@ BaseArena::AllocatedBlock* BaseArena::AllocNewBlock(const size_t block_size,
                                                     const uint32_t alignment) {
   AllocatedBlock *block;
   // Find the next block.
-  if (blocks_alloced_ < static_cast<int64_t>(ABSL_ARRAYSIZE(first_blocks_))) {
+  if (blocks_alloced_ < static_cast<int64_t>(std::size(first_blocks_))) {
     // Use one of the pre-allocated blocks
     block = &first_blocks_[blocks_alloced_++];
   } else {  // oops, out of space, move to the vector
@@ -302,11 +302,11 @@ BaseArena::AllocatedBlock* BaseArena::AllocNewBlock(const size_t block_size,
 // ----------------------------------------------------------------------
 
 const BaseArena::AllocatedBlock *BaseArena::IndexToBlock(int index) const {
-  if (index < static_cast<int64_t>(ABSL_ARRAYSIZE(first_blocks_))) {
+  if (index < static_cast<int64_t>(std::size(first_blocks_))) {
     return &first_blocks_[index];
   }
   ABSL_CHECK(overflow_blocks_ != nullptr);
-  int index_in_overflow_blocks = index - ABSL_ARRAYSIZE(first_blocks_);
+  int index_in_overflow_blocks = index - std::size(first_blocks_);
   ABSL_CHECK_GE(index_in_overflow_blocks, 0);
   ABSL_CHECK_LT(static_cast<size_t>(index_in_overflow_blocks),
            overflow_blocks_->size());

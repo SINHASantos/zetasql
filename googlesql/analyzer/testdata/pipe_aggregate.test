@@ -543,7 +543,7 @@ ERROR: Column k in SELECT * REPLACE list does not exist [at 2:46]
 select struct(1 as f, 2 as g) sf
 |> AGGREGATE any_value(sf).* except (f,g)
 --
-ERROR: SELECT * expands to zero columns after applying EXCEPT [at 2:14]
+ERROR: SELECT .* expands to zero columns after applying EXCEPT [at 2:14]
 |> AGGREGATE any_value(sf).* except (f,g)
              ^
 ==

@@ -1,0 +1,2728 @@
+# Scenario 1: AGG(rk.m) for derived measures
+# Verifies that a GetRowField returning a derived measure inside an aggregate function (AGG)
+# is replaced by a MakeStruct closure and aggregated properly.
+#
+# We can't run sqlbuilder for measures from rows because the rewritten ASTs
+# are unparsed to `IF(row IS NULL, ..., ...)`, which fails resolution because
+# we currently do not allow row-typed arguments.
+[default no_java]
+[default no_run_deserializer]
+[default no_run_sqlbuilder]
+[default language_features=MAXIMUM,+ENABLE_MEASURES,+ROW_TYPE,+MEASURES_IN_STRUCT,+DERIVED_MEASURE]
+[default enabled_ast_rewrites=DEFAULTS,+MEASURE_TYPE,+ROW_TYPE]
+SELECT normal_col_1, AGG(row_type_col.measure_derived_sum_price_plus_one)
+FROM tvf_returning_derived_measure_row_type()
+GROUP BY normal_col_1;
+--
+QueryStmt
++-output_column_list=
+| +-$groupby.normal_col_1#4 AS normal_col_1 [STRING]
+| +-$aggregate.$agg1#3 AS `$col2` [INT64]
++-query=
+  +-ProjectScan
+    +-column_list=[$groupby.normal_col_1#4, $aggregate.$agg1#3]
+    +-input_scan=
+      +-AggregateScan
+        +-column_list=[$groupby.normal_col_1#4, $aggregate.$agg1#3]
+        +-input_scan=
+        | +-TVFScan(column_list=tvf_returning_derived_measure_row_type.[normal_col_1#1, row_type_col#2], tvf=tvf_returning_derived_measure_row_type, signature=() -> TABLE<normal_col_1 STRING, row_type_col ROW<MeasureTable_Derived>> (table: table_for_tvf_returning_derived_measure_row_type), column_index_list=[0, 1], function_call_signature=() -> ANY TABLE)
+        +-group_by_list=
+        | +-normal_col_1#4 := ColumnRef(type=STRING, column=tvf_returning_derived_measure_row_type.normal_col_1#1)
+        +-aggregate_list=
+          +-$agg1#3 :=
+            +-AggregateFunctionCall(GoogleSQL:AGG(MEASURE<INT64>) -> INT64)
+              +-GetRowField
+                +-type=MEASURE<INT64>
+                +-expr=
+                | +-ColumnRef(type=ROW<MeasureTable_Derived>, column=tvf_returning_derived_measure_row_type.row_type_col#2)
+                +-column=MeasureTable_Derived.measure_derived_sum_price_plus_one
+
+[REWRITTEN AST]
+QueryStmt
++-output_column_list=
+| +-$groupby.normal_col_1#4 AS normal_col_1 [STRING]
+| +-$aggregate.$agg1#3 AS `$col2` [INT64]
++-query=
+  +-ProjectScan
+    +-column_list=[$groupby.normal_col_1#4, $aggregate.$agg1#3]
+    +-input_scan=
+      +-ProjectScan
+        +-column_list=[$groupby.normal_col_1#4, $aggregate.$agg1#3]
+        +-expr_list=
+        | +-$agg1#3 :=
+        |   +-FunctionCall(GoogleSQL:$add(INT64, INT64) -> INT64)
+        |     +-ColumnRef(type=INT64, column=$aggregate.constituent_aggregate_1#8)
+        |     +-Literal(type=INT64, value=1)
+        +-input_scan=
+          +-AggregateScan
+            +-column_list=[$groupby.normal_col_1#4, $aggregate.constituent_aggregate_1#8]
+            +-input_scan=
+            | +-ProjectScan
+            |   +-column_list=[tvf_returning_derived_measure_row_type.normal_col_1#1, tvf_returning_derived_measure_row_type.$row_type_col$scanrow#11, $aggregate.agg_arg#5, $aggregate.dep_closure#7]
+            |   +-expr_list=
+            |   | +-dep_closure#7 :=
+            |   |   +-GetStructField
+            |   |     +-type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>
+            |   |     +-expr=
+            |   |     | +-GetStructField
+            |   |     |   +-type=STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>
+            |   |     |   +-expr=
+            |   |     |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>, column=$aggregate.agg_arg#5)
+            |   |     |   +-field_idx=0
+            |   |     +-field_idx=0
+            |   +-input_scan=
+            |     +-ProjectScan
+            |       +-column_list=[tvf_returning_derived_measure_row_type.normal_col_1#1, tvf_returning_derived_measure_row_type.$row_type_col$scanrow#11, $aggregate.agg_arg#5]
+            |       +-expr_list=
+            |       | +-agg_arg#5 :=
+            |       |   +-FunctionCall(GoogleSQL:if(BOOL, STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>, STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>) -> STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>)
+            |       |     +-FunctionCall(GoogleSQL:$is_null(STRUCT<price INT64, key INT64>) -> BOOL)
+            |       |     | +-ColumnRef(type=STRUCT<price INT64, key INT64>, column=tvf_returning_derived_measure_row_type.$row_type_col$scanrow#11)
+            |       |     +-Literal(type=STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>, value=NULL)
+            |       |     +-MakeStruct
+            |       |       +-type=STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>
+            |       |       +-field_list=
+            |       |         +-MakeStruct
+            |       |         | +-type=STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>
+            |       |         | +-field_list=
+            |       |         |   +-FunctionCall(GoogleSQL:if(BOOL, STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>) -> STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>)
+            |       |         |     +-FunctionCall(GoogleSQL:$is_null(STRUCT<price INT64, key INT64>) -> BOOL)
+            |       |         |     | +-ColumnRef(type=STRUCT<price INT64, key INT64>, column=tvf_returning_derived_measure_row_type.$row_type_col$scanrow#11)
+            |       |         |     +-Literal(type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, value=NULL)
+            |       |         |     +-MakeStruct
+            |       |         |       +-type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>
+            |       |         |       +-field_list=
+            |       |         |         +-MakeStruct
+            |       |         |         | +-type=STRUCT<price INT64>
+            |       |         |         | +-field_list=
+            |       |         |         |   +-GetStructField
+            |       |         |         |     +-type=INT64
+            |       |         |         |     +-expr=
+            |       |         |         |     | +-ColumnRef(type=STRUCT<price INT64, key INT64>, column=tvf_returning_derived_measure_row_type.$row_type_col$scanrow#11)
+            |       |         |         |     +-field_idx=0
+            |       |         |         +-MakeStruct
+            |       |         |           +-type=STRUCT<key INT64>
+            |       |         |           +-field_list=
+            |       |         |             +-GetStructField
+            |       |         |               +-type=INT64
+            |       |         |               +-expr=
+            |       |         |               | +-ColumnRef(type=STRUCT<price INT64, key INT64>, column=tvf_returning_derived_measure_row_type.$row_type_col$scanrow#11)
+            |       |         |               +-field_idx=1
+            |       |         +-MakeStruct
+            |       |           +-type=STRUCT<key INT64>
+            |       |           +-field_list=
+            |       |             +-GetStructField
+            |       |               +-type=INT64
+            |       |               +-expr=
+            |       |               | +-ColumnRef(type=STRUCT<price INT64, key INT64>, column=tvf_returning_derived_measure_row_type.$row_type_col$scanrow#11)
+            |       |               +-field_idx=1
+            |       +-input_scan=
+            |         +-TVFScan(column_list=tvf_returning_derived_measure_row_type.[normal_col_1#1, $row_type_col$scanrow#11], tvf=tvf_returning_derived_measure_row_type, signature=() -> TABLE<normal_col_1 STRING, row_type_col STRUCT<price INT64, key INT64>>, column_index_list=[0, 1], function_call_signature=() -> ANY TABLE)
+            +-group_by_list=
+            | +-normal_col_1#4 := ColumnRef(type=STRING, column=tvf_returning_derived_measure_row_type.normal_col_1#1)
+            +-aggregate_list=
+              +-constituent_aggregate_1#8 :=
+                +-AggregateFunctionCall(GoogleSQL:sum(INT64) -> INT64)
+                  +-ColumnRef(type=INT64, column=$aggregate.$any_value_grain_lock_0#9)
+                  +-where_expr=
+                  | +-FunctionCall(GoogleSQL:$not(BOOL) -> BOOL)
+                  |   +-FunctionCall(GoogleSQL:$is_null(STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>) -> BOOL)
+                  |     +-ColumnRef(type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, column=$aggregate.dep_closure#7)
+                  +-group_by_list=
+                  | +-grain_lock_key#10 :=
+                  |   +-GetStructField
+                  |     +-type=STRUCT<key INT64>
+                  |     +-expr=
+                  |     | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, column=$aggregate.dep_closure#7)
+                  |     +-field_idx=1
+                  +-group_by_aggregate_list=
+                    +-$any_value_grain_lock_0#9 :=
+                      +-AggregateFunctionCall(GoogleSQL:any_value(INT64) -> INT64)
+                        +-GetStructField
+                          +-type=INT64
+                          +-expr=
+                          | +-GetStructField
+                          |   +-type=STRUCT<price INT64>
+                          |   +-expr=
+                          |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, column=$aggregate.dep_closure#7)
+                          |   +-field_idx=0
+                          +-field_idx=0
+==
+
+# Scenario 2: Subquery alias for derived measure in row type
+SELECT AGG(m_col)
+FROM (
+  SELECT row_type_col.measure_derived_sum_price_plus_one AS m_col
+  FROM tvf_returning_derived_measure_row_type()
+);
+--
+QueryStmt
++-output_column_list=
+| +-$aggregate.$agg1#4 AS `$col1` [INT64]
++-query=
+  +-ProjectScan
+    +-column_list=[$aggregate.$agg1#4]
+    +-input_scan=
+      +-AggregateScan
+        +-column_list=[$aggregate.$agg1#4]
+        +-input_scan=
+        | +-ProjectScan
+        |   +-column_list=[$subquery1.m_col#3]
+        |   +-expr_list=
+        |   | +-m_col#3 :=
+        |   |   +-GetRowField
+        |   |     +-type=MEASURE<INT64>
+        |   |     +-expr=
+        |   |     | +-ColumnRef(type=ROW<MeasureTable_Derived>, column=tvf_returning_derived_measure_row_type.row_type_col#2)
+        |   |     +-column=MeasureTable_Derived.measure_derived_sum_price_plus_one
+        |   +-input_scan=
+        |     +-TVFScan(column_list=[tvf_returning_derived_measure_row_type.row_type_col#2], tvf=tvf_returning_derived_measure_row_type, signature=() -> TABLE<normal_col_1 STRING, row_type_col ROW<MeasureTable_Derived>> (table: table_for_tvf_returning_derived_measure_row_type), column_index_list=[1], function_call_signature=() -> ANY TABLE)
+        +-aggregate_list=
+          +-$agg1#4 :=
+            +-AggregateFunctionCall(GoogleSQL:AGG(MEASURE<INT64>) -> INT64)
+              +-ColumnRef(type=MEASURE<INT64>, column=$subquery1.m_col#3)
+
+[REWRITTEN AST]
+QueryStmt
++-output_column_list=
+| +-$aggregate.$agg1#4 AS `$col1` [INT64]
++-query=
+  +-ProjectScan
+    +-column_list=[$aggregate.$agg1#4]
+    +-input_scan=
+      +-ProjectScan
+        +-column_list=[$aggregate.$agg1#4]
+        +-expr_list=
+        | +-$agg1#4 :=
+        |   +-FunctionCall(GoogleSQL:$add(INT64, INT64) -> INT64)
+        |     +-ColumnRef(type=INT64, column=$aggregate.constituent_aggregate_1#7)
+        |     +-Literal(type=INT64, value=1)
+        +-input_scan=
+          +-AggregateScan
+            +-column_list=[$aggregate.constituent_aggregate_1#7]
+            +-input_scan=
+            | +-ProjectScan
+            |   +-column_list=[$subquery1.m_col#3, $aggregate.dep_closure#6]
+            |   +-expr_list=
+            |   | +-dep_closure#6 :=
+            |   |   +-GetStructField
+            |   |     +-type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>
+            |   |     +-expr=
+            |   |     | +-GetStructField
+            |   |     |   +-type=STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>
+            |   |     |   +-expr=
+            |   |     |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>, column=$subquery1.m_col#3)
+            |   |     |   +-field_idx=0
+            |   |     +-field_idx=0
+            |   +-input_scan=
+            |     +-ProjectScan
+            |       +-column_list=[$subquery1.m_col#3]
+            |       +-expr_list=
+            |       | +-m_col#3 :=
+            |       |   +-FunctionCall(GoogleSQL:if(BOOL, STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>, STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>) -> STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>)
+            |       |     +-FunctionCall(GoogleSQL:$is_null(STRUCT<price INT64, key INT64>) -> BOOL)
+            |       |     | +-ColumnRef(type=STRUCT<price INT64, key INT64>, column=tvf_returning_derived_measure_row_type.$row_type_col$scanrow#10)
+            |       |     +-Literal(type=STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>, value=NULL)
+            |       |     +-MakeStruct
+            |       |       +-type=STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>
+            |       |       +-field_list=
+            |       |         +-MakeStruct
+            |       |         | +-type=STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>
+            |       |         | +-field_list=
+            |       |         |   +-FunctionCall(GoogleSQL:if(BOOL, STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>) -> STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>)
+            |       |         |     +-FunctionCall(GoogleSQL:$is_null(STRUCT<price INT64, key INT64>) -> BOOL)
+            |       |         |     | +-ColumnRef(type=STRUCT<price INT64, key INT64>, column=tvf_returning_derived_measure_row_type.$row_type_col$scanrow#10)
+            |       |         |     +-Literal(type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, value=NULL)
+            |       |         |     +-MakeStruct
+            |       |         |       +-type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>
+            |       |         |       +-field_list=
+            |       |         |         +-MakeStruct
+            |       |         |         | +-type=STRUCT<price INT64>
+            |       |         |         | +-field_list=
+            |       |         |         |   +-GetStructField
+            |       |         |         |     +-type=INT64
+            |       |         |         |     +-expr=
+            |       |         |         |     | +-ColumnRef(type=STRUCT<price INT64, key INT64>, column=tvf_returning_derived_measure_row_type.$row_type_col$scanrow#10)
+            |       |         |         |     +-field_idx=0
+            |       |         |         +-MakeStruct
+            |       |         |           +-type=STRUCT<key INT64>
+            |       |         |           +-field_list=
+            |       |         |             +-GetStructField
+            |       |         |               +-type=INT64
+            |       |         |               +-expr=
+            |       |         |               | +-ColumnRef(type=STRUCT<price INT64, key INT64>, column=tvf_returning_derived_measure_row_type.$row_type_col$scanrow#10)
+            |       |         |               +-field_idx=1
+            |       |         +-MakeStruct
+            |       |           +-type=STRUCT<key INT64>
+            |       |           +-field_list=
+            |       |             +-GetStructField
+            |       |               +-type=INT64
+            |       |               +-expr=
+            |       |               | +-ColumnRef(type=STRUCT<price INT64, key INT64>, column=tvf_returning_derived_measure_row_type.$row_type_col$scanrow#10)
+            |       |               +-field_idx=1
+            |       +-input_scan=
+            |         +-TVFScan(column_list=[tvf_returning_derived_measure_row_type.$row_type_col$scanrow#10], tvf=tvf_returning_derived_measure_row_type, signature=() -> TABLE<normal_col_1 STRING, row_type_col STRUCT<price INT64, key INT64>>, column_index_list=[1], function_call_signature=() -> ANY TABLE)
+            +-aggregate_list=
+              +-constituent_aggregate_1#7 :=
+                +-AggregateFunctionCall(GoogleSQL:sum(INT64) -> INT64)
+                  +-ColumnRef(type=INT64, column=$aggregate.$any_value_grain_lock_0#8)
+                  +-where_expr=
+                  | +-FunctionCall(GoogleSQL:$not(BOOL) -> BOOL)
+                  |   +-FunctionCall(GoogleSQL:$is_null(STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>) -> BOOL)
+                  |     +-ColumnRef(type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, column=$aggregate.dep_closure#6)
+                  +-group_by_list=
+                  | +-grain_lock_key#9 :=
+                  |   +-GetStructField
+                  |     +-type=STRUCT<key INT64>
+                  |     +-expr=
+                  |     | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, column=$aggregate.dep_closure#6)
+                  |     +-field_idx=1
+                  +-group_by_aggregate_list=
+                    +-$any_value_grain_lock_0#8 :=
+                      +-AggregateFunctionCall(GoogleSQL:any_value(INT64) -> INT64)
+                        +-GetStructField
+                          +-type=INT64
+                          +-expr=
+                          | +-GetStructField
+                          |   +-type=STRUCT<price INT64>
+                          |   +-expr=
+                          |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, column=$aggregate.dep_closure#6)
+                          |   +-field_idx=0
+                          +-field_idx=0
+==
+
+# Scenario 3: CTE alias for derived measure in row type
+WITH t AS (
+  SELECT row_type_col.measure_derived_sum_price_plus_one AS m_col
+  FROM tvf_returning_derived_measure_row_type()
+)
+SELECT AGG(m_col) FROM t;
+--
+QueryStmt
++-output_column_list=
+| +-$aggregate.$agg1#5 AS `$col1` [INT64]
++-query=
+  +-WithScan
+    +-column_list=[$aggregate.$agg1#5]
+    +-with_entry_list=
+    | +-WithEntry
+    |   +-with_query_name="t"
+    |   +-with_subquery=
+    |     +-ProjectScan
+    |       +-column_list=[t.m_col#3]
+    |       +-expr_list=
+    |       | +-m_col#3 :=
+    |       |   +-GetRowField
+    |       |     +-type=MEASURE<INT64>
+    |       |     +-expr=
+    |       |     | +-ColumnRef(type=ROW<MeasureTable_Derived>, column=tvf_returning_derived_measure_row_type.row_type_col#2)
+    |       |     +-column=MeasureTable_Derived.measure_derived_sum_price_plus_one
+    |       +-input_scan=
+    |         +-TVFScan(column_list=[tvf_returning_derived_measure_row_type.row_type_col#2], tvf=tvf_returning_derived_measure_row_type, signature=() -> TABLE<normal_col_1 STRING, row_type_col ROW<MeasureTable_Derived>> (table: table_for_tvf_returning_derived_measure_row_type), column_index_list=[1], function_call_signature=() -> ANY TABLE)
+    +-query=
+      +-ProjectScan
+        +-column_list=[$aggregate.$agg1#5]
+        +-input_scan=
+          +-AggregateScan
+            +-column_list=[$aggregate.$agg1#5]
+            +-input_scan=
+            | +-WithRefScan(column_list=[t.m_col#4], with_query_name="t")
+            +-aggregate_list=
+              +-$agg1#5 :=
+                +-AggregateFunctionCall(GoogleSQL:AGG(MEASURE<INT64>) -> INT64)
+                  +-ColumnRef(type=MEASURE<INT64>, column=t.m_col#4)
+
+[REWRITTEN AST]
+QueryStmt
++-output_column_list=
+| +-$aggregate.$agg1#5 AS `$col1` [INT64]
++-query=
+  +-WithScan
+    +-column_list=[$aggregate.$agg1#5]
+    +-with_entry_list=
+    | +-WithEntry
+    |   +-with_query_name="t"
+    |   +-with_subquery=
+    |     +-ProjectScan
+    |       +-column_list=[t.m_col#3]
+    |       +-expr_list=
+    |       | +-m_col#3 :=
+    |       |   +-FunctionCall(GoogleSQL:if(BOOL, STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>, STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>) -> STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>)
+    |       |     +-FunctionCall(GoogleSQL:$is_null(STRUCT<price INT64, key INT64>) -> BOOL)
+    |       |     | +-ColumnRef(type=STRUCT<price INT64, key INT64>, column=tvf_returning_derived_measure_row_type.$row_type_col$scanrow#11)
+    |       |     +-Literal(type=STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>, value=NULL)
+    |       |     +-MakeStruct
+    |       |       +-type=STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>
+    |       |       +-field_list=
+    |       |         +-MakeStruct
+    |       |         | +-type=STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>
+    |       |         | +-field_list=
+    |       |         |   +-FunctionCall(GoogleSQL:if(BOOL, STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>) -> STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>)
+    |       |         |     +-FunctionCall(GoogleSQL:$is_null(STRUCT<price INT64, key INT64>) -> BOOL)
+    |       |         |     | +-ColumnRef(type=STRUCT<price INT64, key INT64>, column=tvf_returning_derived_measure_row_type.$row_type_col$scanrow#11)
+    |       |         |     +-Literal(type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, value=NULL)
+    |       |         |     +-MakeStruct
+    |       |         |       +-type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>
+    |       |         |       +-field_list=
+    |       |         |         +-MakeStruct
+    |       |         |         | +-type=STRUCT<price INT64>
+    |       |         |         | +-field_list=
+    |       |         |         |   +-GetStructField
+    |       |         |         |     +-type=INT64
+    |       |         |         |     +-expr=
+    |       |         |         |     | +-ColumnRef(type=STRUCT<price INT64, key INT64>, column=tvf_returning_derived_measure_row_type.$row_type_col$scanrow#11)
+    |       |         |         |     +-field_idx=0
+    |       |         |         +-MakeStruct
+    |       |         |           +-type=STRUCT<key INT64>
+    |       |         |           +-field_list=
+    |       |         |             +-GetStructField
+    |       |         |               +-type=INT64
+    |       |         |               +-expr=
+    |       |         |               | +-ColumnRef(type=STRUCT<price INT64, key INT64>, column=tvf_returning_derived_measure_row_type.$row_type_col$scanrow#11)
+    |       |         |               +-field_idx=1
+    |       |         +-MakeStruct
+    |       |           +-type=STRUCT<key INT64>
+    |       |           +-field_list=
+    |       |             +-GetStructField
+    |       |               +-type=INT64
+    |       |               +-expr=
+    |       |               | +-ColumnRef(type=STRUCT<price INT64, key INT64>, column=tvf_returning_derived_measure_row_type.$row_type_col$scanrow#11)
+    |       |               +-field_idx=1
+    |       +-input_scan=
+    |         +-TVFScan(column_list=[tvf_returning_derived_measure_row_type.$row_type_col$scanrow#11], tvf=tvf_returning_derived_measure_row_type, signature=() -> TABLE<normal_col_1 STRING, row_type_col STRUCT<price INT64, key INT64>>, column_index_list=[1], function_call_signature=() -> ANY TABLE)
+    +-query=
+      +-ProjectScan
+        +-column_list=[$aggregate.$agg1#5]
+        +-input_scan=
+          +-ProjectScan
+            +-column_list=[$aggregate.$agg1#5]
+            +-expr_list=
+            | +-$agg1#5 :=
+            |   +-FunctionCall(GoogleSQL:$add(INT64, INT64) -> INT64)
+            |     +-ColumnRef(type=INT64, column=$aggregate.constituent_aggregate_1#8)
+            |     +-Literal(type=INT64, value=1)
+            +-input_scan=
+              +-AggregateScan
+                +-column_list=[$aggregate.constituent_aggregate_1#8]
+                +-input_scan=
+                | +-ProjectScan
+                |   +-column_list=[t.m_col#4, $aggregate.dep_closure#7]
+                |   +-expr_list=
+                |   | +-dep_closure#7 :=
+                |   |   +-GetStructField
+                |   |     +-type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>
+                |   |     +-expr=
+                |   |     | +-GetStructField
+                |   |     |   +-type=STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>
+                |   |     |   +-expr=
+                |   |     |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>, column=t.m_col#4)
+                |   |     |   +-field_idx=0
+                |   |     +-field_idx=0
+                |   +-input_scan=
+                |     +-WithRefScan(column_list=[t.m_col#4], with_query_name="t")
+                +-aggregate_list=
+                  +-constituent_aggregate_1#8 :=
+                    +-AggregateFunctionCall(GoogleSQL:sum(INT64) -> INT64)
+                      +-ColumnRef(type=INT64, column=$aggregate.$any_value_grain_lock_0#9)
+                      +-where_expr=
+                      | +-FunctionCall(GoogleSQL:$not(BOOL) -> BOOL)
+                      |   +-FunctionCall(GoogleSQL:$is_null(STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>) -> BOOL)
+                      |     +-ColumnRef(type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, column=$aggregate.dep_closure#7)
+                      +-group_by_list=
+                      | +-grain_lock_key#10 :=
+                      |   +-GetStructField
+                      |     +-type=STRUCT<key INT64>
+                      |     +-expr=
+                      |     | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, column=$aggregate.dep_closure#7)
+                      |     +-field_idx=1
+                      +-group_by_aggregate_list=
+                        +-$any_value_grain_lock_0#9 :=
+                          +-AggregateFunctionCall(GoogleSQL:any_value(INT64) -> INT64)
+                            +-GetStructField
+                              +-type=INT64
+                              +-expr=
+                              | +-GetStructField
+                              |   +-type=STRUCT<price INT64>
+                              |   +-expr=
+                              |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, column=$aggregate.dep_closure#7)
+                              |   +-field_idx=0
+                              +-field_idx=0
+==
+
+# Scenario 4: Struct of derived measures in row type
+SELECT AGG(s.m)
+FROM (
+  SELECT STRUCT(row_type_col.measure_derived_sum_price_plus_one AS m) AS s
+  FROM tvf_returning_derived_measure_row_type()
+);
+--
+QueryStmt
++-output_column_list=
+| +-$aggregate.$agg1#4 AS `$col1` [INT64]
++-query=
+  +-ProjectScan
+    +-column_list=[$aggregate.$agg1#4]
+    +-input_scan=
+      +-AggregateScan
+        +-column_list=[$aggregate.$agg1#4]
+        +-input_scan=
+        | +-ProjectScan
+        |   +-column_list=[$subquery1.s#3]
+        |   +-expr_list=
+        |   | +-s#3 :=
+        |   |   +-MakeStruct
+        |   |     +-type=STRUCT<m MEASURE<INT64>>
+        |   |     +-field_list=
+        |   |       +-GetRowField
+        |   |         +-type=MEASURE<INT64>
+        |   |         +-expr=
+        |   |         | +-ColumnRef(type=ROW<MeasureTable_Derived>, column=tvf_returning_derived_measure_row_type.row_type_col#2)
+        |   |         +-column=MeasureTable_Derived.measure_derived_sum_price_plus_one
+        |   +-input_scan=
+        |     +-TVFScan(column_list=[tvf_returning_derived_measure_row_type.row_type_col#2], tvf=tvf_returning_derived_measure_row_type, signature=() -> TABLE<normal_col_1 STRING, row_type_col ROW<MeasureTable_Derived>> (table: table_for_tvf_returning_derived_measure_row_type), column_index_list=[1], function_call_signature=() -> ANY TABLE)
+        +-aggregate_list=
+          +-$agg1#4 :=
+            +-AggregateFunctionCall(GoogleSQL:AGG(MEASURE<INT64>) -> INT64)
+              +-GetStructField
+                +-type=MEASURE<INT64>
+                +-expr=
+                | +-ColumnRef(type=STRUCT<m MEASURE<INT64>>, column=$subquery1.s#3)
+                +-field_idx=0
+
+[REWRITTEN AST]
+QueryStmt
++-output_column_list=
+| +-$aggregate.$agg1#4 AS `$col1` [INT64]
++-query=
+  +-ProjectScan
+    +-column_list=[$aggregate.$agg1#4]
+    +-input_scan=
+      +-ProjectScan
+        +-column_list=[$aggregate.$agg1#4]
+        +-expr_list=
+        | +-$agg1#4 :=
+        |   +-FunctionCall(GoogleSQL:$add(INT64, INT64) -> INT64)
+        |     +-ColumnRef(type=INT64, column=$aggregate.constituent_aggregate_1#8)
+        |     +-Literal(type=INT64, value=1)
+        +-input_scan=
+          +-AggregateScan
+            +-column_list=[$aggregate.constituent_aggregate_1#8]
+            +-input_scan=
+            | +-ProjectScan
+            |   +-column_list=[$subquery1.s#3, $aggregate.agg_arg#5, $aggregate.dep_closure#7]
+            |   +-expr_list=
+            |   | +-dep_closure#7 :=
+            |   |   +-GetStructField
+            |   |     +-type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>
+            |   |     +-expr=
+            |   |     | +-GetStructField
+            |   |     |   +-type=STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>
+            |   |     |   +-expr=
+            |   |     |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>, column=$aggregate.agg_arg#5)
+            |   |     |   +-field_idx=0
+            |   |     +-field_idx=0
+            |   +-input_scan=
+            |     +-ProjectScan
+            |       +-column_list=[$subquery1.s#3, $aggregate.agg_arg#5]
+            |       +-expr_list=
+            |       | +-agg_arg#5 :=
+            |       |   +-GetStructField
+            |       |     +-type=STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>
+            |       |     +-expr=
+            |       |     | +-ColumnRef(type=STRUCT<m STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>>, column=$subquery1.s#3)
+            |       |     +-field_idx=0
+            |       +-input_scan=
+            |         +-ProjectScan
+            |           +-column_list=[$subquery1.s#3]
+            |           +-expr_list=
+            |           | +-s#3 :=
+            |           |   +-MakeStruct
+            |           |     +-type=STRUCT<m STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>>
+            |           |     +-field_list=
+            |           |       +-FunctionCall(GoogleSQL:if(BOOL, STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>, STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>) -> STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>)
+            |           |         +-FunctionCall(GoogleSQL:$is_null(STRUCT<price INT64, key INT64>) -> BOOL)
+            |           |         | +-ColumnRef(type=STRUCT<price INT64, key INT64>, column=tvf_returning_derived_measure_row_type.$row_type_col$scanrow#11)
+            |           |         +-Literal(type=STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>, value=NULL)
+            |           |         +-MakeStruct
+            |           |           +-type=STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>
+            |           |           +-field_list=
+            |           |             +-MakeStruct
+            |           |             | +-type=STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>
+            |           |             | +-field_list=
+            |           |             |   +-FunctionCall(GoogleSQL:if(BOOL, STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>) -> STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>)
+            |           |             |     +-FunctionCall(GoogleSQL:$is_null(STRUCT<price INT64, key INT64>) -> BOOL)
+            |           |             |     | +-ColumnRef(type=STRUCT<price INT64, key INT64>, column=tvf_returning_derived_measure_row_type.$row_type_col$scanrow#11)
+            |           |             |     +-Literal(type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, value=NULL)
+            |           |             |     +-MakeStruct
+            |           |             |       +-type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>
+            |           |             |       +-field_list=
+            |           |             |         +-MakeStruct
+            |           |             |         | +-type=STRUCT<price INT64>
+            |           |             |         | +-field_list=
+            |           |             |         |   +-GetStructField
+            |           |             |         |     +-type=INT64
+            |           |             |         |     +-expr=
+            |           |             |         |     | +-ColumnRef(type=STRUCT<price INT64, key INT64>, column=tvf_returning_derived_measure_row_type.$row_type_col$scanrow#11)
+            |           |             |         |     +-field_idx=0
+            |           |             |         +-MakeStruct
+            |           |             |           +-type=STRUCT<key INT64>
+            |           |             |           +-field_list=
+            |           |             |             +-GetStructField
+            |           |             |               +-type=INT64
+            |           |             |               +-expr=
+            |           |             |               | +-ColumnRef(type=STRUCT<price INT64, key INT64>, column=tvf_returning_derived_measure_row_type.$row_type_col$scanrow#11)
+            |           |             |               +-field_idx=1
+            |           |             +-MakeStruct
+            |           |               +-type=STRUCT<key INT64>
+            |           |               +-field_list=
+            |           |                 +-GetStructField
+            |           |                   +-type=INT64
+            |           |                   +-expr=
+            |           |                   | +-ColumnRef(type=STRUCT<price INT64, key INT64>, column=tvf_returning_derived_measure_row_type.$row_type_col$scanrow#11)
+            |           |                   +-field_idx=1
+            |           +-input_scan=
+            |             +-TVFScan(column_list=[tvf_returning_derived_measure_row_type.$row_type_col$scanrow#11], tvf=tvf_returning_derived_measure_row_type, signature=() -> TABLE<normal_col_1 STRING, row_type_col STRUCT<price INT64, key INT64>>, column_index_list=[1], function_call_signature=() -> ANY TABLE)
+            +-aggregate_list=
+              +-constituent_aggregate_1#8 :=
+                +-AggregateFunctionCall(GoogleSQL:sum(INT64) -> INT64)
+                  +-ColumnRef(type=INT64, column=$aggregate.$any_value_grain_lock_0#9)
+                  +-where_expr=
+                  | +-FunctionCall(GoogleSQL:$not(BOOL) -> BOOL)
+                  |   +-FunctionCall(GoogleSQL:$is_null(STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>) -> BOOL)
+                  |     +-ColumnRef(type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, column=$aggregate.dep_closure#7)
+                  +-group_by_list=
+                  | +-grain_lock_key#10 :=
+                  |   +-GetStructField
+                  |     +-type=STRUCT<key INT64>
+                  |     +-expr=
+                  |     | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, column=$aggregate.dep_closure#7)
+                  |     +-field_idx=1
+                  +-group_by_aggregate_list=
+                    +-$any_value_grain_lock_0#9 :=
+                      +-AggregateFunctionCall(GoogleSQL:any_value(INT64) -> INT64)
+                        +-GetStructField
+                          +-type=INT64
+                          +-expr=
+                          | +-GetStructField
+                          |   +-type=STRUCT<price INT64>
+                          |   +-expr=
+                          |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, column=$aggregate.dep_closure#7)
+                          |   +-field_idx=0
+                          +-field_idx=0
+==
+
+# Scenario 5: Multiple derived measures from different row variables
+SELECT AGG(t1.row_type_col.measure_derived_sum_price_plus_one),
+       AGG(t2.row_type_col.measure_derived_sum_price_plus_one)
+FROM tvf_returning_derived_measure_row_type() AS t1
+CROSS JOIN tvf_returning_derived_measure_row_type() AS t2;
+--
+QueryStmt
++-output_column_list=
+| +-$aggregate.$agg1#5 AS `$col1` [INT64]
+| +-$aggregate.$agg2#6 AS `$col2` [INT64]
++-query=
+  +-ProjectScan
+    +-column_list=$aggregate.[$agg1#5, $agg2#6]
+    +-input_scan=
+      +-AggregateScan
+        +-column_list=$aggregate.[$agg1#5, $agg2#6]
+        +-input_scan=
+        | +-JoinScan
+        |   +-column_list=tvf_returning_derived_measure_row_type.[row_type_col#2, row_type_col#4]
+        |   +-left_scan=
+        |   | +-TVFScan(column_list=[tvf_returning_derived_measure_row_type.row_type_col#2], tvf=tvf_returning_derived_measure_row_type, signature=() -> TABLE<normal_col_1 STRING, row_type_col ROW<MeasureTable_Derived>> (table: table_for_tvf_returning_derived_measure_row_type), column_index_list=[1], alias="t1", function_call_signature=() -> ANY TABLE)
+        |   +-right_scan=
+        |     +-TVFScan(column_list=[tvf_returning_derived_measure_row_type.row_type_col#4], tvf=tvf_returning_derived_measure_row_type, signature=() -> TABLE<normal_col_1 STRING, row_type_col ROW<MeasureTable_Derived>> (table: table_for_tvf_returning_derived_measure_row_type), column_index_list=[1], alias="t2", function_call_signature=() -> ANY TABLE)
+        +-aggregate_list=
+          +-$agg1#5 :=
+          | +-AggregateFunctionCall(GoogleSQL:AGG(MEASURE<INT64>) -> INT64)
+          |   +-GetRowField
+          |     +-type=MEASURE<INT64>
+          |     +-expr=
+          |     | +-ColumnRef(type=ROW<MeasureTable_Derived>, column=tvf_returning_derived_measure_row_type.row_type_col#2)
+          |     +-column=MeasureTable_Derived.measure_derived_sum_price_plus_one
+          +-$agg2#6 :=
+            +-AggregateFunctionCall(GoogleSQL:AGG(MEASURE<INT64>) -> INT64)
+              +-GetRowField
+                +-type=MEASURE<INT64>
+                +-expr=
+                | +-ColumnRef(type=ROW<MeasureTable_Derived>, column=tvf_returning_derived_measure_row_type.row_type_col#4)
+                +-column=MeasureTable_Derived.measure_derived_sum_price_plus_one
+
+[REWRITTEN AST]
+QueryStmt
++-output_column_list=
+| +-$aggregate.$agg1#5 AS `$col1` [INT64]
+| +-$aggregate.$agg2#6 AS `$col2` [INT64]
++-query=
+  +-ProjectScan
+    +-column_list=$aggregate.[$agg1#5, $agg2#6]
+    +-input_scan=
+      +-ProjectScan
+        +-column_list=$aggregate.[$agg1#5, $agg2#6]
+        +-expr_list=
+        | +-$agg1#5 :=
+        | | +-FunctionCall(GoogleSQL:$add(INT64, INT64) -> INT64)
+        | |   +-ColumnRef(type=INT64, column=$aggregate.constituent_aggregate_1#10)
+        | |   +-Literal(type=INT64, value=1)
+        | +-$agg2#6 :=
+        |   +-FunctionCall(GoogleSQL:$add(INT64, INT64) -> INT64)
+        |     +-ColumnRef(type=INT64, column=$aggregate.constituent_aggregate_1#16)
+        |     +-Literal(type=INT64, value=1)
+        +-input_scan=
+          +-AggregateScan
+            +-column_list=$aggregate.[constituent_aggregate_1#10, constituent_aggregate_1#16]
+            +-input_scan=
+            | +-ProjectScan
+            |   +-column_list=[tvf_returning_derived_measure_row_type.$row_type_col$scanrow#20, tvf_returning_derived_measure_row_type.$row_type_col$scanrow#19, $aggregate.agg_arg#7, $aggregate.dep_closure#9, $aggregate.agg_arg#13, $aggregate.dep_closure#15]
+            |   +-expr_list=
+            |   | +-dep_closure#15 :=
+            |   |   +-GetStructField
+            |   |     +-type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>
+            |   |     +-expr=
+            |   |     | +-GetStructField
+            |   |     |   +-type=STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>
+            |   |     |   +-expr=
+            |   |     |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>, column=$aggregate.agg_arg#13)
+            |   |     |   +-field_idx=0
+            |   |     +-field_idx=0
+            |   +-input_scan=
+            |     +-ProjectScan
+            |       +-column_list=[tvf_returning_derived_measure_row_type.$row_type_col$scanrow#20, tvf_returning_derived_measure_row_type.$row_type_col$scanrow#19, $aggregate.agg_arg#7, $aggregate.dep_closure#9, $aggregate.agg_arg#13]
+            |       +-expr_list=
+            |       | +-agg_arg#13 :=
+            |       |   +-FunctionCall(GoogleSQL:if(BOOL, STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>, STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>) -> STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>)
+            |       |     +-FunctionCall(GoogleSQL:$is_null(STRUCT<price INT64, key INT64>) -> BOOL)
+            |       |     | +-ColumnRef(type=STRUCT<price INT64, key INT64>, column=tvf_returning_derived_measure_row_type.$row_type_col$scanrow#19)
+            |       |     +-Literal(type=STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>, value=NULL)
+            |       |     +-MakeStruct
+            |       |       +-type=STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>
+            |       |       +-field_list=
+            |       |         +-MakeStruct
+            |       |         | +-type=STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>
+            |       |         | +-field_list=
+            |       |         |   +-FunctionCall(GoogleSQL:if(BOOL, STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>) -> STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>)
+            |       |         |     +-FunctionCall(GoogleSQL:$is_null(STRUCT<price INT64, key INT64>) -> BOOL)
+            |       |         |     | +-ColumnRef(type=STRUCT<price INT64, key INT64>, column=tvf_returning_derived_measure_row_type.$row_type_col$scanrow#19)
+            |       |         |     +-Literal(type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, value=NULL)
+            |       |         |     +-MakeStruct
+            |       |         |       +-type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>
+            |       |         |       +-field_list=
+            |       |         |         +-MakeStruct
+            |       |         |         | +-type=STRUCT<price INT64>
+            |       |         |         | +-field_list=
+            |       |         |         |   +-GetStructField
+            |       |         |         |     +-type=INT64
+            |       |         |         |     +-expr=
+            |       |         |         |     | +-ColumnRef(type=STRUCT<price INT64, key INT64>, column=tvf_returning_derived_measure_row_type.$row_type_col$scanrow#19)
+            |       |         |         |     +-field_idx=0
+            |       |         |         +-MakeStruct
+            |       |         |           +-type=STRUCT<key INT64>
+            |       |         |           +-field_list=
+            |       |         |             +-GetStructField
+            |       |         |               +-type=INT64
+            |       |         |               +-expr=
+            |       |         |               | +-ColumnRef(type=STRUCT<price INT64, key INT64>, column=tvf_returning_derived_measure_row_type.$row_type_col$scanrow#19)
+            |       |         |               +-field_idx=1
+            |       |         +-MakeStruct
+            |       |           +-type=STRUCT<key INT64>
+            |       |           +-field_list=
+            |       |             +-GetStructField
+            |       |               +-type=INT64
+            |       |               +-expr=
+            |       |               | +-ColumnRef(type=STRUCT<price INT64, key INT64>, column=tvf_returning_derived_measure_row_type.$row_type_col$scanrow#19)
+            |       |               +-field_idx=1
+            |       +-input_scan=
+            |         +-ProjectScan
+            |           +-column_list=[tvf_returning_derived_measure_row_type.$row_type_col$scanrow#20, tvf_returning_derived_measure_row_type.$row_type_col$scanrow#19, $aggregate.agg_arg#7, $aggregate.dep_closure#9]
+            |           +-expr_list=
+            |           | +-dep_closure#9 :=
+            |           |   +-GetStructField
+            |           |     +-type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>
+            |           |     +-expr=
+            |           |     | +-GetStructField
+            |           |     |   +-type=STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>
+            |           |     |   +-expr=
+            |           |     |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>, column=$aggregate.agg_arg#7)
+            |           |     |   +-field_idx=0
+            |           |     +-field_idx=0
+            |           +-input_scan=
+            |             +-ProjectScan
+            |               +-column_list=[tvf_returning_derived_measure_row_type.$row_type_col$scanrow#20, tvf_returning_derived_measure_row_type.$row_type_col$scanrow#19, $aggregate.agg_arg#7]
+            |               +-expr_list=
+            |               | +-agg_arg#7 :=
+            |               |   +-FunctionCall(GoogleSQL:if(BOOL, STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>, STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>) -> STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>)
+            |               |     +-FunctionCall(GoogleSQL:$is_null(STRUCT<price INT64, key INT64>) -> BOOL)
+            |               |     | +-ColumnRef(type=STRUCT<price INT64, key INT64>, column=tvf_returning_derived_measure_row_type.$row_type_col$scanrow#20)
+            |               |     +-Literal(type=STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>, value=NULL)
+            |               |     +-MakeStruct
+            |               |       +-type=STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>
+            |               |       +-field_list=
+            |               |         +-MakeStruct
+            |               |         | +-type=STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>
+            |               |         | +-field_list=
+            |               |         |   +-FunctionCall(GoogleSQL:if(BOOL, STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>) -> STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>)
+            |               |         |     +-FunctionCall(GoogleSQL:$is_null(STRUCT<price INT64, key INT64>) -> BOOL)
+            |               |         |     | +-ColumnRef(type=STRUCT<price INT64, key INT64>, column=tvf_returning_derived_measure_row_type.$row_type_col$scanrow#20)
+            |               |         |     +-Literal(type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, value=NULL)
+            |               |         |     +-MakeStruct
+            |               |         |       +-type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>
+            |               |         |       +-field_list=
+            |               |         |         +-MakeStruct
+            |               |         |         | +-type=STRUCT<price INT64>
+            |               |         |         | +-field_list=
+            |               |         |         |   +-GetStructField
+            |               |         |         |     +-type=INT64
+            |               |         |         |     +-expr=
+            |               |         |         |     | +-ColumnRef(type=STRUCT<price INT64, key INT64>, column=tvf_returning_derived_measure_row_type.$row_type_col$scanrow#20)
+            |               |         |         |     +-field_idx=0
+            |               |         |         +-MakeStruct
+            |               |         |           +-type=STRUCT<key INT64>
+            |               |         |           +-field_list=
+            |               |         |             +-GetStructField
+            |               |         |               +-type=INT64
+            |               |         |               +-expr=
+            |               |         |               | +-ColumnRef(type=STRUCT<price INT64, key INT64>, column=tvf_returning_derived_measure_row_type.$row_type_col$scanrow#20)
+            |               |         |               +-field_idx=1
+            |               |         +-MakeStruct
+            |               |           +-type=STRUCT<key INT64>
+            |               |           +-field_list=
+            |               |             +-GetStructField
+            |               |               +-type=INT64
+            |               |               +-expr=
+            |               |               | +-ColumnRef(type=STRUCT<price INT64, key INT64>, column=tvf_returning_derived_measure_row_type.$row_type_col$scanrow#20)
+            |               |               +-field_idx=1
+            |               +-input_scan=
+            |                 +-JoinScan
+            |                   +-column_list=tvf_returning_derived_measure_row_type.[$row_type_col$scanrow#20, $row_type_col$scanrow#19]
+            |                   +-left_scan=
+            |                   | +-TVFScan(column_list=[tvf_returning_derived_measure_row_type.$row_type_col$scanrow#20], tvf=tvf_returning_derived_measure_row_type, signature=() -> TABLE<normal_col_1 STRING, row_type_col STRUCT<price INT64, key INT64>>, column_index_list=[1], alias="t1", function_call_signature=() -> ANY TABLE)
+            |                   +-right_scan=
+            |                     +-TVFScan(column_list=[tvf_returning_derived_measure_row_type.$row_type_col$scanrow#19], tvf=tvf_returning_derived_measure_row_type, signature=() -> TABLE<normal_col_1 STRING, row_type_col STRUCT<price INT64, key INT64>>, column_index_list=[1], alias="t2", function_call_signature=() -> ANY TABLE)
+            +-aggregate_list=
+              +-constituent_aggregate_1#10 :=
+              | +-AggregateFunctionCall(GoogleSQL:sum(INT64) -> INT64)
+              |   +-ColumnRef(type=INT64, column=$aggregate.$any_value_grain_lock_0#11)
+              |   +-where_expr=
+              |   | +-FunctionCall(GoogleSQL:$not(BOOL) -> BOOL)
+              |   |   +-FunctionCall(GoogleSQL:$is_null(STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>) -> BOOL)
+              |   |     +-ColumnRef(type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, column=$aggregate.dep_closure#9)
+              |   +-group_by_list=
+              |   | +-grain_lock_key#12 :=
+              |   |   +-GetStructField
+              |   |     +-type=STRUCT<key INT64>
+              |   |     +-expr=
+              |   |     | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, column=$aggregate.dep_closure#9)
+              |   |     +-field_idx=1
+              |   +-group_by_aggregate_list=
+              |     +-$any_value_grain_lock_0#11 :=
+              |       +-AggregateFunctionCall(GoogleSQL:any_value(INT64) -> INT64)
+              |         +-GetStructField
+              |           +-type=INT64
+              |           +-expr=
+              |           | +-GetStructField
+              |           |   +-type=STRUCT<price INT64>
+              |           |   +-expr=
+              |           |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, column=$aggregate.dep_closure#9)
+              |           |   +-field_idx=0
+              |           +-field_idx=0
+              +-constituent_aggregate_1#16 :=
+                +-AggregateFunctionCall(GoogleSQL:sum(INT64) -> INT64)
+                  +-ColumnRef(type=INT64, column=$aggregate.$any_value_grain_lock_0#17)
+                  +-where_expr=
+                  | +-FunctionCall(GoogleSQL:$not(BOOL) -> BOOL)
+                  |   +-FunctionCall(GoogleSQL:$is_null(STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>) -> BOOL)
+                  |     +-ColumnRef(type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, column=$aggregate.dep_closure#15)
+                  +-group_by_list=
+                  | +-grain_lock_key#18 :=
+                  |   +-GetStructField
+                  |     +-type=STRUCT<key INT64>
+                  |     +-expr=
+                  |     | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, column=$aggregate.dep_closure#15)
+                  |     +-field_idx=1
+                  +-group_by_aggregate_list=
+                    +-$any_value_grain_lock_0#17 :=
+                      +-AggregateFunctionCall(GoogleSQL:any_value(INT64) -> INT64)
+                        +-GetStructField
+                          +-type=INT64
+                          +-expr=
+                          | +-GetStructField
+                          |   +-type=STRUCT<price INT64>
+                          |   +-expr=
+                          |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, column=$aggregate.dep_closure#15)
+                          |   +-field_idx=0
+                          +-field_idx=0
+==
+
+# Scenario 6: Error Scenario: Returning MEASURE at top-level
+# Verifies that a query selecting a row-type derived measure directly without an outer
+# aggregate is still rejected by the analyzer with the standard MEASURE error.
+SELECT row_type_col.measure_derived_sum_price_plus_one
+FROM tvf_returning_derived_measure_row_type();
+--
+ERROR: Returning expressions of type MEASURE is not allowed [at 1:1]
+SELECT row_type_col.measure_derived_sum_price_plus_one
+^
+==
+
+# Scenario 7: Accessing non-measure fields of row type
+SELECT row_type_col.key, AGG(row_type_col.measure_derived_sum_price_plus_one)
+FROM tvf_returning_derived_measure_row_type()
+GROUP BY 1;
+--
+QueryStmt
++-output_column_list=
+| +-$groupby.key#4 AS key [INT64]
+| +-$aggregate.$agg1#3 AS `$col2` [INT64]
++-query=
+  +-ProjectScan
+    +-column_list=[$groupby.key#4, $aggregate.$agg1#3]
+    +-input_scan=
+      +-AggregateScan
+        +-column_list=[$groupby.key#4, $aggregate.$agg1#3]
+        +-input_scan=
+        | +-TVFScan(column_list=[tvf_returning_derived_measure_row_type.row_type_col#2], tvf=tvf_returning_derived_measure_row_type, signature=() -> TABLE<normal_col_1 STRING, row_type_col ROW<MeasureTable_Derived>> (table: table_for_tvf_returning_derived_measure_row_type), column_index_list=[1], function_call_signature=() -> ANY TABLE)
+        +-group_by_list=
+        | +-key#4 :=
+        |   +-GetRowField
+        |     +-type=INT64
+        |     +-expr=
+        |     | +-ColumnRef(type=ROW<MeasureTable_Derived>, column=tvf_returning_derived_measure_row_type.row_type_col#2)
+        |     +-column=MeasureTable_Derived.key
+        +-aggregate_list=
+          +-$agg1#3 :=
+            +-AggregateFunctionCall(GoogleSQL:AGG(MEASURE<INT64>) -> INT64)
+              +-GetRowField
+                +-type=MEASURE<INT64>
+                +-expr=
+                | +-ColumnRef(type=ROW<MeasureTable_Derived>, column=tvf_returning_derived_measure_row_type.row_type_col#2)
+                +-column=MeasureTable_Derived.measure_derived_sum_price_plus_one
+
+[REWRITTEN AST]
+QueryStmt
++-output_column_list=
+| +-$groupby.key#4 AS key [INT64]
+| +-$aggregate.$agg1#3 AS `$col2` [INT64]
++-query=
+  +-ProjectScan
+    +-column_list=[$groupby.key#4, $aggregate.$agg1#3]
+    +-input_scan=
+      +-ProjectScan
+        +-column_list=[$groupby.key#4, $aggregate.$agg1#3]
+        +-expr_list=
+        | +-$agg1#3 :=
+        |   +-FunctionCall(GoogleSQL:$add(INT64, INT64) -> INT64)
+        |     +-ColumnRef(type=INT64, column=$aggregate.constituent_aggregate_1#8)
+        |     +-Literal(type=INT64, value=1)
+        +-input_scan=
+          +-AggregateScan
+            +-column_list=[$groupby.key#4, $aggregate.constituent_aggregate_1#8]
+            +-input_scan=
+            | +-ProjectScan
+            |   +-column_list=[tvf_returning_derived_measure_row_type.$row_type_col$scanrow#11, $aggregate.agg_arg#5, $aggregate.dep_closure#7]
+            |   +-expr_list=
+            |   | +-dep_closure#7 :=
+            |   |   +-GetStructField
+            |   |     +-type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>
+            |   |     +-expr=
+            |   |     | +-GetStructField
+            |   |     |   +-type=STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>
+            |   |     |   +-expr=
+            |   |     |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>, column=$aggregate.agg_arg#5)
+            |   |     |   +-field_idx=0
+            |   |     +-field_idx=0
+            |   +-input_scan=
+            |     +-ProjectScan
+            |       +-column_list=[tvf_returning_derived_measure_row_type.$row_type_col$scanrow#11, $aggregate.agg_arg#5]
+            |       +-expr_list=
+            |       | +-agg_arg#5 :=
+            |       |   +-FunctionCall(GoogleSQL:if(BOOL, STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>, STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>) -> STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>)
+            |       |     +-FunctionCall(GoogleSQL:$is_null(STRUCT<price INT64, key INT64>) -> BOOL)
+            |       |     | +-ColumnRef(type=STRUCT<price INT64, key INT64>, column=tvf_returning_derived_measure_row_type.$row_type_col$scanrow#11)
+            |       |     +-Literal(type=STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>, value=NULL)
+            |       |     +-MakeStruct
+            |       |       +-type=STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>
+            |       |       +-field_list=
+            |       |         +-MakeStruct
+            |       |         | +-type=STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>
+            |       |         | +-field_list=
+            |       |         |   +-FunctionCall(GoogleSQL:if(BOOL, STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>) -> STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>)
+            |       |         |     +-FunctionCall(GoogleSQL:$is_null(STRUCT<price INT64, key INT64>) -> BOOL)
+            |       |         |     | +-ColumnRef(type=STRUCT<price INT64, key INT64>, column=tvf_returning_derived_measure_row_type.$row_type_col$scanrow#11)
+            |       |         |     +-Literal(type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, value=NULL)
+            |       |         |     +-MakeStruct
+            |       |         |       +-type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>
+            |       |         |       +-field_list=
+            |       |         |         +-MakeStruct
+            |       |         |         | +-type=STRUCT<price INT64>
+            |       |         |         | +-field_list=
+            |       |         |         |   +-GetStructField
+            |       |         |         |     +-type=INT64
+            |       |         |         |     +-expr=
+            |       |         |         |     | +-ColumnRef(type=STRUCT<price INT64, key INT64>, column=tvf_returning_derived_measure_row_type.$row_type_col$scanrow#11)
+            |       |         |         |     +-field_idx=0
+            |       |         |         +-MakeStruct
+            |       |         |           +-type=STRUCT<key INT64>
+            |       |         |           +-field_list=
+            |       |         |             +-GetStructField
+            |       |         |               +-type=INT64
+            |       |         |               +-expr=
+            |       |         |               | +-ColumnRef(type=STRUCT<price INT64, key INT64>, column=tvf_returning_derived_measure_row_type.$row_type_col$scanrow#11)
+            |       |         |               +-field_idx=1
+            |       |         +-MakeStruct
+            |       |           +-type=STRUCT<key INT64>
+            |       |           +-field_list=
+            |       |             +-GetStructField
+            |       |               +-type=INT64
+            |       |               +-expr=
+            |       |               | +-ColumnRef(type=STRUCT<price INT64, key INT64>, column=tvf_returning_derived_measure_row_type.$row_type_col$scanrow#11)
+            |       |               +-field_idx=1
+            |       +-input_scan=
+            |         +-TVFScan(column_list=[tvf_returning_derived_measure_row_type.$row_type_col$scanrow#11], tvf=tvf_returning_derived_measure_row_type, signature=() -> TABLE<normal_col_1 STRING, row_type_col STRUCT<price INT64, key INT64>>, column_index_list=[1], function_call_signature=() -> ANY TABLE)
+            +-group_by_list=
+            | +-key#4 :=
+            |   +-GetStructField
+            |     +-type=INT64
+            |     +-expr=
+            |     | +-ColumnRef(type=STRUCT<price INT64, key INT64>, column=tvf_returning_derived_measure_row_type.$row_type_col$scanrow#11)
+            |     +-field_idx=1
+            +-aggregate_list=
+              +-constituent_aggregate_1#8 :=
+                +-AggregateFunctionCall(GoogleSQL:sum(INT64) -> INT64)
+                  +-ColumnRef(type=INT64, column=$aggregate.$any_value_grain_lock_0#9)
+                  +-where_expr=
+                  | +-FunctionCall(GoogleSQL:$not(BOOL) -> BOOL)
+                  |   +-FunctionCall(GoogleSQL:$is_null(STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>) -> BOOL)
+                  |     +-ColumnRef(type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, column=$aggregate.dep_closure#7)
+                  +-group_by_list=
+                  | +-grain_lock_key#10 :=
+                  |   +-GetStructField
+                  |     +-type=STRUCT<key INT64>
+                  |     +-expr=
+                  |     | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, column=$aggregate.dep_closure#7)
+                  |     +-field_idx=1
+                  +-group_by_aggregate_list=
+                    +-$any_value_grain_lock_0#9 :=
+                      +-AggregateFunctionCall(GoogleSQL:any_value(INT64) -> INT64)
+                        +-GetStructField
+                          +-type=INT64
+                          +-expr=
+                          | +-GetStructField
+                          |   +-type=STRUCT<price INT64>
+                          |   +-expr=
+                          |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, column=$aggregate.dep_closure#7)
+                          |   +-field_idx=0
+                          +-field_idx=0
+==
+
+# Scenario 8: Left outer join with row-type derived measures
+SELECT
+  AGG(t2.row_type_col.measure_derived_sum_price_plus_one)
+FROM
+  tvf_returning_derived_measure_row_type() AS t1
+  LEFT OUTER JOIN
+  tvf_returning_derived_measure_row_type() AS t2
+  ON t1.row_type_col.key = t2.row_type_col.key;
+--
+QueryStmt
++-output_column_list=
+| +-$aggregate.$agg1#5 AS `$col1` [INT64]
++-query=
+  +-ProjectScan
+    +-column_list=[$aggregate.$agg1#5]
+    +-input_scan=
+      +-AggregateScan
+        +-column_list=[$aggregate.$agg1#5]
+        +-input_scan=
+        | +-JoinScan
+        |   +-column_list=tvf_returning_derived_measure_row_type.[row_type_col#2, row_type_col#4]
+        |   +-join_type=LEFT
+        |   +-left_scan=
+        |   | +-TVFScan(column_list=[tvf_returning_derived_measure_row_type.row_type_col#2], tvf=tvf_returning_derived_measure_row_type, signature=() -> TABLE<normal_col_1 STRING, row_type_col ROW<MeasureTable_Derived>> (table: table_for_tvf_returning_derived_measure_row_type), column_index_list=[1], alias="t1", function_call_signature=() -> ANY TABLE)
+        |   +-right_scan=
+        |   | +-TVFScan(column_list=[tvf_returning_derived_measure_row_type.row_type_col#4], tvf=tvf_returning_derived_measure_row_type, signature=() -> TABLE<normal_col_1 STRING, row_type_col ROW<MeasureTable_Derived>> (table: table_for_tvf_returning_derived_measure_row_type), column_index_list=[1], alias="t2", function_call_signature=() -> ANY TABLE)
+        |   +-join_expr=
+        |     +-FunctionCall(GoogleSQL:$equal(INT64, INT64) -> BOOL)
+        |       +-GetRowField
+        |       | +-type=INT64
+        |       | +-expr=
+        |       | | +-ColumnRef(type=ROW<MeasureTable_Derived>, column=tvf_returning_derived_measure_row_type.row_type_col#2)
+        |       | +-column=MeasureTable_Derived.key
+        |       +-GetRowField
+        |         +-type=INT64
+        |         +-expr=
+        |         | +-ColumnRef(type=ROW<MeasureTable_Derived>, column=tvf_returning_derived_measure_row_type.row_type_col#4)
+        |         +-column=MeasureTable_Derived.key
+        +-aggregate_list=
+          +-$agg1#5 :=
+            +-AggregateFunctionCall(GoogleSQL:AGG(MEASURE<INT64>) -> INT64)
+              +-GetRowField
+                +-type=MEASURE<INT64>
+                +-expr=
+                | +-ColumnRef(type=ROW<MeasureTable_Derived>, column=tvf_returning_derived_measure_row_type.row_type_col#4)
+                +-column=MeasureTable_Derived.measure_derived_sum_price_plus_one
+
+[REWRITTEN AST]
+QueryStmt
++-output_column_list=
+| +-$aggregate.$agg1#5 AS `$col1` [INT64]
++-query=
+  +-ProjectScan
+    +-column_list=[$aggregate.$agg1#5]
+    +-input_scan=
+      +-ProjectScan
+        +-column_list=[$aggregate.$agg1#5]
+        +-expr_list=
+        | +-$agg1#5 :=
+        |   +-FunctionCall(GoogleSQL:$add(INT64, INT64) -> INT64)
+        |     +-ColumnRef(type=INT64, column=$aggregate.constituent_aggregate_1#9)
+        |     +-Literal(type=INT64, value=1)
+        +-input_scan=
+          +-AggregateScan
+            +-column_list=[$aggregate.constituent_aggregate_1#9]
+            +-input_scan=
+            | +-ProjectScan
+            |   +-column_list=[tvf_returning_derived_measure_row_type.$row_type_col$scanrow#13, tvf_returning_derived_measure_row_type.$row_type_col$scanrow#12, $aggregate.agg_arg#6, $aggregate.dep_closure#8]
+            |   +-expr_list=
+            |   | +-dep_closure#8 :=
+            |   |   +-GetStructField
+            |   |     +-type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>
+            |   |     +-expr=
+            |   |     | +-GetStructField
+            |   |     |   +-type=STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>
+            |   |     |   +-expr=
+            |   |     |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>, column=$aggregate.agg_arg#6)
+            |   |     |   +-field_idx=0
+            |   |     +-field_idx=0
+            |   +-input_scan=
+            |     +-ProjectScan
+            |       +-column_list=[tvf_returning_derived_measure_row_type.$row_type_col$scanrow#13, tvf_returning_derived_measure_row_type.$row_type_col$scanrow#12, $aggregate.agg_arg#6]
+            |       +-expr_list=
+            |       | +-agg_arg#6 :=
+            |       |   +-FunctionCall(GoogleSQL:if(BOOL, STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>, STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>) -> STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>)
+            |       |     +-FunctionCall(GoogleSQL:$is_null(STRUCT<price INT64, key INT64>) -> BOOL)
+            |       |     | +-ColumnRef(type=STRUCT<price INT64, key INT64>, column=tvf_returning_derived_measure_row_type.$row_type_col$scanrow#12)
+            |       |     +-Literal(type=STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>, value=NULL)
+            |       |     +-MakeStruct
+            |       |       +-type=STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>
+            |       |       +-field_list=
+            |       |         +-MakeStruct
+            |       |         | +-type=STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>
+            |       |         | +-field_list=
+            |       |         |   +-FunctionCall(GoogleSQL:if(BOOL, STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>) -> STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>)
+            |       |         |     +-FunctionCall(GoogleSQL:$is_null(STRUCT<price INT64, key INT64>) -> BOOL)
+            |       |         |     | +-ColumnRef(type=STRUCT<price INT64, key INT64>, column=tvf_returning_derived_measure_row_type.$row_type_col$scanrow#12)
+            |       |         |     +-Literal(type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, value=NULL)
+            |       |         |     +-MakeStruct
+            |       |         |       +-type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>
+            |       |         |       +-field_list=
+            |       |         |         +-MakeStruct
+            |       |         |         | +-type=STRUCT<price INT64>
+            |       |         |         | +-field_list=
+            |       |         |         |   +-GetStructField
+            |       |         |         |     +-type=INT64
+            |       |         |         |     +-expr=
+            |       |         |         |     | +-ColumnRef(type=STRUCT<price INT64, key INT64>, column=tvf_returning_derived_measure_row_type.$row_type_col$scanrow#12)
+            |       |         |         |     +-field_idx=0
+            |       |         |         +-MakeStruct
+            |       |         |           +-type=STRUCT<key INT64>
+            |       |         |           +-field_list=
+            |       |         |             +-GetStructField
+            |       |         |               +-type=INT64
+            |       |         |               +-expr=
+            |       |         |               | +-ColumnRef(type=STRUCT<price INT64, key INT64>, column=tvf_returning_derived_measure_row_type.$row_type_col$scanrow#12)
+            |       |         |               +-field_idx=1
+            |       |         +-MakeStruct
+            |       |           +-type=STRUCT<key INT64>
+            |       |           +-field_list=
+            |       |             +-GetStructField
+            |       |               +-type=INT64
+            |       |               +-expr=
+            |       |               | +-ColumnRef(type=STRUCT<price INT64, key INT64>, column=tvf_returning_derived_measure_row_type.$row_type_col$scanrow#12)
+            |       |               +-field_idx=1
+            |       +-input_scan=
+            |         +-JoinScan
+            |           +-column_list=tvf_returning_derived_measure_row_type.[$row_type_col$scanrow#13, $row_type_col$scanrow#12]
+            |           +-join_type=LEFT
+            |           +-left_scan=
+            |           | +-TVFScan(column_list=[tvf_returning_derived_measure_row_type.$row_type_col$scanrow#13], tvf=tvf_returning_derived_measure_row_type, signature=() -> TABLE<normal_col_1 STRING, row_type_col STRUCT<price INT64, key INT64>>, column_index_list=[1], alias="t1", function_call_signature=() -> ANY TABLE)
+            |           +-right_scan=
+            |           | +-TVFScan(column_list=[tvf_returning_derived_measure_row_type.$row_type_col$scanrow#12], tvf=tvf_returning_derived_measure_row_type, signature=() -> TABLE<normal_col_1 STRING, row_type_col STRUCT<price INT64, key INT64>>, column_index_list=[1], alias="t2", function_call_signature=() -> ANY TABLE)
+            |           +-join_expr=
+            |             +-FunctionCall(GoogleSQL:$equal(INT64, INT64) -> BOOL)
+            |               +-GetStructField
+            |               | +-type=INT64
+            |               | +-expr=
+            |               | | +-ColumnRef(type=STRUCT<price INT64, key INT64>, column=tvf_returning_derived_measure_row_type.$row_type_col$scanrow#13)
+            |               | +-field_idx=1
+            |               +-GetStructField
+            |                 +-type=INT64
+            |                 +-expr=
+            |                 | +-ColumnRef(type=STRUCT<price INT64, key INT64>, column=tvf_returning_derived_measure_row_type.$row_type_col$scanrow#12)
+            |                 +-field_idx=1
+            +-aggregate_list=
+              +-constituent_aggregate_1#9 :=
+                +-AggregateFunctionCall(GoogleSQL:sum(INT64) -> INT64)
+                  +-ColumnRef(type=INT64, column=$aggregate.$any_value_grain_lock_0#10)
+                  +-where_expr=
+                  | +-FunctionCall(GoogleSQL:$not(BOOL) -> BOOL)
+                  |   +-FunctionCall(GoogleSQL:$is_null(STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>) -> BOOL)
+                  |     +-ColumnRef(type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, column=$aggregate.dep_closure#8)
+                  +-group_by_list=
+                  | +-grain_lock_key#11 :=
+                  |   +-GetStructField
+                  |     +-type=STRUCT<key INT64>
+                  |     +-expr=
+                  |     | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, column=$aggregate.dep_closure#8)
+                  |     +-field_idx=1
+                  +-group_by_aggregate_list=
+                    +-$any_value_grain_lock_0#10 :=
+                      +-AggregateFunctionCall(GoogleSQL:any_value(INT64) -> INT64)
+                        +-GetStructField
+                          +-type=INT64
+                          +-expr=
+                          | +-GetStructField
+                          |   +-type=STRUCT<price INT64>
+                          |   +-expr=
+                          |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, column=$aggregate.dep_closure#8)
+                          |   +-field_idx=0
+                          +-field_idx=0
+==
+
+# Scenario 9: Right outer join with row-type derived measures
+SELECT
+  AGG(t1.row_type_col.measure_derived_sum_price_plus_one)
+FROM
+  tvf_returning_derived_measure_row_type() AS t1
+  RIGHT OUTER JOIN
+  tvf_returning_derived_measure_row_type() AS t2
+  ON t1.row_type_col.key = t2.row_type_col.key;
+--
+QueryStmt
++-output_column_list=
+| +-$aggregate.$agg1#5 AS `$col1` [INT64]
++-query=
+  +-ProjectScan
+    +-column_list=[$aggregate.$agg1#5]
+    +-input_scan=
+      +-AggregateScan
+        +-column_list=[$aggregate.$agg1#5]
+        +-input_scan=
+        | +-JoinScan
+        |   +-column_list=tvf_returning_derived_measure_row_type.[row_type_col#2, row_type_col#4]
+        |   +-join_type=RIGHT
+        |   +-left_scan=
+        |   | +-TVFScan(column_list=[tvf_returning_derived_measure_row_type.row_type_col#2], tvf=tvf_returning_derived_measure_row_type, signature=() -> TABLE<normal_col_1 STRING, row_type_col ROW<MeasureTable_Derived>> (table: table_for_tvf_returning_derived_measure_row_type), column_index_list=[1], alias="t1", function_call_signature=() -> ANY TABLE)
+        |   +-right_scan=
+        |   | +-TVFScan(column_list=[tvf_returning_derived_measure_row_type.row_type_col#4], tvf=tvf_returning_derived_measure_row_type, signature=() -> TABLE<normal_col_1 STRING, row_type_col ROW<MeasureTable_Derived>> (table: table_for_tvf_returning_derived_measure_row_type), column_index_list=[1], alias="t2", function_call_signature=() -> ANY TABLE)
+        |   +-join_expr=
+        |     +-FunctionCall(GoogleSQL:$equal(INT64, INT64) -> BOOL)
+        |       +-GetRowField
+        |       | +-type=INT64
+        |       | +-expr=
+        |       | | +-ColumnRef(type=ROW<MeasureTable_Derived>, column=tvf_returning_derived_measure_row_type.row_type_col#2)
+        |       | +-column=MeasureTable_Derived.key
+        |       +-GetRowField
+        |         +-type=INT64
+        |         +-expr=
+        |         | +-ColumnRef(type=ROW<MeasureTable_Derived>, column=tvf_returning_derived_measure_row_type.row_type_col#4)
+        |         +-column=MeasureTable_Derived.key
+        +-aggregate_list=
+          +-$agg1#5 :=
+            +-AggregateFunctionCall(GoogleSQL:AGG(MEASURE<INT64>) -> INT64)
+              +-GetRowField
+                +-type=MEASURE<INT64>
+                +-expr=
+                | +-ColumnRef(type=ROW<MeasureTable_Derived>, column=tvf_returning_derived_measure_row_type.row_type_col#2)
+                +-column=MeasureTable_Derived.measure_derived_sum_price_plus_one
+
+[REWRITTEN AST]
+QueryStmt
++-output_column_list=
+| +-$aggregate.$agg1#5 AS `$col1` [INT64]
++-query=
+  +-ProjectScan
+    +-column_list=[$aggregate.$agg1#5]
+    +-input_scan=
+      +-ProjectScan
+        +-column_list=[$aggregate.$agg1#5]
+        +-expr_list=
+        | +-$agg1#5 :=
+        |   +-FunctionCall(GoogleSQL:$add(INT64, INT64) -> INT64)
+        |     +-ColumnRef(type=INT64, column=$aggregate.constituent_aggregate_1#9)
+        |     +-Literal(type=INT64, value=1)
+        +-input_scan=
+          +-AggregateScan
+            +-column_list=[$aggregate.constituent_aggregate_1#9]
+            +-input_scan=
+            | +-ProjectScan
+            |   +-column_list=[tvf_returning_derived_measure_row_type.$row_type_col$scanrow#12, tvf_returning_derived_measure_row_type.$row_type_col$scanrow#13, $aggregate.agg_arg#6, $aggregate.dep_closure#8]
+            |   +-expr_list=
+            |   | +-dep_closure#8 :=
+            |   |   +-GetStructField
+            |   |     +-type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>
+            |   |     +-expr=
+            |   |     | +-GetStructField
+            |   |     |   +-type=STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>
+            |   |     |   +-expr=
+            |   |     |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>, column=$aggregate.agg_arg#6)
+            |   |     |   +-field_idx=0
+            |   |     +-field_idx=0
+            |   +-input_scan=
+            |     +-ProjectScan
+            |       +-column_list=[tvf_returning_derived_measure_row_type.$row_type_col$scanrow#12, tvf_returning_derived_measure_row_type.$row_type_col$scanrow#13, $aggregate.agg_arg#6]
+            |       +-expr_list=
+            |       | +-agg_arg#6 :=
+            |       |   +-FunctionCall(GoogleSQL:if(BOOL, STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>, STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>) -> STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>)
+            |       |     +-FunctionCall(GoogleSQL:$is_null(STRUCT<price INT64, key INT64>) -> BOOL)
+            |       |     | +-ColumnRef(type=STRUCT<price INT64, key INT64>, column=tvf_returning_derived_measure_row_type.$row_type_col$scanrow#12)
+            |       |     +-Literal(type=STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>, value=NULL)
+            |       |     +-MakeStruct
+            |       |       +-type=STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>
+            |       |       +-field_list=
+            |       |         +-MakeStruct
+            |       |         | +-type=STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>
+            |       |         | +-field_list=
+            |       |         |   +-FunctionCall(GoogleSQL:if(BOOL, STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>) -> STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>)
+            |       |         |     +-FunctionCall(GoogleSQL:$is_null(STRUCT<price INT64, key INT64>) -> BOOL)
+            |       |         |     | +-ColumnRef(type=STRUCT<price INT64, key INT64>, column=tvf_returning_derived_measure_row_type.$row_type_col$scanrow#12)
+            |       |         |     +-Literal(type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, value=NULL)
+            |       |         |     +-MakeStruct
+            |       |         |       +-type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>
+            |       |         |       +-field_list=
+            |       |         |         +-MakeStruct
+            |       |         |         | +-type=STRUCT<price INT64>
+            |       |         |         | +-field_list=
+            |       |         |         |   +-GetStructField
+            |       |         |         |     +-type=INT64
+            |       |         |         |     +-expr=
+            |       |         |         |     | +-ColumnRef(type=STRUCT<price INT64, key INT64>, column=tvf_returning_derived_measure_row_type.$row_type_col$scanrow#12)
+            |       |         |         |     +-field_idx=0
+            |       |         |         +-MakeStruct
+            |       |         |           +-type=STRUCT<key INT64>
+            |       |         |           +-field_list=
+            |       |         |             +-GetStructField
+            |       |         |               +-type=INT64
+            |       |         |               +-expr=
+            |       |         |               | +-ColumnRef(type=STRUCT<price INT64, key INT64>, column=tvf_returning_derived_measure_row_type.$row_type_col$scanrow#12)
+            |       |         |               +-field_idx=1
+            |       |         +-MakeStruct
+            |       |           +-type=STRUCT<key INT64>
+            |       |           +-field_list=
+            |       |             +-GetStructField
+            |       |               +-type=INT64
+            |       |               +-expr=
+            |       |               | +-ColumnRef(type=STRUCT<price INT64, key INT64>, column=tvf_returning_derived_measure_row_type.$row_type_col$scanrow#12)
+            |       |               +-field_idx=1
+            |       +-input_scan=
+            |         +-JoinScan
+            |           +-column_list=tvf_returning_derived_measure_row_type.[$row_type_col$scanrow#12, $row_type_col$scanrow#13]
+            |           +-join_type=RIGHT
+            |           +-left_scan=
+            |           | +-TVFScan(column_list=[tvf_returning_derived_measure_row_type.$row_type_col$scanrow#12], tvf=tvf_returning_derived_measure_row_type, signature=() -> TABLE<normal_col_1 STRING, row_type_col STRUCT<price INT64, key INT64>>, column_index_list=[1], alias="t1", function_call_signature=() -> ANY TABLE)
+            |           +-right_scan=
+            |           | +-TVFScan(column_list=[tvf_returning_derived_measure_row_type.$row_type_col$scanrow#13], tvf=tvf_returning_derived_measure_row_type, signature=() -> TABLE<normal_col_1 STRING, row_type_col STRUCT<price INT64, key INT64>>, column_index_list=[1], alias="t2", function_call_signature=() -> ANY TABLE)
+            |           +-join_expr=
+            |             +-FunctionCall(GoogleSQL:$equal(INT64, INT64) -> BOOL)
+            |               +-GetStructField
+            |               | +-type=INT64
+            |               | +-expr=
+            |               | | +-ColumnRef(type=STRUCT<price INT64, key INT64>, column=tvf_returning_derived_measure_row_type.$row_type_col$scanrow#12)
+            |               | +-field_idx=1
+            |               +-GetStructField
+            |                 +-type=INT64
+            |                 +-expr=
+            |                 | +-ColumnRef(type=STRUCT<price INT64, key INT64>, column=tvf_returning_derived_measure_row_type.$row_type_col$scanrow#13)
+            |                 +-field_idx=1
+            +-aggregate_list=
+              +-constituent_aggregate_1#9 :=
+                +-AggregateFunctionCall(GoogleSQL:sum(INT64) -> INT64)
+                  +-ColumnRef(type=INT64, column=$aggregate.$any_value_grain_lock_0#10)
+                  +-where_expr=
+                  | +-FunctionCall(GoogleSQL:$not(BOOL) -> BOOL)
+                  |   +-FunctionCall(GoogleSQL:$is_null(STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>) -> BOOL)
+                  |     +-ColumnRef(type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, column=$aggregate.dep_closure#8)
+                  +-group_by_list=
+                  | +-grain_lock_key#11 :=
+                  |   +-GetStructField
+                  |     +-type=STRUCT<key INT64>
+                  |     +-expr=
+                  |     | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, column=$aggregate.dep_closure#8)
+                  |     +-field_idx=1
+                  +-group_by_aggregate_list=
+                    +-$any_value_grain_lock_0#10 :=
+                      +-AggregateFunctionCall(GoogleSQL:any_value(INT64) -> INT64)
+                        +-GetStructField
+                          +-type=INT64
+                          +-expr=
+                          | +-GetStructField
+                          |   +-type=STRUCT<price INT64>
+                          |   +-expr=
+                          |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, column=$aggregate.dep_closure#8)
+                          |   +-field_idx=0
+                          +-field_idx=0
+==
+
+# Scenario 10: Full outer join with row-type derived measures
+SELECT
+  AGG(t1.row_type_col.measure_derived_sum_price_plus_one),
+  AGG(t2.row_type_col.measure_derived_sum_price_plus_one)
+FROM
+  tvf_returning_derived_measure_row_type() AS t1
+  FULL OUTER JOIN
+  tvf_returning_derived_measure_row_type() AS t2
+  ON t1.row_type_col.key = t2.row_type_col.key;
+--
+QueryStmt
++-output_column_list=
+| +-$aggregate.$agg1#5 AS `$col1` [INT64]
+| +-$aggregate.$agg2#6 AS `$col2` [INT64]
++-query=
+  +-ProjectScan
+    +-column_list=$aggregate.[$agg1#5, $agg2#6]
+    +-input_scan=
+      +-AggregateScan
+        +-column_list=$aggregate.[$agg1#5, $agg2#6]
+        +-input_scan=
+        | +-JoinScan
+        |   +-column_list=tvf_returning_derived_measure_row_type.[row_type_col#2, row_type_col#4]
+        |   +-join_type=FULL
+        |   +-left_scan=
+        |   | +-TVFScan(column_list=[tvf_returning_derived_measure_row_type.row_type_col#2], tvf=tvf_returning_derived_measure_row_type, signature=() -> TABLE<normal_col_1 STRING, row_type_col ROW<MeasureTable_Derived>> (table: table_for_tvf_returning_derived_measure_row_type), column_index_list=[1], alias="t1", function_call_signature=() -> ANY TABLE)
+        |   +-right_scan=
+        |   | +-TVFScan(column_list=[tvf_returning_derived_measure_row_type.row_type_col#4], tvf=tvf_returning_derived_measure_row_type, signature=() -> TABLE<normal_col_1 STRING, row_type_col ROW<MeasureTable_Derived>> (table: table_for_tvf_returning_derived_measure_row_type), column_index_list=[1], alias="t2", function_call_signature=() -> ANY TABLE)
+        |   +-join_expr=
+        |     +-FunctionCall(GoogleSQL:$equal(INT64, INT64) -> BOOL)
+        |       +-GetRowField
+        |       | +-type=INT64
+        |       | +-expr=
+        |       | | +-ColumnRef(type=ROW<MeasureTable_Derived>, column=tvf_returning_derived_measure_row_type.row_type_col#2)
+        |       | +-column=MeasureTable_Derived.key
+        |       +-GetRowField
+        |         +-type=INT64
+        |         +-expr=
+        |         | +-ColumnRef(type=ROW<MeasureTable_Derived>, column=tvf_returning_derived_measure_row_type.row_type_col#4)
+        |         +-column=MeasureTable_Derived.key
+        +-aggregate_list=
+          +-$agg1#5 :=
+          | +-AggregateFunctionCall(GoogleSQL:AGG(MEASURE<INT64>) -> INT64)
+          |   +-GetRowField
+          |     +-type=MEASURE<INT64>
+          |     +-expr=
+          |     | +-ColumnRef(type=ROW<MeasureTable_Derived>, column=tvf_returning_derived_measure_row_type.row_type_col#2)
+          |     +-column=MeasureTable_Derived.measure_derived_sum_price_plus_one
+          +-$agg2#6 :=
+            +-AggregateFunctionCall(GoogleSQL:AGG(MEASURE<INT64>) -> INT64)
+              +-GetRowField
+                +-type=MEASURE<INT64>
+                +-expr=
+                | +-ColumnRef(type=ROW<MeasureTable_Derived>, column=tvf_returning_derived_measure_row_type.row_type_col#4)
+                +-column=MeasureTable_Derived.measure_derived_sum_price_plus_one
+
+[REWRITTEN AST]
+QueryStmt
++-output_column_list=
+| +-$aggregate.$agg1#5 AS `$col1` [INT64]
+| +-$aggregate.$agg2#6 AS `$col2` [INT64]
++-query=
+  +-ProjectScan
+    +-column_list=$aggregate.[$agg1#5, $agg2#6]
+    +-input_scan=
+      +-ProjectScan
+        +-column_list=$aggregate.[$agg1#5, $agg2#6]
+        +-expr_list=
+        | +-$agg1#5 :=
+        | | +-FunctionCall(GoogleSQL:$add(INT64, INT64) -> INT64)
+        | |   +-ColumnRef(type=INT64, column=$aggregate.constituent_aggregate_1#10)
+        | |   +-Literal(type=INT64, value=1)
+        | +-$agg2#6 :=
+        |   +-FunctionCall(GoogleSQL:$add(INT64, INT64) -> INT64)
+        |     +-ColumnRef(type=INT64, column=$aggregate.constituent_aggregate_1#16)
+        |     +-Literal(type=INT64, value=1)
+        +-input_scan=
+          +-AggregateScan
+            +-column_list=$aggregate.[constituent_aggregate_1#10, constituent_aggregate_1#16]
+            +-input_scan=
+            | +-ProjectScan
+            |   +-column_list=[tvf_returning_derived_measure_row_type.$row_type_col$scanrow#20, tvf_returning_derived_measure_row_type.$row_type_col$scanrow#19, $aggregate.agg_arg#7, $aggregate.dep_closure#9, $aggregate.agg_arg#13, $aggregate.dep_closure#15]
+            |   +-expr_list=
+            |   | +-dep_closure#15 :=
+            |   |   +-GetStructField
+            |   |     +-type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>
+            |   |     +-expr=
+            |   |     | +-GetStructField
+            |   |     |   +-type=STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>
+            |   |     |   +-expr=
+            |   |     |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>, column=$aggregate.agg_arg#13)
+            |   |     |   +-field_idx=0
+            |   |     +-field_idx=0
+            |   +-input_scan=
+            |     +-ProjectScan
+            |       +-column_list=[tvf_returning_derived_measure_row_type.$row_type_col$scanrow#20, tvf_returning_derived_measure_row_type.$row_type_col$scanrow#19, $aggregate.agg_arg#7, $aggregate.dep_closure#9, $aggregate.agg_arg#13]
+            |       +-expr_list=
+            |       | +-agg_arg#13 :=
+            |       |   +-FunctionCall(GoogleSQL:if(BOOL, STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>, STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>) -> STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>)
+            |       |     +-FunctionCall(GoogleSQL:$is_null(STRUCT<price INT64, key INT64>) -> BOOL)
+            |       |     | +-ColumnRef(type=STRUCT<price INT64, key INT64>, column=tvf_returning_derived_measure_row_type.$row_type_col$scanrow#19)
+            |       |     +-Literal(type=STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>, value=NULL)
+            |       |     +-MakeStruct
+            |       |       +-type=STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>
+            |       |       +-field_list=
+            |       |         +-MakeStruct
+            |       |         | +-type=STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>
+            |       |         | +-field_list=
+            |       |         |   +-FunctionCall(GoogleSQL:if(BOOL, STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>) -> STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>)
+            |       |         |     +-FunctionCall(GoogleSQL:$is_null(STRUCT<price INT64, key INT64>) -> BOOL)
+            |       |         |     | +-ColumnRef(type=STRUCT<price INT64, key INT64>, column=tvf_returning_derived_measure_row_type.$row_type_col$scanrow#19)
+            |       |         |     +-Literal(type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, value=NULL)
+            |       |         |     +-MakeStruct
+            |       |         |       +-type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>
+            |       |         |       +-field_list=
+            |       |         |         +-MakeStruct
+            |       |         |         | +-type=STRUCT<price INT64>
+            |       |         |         | +-field_list=
+            |       |         |         |   +-GetStructField
+            |       |         |         |     +-type=INT64
+            |       |         |         |     +-expr=
+            |       |         |         |     | +-ColumnRef(type=STRUCT<price INT64, key INT64>, column=tvf_returning_derived_measure_row_type.$row_type_col$scanrow#19)
+            |       |         |         |     +-field_idx=0
+            |       |         |         +-MakeStruct
+            |       |         |           +-type=STRUCT<key INT64>
+            |       |         |           +-field_list=
+            |       |         |             +-GetStructField
+            |       |         |               +-type=INT64
+            |       |         |               +-expr=
+            |       |         |               | +-ColumnRef(type=STRUCT<price INT64, key INT64>, column=tvf_returning_derived_measure_row_type.$row_type_col$scanrow#19)
+            |       |         |               +-field_idx=1
+            |       |         +-MakeStruct
+            |       |           +-type=STRUCT<key INT64>
+            |       |           +-field_list=
+            |       |             +-GetStructField
+            |       |               +-type=INT64
+            |       |               +-expr=
+            |       |               | +-ColumnRef(type=STRUCT<price INT64, key INT64>, column=tvf_returning_derived_measure_row_type.$row_type_col$scanrow#19)
+            |       |               +-field_idx=1
+            |       +-input_scan=
+            |         +-ProjectScan
+            |           +-column_list=[tvf_returning_derived_measure_row_type.$row_type_col$scanrow#20, tvf_returning_derived_measure_row_type.$row_type_col$scanrow#19, $aggregate.agg_arg#7, $aggregate.dep_closure#9]
+            |           +-expr_list=
+            |           | +-dep_closure#9 :=
+            |           |   +-GetStructField
+            |           |     +-type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>
+            |           |     +-expr=
+            |           |     | +-GetStructField
+            |           |     |   +-type=STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>
+            |           |     |   +-expr=
+            |           |     |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>, column=$aggregate.agg_arg#7)
+            |           |     |   +-field_idx=0
+            |           |     +-field_idx=0
+            |           +-input_scan=
+            |             +-ProjectScan
+            |               +-column_list=[tvf_returning_derived_measure_row_type.$row_type_col$scanrow#20, tvf_returning_derived_measure_row_type.$row_type_col$scanrow#19, $aggregate.agg_arg#7]
+            |               +-expr_list=
+            |               | +-agg_arg#7 :=
+            |               |   +-FunctionCall(GoogleSQL:if(BOOL, STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>, STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>) -> STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>)
+            |               |     +-FunctionCall(GoogleSQL:$is_null(STRUCT<price INT64, key INT64>) -> BOOL)
+            |               |     | +-ColumnRef(type=STRUCT<price INT64, key INT64>, column=tvf_returning_derived_measure_row_type.$row_type_col$scanrow#20)
+            |               |     +-Literal(type=STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>, value=NULL)
+            |               |     +-MakeStruct
+            |               |       +-type=STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>
+            |               |       +-field_list=
+            |               |         +-MakeStruct
+            |               |         | +-type=STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>
+            |               |         | +-field_list=
+            |               |         |   +-FunctionCall(GoogleSQL:if(BOOL, STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>) -> STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>)
+            |               |         |     +-FunctionCall(GoogleSQL:$is_null(STRUCT<price INT64, key INT64>) -> BOOL)
+            |               |         |     | +-ColumnRef(type=STRUCT<price INT64, key INT64>, column=tvf_returning_derived_measure_row_type.$row_type_col$scanrow#20)
+            |               |         |     +-Literal(type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, value=NULL)
+            |               |         |     +-MakeStruct
+            |               |         |       +-type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>
+            |               |         |       +-field_list=
+            |               |         |         +-MakeStruct
+            |               |         |         | +-type=STRUCT<price INT64>
+            |               |         |         | +-field_list=
+            |               |         |         |   +-GetStructField
+            |               |         |         |     +-type=INT64
+            |               |         |         |     +-expr=
+            |               |         |         |     | +-ColumnRef(type=STRUCT<price INT64, key INT64>, column=tvf_returning_derived_measure_row_type.$row_type_col$scanrow#20)
+            |               |         |         |     +-field_idx=0
+            |               |         |         +-MakeStruct
+            |               |         |           +-type=STRUCT<key INT64>
+            |               |         |           +-field_list=
+            |               |         |             +-GetStructField
+            |               |         |               +-type=INT64
+            |               |         |               +-expr=
+            |               |         |               | +-ColumnRef(type=STRUCT<price INT64, key INT64>, column=tvf_returning_derived_measure_row_type.$row_type_col$scanrow#20)
+            |               |         |               +-field_idx=1
+            |               |         +-MakeStruct
+            |               |           +-type=STRUCT<key INT64>
+            |               |           +-field_list=
+            |               |             +-GetStructField
+            |               |               +-type=INT64
+            |               |               +-expr=
+            |               |               | +-ColumnRef(type=STRUCT<price INT64, key INT64>, column=tvf_returning_derived_measure_row_type.$row_type_col$scanrow#20)
+            |               |               +-field_idx=1
+            |               +-input_scan=
+            |                 +-JoinScan
+            |                   +-column_list=tvf_returning_derived_measure_row_type.[$row_type_col$scanrow#20, $row_type_col$scanrow#19]
+            |                   +-join_type=FULL
+            |                   +-left_scan=
+            |                   | +-TVFScan(column_list=[tvf_returning_derived_measure_row_type.$row_type_col$scanrow#20], tvf=tvf_returning_derived_measure_row_type, signature=() -> TABLE<normal_col_1 STRING, row_type_col STRUCT<price INT64, key INT64>>, column_index_list=[1], alias="t1", function_call_signature=() -> ANY TABLE)
+            |                   +-right_scan=
+            |                   | +-TVFScan(column_list=[tvf_returning_derived_measure_row_type.$row_type_col$scanrow#19], tvf=tvf_returning_derived_measure_row_type, signature=() -> TABLE<normal_col_1 STRING, row_type_col STRUCT<price INT64, key INT64>>, column_index_list=[1], alias="t2", function_call_signature=() -> ANY TABLE)
+            |                   +-join_expr=
+            |                     +-FunctionCall(GoogleSQL:$equal(INT64, INT64) -> BOOL)
+            |                       +-GetStructField
+            |                       | +-type=INT64
+            |                       | +-expr=
+            |                       | | +-ColumnRef(type=STRUCT<price INT64, key INT64>, column=tvf_returning_derived_measure_row_type.$row_type_col$scanrow#20)
+            |                       | +-field_idx=1
+            |                       +-GetStructField
+            |                         +-type=INT64
+            |                         +-expr=
+            |                         | +-ColumnRef(type=STRUCT<price INT64, key INT64>, column=tvf_returning_derived_measure_row_type.$row_type_col$scanrow#19)
+            |                         +-field_idx=1
+            +-aggregate_list=
+              +-constituent_aggregate_1#10 :=
+              | +-AggregateFunctionCall(GoogleSQL:sum(INT64) -> INT64)
+              |   +-ColumnRef(type=INT64, column=$aggregate.$any_value_grain_lock_0#11)
+              |   +-where_expr=
+              |   | +-FunctionCall(GoogleSQL:$not(BOOL) -> BOOL)
+              |   |   +-FunctionCall(GoogleSQL:$is_null(STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>) -> BOOL)
+              |   |     +-ColumnRef(type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, column=$aggregate.dep_closure#9)
+              |   +-group_by_list=
+              |   | +-grain_lock_key#12 :=
+              |   |   +-GetStructField
+              |   |     +-type=STRUCT<key INT64>
+              |   |     +-expr=
+              |   |     | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, column=$aggregate.dep_closure#9)
+              |   |     +-field_idx=1
+              |   +-group_by_aggregate_list=
+              |     +-$any_value_grain_lock_0#11 :=
+              |       +-AggregateFunctionCall(GoogleSQL:any_value(INT64) -> INT64)
+              |         +-GetStructField
+              |           +-type=INT64
+              |           +-expr=
+              |           | +-GetStructField
+              |           |   +-type=STRUCT<price INT64>
+              |           |   +-expr=
+              |           |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, column=$aggregate.dep_closure#9)
+              |           |   +-field_idx=0
+              |           +-field_idx=0
+              +-constituent_aggregate_1#16 :=
+                +-AggregateFunctionCall(GoogleSQL:sum(INT64) -> INT64)
+                  +-ColumnRef(type=INT64, column=$aggregate.$any_value_grain_lock_0#17)
+                  +-where_expr=
+                  | +-FunctionCall(GoogleSQL:$not(BOOL) -> BOOL)
+                  |   +-FunctionCall(GoogleSQL:$is_null(STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>) -> BOOL)
+                  |     +-ColumnRef(type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, column=$aggregate.dep_closure#15)
+                  +-group_by_list=
+                  | +-grain_lock_key#18 :=
+                  |   +-GetStructField
+                  |     +-type=STRUCT<key INT64>
+                  |     +-expr=
+                  |     | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, column=$aggregate.dep_closure#15)
+                  |     +-field_idx=1
+                  +-group_by_aggregate_list=
+                    +-$any_value_grain_lock_0#17 :=
+                      +-AggregateFunctionCall(GoogleSQL:any_value(INT64) -> INT64)
+                        +-GetStructField
+                          +-type=INT64
+                          +-expr=
+                          | +-GetStructField
+                          |   +-type=STRUCT<price INT64>
+                          |   +-expr=
+                          |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, column=$aggregate.dep_closure#15)
+                          |   +-field_idx=0
+                          +-field_idx=0
+==
+
+# Scenario: Query derived measure that uses row field.
+# derived_measure_with_row := AGG(inner_row_col.measure_sum_price) + 1.
+# This currently fails because table with row type column is not supported.
+[allow_internal_error_todo_bug=b/527119708 - Support derived measures with row field accesses that return MEASURE type]
+SELECT AGG(derived_measure_with_row)
+FROM MeasureTable_NestedRow_WithDerived;
+--
+ERROR: generic::internal: RET_CHECK failure (<location redacted>) !column->GetType()->IsRow() Table with RowType column is not supported
+==
+
+# Scenario: Query derived measure from a nested row type out of a TVF scan.
+SELECT AGG(row_type_col.inner_row_col.measure_derived_sum_price_plus_one)
+FROM tvf_returning_nested_row_with_derived_type();
+--
+QueryStmt
++-output_column_list=
+| +-$aggregate.$agg1#2 AS `$col1` [INT64]
++-query=
+  +-ProjectScan
+    +-column_list=[$aggregate.$agg1#2]
+    +-input_scan=
+      +-AggregateScan
+        +-column_list=[$aggregate.$agg1#2]
+        +-input_scan=
+        | +-TVFScan(column_list=[tvf_returning_nested_row_with_derived_type.row_type_col#1], tvf=tvf_returning_nested_row_with_derived_type, signature=() -> TABLE<row_type_col ROW<MeasureTable_NestedRow_WithDerivedType>> (table: table_for_tvf_returning_nested_row_with_derived_type), column_index_list=[0], function_call_signature=() -> ANY TABLE)
+        +-aggregate_list=
+          +-$agg1#2 :=
+            +-AggregateFunctionCall(GoogleSQL:AGG(MEASURE<INT64>) -> INT64)
+              +-GetRowField
+                +-type=MEASURE<INT64>
+                +-expr=
+                | +-GetRowField
+                |   +-type=ROW<MeasureTable_Derived>
+                |   +-expr=
+                |   | +-ColumnRef(type=ROW<MeasureTable_NestedRow_WithDerivedType>, column=tvf_returning_nested_row_with_derived_type.row_type_col#1)
+                |   +-column=MeasureTable_NestedRow_WithDerivedType.inner_row_col
+                +-column=MeasureTable_Derived.measure_derived_sum_price_plus_one
+
+[REWRITTEN AST]
+QueryStmt
++-output_column_list=
+| +-$aggregate.$agg1#2 AS `$col1` [INT64]
++-query=
+  +-ProjectScan
+    +-column_list=[$aggregate.$agg1#2]
+    +-input_scan=
+      +-ProjectScan
+        +-column_list=[$aggregate.$agg1#2]
+        +-expr_list=
+        | +-$agg1#2 :=
+        |   +-FunctionCall(GoogleSQL:$add(INT64, INT64) -> INT64)
+        |     +-ColumnRef(type=INT64, column=$aggregate.constituent_aggregate_1#6)
+        |     +-Literal(type=INT64, value=1)
+        +-input_scan=
+          +-AggregateScan
+            +-column_list=[$aggregate.constituent_aggregate_1#6]
+            +-input_scan=
+            | +-ProjectScan
+            |   +-column_list=[tvf_returning_nested_row_with_derived_type.$row_type_col$scanrow#9, $aggregate.agg_arg#3, $aggregate.dep_closure#5]
+            |   +-expr_list=
+            |   | +-dep_closure#5 :=
+            |   |   +-GetStructField
+            |   |     +-type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>
+            |   |     +-expr=
+            |   |     | +-GetStructField
+            |   |     |   +-type=STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>
+            |   |     |   +-expr=
+            |   |     |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>, column=$aggregate.agg_arg#3)
+            |   |     |   +-field_idx=0
+            |   |     +-field_idx=0
+            |   +-input_scan=
+            |     +-ProjectScan
+            |       +-column_list=[tvf_returning_nested_row_with_derived_type.$row_type_col$scanrow#9, $aggregate.agg_arg#3]
+            |       +-expr_list=
+            |       | +-agg_arg#3 :=
+            |       |   +-FunctionCall(GoogleSQL:if(BOOL, STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>, STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>) -> STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>)
+            |       |     +-FunctionCall(GoogleSQL:$is_null(STRUCT<price INT64, key INT64>) -> BOOL)
+            |       |     | +-GetStructField
+            |       |     |   +-type=STRUCT<price INT64, key INT64>
+            |       |     |   +-expr=
+            |       |     |   | +-ColumnRef(type=STRUCT<inner_row_col STRUCT<price INT64, key INT64>>, column=tvf_returning_nested_row_with_derived_type.$row_type_col$scanrow#9)
+            |       |     |   +-field_idx=0
+            |       |     +-Literal(type=STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>, value=NULL)
+            |       |     +-MakeStruct
+            |       |       +-type=STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>
+            |       |       +-field_list=
+            |       |         +-MakeStruct
+            |       |         | +-type=STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>
+            |       |         | +-field_list=
+            |       |         |   +-FunctionCall(GoogleSQL:if(BOOL, STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>) -> STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>)
+            |       |         |     +-FunctionCall(GoogleSQL:$is_null(STRUCT<price INT64, key INT64>) -> BOOL)
+            |       |         |     | +-GetStructField
+            |       |         |     |   +-type=STRUCT<price INT64, key INT64>
+            |       |         |     |   +-expr=
+            |       |         |     |   | +-ColumnRef(type=STRUCT<inner_row_col STRUCT<price INT64, key INT64>>, column=tvf_returning_nested_row_with_derived_type.$row_type_col$scanrow#9)
+            |       |         |     |   +-field_idx=0
+            |       |         |     +-Literal(type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, value=NULL)
+            |       |         |     +-MakeStruct
+            |       |         |       +-type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>
+            |       |         |       +-field_list=
+            |       |         |         +-MakeStruct
+            |       |         |         | +-type=STRUCT<price INT64>
+            |       |         |         | +-field_list=
+            |       |         |         |   +-GetStructField
+            |       |         |         |     +-type=INT64
+            |       |         |         |     +-expr=
+            |       |         |         |     | +-GetStructField
+            |       |         |         |     |   +-type=STRUCT<price INT64, key INT64>
+            |       |         |         |     |   +-expr=
+            |       |         |         |     |   | +-ColumnRef(type=STRUCT<inner_row_col STRUCT<price INT64, key INT64>>, column=tvf_returning_nested_row_with_derived_type.$row_type_col$scanrow#9)
+            |       |         |         |     |   +-field_idx=0
+            |       |         |         |     +-field_idx=0
+            |       |         |         +-MakeStruct
+            |       |         |           +-type=STRUCT<key INT64>
+            |       |         |           +-field_list=
+            |       |         |             +-GetStructField
+            |       |         |               +-type=INT64
+            |       |         |               +-expr=
+            |       |         |               | +-GetStructField
+            |       |         |               |   +-type=STRUCT<price INT64, key INT64>
+            |       |         |               |   +-expr=
+            |       |         |               |   | +-ColumnRef(type=STRUCT<inner_row_col STRUCT<price INT64, key INT64>>, column=tvf_returning_nested_row_with_derived_type.$row_type_col$scanrow#9)
+            |       |         |               |   +-field_idx=0
+            |       |         |               +-field_idx=1
+            |       |         +-MakeStruct
+            |       |           +-type=STRUCT<key INT64>
+            |       |           +-field_list=
+            |       |             +-GetStructField
+            |       |               +-type=INT64
+            |       |               +-expr=
+            |       |               | +-GetStructField
+            |       |               |   +-type=STRUCT<price INT64, key INT64>
+            |       |               |   +-expr=
+            |       |               |   | +-ColumnRef(type=STRUCT<inner_row_col STRUCT<price INT64, key INT64>>, column=tvf_returning_nested_row_with_derived_type.$row_type_col$scanrow#9)
+            |       |               |   +-field_idx=0
+            |       |               +-field_idx=1
+            |       +-input_scan=
+            |         +-TVFScan(column_list=[tvf_returning_nested_row_with_derived_type.$row_type_col$scanrow#9], tvf=tvf_returning_nested_row_with_derived_type, signature=() -> TABLE<row_type_col STRUCT<inner_row_col STRUCT<price INT64, key INT64>>>, column_index_list=[0], function_call_signature=() -> ANY TABLE)
+            +-aggregate_list=
+              +-constituent_aggregate_1#6 :=
+                +-AggregateFunctionCall(GoogleSQL:sum(INT64) -> INT64)
+                  +-ColumnRef(type=INT64, column=$aggregate.$any_value_grain_lock_0#7)
+                  +-where_expr=
+                  | +-FunctionCall(GoogleSQL:$not(BOOL) -> BOOL)
+                  |   +-FunctionCall(GoogleSQL:$is_null(STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>) -> BOOL)
+                  |     +-ColumnRef(type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, column=$aggregate.dep_closure#5)
+                  +-group_by_list=
+                  | +-grain_lock_key#8 :=
+                  |   +-GetStructField
+                  |     +-type=STRUCT<key INT64>
+                  |     +-expr=
+                  |     | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, column=$aggregate.dep_closure#5)
+                  |     +-field_idx=1
+                  +-group_by_aggregate_list=
+                    +-$any_value_grain_lock_0#7 :=
+                      +-AggregateFunctionCall(GoogleSQL:any_value(INT64) -> INT64)
+                        +-GetStructField
+                          +-type=INT64
+                          +-expr=
+                          | +-GetStructField
+                          |   +-type=STRUCT<price INT64>
+                          |   +-expr=
+                          |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, column=$aggregate.dep_closure#5)
+                          |   +-field_idx=0
+                          +-field_idx=0
+==
+
+# Scenario: Query derived measure from a nested row type projected in a subquery.
+SELECT AGG(inner_row.measure_derived_sum_price_plus_one)
+FROM (
+  SELECT row_type_col.inner_row_col AS inner_row
+  FROM tvf_returning_nested_row_with_derived_type()
+);
+--
+QueryStmt
++-output_column_list=
+| +-$aggregate.$agg1#3 AS `$col1` [INT64]
++-query=
+  +-ProjectScan
+    +-column_list=[$aggregate.$agg1#3]
+    +-input_scan=
+      +-AggregateScan
+        +-column_list=[$aggregate.$agg1#3]
+        +-input_scan=
+        | +-ProjectScan
+        |   +-column_list=[$subquery1.inner_row#2]
+        |   +-expr_list=
+        |   | +-inner_row#2 :=
+        |   |   +-GetRowField
+        |   |     +-type=ROW<MeasureTable_Derived>
+        |   |     +-expr=
+        |   |     | +-ColumnRef(type=ROW<MeasureTable_NestedRow_WithDerivedType>, column=tvf_returning_nested_row_with_derived_type.row_type_col#1)
+        |   |     +-column=MeasureTable_NestedRow_WithDerivedType.inner_row_col
+        |   +-input_scan=
+        |     +-TVFScan(column_list=[tvf_returning_nested_row_with_derived_type.row_type_col#1], tvf=tvf_returning_nested_row_with_derived_type, signature=() -> TABLE<row_type_col ROW<MeasureTable_NestedRow_WithDerivedType>> (table: table_for_tvf_returning_nested_row_with_derived_type), column_index_list=[0], function_call_signature=() -> ANY TABLE)
+        +-aggregate_list=
+          +-$agg1#3 :=
+            +-AggregateFunctionCall(GoogleSQL:AGG(MEASURE<INT64>) -> INT64)
+              +-GetRowField
+                +-type=MEASURE<INT64>
+                +-expr=
+                | +-ColumnRef(type=ROW<MeasureTable_Derived>, column=$subquery1.inner_row#2)
+                +-column=MeasureTable_Derived.measure_derived_sum_price_plus_one
+
+[REWRITTEN AST]
+QueryStmt
++-output_column_list=
+| +-$aggregate.$agg1#3 AS `$col1` [INT64]
++-query=
+  +-ProjectScan
+    +-column_list=[$aggregate.$agg1#3]
+    +-input_scan=
+      +-ProjectScan
+        +-column_list=[$aggregate.$agg1#3]
+        +-expr_list=
+        | +-$agg1#3 :=
+        |   +-FunctionCall(GoogleSQL:$add(INT64, INT64) -> INT64)
+        |     +-ColumnRef(type=INT64, column=$aggregate.constituent_aggregate_1#7)
+        |     +-Literal(type=INT64, value=1)
+        +-input_scan=
+          +-AggregateScan
+            +-column_list=[$aggregate.constituent_aggregate_1#7]
+            +-input_scan=
+            | +-ProjectScan
+            |   +-column_list=[$subquery1.$inner_row$scanrow#10, $aggregate.agg_arg#4, $aggregate.dep_closure#6]
+            |   +-expr_list=
+            |   | +-dep_closure#6 :=
+            |   |   +-GetStructField
+            |   |     +-type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>
+            |   |     +-expr=
+            |   |     | +-GetStructField
+            |   |     |   +-type=STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>
+            |   |     |   +-expr=
+            |   |     |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>, column=$aggregate.agg_arg#4)
+            |   |     |   +-field_idx=0
+            |   |     +-field_idx=0
+            |   +-input_scan=
+            |     +-ProjectScan
+            |       +-column_list=[$subquery1.$inner_row$scanrow#10, $aggregate.agg_arg#4]
+            |       +-expr_list=
+            |       | +-agg_arg#4 :=
+            |       |   +-FunctionCall(GoogleSQL:if(BOOL, STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>, STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>) -> STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>)
+            |       |     +-FunctionCall(GoogleSQL:$is_null(STRUCT<price INT64, key INT64>) -> BOOL)
+            |       |     | +-ColumnRef(type=STRUCT<price INT64, key INT64>, column=$subquery1.$inner_row$scanrow#10)
+            |       |     +-Literal(type=STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>, value=NULL)
+            |       |     +-MakeStruct
+            |       |       +-type=STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>
+            |       |       +-field_list=
+            |       |         +-MakeStruct
+            |       |         | +-type=STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>
+            |       |         | +-field_list=
+            |       |         |   +-FunctionCall(GoogleSQL:if(BOOL, STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>) -> STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>)
+            |       |         |     +-FunctionCall(GoogleSQL:$is_null(STRUCT<price INT64, key INT64>) -> BOOL)
+            |       |         |     | +-ColumnRef(type=STRUCT<price INT64, key INT64>, column=$subquery1.$inner_row$scanrow#10)
+            |       |         |     +-Literal(type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, value=NULL)
+            |       |         |     +-MakeStruct
+            |       |         |       +-type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>
+            |       |         |       +-field_list=
+            |       |         |         +-MakeStruct
+            |       |         |         | +-type=STRUCT<price INT64>
+            |       |         |         | +-field_list=
+            |       |         |         |   +-GetStructField
+            |       |         |         |     +-type=INT64
+            |       |         |         |     +-expr=
+            |       |         |         |     | +-ColumnRef(type=STRUCT<price INT64, key INT64>, column=$subquery1.$inner_row$scanrow#10)
+            |       |         |         |     +-field_idx=0
+            |       |         |         +-MakeStruct
+            |       |         |           +-type=STRUCT<key INT64>
+            |       |         |           +-field_list=
+            |       |         |             +-GetStructField
+            |       |         |               +-type=INT64
+            |       |         |               +-expr=
+            |       |         |               | +-ColumnRef(type=STRUCT<price INT64, key INT64>, column=$subquery1.$inner_row$scanrow#10)
+            |       |         |               +-field_idx=1
+            |       |         +-MakeStruct
+            |       |           +-type=STRUCT<key INT64>
+            |       |           +-field_list=
+            |       |             +-GetStructField
+            |       |               +-type=INT64
+            |       |               +-expr=
+            |       |               | +-ColumnRef(type=STRUCT<price INT64, key INT64>, column=$subquery1.$inner_row$scanrow#10)
+            |       |               +-field_idx=1
+            |       +-input_scan=
+            |         +-ProjectScan
+            |           +-column_list=[$subquery1.$inner_row$scanrow#10]
+            |           +-expr_list=
+            |           | +-$inner_row$scanrow#10 :=
+            |           |   +-GetStructField
+            |           |     +-type=STRUCT<price INT64, key INT64>
+            |           |     +-expr=
+            |           |     | +-ColumnRef(type=STRUCT<inner_row_col STRUCT<price INT64, key INT64>>, column=tvf_returning_nested_row_with_derived_type.$row_type_col$scanrow#11)
+            |           |     +-field_idx=0
+            |           +-input_scan=
+            |             +-TVFScan(column_list=[tvf_returning_nested_row_with_derived_type.$row_type_col$scanrow#11], tvf=tvf_returning_nested_row_with_derived_type, signature=() -> TABLE<row_type_col STRUCT<inner_row_col STRUCT<price INT64, key INT64>>>, column_index_list=[0], function_call_signature=() -> ANY TABLE)
+            +-aggregate_list=
+              +-constituent_aggregate_1#7 :=
+                +-AggregateFunctionCall(GoogleSQL:sum(INT64) -> INT64)
+                  +-ColumnRef(type=INT64, column=$aggregate.$any_value_grain_lock_0#8)
+                  +-where_expr=
+                  | +-FunctionCall(GoogleSQL:$not(BOOL) -> BOOL)
+                  |   +-FunctionCall(GoogleSQL:$is_null(STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>) -> BOOL)
+                  |     +-ColumnRef(type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, column=$aggregate.dep_closure#6)
+                  +-group_by_list=
+                  | +-grain_lock_key#9 :=
+                  |   +-GetStructField
+                  |     +-type=STRUCT<key INT64>
+                  |     +-expr=
+                  |     | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, column=$aggregate.dep_closure#6)
+                  |     +-field_idx=1
+                  +-group_by_aggregate_list=
+                    +-$any_value_grain_lock_0#8 :=
+                      +-AggregateFunctionCall(GoogleSQL:any_value(INT64) -> INT64)
+                        +-GetStructField
+                          +-type=INT64
+                          +-expr=
+                          | +-GetStructField
+                          |   +-type=STRUCT<price INT64>
+                          |   +-expr=
+                          |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, column=$aggregate.dep_closure#6)
+                          |   +-field_idx=0
+                          +-field_idx=0
+==
+
+# Scenario: Query multiple derived measures from the same nested row type.
+SELECT AGG(row_type_col.inner_row_col.measure_derived_sum_price_plus_one),
+       AGG(row_type_col.inner_row_col.measure_derived_subtotal)
+FROM tvf_returning_nested_row_with_derived_type();
+--
+QueryStmt
++-output_column_list=
+| +-$aggregate.$agg1#2 AS `$col1` [INT64]
+| +-$aggregate.$agg2#3 AS `$col2` [INT64]
++-query=
+  +-ProjectScan
+    +-column_list=$aggregate.[$agg1#2, $agg2#3]
+    +-input_scan=
+      +-AggregateScan
+        +-column_list=$aggregate.[$agg1#2, $agg2#3]
+        +-input_scan=
+        | +-TVFScan(column_list=[tvf_returning_nested_row_with_derived_type.row_type_col#1], tvf=tvf_returning_nested_row_with_derived_type, signature=() -> TABLE<row_type_col ROW<MeasureTable_NestedRow_WithDerivedType>> (table: table_for_tvf_returning_nested_row_with_derived_type), column_index_list=[0], function_call_signature=() -> ANY TABLE)
+        +-aggregate_list=
+          +-$agg1#2 :=
+          | +-AggregateFunctionCall(GoogleSQL:AGG(MEASURE<INT64>) -> INT64)
+          |   +-GetRowField
+          |     +-type=MEASURE<INT64>
+          |     +-expr=
+          |     | +-GetRowField
+          |     |   +-type=ROW<MeasureTable_Derived>
+          |     |   +-expr=
+          |     |   | +-ColumnRef(type=ROW<MeasureTable_NestedRow_WithDerivedType>, column=tvf_returning_nested_row_with_derived_type.row_type_col#1)
+          |     |   +-column=MeasureTable_NestedRow_WithDerivedType.inner_row_col
+          |     +-column=MeasureTable_Derived.measure_derived_sum_price_plus_one
+          +-$agg2#3 :=
+            +-AggregateFunctionCall(GoogleSQL:AGG(MEASURE<INT64>) -> INT64)
+              +-GetRowField
+                +-type=MEASURE<INT64>
+                +-expr=
+                | +-GetRowField
+                |   +-type=ROW<MeasureTable_Derived>
+                |   +-expr=
+                |   | +-ColumnRef(type=ROW<MeasureTable_NestedRow_WithDerivedType>, column=tvf_returning_nested_row_with_derived_type.row_type_col#1)
+                |   +-column=MeasureTable_NestedRow_WithDerivedType.inner_row_col
+                +-column=MeasureTable_Derived.measure_derived_subtotal
+
+[REWRITTEN AST]
+QueryStmt
++-output_column_list=
+| +-$aggregate.$agg1#2 AS `$col1` [INT64]
+| +-$aggregate.$agg2#3 AS `$col2` [INT64]
++-query=
+  +-ProjectScan
+    +-column_list=$aggregate.[$agg1#2, $agg2#3]
+    +-input_scan=
+      +-ProjectScan
+        +-column_list=$aggregate.[$agg1#2, $agg2#3]
+        +-expr_list=
+        | +-$agg1#2 :=
+        | | +-FunctionCall(GoogleSQL:$add(INT64, INT64) -> INT64)
+        | |   +-ColumnRef(type=INT64, column=$aggregate.constituent_aggregate_1#7)
+        | |   +-Literal(type=INT64, value=1)
+        | +-$agg2#3 :=
+        |   +-FunctionCall(GoogleSQL:$add(INT64, INT64) -> INT64)
+        |     +-ColumnRef(type=INT64, column=$aggregate.constituent_aggregate_1#14)
+        |     +-ColumnRef(type=INT64, column=$aggregate.constituent_aggregate_1#18)
+        +-input_scan=
+          +-AggregateScan
+            +-column_list=$aggregate.[constituent_aggregate_1#7, constituent_aggregate_1#14, constituent_aggregate_1#18]
+            +-input_scan=
+            | +-ProjectScan
+            |   +-column_list=[tvf_returning_nested_row_with_derived_type.$row_type_col$scanrow#21, $aggregate.agg_arg#4, $aggregate.dep_closure#6, $aggregate.agg_arg#10, $aggregate.dep_closure#13, $aggregate.dep_closure#17]
+            |   +-expr_list=
+            |   | +-dep_closure#17 :=
+            |   |   +-GetStructField
+            |   |     +-type=STRUCT<referenced_columns STRUCT<tax INT64>, key_columns STRUCT<key INT64>>
+            |   |     +-expr=
+            |   |     | +-GetStructField
+            |   |     |   +-type=STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, measure_sum_tax STRUCT<referenced_columns STRUCT<tax INT64>, key_columns STRUCT<key INT64>>>
+            |   |     |   +-expr=
+            |   |     |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, measure_sum_tax STRUCT<referenced_columns STRUCT<tax INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>, column=$aggregate.agg_arg#10)
+            |   |     |   +-field_idx=0
+            |   |     +-field_idx=1
+            |   +-input_scan=
+            |     +-ProjectScan
+            |       +-column_list=[tvf_returning_nested_row_with_derived_type.$row_type_col$scanrow#21, $aggregate.agg_arg#4, $aggregate.dep_closure#6, $aggregate.agg_arg#10, $aggregate.dep_closure#13]
+            |       +-expr_list=
+            |       | +-dep_closure#13 :=
+            |       |   +-GetStructField
+            |       |     +-type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>
+            |       |     +-expr=
+            |       |     | +-GetStructField
+            |       |     |   +-type=STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, measure_sum_tax STRUCT<referenced_columns STRUCT<tax INT64>, key_columns STRUCT<key INT64>>>
+            |       |     |   +-expr=
+            |       |     |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, measure_sum_tax STRUCT<referenced_columns STRUCT<tax INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>, column=$aggregate.agg_arg#10)
+            |       |     |   +-field_idx=0
+            |       |     +-field_idx=0
+            |       +-input_scan=
+            |         +-ProjectScan
+            |           +-column_list=[tvf_returning_nested_row_with_derived_type.$row_type_col$scanrow#21, $aggregate.agg_arg#4, $aggregate.dep_closure#6, $aggregate.agg_arg#10]
+            |           +-expr_list=
+            |           | +-agg_arg#10 :=
+            |           |   +-FunctionCall(GoogleSQL:if(BOOL, STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, measure_sum_tax STRUCT<referenced_columns STRUCT<tax INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>, STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, measure_sum_tax STRUCT<referenced_columns STRUCT<tax INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>) -> STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, measure_sum_tax STRUCT<referenced_columns STRUCT<tax INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>)
+            |           |     +-FunctionCall(GoogleSQL:$is_null(STRUCT<price INT64, key INT64, tax INT64>) -> BOOL)
+            |           |     | +-GetStructField
+            |           |     |   +-type=STRUCT<price INT64, key INT64, tax INT64>
+            |           |     |   +-expr=
+            |           |     |   | +-ColumnRef(type=STRUCT<inner_row_col STRUCT<price INT64, key INT64, tax INT64>>, column=tvf_returning_nested_row_with_derived_type.$row_type_col$scanrow#21)
+            |           |     |   +-field_idx=0
+            |           |     +-Literal(type=STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, measure_sum_tax STRUCT<referenced_columns STRUCT<tax INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>, value=NULL)
+            |           |     +-MakeStruct
+            |           |       +-type=STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, measure_sum_tax STRUCT<referenced_columns STRUCT<tax INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>
+            |           |       +-field_list=
+            |           |         +-MakeStruct
+            |           |         | +-type=STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, measure_sum_tax STRUCT<referenced_columns STRUCT<tax INT64>, key_columns STRUCT<key INT64>>>
+            |           |         | +-field_list=
+            |           |         |   +-FunctionCall(GoogleSQL:if(BOOL, STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>) -> STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>)
+            |           |         |   | +-FunctionCall(GoogleSQL:$is_null(STRUCT<price INT64, key INT64, tax INT64>) -> BOOL)
+            |           |         |   | | +-GetStructField
+            |           |         |   | |   +-type=STRUCT<price INT64, key INT64, tax INT64>
+            |           |         |   | |   +-expr=
+            |           |         |   | |   | +-ColumnRef(type=STRUCT<inner_row_col STRUCT<price INT64, key INT64, tax INT64>>, column=tvf_returning_nested_row_with_derived_type.$row_type_col$scanrow#21)
+            |           |         |   | |   +-field_idx=0
+            |           |         |   | +-Literal(type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, value=NULL)
+            |           |         |   | +-MakeStruct
+            |           |         |   |   +-type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>
+            |           |         |   |   +-field_list=
+            |           |         |   |     +-MakeStruct
+            |           |         |   |     | +-type=STRUCT<price INT64>
+            |           |         |   |     | +-field_list=
+            |           |         |   |     |   +-GetStructField
+            |           |         |   |     |     +-type=INT64
+            |           |         |   |     |     +-expr=
+            |           |         |   |     |     | +-GetStructField
+            |           |         |   |     |     |   +-type=STRUCT<price INT64, key INT64, tax INT64>
+            |           |         |   |     |     |   +-expr=
+            |           |         |   |     |     |   | +-ColumnRef(type=STRUCT<inner_row_col STRUCT<price INT64, key INT64, tax INT64>>, column=tvf_returning_nested_row_with_derived_type.$row_type_col$scanrow#21)
+            |           |         |   |     |     |   +-field_idx=0
+            |           |         |   |     |     +-field_idx=0
+            |           |         |   |     +-MakeStruct
+            |           |         |   |       +-type=STRUCT<key INT64>
+            |           |         |   |       +-field_list=
+            |           |         |   |         +-GetStructField
+            |           |         |   |           +-type=INT64
+            |           |         |   |           +-expr=
+            |           |         |   |           | +-GetStructField
+            |           |         |   |           |   +-type=STRUCT<price INT64, key INT64, tax INT64>
+            |           |         |   |           |   +-expr=
+            |           |         |   |           |   | +-ColumnRef(type=STRUCT<inner_row_col STRUCT<price INT64, key INT64, tax INT64>>, column=tvf_returning_nested_row_with_derived_type.$row_type_col$scanrow#21)
+            |           |         |   |           |   +-field_idx=0
+            |           |         |   |           +-field_idx=1
+            |           |         |   +-FunctionCall(GoogleSQL:if(BOOL, STRUCT<referenced_columns STRUCT<tax INT64>, key_columns STRUCT<key INT64>>, STRUCT<referenced_columns STRUCT<tax INT64>, key_columns STRUCT<key INT64>>) -> STRUCT<referenced_columns STRUCT<tax INT64>, key_columns STRUCT<key INT64>>)
+            |           |         |     +-FunctionCall(GoogleSQL:$is_null(STRUCT<price INT64, key INT64, tax INT64>) -> BOOL)
+            |           |         |     | +-GetStructField
+            |           |         |     |   +-type=STRUCT<price INT64, key INT64, tax INT64>
+            |           |         |     |   +-expr=
+            |           |         |     |   | +-ColumnRef(type=STRUCT<inner_row_col STRUCT<price INT64, key INT64, tax INT64>>, column=tvf_returning_nested_row_with_derived_type.$row_type_col$scanrow#21)
+            |           |         |     |   +-field_idx=0
+            |           |         |     +-Literal(type=STRUCT<referenced_columns STRUCT<tax INT64>, key_columns STRUCT<key INT64>>, value=NULL)
+            |           |         |     +-MakeStruct
+            |           |         |       +-type=STRUCT<referenced_columns STRUCT<tax INT64>, key_columns STRUCT<key INT64>>
+            |           |         |       +-field_list=
+            |           |         |         +-MakeStruct
+            |           |         |         | +-type=STRUCT<tax INT64>
+            |           |         |         | +-field_list=
+            |           |         |         |   +-GetStructField
+            |           |         |         |     +-type=INT64
+            |           |         |         |     +-expr=
+            |           |         |         |     | +-GetStructField
+            |           |         |         |     |   +-type=STRUCT<price INT64, key INT64, tax INT64>
+            |           |         |         |     |   +-expr=
+            |           |         |         |     |   | +-ColumnRef(type=STRUCT<inner_row_col STRUCT<price INT64, key INT64, tax INT64>>, column=tvf_returning_nested_row_with_derived_type.$row_type_col$scanrow#21)
+            |           |         |         |     |   +-field_idx=0
+            |           |         |         |     +-field_idx=2
+            |           |         |         +-MakeStruct
+            |           |         |           +-type=STRUCT<key INT64>
+            |           |         |           +-field_list=
+            |           |         |             +-GetStructField
+            |           |         |               +-type=INT64
+            |           |         |               +-expr=
+            |           |         |               | +-GetStructField
+            |           |         |               |   +-type=STRUCT<price INT64, key INT64, tax INT64>
+            |           |         |               |   +-expr=
+            |           |         |               |   | +-ColumnRef(type=STRUCT<inner_row_col STRUCT<price INT64, key INT64, tax INT64>>, column=tvf_returning_nested_row_with_derived_type.$row_type_col$scanrow#21)
+            |           |         |               |   +-field_idx=0
+            |           |         |               +-field_idx=1
+            |           |         +-MakeStruct
+            |           |           +-type=STRUCT<key INT64>
+            |           |           +-field_list=
+            |           |             +-GetStructField
+            |           |               +-type=INT64
+            |           |               +-expr=
+            |           |               | +-GetStructField
+            |           |               |   +-type=STRUCT<price INT64, key INT64, tax INT64>
+            |           |               |   +-expr=
+            |           |               |   | +-ColumnRef(type=STRUCT<inner_row_col STRUCT<price INT64, key INT64, tax INT64>>, column=tvf_returning_nested_row_with_derived_type.$row_type_col$scanrow#21)
+            |           |               |   +-field_idx=0
+            |           |               +-field_idx=1
+            |           +-input_scan=
+            |             +-ProjectScan
+            |               +-column_list=[tvf_returning_nested_row_with_derived_type.$row_type_col$scanrow#21, $aggregate.agg_arg#4, $aggregate.dep_closure#6]
+            |               +-expr_list=
+            |               | +-dep_closure#6 :=
+            |               |   +-GetStructField
+            |               |     +-type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>
+            |               |     +-expr=
+            |               |     | +-GetStructField
+            |               |     |   +-type=STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>
+            |               |     |   +-expr=
+            |               |     |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>, column=$aggregate.agg_arg#4)
+            |               |     |   +-field_idx=0
+            |               |     +-field_idx=0
+            |               +-input_scan=
+            |                 +-ProjectScan
+            |                   +-column_list=[tvf_returning_nested_row_with_derived_type.$row_type_col$scanrow#21, $aggregate.agg_arg#4]
+            |                   +-expr_list=
+            |                   | +-agg_arg#4 :=
+            |                   |   +-FunctionCall(GoogleSQL:if(BOOL, STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>, STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>) -> STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>)
+            |                   |     +-FunctionCall(GoogleSQL:$is_null(STRUCT<price INT64, key INT64, tax INT64>) -> BOOL)
+            |                   |     | +-GetStructField
+            |                   |     |   +-type=STRUCT<price INT64, key INT64, tax INT64>
+            |                   |     |   +-expr=
+            |                   |     |   | +-ColumnRef(type=STRUCT<inner_row_col STRUCT<price INT64, key INT64, tax INT64>>, column=tvf_returning_nested_row_with_derived_type.$row_type_col$scanrow#21)
+            |                   |     |   +-field_idx=0
+            |                   |     +-Literal(type=STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>, value=NULL)
+            |                   |     +-MakeStruct
+            |                   |       +-type=STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>
+            |                   |       +-field_list=
+            |                   |         +-MakeStruct
+            |                   |         | +-type=STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>
+            |                   |         | +-field_list=
+            |                   |         |   +-FunctionCall(GoogleSQL:if(BOOL, STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>) -> STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>)
+            |                   |         |     +-FunctionCall(GoogleSQL:$is_null(STRUCT<price INT64, key INT64, tax INT64>) -> BOOL)
+            |                   |         |     | +-GetStructField
+            |                   |         |     |   +-type=STRUCT<price INT64, key INT64, tax INT64>
+            |                   |         |     |   +-expr=
+            |                   |         |     |   | +-ColumnRef(type=STRUCT<inner_row_col STRUCT<price INT64, key INT64, tax INT64>>, column=tvf_returning_nested_row_with_derived_type.$row_type_col$scanrow#21)
+            |                   |         |     |   +-field_idx=0
+            |                   |         |     +-Literal(type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, value=NULL)
+            |                   |         |     +-MakeStruct
+            |                   |         |       +-type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>
+            |                   |         |       +-field_list=
+            |                   |         |         +-MakeStruct
+            |                   |         |         | +-type=STRUCT<price INT64>
+            |                   |         |         | +-field_list=
+            |                   |         |         |   +-GetStructField
+            |                   |         |         |     +-type=INT64
+            |                   |         |         |     +-expr=
+            |                   |         |         |     | +-GetStructField
+            |                   |         |         |     |   +-type=STRUCT<price INT64, key INT64, tax INT64>
+            |                   |         |         |     |   +-expr=
+            |                   |         |         |     |   | +-ColumnRef(type=STRUCT<inner_row_col STRUCT<price INT64, key INT64, tax INT64>>, column=tvf_returning_nested_row_with_derived_type.$row_type_col$scanrow#21)
+            |                   |         |         |     |   +-field_idx=0
+            |                   |         |         |     +-field_idx=0
+            |                   |         |         +-MakeStruct
+            |                   |         |           +-type=STRUCT<key INT64>
+            |                   |         |           +-field_list=
+            |                   |         |             +-GetStructField
+            |                   |         |               +-type=INT64
+            |                   |         |               +-expr=
+            |                   |         |               | +-GetStructField
+            |                   |         |               |   +-type=STRUCT<price INT64, key INT64, tax INT64>
+            |                   |         |               |   +-expr=
+            |                   |         |               |   | +-ColumnRef(type=STRUCT<inner_row_col STRUCT<price INT64, key INT64, tax INT64>>, column=tvf_returning_nested_row_with_derived_type.$row_type_col$scanrow#21)
+            |                   |         |               |   +-field_idx=0
+            |                   |         |               +-field_idx=1
+            |                   |         +-MakeStruct
+            |                   |           +-type=STRUCT<key INT64>
+            |                   |           +-field_list=
+            |                   |             +-GetStructField
+            |                   |               +-type=INT64
+            |                   |               +-expr=
+            |                   |               | +-GetStructField
+            |                   |               |   +-type=STRUCT<price INT64, key INT64, tax INT64>
+            |                   |               |   +-expr=
+            |                   |               |   | +-ColumnRef(type=STRUCT<inner_row_col STRUCT<price INT64, key INT64, tax INT64>>, column=tvf_returning_nested_row_with_derived_type.$row_type_col$scanrow#21)
+            |                   |               |   +-field_idx=0
+            |                   |               +-field_idx=1
+            |                   +-input_scan=
+            |                     +-TVFScan(column_list=[tvf_returning_nested_row_with_derived_type.$row_type_col$scanrow#21], tvf=tvf_returning_nested_row_with_derived_type, signature=() -> TABLE<row_type_col STRUCT<inner_row_col STRUCT<price INT64, key INT64, tax INT64>>>, column_index_list=[0], function_call_signature=() -> ANY TABLE)
+            +-aggregate_list=
+              +-constituent_aggregate_1#7 :=
+              | +-AggregateFunctionCall(GoogleSQL:sum(INT64) -> INT64)
+              |   +-ColumnRef(type=INT64, column=$aggregate.$any_value_grain_lock_0#8)
+              |   +-where_expr=
+              |   | +-FunctionCall(GoogleSQL:$not(BOOL) -> BOOL)
+              |   |   +-FunctionCall(GoogleSQL:$is_null(STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>) -> BOOL)
+              |   |     +-ColumnRef(type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, column=$aggregate.dep_closure#6)
+              |   +-group_by_list=
+              |   | +-grain_lock_key#9 :=
+              |   |   +-GetStructField
+              |   |     +-type=STRUCT<key INT64>
+              |   |     +-expr=
+              |   |     | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, column=$aggregate.dep_closure#6)
+              |   |     +-field_idx=1
+              |   +-group_by_aggregate_list=
+              |     +-$any_value_grain_lock_0#8 :=
+              |       +-AggregateFunctionCall(GoogleSQL:any_value(INT64) -> INT64)
+              |         +-GetStructField
+              |           +-type=INT64
+              |           +-expr=
+              |           | +-GetStructField
+              |           |   +-type=STRUCT<price INT64>
+              |           |   +-expr=
+              |           |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, column=$aggregate.dep_closure#6)
+              |           |   +-field_idx=0
+              |           +-field_idx=0
+              +-constituent_aggregate_1#14 :=
+              | +-AggregateFunctionCall(GoogleSQL:sum(INT64) -> INT64)
+              |   +-ColumnRef(type=INT64, column=$aggregate.$any_value_grain_lock_0#15)
+              |   +-where_expr=
+              |   | +-FunctionCall(GoogleSQL:$not(BOOL) -> BOOL)
+              |   |   +-FunctionCall(GoogleSQL:$is_null(STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>) -> BOOL)
+              |   |     +-ColumnRef(type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, column=$aggregate.dep_closure#13)
+              |   +-group_by_list=
+              |   | +-grain_lock_key#16 :=
+              |   |   +-GetStructField
+              |   |     +-type=STRUCT<key INT64>
+              |   |     +-expr=
+              |   |     | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, column=$aggregate.dep_closure#13)
+              |   |     +-field_idx=1
+              |   +-group_by_aggregate_list=
+              |     +-$any_value_grain_lock_0#15 :=
+              |       +-AggregateFunctionCall(GoogleSQL:any_value(INT64) -> INT64)
+              |         +-GetStructField
+              |           +-type=INT64
+              |           +-expr=
+              |           | +-GetStructField
+              |           |   +-type=STRUCT<price INT64>
+              |           |   +-expr=
+              |           |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, column=$aggregate.dep_closure#13)
+              |           |   +-field_idx=0
+              |           +-field_idx=0
+              +-constituent_aggregate_1#18 :=
+                +-AggregateFunctionCall(GoogleSQL:sum(INT64) -> INT64)
+                  +-ColumnRef(type=INT64, column=$aggregate.$any_value_grain_lock_0#19)
+                  +-where_expr=
+                  | +-FunctionCall(GoogleSQL:$not(BOOL) -> BOOL)
+                  |   +-FunctionCall(GoogleSQL:$is_null(STRUCT<referenced_columns STRUCT<tax INT64>, key_columns STRUCT<key INT64>>) -> BOOL)
+                  |     +-ColumnRef(type=STRUCT<referenced_columns STRUCT<tax INT64>, key_columns STRUCT<key INT64>>, column=$aggregate.dep_closure#17)
+                  +-group_by_list=
+                  | +-grain_lock_key#20 :=
+                  |   +-GetStructField
+                  |     +-type=STRUCT<key INT64>
+                  |     +-expr=
+                  |     | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<tax INT64>, key_columns STRUCT<key INT64>>, column=$aggregate.dep_closure#17)
+                  |     +-field_idx=1
+                  +-group_by_aggregate_list=
+                    +-$any_value_grain_lock_0#19 :=
+                      +-AggregateFunctionCall(GoogleSQL:any_value(INT64) -> INT64)
+                        +-GetStructField
+                          +-type=INT64
+                          +-expr=
+                          | +-GetStructField
+                          |   +-type=STRUCT<tax INT64>
+                          |   +-expr=
+                          |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<tax INT64>, key_columns STRUCT<key INT64>>, column=$aggregate.dep_closure#17)
+                          |   +-field_idx=0
+                          +-field_idx=0
+==
+
+# Scenario: Query derived measure from a nested row type projected in a CTE.
+WITH t AS (
+  SELECT row_type_col.inner_row_col AS inner_row
+  FROM tvf_returning_nested_row_with_derived_type()
+)
+SELECT AGG(inner_row.measure_derived_sum_price_plus_one) FROM t;
+--
+QueryStmt
++-output_column_list=
+| +-$aggregate.$agg1#4 AS `$col1` [INT64]
++-query=
+  +-WithScan
+    +-column_list=[$aggregate.$agg1#4]
+    +-with_entry_list=
+    | +-WithEntry
+    |   +-with_query_name="t"
+    |   +-with_subquery=
+    |     +-ProjectScan
+    |       +-column_list=[t.inner_row#2]
+    |       +-expr_list=
+    |       | +-inner_row#2 :=
+    |       |   +-GetRowField
+    |       |     +-type=ROW<MeasureTable_Derived>
+    |       |     +-expr=
+    |       |     | +-ColumnRef(type=ROW<MeasureTable_NestedRow_WithDerivedType>, column=tvf_returning_nested_row_with_derived_type.row_type_col#1)
+    |       |     +-column=MeasureTable_NestedRow_WithDerivedType.inner_row_col
+    |       +-input_scan=
+    |         +-TVFScan(column_list=[tvf_returning_nested_row_with_derived_type.row_type_col#1], tvf=tvf_returning_nested_row_with_derived_type, signature=() -> TABLE<row_type_col ROW<MeasureTable_NestedRow_WithDerivedType>> (table: table_for_tvf_returning_nested_row_with_derived_type), column_index_list=[0], function_call_signature=() -> ANY TABLE)
+    +-query=
+      +-ProjectScan
+        +-column_list=[$aggregate.$agg1#4]
+        +-input_scan=
+          +-AggregateScan
+            +-column_list=[$aggregate.$agg1#4]
+            +-input_scan=
+            | +-WithRefScan(column_list=[t.inner_row#3], with_query_name="t")
+            +-aggregate_list=
+              +-$agg1#4 :=
+                +-AggregateFunctionCall(GoogleSQL:AGG(MEASURE<INT64>) -> INT64)
+                  +-GetRowField
+                    +-type=MEASURE<INT64>
+                    +-expr=
+                    | +-ColumnRef(type=ROW<MeasureTable_Derived>, column=t.inner_row#3)
+                    +-column=MeasureTable_Derived.measure_derived_sum_price_plus_one
+
+[REWRITTEN AST]
+QueryStmt
++-output_column_list=
+| +-$aggregate.$agg1#4 AS `$col1` [INT64]
++-query=
+  +-WithScan
+    +-column_list=[$aggregate.$agg1#4]
+    +-with_entry_list=
+    | +-WithEntry
+    |   +-with_query_name="t"
+    |   +-with_subquery=
+    |     +-ProjectScan
+    |       +-column_list=[t.$inner_row$scanrow#13]
+    |       +-expr_list=
+    |       | +-$inner_row$scanrow#13 :=
+    |       |   +-GetStructField
+    |       |     +-type=STRUCT<price INT64, key INT64>
+    |       |     +-expr=
+    |       |     | +-ColumnRef(type=STRUCT<inner_row_col STRUCT<price INT64, key INT64>>, column=tvf_returning_nested_row_with_derived_type.$row_type_col$scanrow#11)
+    |       |     +-field_idx=0
+    |       +-input_scan=
+    |         +-TVFScan(column_list=[tvf_returning_nested_row_with_derived_type.$row_type_col$scanrow#11], tvf=tvf_returning_nested_row_with_derived_type, signature=() -> TABLE<row_type_col STRUCT<inner_row_col STRUCT<price INT64, key INT64>>>, column_index_list=[0], function_call_signature=() -> ANY TABLE)
+    +-query=
+      +-ProjectScan
+        +-column_list=[$aggregate.$agg1#4]
+        +-input_scan=
+          +-ProjectScan
+            +-column_list=[$aggregate.$agg1#4]
+            +-expr_list=
+            | +-$agg1#4 :=
+            |   +-FunctionCall(GoogleSQL:$add(INT64, INT64) -> INT64)
+            |     +-ColumnRef(type=INT64, column=$aggregate.constituent_aggregate_1#8)
+            |     +-Literal(type=INT64, value=1)
+            +-input_scan=
+              +-AggregateScan
+                +-column_list=[$aggregate.constituent_aggregate_1#8]
+                +-input_scan=
+                | +-ProjectScan
+                |   +-column_list=[t.$inner_row$scanrow#12, $aggregate.agg_arg#5, $aggregate.dep_closure#7]
+                |   +-expr_list=
+                |   | +-dep_closure#7 :=
+                |   |   +-GetStructField
+                |   |     +-type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>
+                |   |     +-expr=
+                |   |     | +-GetStructField
+                |   |     |   +-type=STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>
+                |   |     |   +-expr=
+                |   |     |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>, column=$aggregate.agg_arg#5)
+                |   |     |   +-field_idx=0
+                |   |     +-field_idx=0
+                |   +-input_scan=
+                |     +-ProjectScan
+                |       +-column_list=[t.$inner_row$scanrow#12, $aggregate.agg_arg#5]
+                |       +-expr_list=
+                |       | +-agg_arg#5 :=
+                |       |   +-FunctionCall(GoogleSQL:if(BOOL, STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>, STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>) -> STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>)
+                |       |     +-FunctionCall(GoogleSQL:$is_null(STRUCT<price INT64, key INT64>) -> BOOL)
+                |       |     | +-ColumnRef(type=STRUCT<price INT64, key INT64>, column=t.$inner_row$scanrow#12)
+                |       |     +-Literal(type=STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>, value=NULL)
+                |       |     +-MakeStruct
+                |       |       +-type=STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>
+                |       |       +-field_list=
+                |       |         +-MakeStruct
+                |       |         | +-type=STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>
+                |       |         | +-field_list=
+                |       |         |   +-FunctionCall(GoogleSQL:if(BOOL, STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>) -> STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>)
+                |       |         |     +-FunctionCall(GoogleSQL:$is_null(STRUCT<price INT64, key INT64>) -> BOOL)
+                |       |         |     | +-ColumnRef(type=STRUCT<price INT64, key INT64>, column=t.$inner_row$scanrow#12)
+                |       |         |     +-Literal(type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, value=NULL)
+                |       |         |     +-MakeStruct
+                |       |         |       +-type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>
+                |       |         |       +-field_list=
+                |       |         |         +-MakeStruct
+                |       |         |         | +-type=STRUCT<price INT64>
+                |       |         |         | +-field_list=
+                |       |         |         |   +-GetStructField
+                |       |         |         |     +-type=INT64
+                |       |         |         |     +-expr=
+                |       |         |         |     | +-ColumnRef(type=STRUCT<price INT64, key INT64>, column=t.$inner_row$scanrow#12)
+                |       |         |         |     +-field_idx=0
+                |       |         |         +-MakeStruct
+                |       |         |           +-type=STRUCT<key INT64>
+                |       |         |           +-field_list=
+                |       |         |             +-GetStructField
+                |       |         |               +-type=INT64
+                |       |         |               +-expr=
+                |       |         |               | +-ColumnRef(type=STRUCT<price INT64, key INT64>, column=t.$inner_row$scanrow#12)
+                |       |         |               +-field_idx=1
+                |       |         +-MakeStruct
+                |       |           +-type=STRUCT<key INT64>
+                |       |           +-field_list=
+                |       |             +-GetStructField
+                |       |               +-type=INT64
+                |       |               +-expr=
+                |       |               | +-ColumnRef(type=STRUCT<price INT64, key INT64>, column=t.$inner_row$scanrow#12)
+                |       |               +-field_idx=1
+                |       +-input_scan=
+                |         +-WithRefScan(column_list=[t.$inner_row$scanrow#12], with_query_name="t")
+                +-aggregate_list=
+                  +-constituent_aggregate_1#8 :=
+                    +-AggregateFunctionCall(GoogleSQL:sum(INT64) -> INT64)
+                      +-ColumnRef(type=INT64, column=$aggregate.$any_value_grain_lock_0#9)
+                      +-where_expr=
+                      | +-FunctionCall(GoogleSQL:$not(BOOL) -> BOOL)
+                      |   +-FunctionCall(GoogleSQL:$is_null(STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>) -> BOOL)
+                      |     +-ColumnRef(type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, column=$aggregate.dep_closure#7)
+                      +-group_by_list=
+                      | +-grain_lock_key#10 :=
+                      |   +-GetStructField
+                      |     +-type=STRUCT<key INT64>
+                      |     +-expr=
+                      |     | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, column=$aggregate.dep_closure#7)
+                      |     +-field_idx=1
+                      +-group_by_aggregate_list=
+                        +-$any_value_grain_lock_0#9 :=
+                          +-AggregateFunctionCall(GoogleSQL:any_value(INT64) -> INT64)
+                            +-GetStructField
+                              +-type=INT64
+                              +-expr=
+                              | +-GetStructField
+                              |   +-type=STRUCT<price INT64>
+                              |   +-expr=
+                              |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, column=$aggregate.dep_closure#7)
+                              |   +-field_idx=0
+                              +-field_idx=0
+==
+
+# Scenario: Query both normal and derived measures from the same nested row type.
+SELECT AGG(row_type_col.inner_row_col.measure_sum_price),
+       AGG(row_type_col.inner_row_col.measure_derived_sum_price_plus_one)
+FROM tvf_returning_nested_row_with_derived_type();
+--
+
+QueryStmt
++-output_column_list=
+| +-$aggregate.$agg1#2 AS `$col1` [INT64]
+| +-$aggregate.$agg2#3 AS `$col2` [INT64]
++-query=
+  +-ProjectScan
+    +-column_list=$aggregate.[$agg1#2, $agg2#3]
+    +-input_scan=
+      +-AggregateScan
+        +-column_list=$aggregate.[$agg1#2, $agg2#3]
+        +-input_scan=
+        | +-TVFScan(column_list=[tvf_returning_nested_row_with_derived_type.row_type_col#1], tvf=tvf_returning_nested_row_with_derived_type, signature=() -> TABLE<row_type_col ROW<MeasureTable_NestedRow_WithDerivedType>> (table: table_for_tvf_returning_nested_row_with_derived_type), column_index_list=[0], function_call_signature=() -> ANY TABLE)
+        +-aggregate_list=
+          +-$agg1#2 :=
+          | +-AggregateFunctionCall(GoogleSQL:AGG(MEASURE<INT64>) -> INT64)
+          |   +-GetRowField
+          |     +-type=MEASURE<INT64>
+          |     +-expr=
+          |     | +-GetRowField
+          |     |   +-type=ROW<MeasureTable_Derived>
+          |     |   +-expr=
+          |     |   | +-ColumnRef(type=ROW<MeasureTable_NestedRow_WithDerivedType>, column=tvf_returning_nested_row_with_derived_type.row_type_col#1)
+          |     |   +-column=MeasureTable_NestedRow_WithDerivedType.inner_row_col
+          |     +-column=MeasureTable_Derived.measure_sum_price
+          +-$agg2#3 :=
+            +-AggregateFunctionCall(GoogleSQL:AGG(MEASURE<INT64>) -> INT64)
+              +-GetRowField
+                +-type=MEASURE<INT64>
+                +-expr=
+                | +-GetRowField
+                |   +-type=ROW<MeasureTable_Derived>
+                |   +-expr=
+                |   | +-ColumnRef(type=ROW<MeasureTable_NestedRow_WithDerivedType>, column=tvf_returning_nested_row_with_derived_type.row_type_col#1)
+                |   +-column=MeasureTable_NestedRow_WithDerivedType.inner_row_col
+                +-column=MeasureTable_Derived.measure_derived_sum_price_plus_one
+
+[REWRITTEN AST]
+QueryStmt
++-output_column_list=
+| +-$aggregate.$agg1#2 AS `$col1` [INT64]
+| +-$aggregate.$agg2#3 AS `$col2` [INT64]
++-query=
+  +-ProjectScan
+    +-column_list=$aggregate.[$agg1#2, $agg2#3]
+    +-input_scan=
+      +-ProjectScan
+        +-column_list=$aggregate.[$agg1#2, $agg2#3]
+        +-expr_list=
+        | +-$agg1#2 := ColumnRef(type=INT64, column=$aggregate.constituent_aggregate_1#5)
+        | +-$agg2#3 :=
+        |   +-FunctionCall(GoogleSQL:$add(INT64, INT64) -> INT64)
+        |     +-ColumnRef(type=INT64, column=$aggregate.constituent_aggregate_1#11)
+        |     +-Literal(type=INT64, value=1)
+        +-input_scan=
+          +-AggregateScan
+            +-column_list=$aggregate.[constituent_aggregate_1#5, constituent_aggregate_1#11]
+            +-input_scan=
+            | +-ProjectScan
+            |   +-column_list=[tvf_returning_nested_row_with_derived_type.$row_type_col$scanrow#14, $aggregate.agg_arg#4, $aggregate.agg_arg#8, $aggregate.dep_closure#10]
+            |   +-expr_list=
+            |   | +-dep_closure#10 :=
+            |   |   +-GetStructField
+            |   |     +-type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>
+            |   |     +-expr=
+            |   |     | +-GetStructField
+            |   |     |   +-type=STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>
+            |   |     |   +-expr=
+            |   |     |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>, column=$aggregate.agg_arg#8)
+            |   |     |   +-field_idx=0
+            |   |     +-field_idx=0
+            |   +-input_scan=
+            |     +-ProjectScan
+            |       +-column_list=[tvf_returning_nested_row_with_derived_type.$row_type_col$scanrow#14, $aggregate.agg_arg#4, $aggregate.agg_arg#8]
+            |       +-expr_list=
+            |       | +-agg_arg#8 :=
+            |       |   +-FunctionCall(GoogleSQL:if(BOOL, STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>, STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>) -> STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>)
+            |       |     +-FunctionCall(GoogleSQL:$is_null(STRUCT<price INT64, key INT64>) -> BOOL)
+            |       |     | +-GetStructField
+            |       |     |   +-type=STRUCT<price INT64, key INT64>
+            |       |     |   +-expr=
+            |       |     |   | +-ColumnRef(type=STRUCT<inner_row_col STRUCT<price INT64, key INT64>>, column=tvf_returning_nested_row_with_derived_type.$row_type_col$scanrow#14)
+            |       |     |   +-field_idx=0
+            |       |     +-Literal(type=STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>, value=NULL)
+            |       |     +-MakeStruct
+            |       |       +-type=STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>
+            |       |       +-field_list=
+            |       |         +-MakeStruct
+            |       |         | +-type=STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>
+            |       |         | +-field_list=
+            |       |         |   +-FunctionCall(GoogleSQL:if(BOOL, STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>) -> STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>)
+            |       |         |     +-FunctionCall(GoogleSQL:$is_null(STRUCT<price INT64, key INT64>) -> BOOL)
+            |       |         |     | +-GetStructField
+            |       |         |     |   +-type=STRUCT<price INT64, key INT64>
+            |       |         |     |   +-expr=
+            |       |         |     |   | +-ColumnRef(type=STRUCT<inner_row_col STRUCT<price INT64, key INT64>>, column=tvf_returning_nested_row_with_derived_type.$row_type_col$scanrow#14)
+            |       |         |     |   +-field_idx=0
+            |       |         |     +-Literal(type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, value=NULL)
+            |       |         |     +-MakeStruct
+            |       |         |       +-type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>
+            |       |         |       +-field_list=
+            |       |         |         +-MakeStruct
+            |       |         |         | +-type=STRUCT<price INT64>
+            |       |         |         | +-field_list=
+            |       |         |         |   +-GetStructField
+            |       |         |         |     +-type=INT64
+            |       |         |         |     +-expr=
+            |       |         |         |     | +-GetStructField
+            |       |         |         |     |   +-type=STRUCT<price INT64, key INT64>
+            |       |         |         |     |   +-expr=
+            |       |         |         |     |   | +-ColumnRef(type=STRUCT<inner_row_col STRUCT<price INT64, key INT64>>, column=tvf_returning_nested_row_with_derived_type.$row_type_col$scanrow#14)
+            |       |         |         |     |   +-field_idx=0
+            |       |         |         |     +-field_idx=0
+            |       |         |         +-MakeStruct
+            |       |         |           +-type=STRUCT<key INT64>
+            |       |         |           +-field_list=
+            |       |         |             +-GetStructField
+            |       |         |               +-type=INT64
+            |       |         |               +-expr=
+            |       |         |               | +-GetStructField
+            |       |         |               |   +-type=STRUCT<price INT64, key INT64>
+            |       |         |               |   +-expr=
+            |       |         |               |   | +-ColumnRef(type=STRUCT<inner_row_col STRUCT<price INT64, key INT64>>, column=tvf_returning_nested_row_with_derived_type.$row_type_col$scanrow#14)
+            |       |         |               |   +-field_idx=0
+            |       |         |               +-field_idx=1
+            |       |         +-MakeStruct
+            |       |           +-type=STRUCT<key INT64>
+            |       |           +-field_list=
+            |       |             +-GetStructField
+            |       |               +-type=INT64
+            |       |               +-expr=
+            |       |               | +-GetStructField
+            |       |               |   +-type=STRUCT<price INT64, key INT64>
+            |       |               |   +-expr=
+            |       |               |   | +-ColumnRef(type=STRUCT<inner_row_col STRUCT<price INT64, key INT64>>, column=tvf_returning_nested_row_with_derived_type.$row_type_col$scanrow#14)
+            |       |               |   +-field_idx=0
+            |       |               +-field_idx=1
+            |       +-input_scan=
+            |         +-ProjectScan
+            |           +-column_list=[tvf_returning_nested_row_with_derived_type.$row_type_col$scanrow#14, $aggregate.agg_arg#4]
+            |           +-expr_list=
+            |           | +-agg_arg#4 :=
+            |           |   +-FunctionCall(GoogleSQL:if(BOOL, STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>) -> STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>)
+            |           |     +-FunctionCall(GoogleSQL:$is_null(STRUCT<price INT64, key INT64>) -> BOOL)
+            |           |     | +-GetStructField
+            |           |     |   +-type=STRUCT<price INT64, key INT64>
+            |           |     |   +-expr=
+            |           |     |   | +-ColumnRef(type=STRUCT<inner_row_col STRUCT<price INT64, key INT64>>, column=tvf_returning_nested_row_with_derived_type.$row_type_col$scanrow#14)
+            |           |     |   +-field_idx=0
+            |           |     +-Literal(type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, value=NULL)
+            |           |     +-MakeStruct
+            |           |       +-type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>
+            |           |       +-field_list=
+            |           |         +-MakeStruct
+            |           |         | +-type=STRUCT<price INT64>
+            |           |         | +-field_list=
+            |           |         |   +-GetStructField
+            |           |         |     +-type=INT64
+            |           |         |     +-expr=
+            |           |         |     | +-GetStructField
+            |           |         |     |   +-type=STRUCT<price INT64, key INT64>
+            |           |         |     |   +-expr=
+            |           |         |     |   | +-ColumnRef(type=STRUCT<inner_row_col STRUCT<price INT64, key INT64>>, column=tvf_returning_nested_row_with_derived_type.$row_type_col$scanrow#14)
+            |           |         |     |   +-field_idx=0
+            |           |         |     +-field_idx=0
+            |           |         +-MakeStruct
+            |           |           +-type=STRUCT<key INT64>
+            |           |           +-field_list=
+            |           |             +-GetStructField
+            |           |               +-type=INT64
+            |           |               +-expr=
+            |           |               | +-GetStructField
+            |           |               |   +-type=STRUCT<price INT64, key INT64>
+            |           |               |   +-expr=
+            |           |               |   | +-ColumnRef(type=STRUCT<inner_row_col STRUCT<price INT64, key INT64>>, column=tvf_returning_nested_row_with_derived_type.$row_type_col$scanrow#14)
+            |           |               |   +-field_idx=0
+            |           |               +-field_idx=1
+            |           +-input_scan=
+            |             +-TVFScan(column_list=[tvf_returning_nested_row_with_derived_type.$row_type_col$scanrow#14], tvf=tvf_returning_nested_row_with_derived_type, signature=() -> TABLE<row_type_col STRUCT<inner_row_col STRUCT<price INT64, key INT64>>>, column_index_list=[0], function_call_signature=() -> ANY TABLE)
+            +-aggregate_list=
+              +-constituent_aggregate_1#5 :=
+              | +-AggregateFunctionCall(GoogleSQL:sum(INT64) -> INT64)
+              |   +-ColumnRef(type=INT64, column=$aggregate.$any_value_grain_lock_0#6)
+              |   +-where_expr=
+              |   | +-FunctionCall(GoogleSQL:$not(BOOL) -> BOOL)
+              |   |   +-FunctionCall(GoogleSQL:$is_null(STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>) -> BOOL)
+              |   |     +-ColumnRef(type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, column=$aggregate.agg_arg#4)
+              |   +-group_by_list=
+              |   | +-grain_lock_key#7 :=
+              |   |   +-GetStructField
+              |   |     +-type=STRUCT<key INT64>
+              |   |     +-expr=
+              |   |     | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, column=$aggregate.agg_arg#4)
+              |   |     +-field_idx=1
+              |   +-group_by_aggregate_list=
+              |     +-$any_value_grain_lock_0#6 :=
+              |       +-AggregateFunctionCall(GoogleSQL:any_value(INT64) -> INT64)
+              |         +-GetStructField
+              |           +-type=INT64
+              |           +-expr=
+              |           | +-GetStructField
+              |           |   +-type=STRUCT<price INT64>
+              |           |   +-expr=
+              |           |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, column=$aggregate.agg_arg#4)
+              |           |   +-field_idx=0
+              |           +-field_idx=0
+              +-constituent_aggregate_1#11 :=
+                +-AggregateFunctionCall(GoogleSQL:sum(INT64) -> INT64)
+                  +-ColumnRef(type=INT64, column=$aggregate.$any_value_grain_lock_0#12)
+                  +-where_expr=
+                  | +-FunctionCall(GoogleSQL:$not(BOOL) -> BOOL)
+                  |   +-FunctionCall(GoogleSQL:$is_null(STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>) -> BOOL)
+                  |     +-ColumnRef(type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, column=$aggregate.dep_closure#10)
+                  +-group_by_list=
+                  | +-grain_lock_key#13 :=
+                  |   +-GetStructField
+                  |     +-type=STRUCT<key INT64>
+                  |     +-expr=
+                  |     | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, column=$aggregate.dep_closure#10)
+                  |     +-field_idx=1
+                  +-group_by_aggregate_list=
+                    +-$any_value_grain_lock_0#12 :=
+                      +-AggregateFunctionCall(GoogleSQL:any_value(INT64) -> INT64)
+                        +-GetStructField
+                          +-type=INT64
+                          +-expr=
+                          | +-GetStructField
+                          |   +-type=STRUCT<price INT64>
+                          |   +-expr=
+                          |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, column=$aggregate.dep_closure#10)
+                          |   +-field_idx=0
+                          +-field_idx=0

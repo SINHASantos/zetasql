@@ -344,6 +344,74 @@ ARRAY<STRUCT<
   {"name2", true, NULL, false}
 ]
 ==
+[name=element_definition_name_is_predicate_for_nodes]
+select *
+from
+graph_table(aml
+  match (n:Human|Account)
+  columns(element_definition_name(n) AS definition_name,
+          element_definition_name_is(n, Person) AS is_person,
+          element_definition_name_is(n, ACCOUNT) AS is_account)
+) gt
+order by 1
+--
+ARRAY<STRUCT<
+        definition_name STRING,
+        is_person BOOL,
+        is_account BOOL
+      >>
+[known order:
+  {"Account", false, true},
+  {"Account", false, true},
+  {"Account", false, true},
+  {"Account", false, true},
+  {"Person", true, false},
+  {"Person", true, false}
+]
+==
+[name=element_definition_name_is_predicate_for_edges]
+select *
+from
+graph_table(aml
+  match -[e:Knows|Transfer]->
+  columns(element_definition_name(e) AS definition_name,
+          element_definition_name_is(e, Knows) AS is_knows,
+          element_definition_name_is(e, Transfer) AS is_transfer)
+) gt
+order by 1
+--
+ARRAY<STRUCT<
+        definition_name STRING,
+        is_knows BOOL,
+        is_transfer BOOL
+      >>
+[known order:
+  {"Knows", true, false},
+  {"Knows", true, false},
+  {"Transfer", false, true},
+  {"Transfer", false, true},
+  {"Transfer", false, true},
+  {"Transfer", false, true},
+  {"Transfer", false, true},
+  {"Transfer", false, true}
+]
+==
+[required_features=SQL_GRAPH,SQL_GRAPH_ADVANCED_QUERY]
+[name=element_definition_name_is_predicate_with_null]
+select *
+from graph_table(aml
+  optional MATCH (n)-[e]->(m)
+  where false
+  return element_definition_name_is(n, Person) AS is_person,
+        element_definition_name_is(e, Transfer) AS is_transfer,
+        element_definition_name_is(m, Account) AS is_account
+) gt
+order by 1
+--
+ARRAY<STRUCT<is_person BOOL, is_transfer BOOL, is_account BOOL>>[
+  {NULL, NULL, NULL}
+]
+==
 [name=graph_expression_functions_same_node]
 select gt.*
 from

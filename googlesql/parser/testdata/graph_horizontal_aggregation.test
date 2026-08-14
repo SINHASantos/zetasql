@@ -155,7 +155,7 @@ SELECT * from graph_table(aml
 )
 
 --
-ERROR: Syntax error: Expected keyword INSERT or keyword RETURN but got keyword GROUP [at 3:18]
+ERROR: Syntax error: Expected keyword INSERT or keyword REMOVE or keyword RETURN or keyword SET but got keyword GROUP [at 3:18]
   let z = SUM(x) GROUP BY x
                  ^
 

@@ -129,6 +129,8 @@ ResolvedNodeKind GetStatementKind(ASTNodeKind node_kind) {
       return RESOLVED_CREATE_SNAPSHOT_TABLE_STMT;
     case AST_CREATE_PROPERTY_GRAPH_STATEMENT:
       return RESOLVED_CREATE_PROPERTY_GRAPH_STMT;
+    case AST_CREATE_PROPERTY_GRAPH_TYPE_STATEMENT:
+      return RESOLVED_CREATE_PROPERTY_GRAPH_TYPE_STMT;
     case AST_CREATE_TABLE_STATEMENT:
       return RESOLVED_CREATE_TABLE_STMT;
     case AST_CREATE_LIVE_TABLE_STATEMENT:
@@ -139,6 +141,8 @@ ResolvedNodeKind GetStatementKind(ASTNodeKind node_kind) {
       return RESOLVED_CREATE_PRIVILEGE_RESTRICTION_STMT;
     case AST_CREATE_ROW_ACCESS_POLICY_STATEMENT:
       return RESOLVED_CREATE_ROW_ACCESS_POLICY_STMT;
+    case AST_CREATE_DATA_POLICY_STATEMENT:
+      return RESOLVED_CREATE_DATA_POLICY_STMT;
     case AST_CREATE_SEQUENCE_STATEMENT:
       return RESOLVED_CREATE_SEQUENCE_STMT;
     case AST_DEFINE_TABLE_STATEMENT:
@@ -196,6 +200,8 @@ ResolvedNodeKind GetStatementKind(ASTNodeKind node_kind) {
       return RESOLVED_DROP_INDEX_STMT;
     case AST_DROP_AI_INDEX_STATEMENT:
       return RESOLVED_DROP_INDEX_STMT;
+    case AST_DROP_INDEX_STATEMENT:
+      return RESOLVED_DROP_INDEX_STMT;
     case AST_GRANT_STATEMENT:
       return RESOLVED_GRANT_STMT;
     case AST_REVOKE_STATEMENT:
@@ -222,6 +228,8 @@ ResolvedNodeKind GetStatementKind(ASTNodeKind node_kind) {
       return RESOLVED_ALTER_MODEL_STMT;
     case AST_ALTER_ROW_ACCESS_POLICY_STATEMENT:
       return RESOLVED_ALTER_ROW_ACCESS_POLICY_STMT;
+    case AST_ALTER_DATA_POLICY_STATEMENT:
+      return RESOLVED_ALTER_DATA_POLICY_STMT;
     case AST_ALTER_INDEX_STATEMENT:
       return RESOLVED_ALTER_INDEX_STMT;
     case AST_RENAME_STATEMENT:
@@ -266,8 +274,13 @@ ResolvedNodeKind GetNextStatementKind(
   bool statement_is_ctas = false;
   ASTNodeKind node_kind = ParseNextStatementKind(
       resume_location, language_options, &statement_is_ctas);
-  return statement_is_ctas ? RESOLVED_CREATE_TABLE_AS_SELECT_STMT
-                           : GetStatementKind(node_kind);
+  if (!statement_is_ctas) {
+    return GetStatementKind(node_kind);
+  }
+  if (node_kind == AST_CREATE_LIVE_TABLE_STATEMENT) {
+    return RESOLVED_CREATE_LIVE_TABLE_AS_SELECT_STMT;
+  }
+  return RESOLVED_CREATE_TABLE_AS_SELECT_STMT;
 }
 
 absl::Status GetStatementProperties(absl::string_view input,
@@ -300,8 +313,13 @@ absl::Status GetNextStatementProperties(
       GetStatementKind(ast_statement_properties.node_kind);
 
   if (ast_statement_properties.is_create_table_as_select) {
-    GOOGLESQL_RET_CHECK_EQ(statement_properties->node_kind, RESOLVED_CREATE_TABLE_STMT);
-    statement_properties->node_kind = RESOLVED_CREATE_TABLE_AS_SELECT_STMT;
+    if (statement_properties->node_kind == RESOLVED_CREATE_LIVE_TABLE_STMT) {
+      statement_properties->node_kind =
+          RESOLVED_CREATE_LIVE_TABLE_AS_SELECT_STMT;
+    } else {
+      GOOGLESQL_RET_CHECK_EQ(statement_properties->node_kind, RESOLVED_CREATE_TABLE_STMT);
+      statement_properties->node_kind = RESOLVED_CREATE_TABLE_AS_SELECT_STMT;
+    }
   }
 
   statement_properties->is_create_temporary_object =
@@ -362,6 +380,7 @@ absl::Status GetNextStatementProperties(
     case AST_DROP_SEARCH_INDEX_STATEMENT:
     case AST_DROP_VECTOR_INDEX_STATEMENT:
     case AST_DROP_AI_INDEX_STATEMENT:
+    case AST_DROP_INDEX_STATEMENT:
     case AST_DROP_STATEMENT:
     case AST_UNDROP_STATEMENT:
     case AST_RENAME_STATEMENT:

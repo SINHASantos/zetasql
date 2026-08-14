@@ -138,6 +138,7 @@ QueryStmt
             +-AggregateFunctionCall(GoogleSQL:$differential_privacy_count_star(optional(1) STRUCT<INT64, INT64> contribution_bounds_per_group) -> INT64)
               +-parse_location=33-38
               +-Literal(parse_location=75-83, type=STRUCT<INT64, INT64>, value={0, 100})
+
 [REPLACED_LITERALS]
 select with differential_privacy count(*, contribution_bounds_per_group => @_p0_STRUCT)
 from SimpleTypesWithAnonymizationUid a
@@ -190,6 +191,7 @@ QueryStmt
             +-AggregateFunctionCall(GoogleSQL:$differential_privacy_count_star(optional(1) STRUCT<INT64, INT64> contribution_bounds_per_group) -> INT64)
               +-parse_location=33-38
               +-Literal(parse_location=75-83, type=STRUCT<INT64, INT64>, value={0, 100})
+
 [REPLACED_LITERALS]
 select with differential_privacy count(*, contribution_bounds_per_group => @_p0_STRUCT)
 from SimpleTypesWithAnonymizationUid a
@@ -236,6 +238,7 @@ QueryStmt
             +-AggregateFunctionCall(GoogleSQL:$differential_privacy_count_star(optional(1) STRUCT<INT64, INT64> contribution_bounds_per_group) -> INT64)
               +-parse_location=33-38
               +-Literal(parse_location=75-83, type=STRUCT<INT64, INT64>, value={0, 100})
+
 [REPLACED_LITERALS]
 select with differential_privacy count(*, contribution_bounds_per_group => @_p0_STRUCT)
 from SimpleTypesWithAnonymizationUid a
@@ -884,6 +887,7 @@ QueryStmt
             +-AggregateFunctionCall(GoogleSQL:$differential_privacy_count_star(optional(1) STRUCT<INT64, INT64> contribution_bounds_per_group) -> INT64)
               +-parse_location=33-38
               +-Literal(parse_location=75-83, type=STRUCT<INT64, INT64>, value={0, 100})
+
 [REPLACED_LITERALS]
 select with differential_privacy count(*, contribution_bounds_per_group => @_p0_STRUCT)
 from SimpleTypesWithAnonymizationUid a
@@ -1022,6 +1026,7 @@ QueryStmt
             +-AggregateFunctionCall(GoogleSQL:$differential_privacy_count_star(optional(1) STRUCT<INT64, INT64> contribution_bounds_per_group) -> INT64)
               +-parse_location=33-38
               +-Literal(parse_location=75-83, type=STRUCT<INT64, INT64>, value={0, 100})
+
 [REPLACED_LITERALS]
 select with differential_privacy count(*, contribution_bounds_per_group => @_p0_STRUCT)
 from (
@@ -1155,6 +1160,7 @@ QueryStmt
             +-AggregateFunctionCall(GoogleSQL:$differential_privacy_count_star(optional(1) STRUCT<INT64, INT64> contribution_bounds_per_group) -> INT64)
               +-parse_location=33-38
               +-Literal(parse_location=75-83, type=STRUCT<INT64, INT64>, value={0, 100})
+
 [REPLACED_LITERALS]
 select with differential_privacy count(*, contribution_bounds_per_group => @_p0_STRUCT)
 from SimpleTypes a
@@ -1210,6 +1216,7 @@ QueryStmt
             +-AggregateFunctionCall(GoogleSQL:$differential_privacy_count_star(optional(1) STRUCT<INT64, INT64> contribution_bounds_per_group) -> INT64)
               +-parse_location=33-38
               +-Literal(parse_location=75-83, type=STRUCT<INT64, INT64>, value={0, 100})
+
 [REPLACED_LITERALS]
 select with differential_privacy count(*, contribution_bounds_per_group => @_p0_STRUCT)
 from (
@@ -1260,6 +1267,7 @@ QueryStmt
             +-AggregateFunctionCall(GoogleSQL:$differential_privacy_count_star(optional(1) STRUCT<INT64, INT64> contribution_bounds_per_group) -> INT64)
               +-parse_location=33-38
               +-Literal(parse_location=75-83, type=STRUCT<INT64, INT64>, value={0, 100})
+
 [REPLACED_LITERALS]
 select with differential_privacy count(*, contribution_bounds_per_group => @_p0_STRUCT)
 from SimpleTypes a
@@ -1307,6 +1315,7 @@ QueryStmt
             +-AggregateFunctionCall(GoogleSQL:$differential_privacy_count_star(optional(1) STRUCT<INT64, INT64> contribution_bounds_per_group) -> INT64)
               +-parse_location=33-38
               +-Literal(parse_location=75-83, type=STRUCT<INT64, INT64>, value={0, 100})
+
 [REPLACED_LITERALS]
 select with differential_privacy count(*, contribution_bounds_per_group => @_p0_STRUCT)
 from SimpleTypesWithAnonymizationUid a
@@ -1445,6 +1454,7 @@ QueryStmt
             +-AggregateFunctionCall(GoogleSQL:$differential_privacy_count_star(optional(1) STRUCT<INT64, INT64> contribution_bounds_per_group) -> INT64)
               +-parse_location=33-38
               +-Literal(parse_location=75-83, type=STRUCT<INT64, INT64>, value={0, 100})
+
 [REPLACED_LITERALS]
 select with differential_privacy count(*, contribution_bounds_per_group => @_p0_STRUCT)
 from (
@@ -1488,6 +1498,7 @@ QueryStmt
             +-AggregateFunctionCall(GoogleSQL:$differential_privacy_count_star(optional(1) STRUCT<INT64, INT64> contribution_bounds_per_group) -> INT64)
               +-parse_location=33-38
               +-Literal(parse_location=75-83, type=STRUCT<INT64, INT64>, value={0, 100})
+
 [REPLACED_LITERALS]
 select with differential_privacy count(*, contribution_bounds_per_group => @_p0_STRUCT)
 from SimpleTypesWithAnonymizationUid a, T1StringAnonymizationUid b
@@ -1526,6 +1537,7 @@ QueryStmt
             +-AggregateFunctionCall(GoogleSQL:$differential_privacy_count_star(optional(1) STRUCT<INT64, INT64> contribution_bounds_per_group) -> INT64)
               +-parse_location=33-38
               +-Literal(parse_location=75-83, type=STRUCT<INT64, INT64>, value={0, 100})
+
 [REPLACED_LITERALS]
 select with differential_privacy count(*, contribution_bounds_per_group => @_p0_STRUCT)
 from ProtoAnonymizationUid a, ProtoAnonymizationUid b
@@ -1972,6 +1984,7 @@ QueryStmt
               | +-field_descriptor=int64_val
               | +-default_value=0
               +-Literal(type=STRUCT<INT64, INT64>, value=NULL)
+
 [REPLACED_LITERALS]
 SELECT WITH DIFFERENTIAL_PRIVACY SUM(t1.int64_val)
 FROM KitchenSinkWithUidValueTable t1
@@ -2158,6 +2171,7 @@ QueryStmt
               +-parse_location=33-36
               +-ColumnRef(parse_location=37-38, type=INT64, column=$subquery1.n#4)
               +-Literal(type=STRUCT<INT64, INT64>, value=NULL)
+
 [REPLACED_LITERALS]
 SELECT WITH DIFFERENTIAL_PRIVACY SUM(n)
 FROM
@@ -2358,6 +2372,7 @@ QueryStmt
             +-AggregateFunctionCall(GoogleSQL:$differential_privacy_count_star(optional(1) STRUCT<INT64, INT64> contribution_bounds_per_group) -> INT64)
               +-parse_location=33-38
               +-Literal(type=STRUCT<INT64, INT64>, value=NULL)
+
 [REPLACED_LITERALS]
 SELECT WITH DIFFERENTIAL_PRIVACY count(*)
 FROM
@@ -2434,6 +2449,7 @@ QueryStmt
             +-AggregateFunctionCall(GoogleSQL:$differential_privacy_count_star(optional(1) STRUCT<INT64, INT64> contribution_bounds_per_group) -> INT64)
               +-parse_location=33-38
               +-Literal(type=STRUCT<INT64, INT64>, value=NULL)
+
 [REPLACED_LITERALS]
 SELECT WITH DIFFERENTIAL_PRIVACY count(*)
 FROM KitchenSinkWithUidValueTable t1
@@ -2580,6 +2596,7 @@ QueryStmt
             +-AggregateFunctionCall(GoogleSQL:$differential_privacy_count_star(optional(1) STRUCT<INT64, INT64> contribution_bounds_per_group) -> INT64)
               +-parse_location=33-38
               +-Literal(type=STRUCT<INT64, INT64>, value=NULL)
+
 [REPLACED_LITERALS]
 SELECT WITH DIFFERENTIAL_PRIVACY count(*)
 FROM KitchenSinkWithUidValueTable t1
@@ -2670,6 +2687,7 @@ QueryStmt
             +-AggregateFunctionCall(GoogleSQL:$differential_privacy_count_star(optional(1) STRUCT<INT64, INT64> contribution_bounds_per_group) -> INT64)
               +-parse_location=33-38
               +-Literal(type=STRUCT<INT64, INT64>, value=NULL)
+
 [REPLACED_LITERALS]
 SELECT WITH DIFFERENTIAL_PRIVACY count(*)
 FROM (SELECT string_val as x, string_val as y FROM KitchenSinkWithUidValueTable) t1
@@ -2850,6 +2868,7 @@ QueryStmt
             +-AggregateFunctionCall(GoogleSQL:$differential_privacy_count_star(optional(1) STRUCT<INT64, INT64> contribution_bounds_per_group) -> INT64)
               +-parse_location=33-38
               +-Literal(type=STRUCT<INT64, INT64>, value=NULL)
+
 [REPLACED_LITERALS]
 SELECT WITH DIFFERENTIAL_PRIVACY count(*)
 FROM (SELECT string_val as x, string_val as y FROM KitchenSinkWithUidValueTable) t1

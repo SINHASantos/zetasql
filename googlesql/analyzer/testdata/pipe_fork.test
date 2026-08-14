@@ -51,7 +51,6 @@ GeneralizedQueryStmt
               +-KeyValue.Key#1 AS Key [INT64]
               +-KeyValue.Value#2 AS Value [STRING]
 
-
 [REWRITTEN AST]
 MultiStmt
 +-statement_list=
@@ -119,7 +118,6 @@ GeneralizedQueryStmt
             +-output_column_list=
               +-KeyValue.Key#1 AS Key [INT64]
               +-KeyValue.Value#2 AS Value [STRING]
-
 
 [REWRITTEN AST]
 MultiStmt
@@ -225,7 +223,6 @@ GeneralizedQueryStmt
               +-KeyValue.Key#1 AS Key [INT64]
               +-KeyValue.Value#2 AS Value [STRING]
               +-$pipe_extend.k1000#3 AS k1000 [INT64]
-
 
 [REWRITTEN AST]
 MultiStmt
@@ -338,7 +335,6 @@ GeneralizedQueryStmt
             +-output_column_list=
               +-KeyValue.Key#1 AS Key [INT64]
               +-KeyValue.Value#2 AS Value [STRING]
-
 
 [REWRITTEN AST]
 MultiStmt
@@ -472,7 +468,6 @@ GeneralizedQueryStmt
                 +-output_column_list=
                   +-cte.Value#5 AS value [STRING]
 
-
 [REWRITTEN AST]
 MultiStmt
 +-statement_list=
@@ -583,7 +578,6 @@ GeneralizedQueryStmt
                   +-$query.key#3 AS key [INT64]
                   +-cte.Value#7 AS Value [STRING]
 
-
 [REWRITTEN AST]
 MultiStmt
 +-statement_list=
@@ -691,7 +685,6 @@ GeneralizedQueryStmt
                   +-cte.Key#3 AS key [INT64]
                   +-cte.Value#4 AS Value [STRING]
                   +-cte.Value#6 AS Value [STRING]
-
 
 [REWRITTEN AST]
 MultiStmt
@@ -821,7 +814,6 @@ GeneralizedQueryStmt
     |           +-output_column_list=
     |             +-$pipe_extend.k2#7 AS k2 [INT64]
     +-recursive=TRUE
-
 
 [REWRITTEN AST]
 MultiStmt
@@ -976,7 +968,6 @@ GeneralizedQueryStmt
     |             +-$pipe_extend.kc#18 AS kc [INT64]
     +-recursive=TRUE
 
-
 [REWRITTEN AST]
 MultiStmt
 +-statement_list=
@@ -1119,7 +1110,6 @@ GeneralizedQueryStmt
                   +-cte.Value#4 AS Value [STRING]
                   +-cte_1.x#6 AS x [INT64]
 
-
 [REWRITTEN AST]
 MultiStmt
 +-statement_list=
@@ -1260,7 +1250,6 @@ GeneralizedQueryStmt
               +-KeyValue.Key#1 AS key [INT64]
               +-KeyValue.Key#1 AS key [INT64]
 
-
 [REWRITTEN AST]
 MultiStmt
 +-statement_list=
@@ -1364,7 +1353,6 @@ GeneralizedQueryStmt
             | +-KeyValue.Value#2 AS `$value_column` [STRING]
             +-is_value_table=TRUE
 
-
 [REWRITTEN AST]
 MultiStmt
 +-statement_list=
@@ -1435,7 +1423,6 @@ GeneralizedQueryStmt
               +-KeyValue.Key#1 AS Key [INT64]
               +-KeyValue.Value#2 AS Value [STRING]
 
-
 [REWRITTEN AST]
 MultiStmt
 +-statement_list=
@@ -1502,7 +1489,6 @@ GeneralizedQueryStmt
             +-output_column_list=
               +-KeyValue.Key#1 AS Key [INT64]
               +-KeyValue.Value#2 AS Value [STRING]
-
 
 [REWRITTEN AST]
 MultiStmt
@@ -1576,7 +1562,6 @@ GeneralizedQueryStmt
                         +-output_column_list=
                           +-KeyValue.Key#1 AS key [INT64]
 
-
 [REWRITTEN AST]
 MultiStmt
 +-statement_list=
@@ -1612,7 +1597,6 @@ QueryStmt
         +-condition=
         | +-Literal(type=BOOL, value=false)
         +-subpipeline_sql="(\n     |> FORK ( |> SELECT key )\n   )"
-
 
 [REWRITTEN AST]
 QueryStmt
@@ -1659,7 +1643,6 @@ QueryStmt
     |       +-subpipeline_sql="(\n     |> FORK ( |> WHERE true )\n   )"
     +-filter_expr=
       +-Literal(type=BOOL, value=false)
-
 
 [REWRITTEN AST]
 QueryStmt
@@ -1733,7 +1716,6 @@ GeneralizedQueryStmt
                         +-column_list=[KeyValue.Value#2]
                         +-input_scan=
                           +-SubpipelineInputScan(column_list=KeyValue.[Key#1, Value#2])
-
 
 [REWRITTEN AST]
 MultiStmt
@@ -1813,7 +1795,6 @@ ExplainStmt
                 +-output_column_list=
                   +-KeyValue.Value#2 AS value [STRING]
 
-
 [REWRITTEN AST]
 ExplainStmt
 +-statement=
@@ -1883,7 +1864,6 @@ GeneralizedQueryStmt
           +-OutputSchema
             +-output_column_list=
               +-KeyValue.Key#1 AS key [INT64]
-
 
 [REWRITTEN AST]
 MultiStmt
@@ -1957,7 +1937,6 @@ GeneralizedQueryStmt
             +-output_column_list=
               +-KeyValue.Key#1 AS key [INT64]
 
-
 [REWRITTEN AST]
 MultiStmt
 +-hint_list=
@@ -2028,7 +2007,6 @@ GeneralizedQueryStmt
                     +-column_list=[KeyValue.Value#2]
                     +-input_scan=
                       +-SubpipelineInputScan(column_list=KeyValue.[Key#1, Value#2])
-
 
 [REWRITTEN AST]
 MultiStmt

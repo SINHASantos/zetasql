@@ -82,14 +82,15 @@ MakeFunctionFromCreateFunctionImpl(
   }
   if (create_function_stmt.function_expression() != nullptr) {
     std::unique_ptr<SQLFunction> sql_function;
-    GOOGLESQL_ASSIGN_OR_RETURN(function,
-                     SQLFunction::Create(
-                         std::move(name_path), function_mode,
-                         create_function_stmt.signature(), std::move(options),
-                         create_function_stmt.function_expression(),
-                         create_function_stmt.argument_name_list(),
-                         &create_function_stmt.aggregate_expression_list(),
-                         /*parse_resume_location=*/std::nullopt));
+    GOOGLESQL_ASSIGN_OR_RETURN(
+        function,
+        SQLFunction::Create(
+            std::move(name_path), function_mode,
+            create_function_stmt.signature(), std::move(options),
+            create_function_stmt.function_expression(),
+            create_function_stmt.argument_name_list(),
+            &create_function_stmt.aggregate_expression_list(),
+            ParseResumeLocation::FromStringView(create_function_stmt.code())));
   } else if (create_function_stmt.language() == "SQL") {
     function = std::make_unique<TemplatedSQLFunction>(
         create_function_stmt.name_path(), create_function_stmt.signature(),

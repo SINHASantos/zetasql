@@ -19,9 +19,7 @@
 #include <array>
 #include <cstdint>
 #include <memory>
-#include <new>
 #include <optional>
-#include <set>
 #include <string>
 #include <utility>
 #include <vector>
@@ -44,7 +42,6 @@
 #include "googlesql/resolved_ast/serialization.pb.h"
 #include "googlesql/base/case.h"
 #include "absl/algorithm/container.h"
-#include "absl/base/no_destructor.h"
 #include "absl/container/btree_set.h"
 #include "absl/container/flat_hash_map.h"
 #include "googlesql/base/check.h"
@@ -52,16 +49,13 @@
 #include "absl/status/status.h"
 #include "googlesql/base/status_macros.h"
 #include "absl/status/statusor.h"
-#include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_join.h"
 #include "absl/strings/string_view.h"
 #include "absl/strings/substitute.h"
-#include "absl/types/optional.h"
 #include "absl/types/span.h"
 #include "googlesql/base/map_util.h"
 #include "googlesql/base/ret_check.h"
-#include "googlesql/base/status.h"
 #include "googlesql/base/status_builder.h"
 
 namespace googlesql {
@@ -1303,6 +1297,7 @@ absl::Status FunctionSignature::InitInternal() {
   GOOGLESQL_RETURN_IF_ERROR(CreateNamedArgumentToOptionsMap());
   GOOGLESQL_RETURN_IF_ERROR(IsValid(ProductMode::PRODUCT_EXTERNAL));
   ComputeConcreteArgumentTypes();
+
   return absl::OkStatus();
 }
 
@@ -1679,7 +1674,63 @@ bool FunctionArgumentType::TemplatedKindIsRelated(
          TemplatedKindIsRelatedImpl(kind, kind_);
 }
 
+static absl::Status ValidateSignatureConstraints(
+    const FunctionSignature& signature) {
+  FunctionEnums::NamedArgumentKind max_seen_kind =
+      FunctionEnums::POSITIONAL_ONLY;
+
+  for (int i = 0; i < signature.arguments().size(); ++i) {
+    const FunctionArgumentType& arg = signature.argument(i);
+    FunctionEnums::NamedArgumentKind current_kind =
+        arg.options().named_argument_kind();
+
+    GOOGLESQL_RET_CHECK_NE(current_kind, FunctionEnums::NAMED_ARGUMENT_KIND_UNSPECIFIED);
+
+    if (current_kind < max_seen_kind) {
+      const bool is_allowed_positional_after_named =
+          current_kind == FunctionEnums::POSITIONAL_ONLY &&
+          max_seen_kind == FunctionEnums::POSITIONAL_OR_NAMED &&
+          (arg.optional() || arg.repeated() || arg.IsLambda());
+      if (!is_allowed_positional_after_named) {
+        return absl::InvalidArgumentError(absl::StrCat(
+            "Argument ", i, " has kind ",
+            FunctionEnums::NamedArgumentKind_Name(current_kind),
+            " but follows an argument with a more restrictive kind ",
+            FunctionEnums::NamedArgumentKind_Name(max_seen_kind),
+            ". Function signature: ", signature.DebugString()));
+      }
+    }
+    max_seen_kind = std::max(max_seen_kind, current_kind);
+
+    if ((current_kind == FunctionEnums::NAMED_ONLY ||
+         current_kind == FunctionEnums::POSITIONAL_OR_NAMED) &&
+        !arg.has_argument_name()) {
+      return absl::InvalidArgumentError(absl::StrCat(
+          "Argument ", i, " is ",
+          FunctionEnums::NamedArgumentKind_Name(current_kind),
+          " but has no name. Function signature: ", signature.DebugString()));
+    }
+
+    if (arg.repeated()) {
+      if (current_kind != FunctionEnums::POSITIONAL_ONLY) {
+        return absl::InvalidArgumentError(
+            absl::StrCat("Repeated argument ", i,
+                         " must be POSITIONAL_ONLY. Function signature: ",
+                         signature.DebugString()));
+      }
+      if (!arg.IsScalar()) {
+        return absl::InvalidArgumentError(absl::StrCat(
+            "Repeated argument ", i,
+            " must be Scalar. Function signature: ", signature.DebugString()));
+      }
+    }
+  }
+  return absl::OkStatus();
+}
+
 absl::Status FunctionSignature::IsValid(ProductMode product_mode) const {
+  GOOGLESQL_RETURN_IF_ERROR(ValidateSignatureConstraints(*this));
+
   if (result_type_.repeated() || result_type_.optional()) {
     return MakeSqlError() << "Result type cannot be repeated or optional";
   }

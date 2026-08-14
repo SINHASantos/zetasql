@@ -946,6 +946,7 @@ QueryStmt
           +-privacy_unit_column=
             +-parse_location=45-77
             +-ColumnRef(parse_location=67-77, type=STRUCT<first_dimension INT64, second_dimension STRING>, column=$subquery1.struct_col#4)
+
 [REPLACED_LITERALS]
 SELECT WITH DIFFERENTIAL_PRIVACY OPTIONS (
   privacy_unit_column = struct_col)

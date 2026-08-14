@@ -3108,7 +3108,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=[tvf_templated_select_any_scalar_arg.x#3]
-        +-tvf=tvf_templated_select_any_scalar_arg((ANY TYPE) -> ANY TABLE)
+        +-tvf=tvf_templated_select_any_scalar_arg
         +-signature=(GRAPH_NODE(aml)<age UINT32, birthday DATE, data BYTES, id INT64, name STRING>) -> TABLE<x GRAPH_NODE(aml)<age UINT32, birthday DATE, data BYTES, id INT64, name STRING>>
         +-argument_list=
         | +-FunctionArgument
@@ -3507,7 +3507,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=[tvf_templated_select_any_scalar_arg.x#1]
-        +-tvf=tvf_templated_select_any_scalar_arg((ANY TYPE) -> ANY TABLE)
+        +-tvf=tvf_templated_select_any_scalar_arg
         +-signature=(literal INT64) -> TABLE<x INT64>
         +-argument_list=
         | +-FunctionArgument
@@ -4081,3 +4081,253 @@ select * from graph_table(
 ERROR: UPDATE constructor expects an input type of proto type, but found type GRAPH_NODE(aml)<age UINT32, birthday DATE, data BYTES, ...> [at 4:11]
   columns(UPDATE(a) { id: 1 } as u)
           ^
+==
+
+[default language_features=NONE,+SQL_GRAPH,+SQL_GRAPH_ADVANCED_QUERY]
+
+graph aml
+match (n IS Person | Account )
+where ELEMENT_DEFINITION_NAME_IS(n, {{Person|'Person'|UnknownTable|Transfer}})
+return 1 as v
+--
+ALTERNATION GROUP: Person
+--
+QueryStmt
++-output_column_list=
+| +-$graph_table.v#2 AS v [INT64]
++-query=
+  +-GraphTableScan
+    +-column_list=[$graph_table.v#2]
+    +-property_graph=aml
+    +-input_scan=
+      +-GraphLinearScan
+        +-column_list=[$graph_table.v#2]
+        +-scan_list=
+          +-GraphLinearScan
+            +-column_list=[$graph_table.v#2]
+            +-scan_list=
+              +-GraphScan
+              | +-column_list=[$element_table.n#1]
+              | +-input_scan_list=
+              | | +-GraphPathScan
+              | |   +-column_list=[$element_table.n#1]
+              | |   +-input_scan_list=
+              | |   | +-GraphNodeScan
+              | |   |   +-column_list=[$element_table.n#1]
+              | |   |   +-label_expr=
+              | |   |   | +-GraphLabelNaryExpr
+              | |   |   |   +-parse_location=22-38
+              | |   |   |   +-op=OR
+              | |   |   |   +-operand_list=
+              | |   |   |     +-GraphLabel(parse_location=22-28, label=aml.Person)
+              | |   |   |     +-GraphLabel(parse_location=31-38, label=aml.Account)
+              | |   |   +-target_element_table_list=[aml.Account,aml.Person]
+              | |   +-head=$element_table.n#1
+              | |   +-tail=$element_table.n#1
+              | +-filter_expr=
+              | | +-FunctionCall(GoogleSQL:element_definition_name_is(GRAPH_NODE(aml)<age UINT32, balance UINT64, birthday DATE, data BYTES, id INT64, name STRING>, STRING) -> BOOL)
+              | |   +-ColumnRef(type=GRAPH_NODE(aml)<age UINT32, balance UINT64, birthday DATE, data BYTES, id INT64, name STRING>, column=$element_table.n#1)
+              | |   +-Literal(type=STRING, value="Person", has_explicit_type=TRUE, preserve_in_literal_remover=TRUE)
+              | +-input_scan=
+              |   +-SingleRowScan
+              +-ProjectScan
+                +-column_list=[$graph_table.v#2]
+                +-expr_list=
+                | +-v#2 := Literal(type=INT64, value=1)
+                +-input_scan=
+                  +-GraphRefScan(column_list=[$element_table.n#1])
+
+[SQLBUILDER_TARGET_SYNTAX_MODE standard]
+[SQLBUILDER_OUTPUT]
+SELECT
+  aml_1.a_3 AS v
+FROM
+  GRAPH_TABLE(
+    aml
+    MATCH
+      (a_2 IS (Person | Account))
+      WHERE
+        ELEMENT_DEFINITION_NAME_IS(a_2, Person)
+    RETURN
+      1 AS a_3
+  ) AS aml_1;
+
+[SQLBUILDER_TARGET_SYNTAX_MODE pipe]
+[SQLBUILDER_OUTPUT]
+FROM
+  GRAPH_TABLE(
+    aml
+    MATCH
+      (a_2 IS (Person | Account))
+      WHERE
+        ELEMENT_DEFINITION_NAME_IS(a_2, Person)
+    RETURN
+      1 AS a_3
+  ) AS aml_1
+|> SELECT
+     aml_1.a_3 AS v;
+--
+ALTERNATION GROUP: 'Person'
+--
+ERROR: Second argument of ELEMENT_DEFINITION_NAME_IS must be an identifier [at 3:37]
+where ELEMENT_DEFINITION_NAME_IS(n, 'Person')
+                                    ^
+--
+ALTERNATION GROUP: UnknownTable
+--
+ERROR: Element table UnknownTable is not defined in PropertyGraph aml [at 3:37]
+where ELEMENT_DEFINITION_NAME_IS(n, UnknownTable)
+                                    ^
+--
+ALTERNATION GROUP: Transfer
+--
+ERROR: ELEMENT_DEFINITION_NAME_IS expects a node element table, but Transfer is an edge element table [at 3:37]
+where ELEMENT_DEFINITION_NAME_IS(n, Transfer)
+                                    ^
+==
+
+graph aml
+match ()-[e]->()
+where ELEMENT_DEFINITION_NAME_IS(e{{|,Person|,Transfer|,'Transfer'|,UnknownTable}})
+return 1 as v
+--
+ALTERNATION GROUP: <empty>
+--
+ERROR: ELEMENT_DEFINITION_NAME_IS should have exactly two arguments [at 3:7]
+where ELEMENT_DEFINITION_NAME_IS(e)
+      ^
+--
+ALTERNATION GROUP: ,Person
+--
+ERROR: ELEMENT_DEFINITION_NAME_IS expects an edge element table, but Person is a node element table [at 3:36]
+where ELEMENT_DEFINITION_NAME_IS(e,Person)
+                                   ^
+--
+ALTERNATION GROUP: ,Transfer
+--
+QueryStmt
++-output_column_list=
+| +-$graph_table.v#4 AS v [INT64]
++-query=
+  +-GraphTableScan
+    +-column_list=[$graph_table.v#4]
+    +-property_graph=aml
+    +-input_scan=
+      +-GraphLinearScan
+        +-column_list=[$graph_table.v#4]
+        +-scan_list=
+          +-GraphLinearScan
+            +-column_list=[$graph_table.v#4]
+            +-scan_list=
+              +-GraphScan
+              | +-column_list=$element_table.[$element1#1, e#2, $element2#3]
+              | +-input_scan_list=
+              | | +-GraphPathScan
+              | |   +-column_list=$element_table.[$element1#1, e#2, $element2#3]
+              | |   +-input_scan_list=
+              | |   | +-GraphNodeScan
+              | |   | | +-column_list=[$element_table.$element1#1]
+              | |   | | +-label_expr=
+              | |   | | | +-GraphLabelNaryExpr
+              | |   | | |   +-op=OR
+              | |   | | |   +-operand_list=
+              | |   | | |     +-GraphWildCardLabel
+              | |   | | |     +-GraphLabelNaryExpr
+              | |   | | |       +-op=NOT
+              | |   | | |       +-operand_list=
+              | |   | | |         +-GraphWildCardLabel
+              | |   | | +-target_element_table_list=[aml.Account,aml.Person,aml.Syndicate]
+              | |   | +-GraphEdgeScan
+              | |   | | +-column_list=[$element_table.e#2]
+              | |   | | +-label_expr=
+              | |   | | | +-GraphLabelNaryExpr
+              | |   | | |   +-op=OR
+              | |   | | |   +-operand_list=
+              | |   | | |     +-GraphWildCardLabel
+              | |   | | |     +-GraphLabelNaryExpr
+              | |   | | |       +-op=NOT
+              | |   | | |       +-operand_list=
+              | |   | | |         +-GraphWildCardLabel
+              | |   | | +-target_element_table_list=[aml.PersonOwnAccount,aml.Transfer]
+              | |   | | +-orientation=RIGHT
+              | |   | +-GraphNodeScan
+              | |   |   +-column_list=[$element_table.$element2#3]
+              | |   |   +-label_expr=
+              | |   |   | +-GraphLabelNaryExpr
+              | |   |   |   +-op=OR
+              | |   |   |   +-operand_list=
+              | |   |   |     +-GraphWildCardLabel
+              | |   |   |     +-GraphLabelNaryExpr
+              | |   |   |       +-op=NOT
+              | |   |   |       +-operand_list=
+              | |   |   |         +-GraphWildCardLabel
+              | |   |   +-target_element_table_list=[aml.Account,aml.Person,aml.Syndicate]
+              | |   +-head=$element_table.$element1#1
+              | |   +-tail=$element_table.$element2#3
+              | +-filter_expr=
+              | | +-FunctionCall(GoogleSQL:element_definition_name_is(GRAPH_EDGE(aml)<accountId INT64, amount UINT64, personId INT64, targetAccountId INT64>, STRING) -> BOOL)
+              | |   +-ColumnRef(type=GRAPH_EDGE(aml)<accountId INT64, amount UINT64, personId INT64, targetAccountId INT64>, column=$element_table.e#2)
+              | |   +-Literal(type=STRING, value="Transfer", has_explicit_type=TRUE, preserve_in_literal_remover=TRUE)
+              | +-input_scan=
+              |   +-SingleRowScan
+              +-ProjectScan
+                +-column_list=[$graph_table.v#4]
+                +-expr_list=
+                | +-v#4 := Literal(type=INT64, value=1)
+                +-input_scan=
+                  +-GraphRefScan(column_list=$element_table.[$element1#1, e#2, $element2#3])
+
+[SQLBUILDER_TARGET_SYNTAX_MODE standard]
+[SQLBUILDER_OUTPUT]
+SELECT
+  aml_1.a_5 AS v
+FROM
+  GRAPH_TABLE(
+    aml
+    MATCH
+      (a_2 IS (% | ! %))
+      -[a_3 IS (% | ! %)]->
+      (a_4 IS (% | ! %))
+      WHERE
+        ELEMENT_DEFINITION_NAME_IS(a_3, Transfer)
+    RETURN
+      1 AS a_5
+  ) AS aml_1;
+
+[SQLBUILDER_TARGET_SYNTAX_MODE pipe]
+[SQLBUILDER_OUTPUT]
+FROM
+  GRAPH_TABLE(
+    aml
+    MATCH
+      (a_2 IS (% | ! %))
+      -[a_3 IS (% | ! %)]->
+      (a_4 IS (% | ! %))
+      WHERE
+        ELEMENT_DEFINITION_NAME_IS(a_3, Transfer)
+    RETURN
+      1 AS a_5
+  ) AS aml_1
+|> SELECT
+     aml_1.a_5 AS v;
+--
+ALTERNATION GROUP: ,'Transfer'
+--
+ERROR: Second argument of ELEMENT_DEFINITION_NAME_IS must be an identifier [at 3:36]
+where ELEMENT_DEFINITION_NAME_IS(e,'Transfer')
+                                   ^
+--
+ALTERNATION GROUP: ,UnknownTable
+--
+ERROR: Element table UnknownTable is not defined in PropertyGraph aml [at 3:36]
+where ELEMENT_DEFINITION_NAME_IS(e,UnknownTable)
+                                   ^
+==
+
+graph aml
+match (n IS Person | Account Where ELEMENT_DEFINITION_NAME_IS(1, Person))
+return 1 as v
+--
+ERROR: First argument of ELEMENT_DEFINITION_NAME_IS must be of graph element type [at 2:63]
+match (n IS Person | Account Where ELEMENT_DEFINITION_NAME_IS(1, Person))
+                                                              ^

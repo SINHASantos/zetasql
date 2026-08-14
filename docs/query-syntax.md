@@ -1827,9 +1827,10 @@ Graph Query Language (GQL) reference guide.
   USING ( <span class="var">column_list</span> )
 </pre>
 
-The `JOIN` operation merges two `from_item`s so that the `SELECT` clause can
-query them as one source. The join operator and join condition specify how to
-combine and discard rows from the two `from_item`s to form a single source.
+The `JOIN` operation combines two `from_item`s so that the `SELECT` clause can
+query them as one source. The join operation pairs rows from the two
+`from_item`s, and a join condition filters those pairs to determine which rows
+appear in the output.
 
 ### `[INNER] JOIN` 
 <a id="inner_join"></a>
@@ -2349,13 +2350,20 @@ Result:
 ### Join conditions 
 <a id="join_conditions"></a>
 
-In a [join operation][query-joins], a join condition helps specify how to
-combine rows in two `from_items` to form a single source.
+A [join operation][query-joins] pairs rows from two `from_item`s, and a join
+condition filters those pairs to determine which rows appear in the output.
 
 The two types of join conditions are the [`ON` clause][on-clause] and
-[`USING` clause][using-clause]. You must use a join condition when you perform a
-conditional join operation. You can't use a join condition when you perform a
-cross join operation.
+[`USING` clause][using-clause].
+
+When you use the `JOIN` keyword, you typically need an
+`ON` or `USING` clause to specify the join
+condition. The following two exceptions apply:
+
+*   You can't use an `ON` or `USING` clause with
+    the [`CROSS JOIN` operator][cross-join].
+*   You can omit the `ON` or `USING` clause for
+    the [`LEFT [OUTER] JOIN LATERAL` operator][lateral-join].
 
 #### `ON` clause 
 <a id="on_clause"></a>
@@ -2366,8 +2374,10 @@ ON bool_expression
 
 **Description**
 
-Given a row from each table, if the `ON` clause evaluates to `TRUE`, the query
-generates a consolidated row with the result of combining the given rows.
+The `ON` clause determines which rows from a join operation appear in the
+output. Given a row from the Cartesian product of two `from_item`s, if
+`bool_expression` evaluates to `TRUE`, the join includes that row in the
+output.
 
 Definitions:
 
@@ -2476,12 +2486,13 @@ column_name_list:
 
 **Description**
 
-When you are joining two tables, `USING` performs an
+The `USING` clause determines which rows from a join operation appear in the
+output. The `USING` clause performs an
 [equality comparison operation][comparison-operators] on the columns named in
 `column_name_list`. Each column name in `column_name_list` must appear in both
-input tables. For each pair of rows from the input tables, if the
-equality comparisons all evaluate to `TRUE`, one row is added to the resulting
-column.
+input tables. Given a row from the Cartesian product of two `from_item`s, if
+the equality comparisons all evaluate to `TRUE`, the join includes that row
+in the output.
 
 Definitions:
 
@@ -7409,6 +7420,8 @@ Results:
 
 [cte-visibility]: #cte_visibility
 
+[lateral-join]: #lateral_join
+
 [comma-cross-join]: #comma_cross_join
 
 [cross-join]: #cross_join
@@ -7538,6 +7551,8 @@ Results:
 [analysis-rules]: https://github.com/google/googlesql/blob/master/docs/analysis-rules.md
 
 [privacy-view]: https://github.com/google/googlesql/blob/master/docs/analysis-rules.md#privacy_view
+
+[map-subscript-operator]: https://github.com/google/googlesql/blob/master/docs/operators.md#map_subscript_operator
 
 [graph-table-operator]: https://github.com/google/googlesql/blob/master/docs/graph-sql-queries.md#graph_table_operator
 

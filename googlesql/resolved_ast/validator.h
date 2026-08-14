@@ -53,6 +53,8 @@
 #include "googlesql/base/status_builder.h"
 namespace googlesql {
 
+class RowType;
+
 // Options to disable certain validations. Options are used to retroactively
 // add validations of invariants even if some client code still needs to be
 // cleaned up. A non-default ValidatorOptions in client code signals a cleanup
@@ -147,6 +149,9 @@ class Validator {
       const Type* column_type,
       const ResolvedIdentityColumnInfo* identity_column_info,
       bool skip_check_type_match = false);
+  absl::Status ValidateResolvedCreateTableAsSelectStmtBase(
+      const ResolvedCreateTableAsSelectStmtBase* stmt,
+      const std::set<ResolvedColumn>& pipe_visible_parameters = {});
   absl::Status ValidateResolvedCreateTableAsSelectStmt(
       const ResolvedCreateTableAsSelectStmt* stmt,
       const std::set<ResolvedColumn>& pipe_visible_parameters = {});
@@ -156,6 +161,8 @@ class Validator {
       const ResolvedCreateViewStmt* stmt);
   absl::Status ValidateResolvedCreateLiveTableStmt(
       const ResolvedCreateLiveTableStmt* stmt);
+  absl::Status ValidateResolvedCreateLiveTableAsSelectStmt(
+      const ResolvedCreateLiveTableAsSelectStmt* stmt);
   absl::Status ValidateResolvedCreateMaterializedViewStmt(
       const ResolvedCreateMaterializedViewStmt* stmt);
   absl::Status ValidateResolvedCreateApproxViewStmt(
@@ -166,6 +173,8 @@ class Validator {
       const ResolvedCreatePrivilegeRestrictionStmt* stmt);
   absl::Status ValidateResolvedCreateRowAccessPolicyStmt(
       const ResolvedCreateRowAccessPolicyStmt* stmt);
+  absl::Status ValidateResolvedCreateDataPolicyStmt(
+      const ResolvedCreateDataPolicyStmt* stmt);
   absl::Status ValidateResolvedCreateConnectionStmt(
       const ResolvedCreateConnectionStmt* stmt);
   absl::Status ValidateResolvedCreateConstantStmt(
@@ -434,6 +443,11 @@ class Validator {
       const std::set<ResolvedColumn>& visible_columns,
       const std::set<ResolvedColumn>& visible_parameters,
       const ResolvedAnalyticFunctionCall* call);
+
+  absl::Status ValidateResolvedEstimatorFunctionCall(
+      const std::set<ResolvedColumn>& visible_columns,
+      const std::set<ResolvedColumn>& visible_parameters,
+      const ResolvedEstimatorFunctionCall* call);
 
   absl::Status ValidateResolvedMakeStruct(
       const std::set<ResolvedColumn>& visible_columns,
@@ -806,6 +820,10 @@ class Validator {
       const ResolvedPipeTeeScan* scan,
       const std::set<ResolvedColumn>& visible_parameters);
 
+  absl::Status ValidateResolvedInsertScan(
+      const ResolvedInsertScan* scan,
+      const std::set<ResolvedColumn>& visible_parameters);
+
   absl::Status ValidateResolvedPipeExportDataScan(
       const ResolvedPipeExportDataScan* scan,
       const std::set<ResolvedColumn>& visible_parameters);
@@ -814,8 +832,8 @@ class Validator {
       const ResolvedPipeCreateTableScan* scan,
       const std::set<ResolvedColumn>& visible_parameters);
 
-  absl::Status ValidateResolvedPipeInsertScan(
-      const ResolvedPipeInsertScan* scan,
+  absl::Status ValidateResolvedUpdateScan(
+      const ResolvedUpdateScan* scan,
       const std::set<ResolvedColumn>& visible_parameters);
 
   absl::Status ValidateResolvedSubpipeline(
@@ -862,6 +880,24 @@ class Validator {
 
   absl::Status ValidateResolvedCreatePropertyGraphStmt(
       const ResolvedCreatePropertyGraphStmt* stmt);
+
+  absl::Status ValidateResolvedCreatePropertyGraphTypeStmt(
+      const ResolvedCreatePropertyGraphTypeStmt* stmt);
+
+  // Validates a single node or edge element type of a property graph type.
+  // 'all_node_type_name_set' holds the names of all node types declared in the
+  // statement (used to check edge FROM/TO references); 'all_label_name_set'
+  // holds all label names declared on the statement.
+  // REQUIRES: The underlying string_views for both sets must be valid for the
+  // lifetime of the call.
+  absl::Status ValidateResolvedGraphElementType(
+      const ResolvedGraphElementType* element_type, bool is_edge_type,
+      const absl::flat_hash_set<
+          absl::string_view, googlesql_base::StringViewCaseHash,
+          googlesql_base::StringViewCaseEqual>& all_node_type_name_set,
+      const absl::flat_hash_set<
+          absl::string_view, googlesql_base::StringViewCaseHash,
+          googlesql_base::StringViewCaseEqual>& all_label_name_set);
 
   // REQUIRES: The underlying string_views for 'node_table_scan_map',
   // 'all_label_name_set' and 'all_property_name_set' must be valid for the
@@ -1309,6 +1345,20 @@ class Validator {
   // List of column ids seen so far. Used to ensure that every unique column
   // has a distinct id.
   absl::flat_hash_set<int> column_ids_seen_;
+
+  // Lists of RowType pointers seen being 'created' so far. Used to ensure that
+  // each RowType created by certain node types has a unique type pointer.
+  // `seen_unique_row_types_` tracks the seen RowTypes from nodes which need to
+  // produce a unique RowType (TableScan and GetRowField).
+  // `seen_nonunique_row_types_` tracks the seen RowTypes from nodes which are
+  // allowed to produce duplicate RowType pointers (TvfScan).
+  absl::flat_hash_set<const RowType*> seen_unique_row_types_;
+  absl::flat_hash_set<const RowType*> seen_nonunique_row_types_;
+
+  // RowType produced by a TableScan cannot produce a nested ROW type. Track
+  // both to check the opposite set any time we see one or the other.
+  absl::flat_hash_set<const RowType*> seen_row_types_from_tablescan_;
+  absl::flat_hash_set<const RowType*> seen_row_types_producing_nested_;
 
   // List of side effect columns that are yet to be consumed by a
   // $with_side_effects() call. At the end of validation, this list must be

@@ -991,6 +991,7 @@ CreateFunctionStmt
 |       +-$groupbymod#1 := ArgumentRef(parse_location=138-141, type=INT64, name="key", argument_kind=AGGREGATE)
 +-function_expression=
   +-ColumnRef(type=BOOL, column=$aggregate.$agg1#3)
+
 [SQLBUILDER_TARGET_SYNTAX_MODE standard]
 [SQLBUILDER_OUTPUT]
 CREATE AGGREGATE FUNCTION LambdaArgHidesFunctionArg(key INT64)
@@ -1151,6 +1152,7 @@ CreateFunctionStmt
 |       +-$groupbymod#1 := ArgumentRef(parse_location=141-144, type=INT64, name="key", argument_kind=AGGREGATE)
 +-function_expression=
   +-ColumnRef(type=BOOL, column=$aggregate.$agg1#3)
+
 [SQLBUILDER_TARGET_SYNTAX_MODE standard]
 [SQLBUILDER_OUTPUT]
 CREATE AGGREGATE FUNCTION LambdaBodyAccessingGroupingKey(key INT64)
@@ -1548,6 +1550,7 @@ QueryStmt
         +-array_expr_list=
         | +-Literal(type=ARRAY<INT64>, value=[1, 2, 3])
         +-element_column_list=[$array.x#1]
+
 [SQLBUILDER_TARGET_SYNTAX_MODE standard]
 [SQLBUILDER_OUTPUT]
 SELECT
@@ -1845,6 +1848,7 @@ CreateFunctionStmt
 |       +-$groupbymod#1 := ArgumentRef(parse_location=222-225, type=INT64, name="key", argument_kind=AGGREGATE)
 +-function_expression=
   +-ColumnRef(type=INT64, column=$aggregate.$agg1#3)
+
 [SQLBUILDER_TARGET_SYNTAX_MODE standard]
 [SQLBUILDER_OUTPUT]
 CREATE AGGREGATE FUNCTION WithExprAccessingGroupingConstAndArg(key INT64, not_aggregate_arg INT64 NOT AGGREGATE)

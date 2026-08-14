@@ -24,6 +24,7 @@
 #include <vector>
 
 #include "googlesql/public/functions/rounding_mode.pb.h"
+#include "googlesql/public/proto/vector_encoding_id.pb.h"
 #include "googlesql/public/simple_value.pb.h"
 #include "googlesql/public/type_parameters.pb.h"
 #include "googlesql/public/types/annotation.h"
@@ -72,7 +73,14 @@ std::string TimestampTypeParametersDebugString(
 
 std::string VectorTypeParametersDebugString(
     const VectorTypeParametersProto& parameters) {
-  return absl::Substitute("(length=$0)", parameters.length());
+  std::string encoding_str =
+      parameters.has_encoding() &&
+              parameters.encoding() !=
+                  googlesql::VectorEncodingId::UNKNOWN_VECTOR_ENCODING
+          ? absl::StrCat(", encoding=", googlesql::VectorEncodingId_Id_Name(
+                                            parameters.encoding()))
+          : "";
+  return absl::StrCat("(length=", parameters.length(), encoding_str, ")");
 }
 
 std::string ChildTypeParametersDebugString(
@@ -153,6 +161,13 @@ std::string TypeParameters::ToParenthesizedString() const {
   }
   if (const auto* vector_params =
           std::get_if<VectorTypeParametersProto>(&type_parameters_holder_)) {
+    if (vector_params->has_encoding() &&
+        vector_params->encoding() !=
+            googlesql::VectorEncodingId::UNKNOWN_VECTOR_ENCODING) {
+      return absl::StrCat(
+          "(", vector_params->length(), ", '",
+          googlesql::VectorEncodingId_Id_Name(vector_params->encoding()), "')");
+    }
     return absl::StrCat("(", vector_params->length(), ")");
   }
   return "";
@@ -263,6 +278,18 @@ absl::Status TypeParameters::ValidateVectorTypeParameters(
     const VectorTypeParametersProto& vector_type_parameters) {
   if (vector_type_parameters.has_length()) {
     GOOGLESQL_RET_CHECK_GT(vector_type_parameters.length(), 0);
+  }
+  if (vector_type_parameters.has_encoding()) {
+    GOOGLESQL_RET_CHECK_NE(vector_type_parameters.encoding(),
+                 googlesql::VectorEncodingId::UNKNOWN_VECTOR_ENCODING)
+        << R"(Unrecognized VECTOR encoding: ")"
+        << googlesql::VectorEncodingId_Id_Name(
+               vector_type_parameters.encoding())
+        << R"(")";
+    GOOGLESQL_RET_CHECK(googlesql::VectorEncodingId_Id_IsValid(
+        vector_type_parameters.encoding()))
+        << R"(Unrecognized VECTOR encoding: ")"
+        << vector_type_parameters.encoding() << R"(")";
   }
   return absl::OkStatus();
 }

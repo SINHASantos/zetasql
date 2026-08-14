@@ -1103,7 +1103,6 @@ QueryStmt
               +-Literal(type=ENUM<DIFFERENTIAL_PRIVACY_REPORT_FORMAT>, value=JSON)
               +-Literal(type=STRUCT<DOUBLE, DOUBLE>, value={1, 4})
 
-
 [REWRITTEN AST]
 QueryStmt
 +-output_column_list=

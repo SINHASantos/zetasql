@@ -70,8 +70,9 @@ using SqlMode = ExecuteQueryConfig::SqlMode;
 
 absl::Status ExecuteQuery(absl::string_view sql, ExecuteQueryConfig& config,
                           std::ostream& out_stream) {
-  ExecuteQueryStreamWriter writer{out_stream,
-                                  /*use_box_glyphs=*/config.use_box_glyphs()};
+  ExecuteQueryStreamWriter writer{
+      out_stream, /*use_box_glyphs=*/config.use_box_glyphs(),
+      /*linear_resolved_ast=*/config.linear_resolved_ast()};
   return ExecuteQuery(sql, config, writer);
 }
 
@@ -1023,6 +1024,7 @@ static absl::Status RunFileBasedTestImpl(
   test_case_options.RegisterString("enabled_language_features", "");
   test_case_options.RegisterInt64("max_statements_to_execute", -1);
   test_case_options.RegisterBool("use_box_glyphs", true);
+  test_case_options.RegisterBool("linear_resolved_ast", false);
 
   std::string test_case = std::string(test_case_input);
   GOOGLESQL_RETURN_IF_ERROR(test_case_options.ParseTestCaseOptions(&test_case));
@@ -1049,6 +1051,8 @@ static absl::Status RunFileBasedTestImpl(
   config.mutable_analyzer_options().set_error_message_mode(
       ERROR_MESSAGE_MULTI_LINE_WITH_CARET);
   config.set_use_box_glyphs(test_case_options.GetBool("use_box_glyphs"));
+  config.set_linear_resolved_ast(
+      test_case_options.GetBool("linear_resolved_ast"));
 
   return ExecuteQuery(test_case, config, *output);
 }

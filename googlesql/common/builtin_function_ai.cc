@@ -130,9 +130,6 @@ std::vector<FunctionArgumentTypeList> CrossProduct(
 // Generates AI.IF signatures for a given prompt type. Keeps main AI.IF logic
 // separated from future AI functions.
 
-// TODO: Add function signatures for `model` to be a MODEL
-// reference once it is supported for scalar functions.
-
 // For now, since we would like to distinguish explicitly passed NULL
 // arguments from omitted arguments as different AI.IF invocations and
 // because no default values exist when arguments are unspecified,
@@ -188,6 +185,9 @@ absl::Status GetAIFunctions(TypeFactory* /*type_factory*/,
                             NameToFunctionMap* functions) {
   // Volatile because AI functions will have non-deterministic results; the
   // results depend on the LLM chosen.
+
+  // TODO: Remove FEATURE_AI_IF as a required language feature once
+  // AI.IF is disabled for Spanner via FEATURE_DISABLE_AI_IF.
   FunctionOptions function_options =
       FunctionOptions()
           .set_volatility(FunctionEnums::VOLATILE)
@@ -200,6 +200,7 @@ absl::Status GetAIFunctions(TypeFactory* /*type_factory*/,
 
   // Add and create AI.IF signatures with those argument combinations.
   std::vector<FunctionSignatureOnHeap> ai_if_signatures;
+  ai_if_signatures.reserve(all_ai_if_signature_args.size());
   FunctionSignatureId enum_id;
   for (const FunctionArgumentTypeList& signature_arg :
        all_ai_if_signature_args) {
@@ -212,8 +213,12 @@ absl::Status GetAIFunctions(TypeFactory* /*type_factory*/,
                                 /*context_id=*/enum_id});
   }
 
-  InsertNamespaceFunction(functions, options, "ai", "if", Function::SCALAR,
-                          ai_if_signatures, function_options);
+  // TODO: Remove this check once engine catalogs are compatible
+  // with the GoogleSQL built-in AI.IF function.
+  if (!options.language_options.LanguageFeatureEnabled(FEATURE_DISABLE_AI_IF)) {
+    InsertNamespaceFunction(functions, options, "ai", "if", Function::SCALAR,
+                            ai_if_signatures, function_options);
+  }
 
   return absl::OkStatus();
 }

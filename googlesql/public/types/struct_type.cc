@@ -55,6 +55,7 @@
 #include "absl/strings/string_view.h"
 #include "absl/strings/substitute.h"
 #include "absl/synchronization/mutex.h"
+#include "absl/types/span.h"
 #include "googlesql/base/compact_reference_counted.h"
 #include "googlesql/base/ret_check.h"
 
@@ -455,17 +456,31 @@ absl::HashState StructType::HashTypeParameter(absl::HashState state) const {
   return state;
 }
 
-absl::HashState StructType::HashValueContent(const ValueContent& value,
-                                             absl::HashState state) const {
+template <typename H>
+static absl::HashState HashValueContentForStruct(
+    const ValueContent& value, absl::HashState state,
+    absl::Span<const StructField> fields) {
   absl::HashState result = absl::HashState::Create(&state);
   const internal::ValueContentOrderedList* container =
       value.GetAs<internal::ValueContentOrderedListRef*>()->value();
   for (int i = 0; i < container->num_elements(); i++) {
-    NullableValueContentHasher hasher(field(i).type);
-    result = absl::HashState::combine(std::move(result),
-                                      hasher(container->element(i)));
+    result = absl::HashState::combine(
+        std::move(result),
+        absl::HashOf(H{container->element(i), fields[i].type}));
   }
   return result;
+}
+
+absl::HashState StructType::HashValueContent(const ValueContent& value,
+                                             absl::HashState state) const {
+  return HashValueContentForStruct<HashableNullableValueContent<
+      /*ignore_floats=*/false>>(value, std::move(state), fields_);
+}
+
+absl::HashState StructType::HashValueContentIgnoringFloat(
+    const ValueContent& value, absl::HashState state) const {
+  return HashValueContentForStruct<HashableNullableValueContent<
+      /*ignore_floats=*/true>>(value, std::move(state), fields_);
 }
 
 bool StructType::ValueContentEquals(

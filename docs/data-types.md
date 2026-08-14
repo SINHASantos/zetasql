@@ -116,6 +116,15 @@ information on data type literals and constructors, see
 </tr>
 
 <tr>
+  <td><a href="#map_type">Map type</a>
+</td>
+  <td>
+    Unordered collection of keys and associated values.<br/>
+    SQL type name: <code>MAP</code>
+  </td>
+</tr>
+
+<tr>
   <td><a href="#measure_type">Measure type</a>
 </td>
   <td>
@@ -282,6 +291,7 @@ Applies to all data types except for:
 + `PROTO`
 + `STRUCT`
 + `GEOGRAPHY`
++ `MAP`
 + `GRAPH_ELEMENT`
 
 #### Ordering `NULL`s 
@@ -361,6 +371,7 @@ Groupable data types can generally appear in an expression following `GROUP BY`,
 
 + `PROTO`
 + `GEOGRAPHY`
++ `MAP`
 
 #### Grouping with floating point types
 
@@ -410,6 +421,7 @@ All data types are supported except for:
 
 + `PROTO`
 + `GEOGRAPHY`
++ `MAP`
 
 Notes:
 
@@ -1604,6 +1616,49 @@ Supported non-JSON types for ordering coercion include:
 they don't preserve order when cast to JSON.
 
 [json-literals]: https://github.com/google/googlesql/blob/master/docs/lexical.md#json_literals
+
+## Map type 
+<a id="map_type"></a>
+
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>MAP</code></td>
+<td>Unordered collection of keys and associated values.</td>
+</tr>
+</tbody>
+</table>
+
+### Declaring a map type
+
+```
+MAP<KEY_TYPE, VALUE_TYPE>
+```
+
+To declare a map type, you must include angle brackets (`<` and `>`) and
+the data types for the map keys and values.
+
++   `KEY_TYPE`: The data type for the key. Groupable data types are allowed.
++   `VALUE_TYPE`: The data type for the key's associated value. All data types
+    are allowed.
+
+### Constructing a map
+
+You can construct a map using the [`MAP_FROM_ARRAY`][map-from-array] function.
+When constructing a map, these caveats apply:
+
++   Keys must be distinct. If you attempt to create a map with one or more
+    identical keys, an error is produced.
++   A key can be `NULL`.
++   A `NULL` key is retrievable.
+
+[map-from-array]: https://github.com/google/googlesql/blob/master/docs/map-functions.md#map_from_array
 
 ## Measure type 
 <a id="measure_type"></a>

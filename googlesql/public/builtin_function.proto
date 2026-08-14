@@ -40,7 +40,7 @@ enum FunctionSignatureId {
   //
   // 0002-0999 Non-standard function calls    (NextId: 354)
   // 1000-1099 String functions               (NextId: 1086)
-  // 1100-1199 Control flow functions         (NextId: 1108)
+  // 1100-1199 Control flow functions         (NextId: 1109)
   // 1200-1299 Time functions                 (Fully used)
   // 1300-1399 Math functions                 (Fully used)
   // 1400-1499 Aggregate functions I          (Fully used)
@@ -61,11 +61,11 @@ enum FunctionSignatureId {
   // 3100-3199 Measure functions              (NextId: 3101)
   // 3200-3299 MATCH_RECOGNIZE functions      (NextId: 3207)
   // 3300-3399 Aggregate functions III        (NextId: 3303)
-  // 3400-3499 Misc functions II              (NextId: 3416)
+  // 3400-3499 Misc functions II              (NextId: 3429)
   // 3500-3599 Vector functions               (NextId: 3502)
   // 4000-4099 Table valued functions         (NextId: 4006)
   // 5000-5023 AI functions                   (Fully used)
-  // 5024-5049 Table valued functions II      (NextId: 5031)
+  // 5024-5049 Table valued functions II      (NextId: 5035)
   // 5050-5099 AI functions II                (NextId: 5062)
 
   // enum value                       // Related function name
@@ -406,7 +406,8 @@ enum FunctionSignatureId {
   // the expression is returned. Calls to this operator are where deferred side
   // effects generated in a ResolvedDeferredComputedColumn are finally consumed.
   // See (broken link).
-  FN_WITH_SIDE_EFFECTS = 1107;  // $with_side_effects
+  FN_WITH_SIDE_EFFECTS = 1107;   // $with_side_effects
+  FN_NULLIF_WITH_LAMBDA = 1108;  // nullif(a, lambda) -> a
 
   // Time functions
   FN_CURRENT_DATE = 1200;       // current_date
@@ -938,6 +939,30 @@ enum FunctionSignatureId {
   FN_JSON_EXISTS = 3410;      // json_exists(json, string) -> bool
   FN_JSON_EXISTS_ANY = 3411;  // json_exists_any(json, array<string>) -> bool
   FN_JSON_EXISTS_ALL = 3412;  // json_exists_all(json, array<string>) -> bool
+  FN_BIT_CAST_FLOAT_TO_BYTES =
+      3417;  // bit_cast_to_bytes(float [, endianness]) -> bytes
+  FN_BIT_CAST_DOUBLE_TO_BYTES =
+      3418;  // bit_cast_to_bytes(double [, endianness]) -> bytes
+  FN_BIT_CAST_INT32_TO_BYTES =
+      3419;  // bit_cast_to_bytes(int32 [, endianness]) -> bytes
+  FN_BIT_CAST_UINT32_TO_BYTES =
+      3420;  // bit_cast_to_bytes(uint32 [, endianness]) -> bytes
+  FN_BIT_CAST_INT64_TO_BYTES =
+      3421;  // bit_cast_to_bytes(int64 [, endianness]) -> bytes
+  FN_BIT_CAST_UINT64_TO_BYTES =
+      3422;  // bit_cast_to_bytes(uint64 [, endianness]) -> bytes
+  FN_BIT_CAST_BYTES_TO_FLOAT =
+      3423;  // bit_cast_to_float(bytes [, endianness]) -> float
+  FN_BIT_CAST_BYTES_TO_DOUBLE =
+      3424;  // bit_cast_to_double(bytes [, endianness]) -> double
+  FN_BIT_CAST_BYTES_TO_INT32 =
+      3425;  // bit_cast_to_int32(bytes [, endianness]) -> int32
+  FN_BIT_CAST_BYTES_TO_UINT32 =
+      3426;  // bit_cast_to_uint32(bytes [, endianness]) -> uint32
+  FN_BIT_CAST_BYTES_TO_INT64 =
+      3427;  // bit_cast_to_int64(bytes [, endianness]) -> int64
+  FN_BIT_CAST_BYTES_TO_UINT64 =
+      3428;  // bit_cast_to_uint64(bytes [, endianness]) -> uint64
   FN_FROM_PROTO_TIMESTAMP =
       1626;  // from_proto(google.protobuf.Timestamp) -> timestamp
   FN_FROM_PROTO_DATE = 1627;  // from_proto(google.type.Date) -> date
@@ -1617,7 +1642,9 @@ enum FunctionSignatureId {
   FN_IS_DEST_NODE = 2611;                 // node IS DESTINATION [ OF ] edge
   FN_SAME_GRAPH_ELEMENT = 2612;           // SAME(elements...)
   FN_ALL_DIFFERENT_GRAPH_ELEMENT = 2622;  // ALL_DIFFERENT(elements...)
-  FN_PROPERTY_EXISTS = 2613;       // PROPERTY_EXISTS(element, property_name)
+  FN_PROPERTY_EXISTS = 2613;  // PROPERTY_EXISTS(element, property_name)
+  FN_ELEMENT_DEFINITION_NAME_IS =
+      5031;  // ELEMENT_DEFINITION_NAME_IS(element, element_definition_name)
   FN_EQUAL_GRAPH_NODE = 2623;      // $equal
   FN_EQUAL_GRAPH_EDGE = 2624;      // $equal
   FN_NOT_EQUAL_GRAPH_NODE = 2625;  // $not_equal
@@ -1832,6 +1859,15 @@ enum FunctionSignatureId {
   FN_SINGLE_VECTOR_SEARCH_TVF_STRING_WITH_JSON_OPTIONS =
       5030;  // VECTOR_SEARCH(table, string, string,
              // int64, string, double, json) -> ANY TABLE
+
+  FN_BATCH_HYBRID_VECTOR_SEARCH_TVF_WITH_PROTO_OPTIONS =
+      5033;  // HYBRID_VECTOR_SEARCH(table, string, table, string,
+             // array<string>, string, int64, string, double, proto) -> ANY
+             // TABLE
+  FN_BATCH_HYBRID_VECTOR_SEARCH_TVF_WITH_JSON_OPTIONS =
+      5034;  // HYBRID_VECTOR_SEARCH(table, string, table, string,
+             // array<string>, string, int64, string, double, json) -> ANY
+             // TABLE
 
   // AI functions
   // Signature ids for AI.IF(prompt). This must be the minimal signature for

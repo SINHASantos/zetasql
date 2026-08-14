@@ -23,37 +23,10 @@ if [ "$MODE" = "build" ]; then
   # Build everything.
   bazel build ${BAZEL_ARGS} -c opt ...
 elif [ "$MODE" = "release" ]; then
-  VERSION=$2
-  if [ -z "$VERSION" ]; then
-    echo "Version is required for release mode"
-    exit 1
-  fi
-
-  ARTIFACTS=(client jni-channel jni-channel-darwin jni-channel-linux types)
-  targets=()
-  for artifact in "${ARTIFACTS[@]}"; do
-    target_name=${artifact//-/_}
-    targets+=("//java/com/google/googlesql:${target_name}_pom")
-    targets+=("//java/com/google/googlesql:${target_name}_jar")
-    targets+=("//java/com/google/googlesql:${target_name}_src")
-    targets+=("//java/com/google/googlesql:${target_name}_javadoc")
-  done
-
-  # Build execute_query and Java artifacts
-  bazel build ${BAZEL_ARGS} -c opt --dynamic_mode=off --define=pom_version=${VERSION} \
-    //googlesql/tools/execute_query:execute_query \
-    "${targets[@]}"
+  # Build execute_query binary for Docker release
+  bazel build ${BAZEL_ARGS} -c opt --dynamic_mode=off \
+    //googlesql/tools/execute_query:execute_query
   cp /googlesql/bazel-bin/googlesql/tools/execute_query/execute_query $HOME/bin/execute_query
-
-  # Stage Java artifacts for copying
-  mkdir -p /googlesql/java_staging
-  bin=/googlesql/bazel-bin/java/com/google/googlesql
-  for artifact in "${ARTIFACTS[@]}"; do
-    cp ${bin}/${artifact//-/_}_pom.xml /googlesql/java_staging/googlesql-${artifact}.pom
-    cp ${bin}/${artifact//-/_}_jar.jar /googlesql/java_staging/googlesql-${artifact}.jar
-    cp ${bin}/${artifact//-/_}_src.jar /googlesql/java_staging/googlesql-${artifact}-sources.jar
-    cp ${bin}/${artifact//-/_}_javadoc.jar /googlesql/java_staging/googlesql-${artifact}-javadoc.jar
-  done
 else
   echo "Unknown mode: $MODE"
   echo "Supported modes are: build, release"

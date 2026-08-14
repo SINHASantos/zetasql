@@ -876,12 +876,15 @@ absl::Status LazyResolutionFunction::ResolveAndUpdateIfNeeded(
     // If we got to here, then resolution_status() must be ok.
     GOOGLESQL_RET_CHECK_OK(resolution_status());
     function_options->set_sql_name(Name());
+    if (AggregateExpressionList() != nullptr) {
+      GOOGLESQL_RET_CHECK(AggregateExpressionList()->empty());
+    }
     std::unique_ptr<NonSqlFunction> non_sql_function;
     GOOGLESQL_RETURN_IF_ERROR(NonSqlFunction::Create(
         Name(), mode_, {this->ResolvedStatement()->signature()},
         *function_options, module_details_, this->ResolvedStatement(),
-        ArgumentNames(), AggregateExpressionList(),
-        lazy_resolution_object_.parse_resume_location(), &non_sql_function));
+        ArgumentNames(), lazy_resolution_object_.parse_resume_location(),
+        &non_sql_function));
     resolved_function = std::move(non_sql_function);
   } else if (IsTemplated()) {
     GOOGLESQL_RET_CHECK(templated_expression_resume_location_.has_value());
@@ -905,6 +908,7 @@ absl::Status LazyResolutionFunction::ResolveAndUpdateIfNeeded(
         *function_options, FunctionExpression(), ArgumentNames(),
         AggregateExpressionList(),
         lazy_resolution_object_.parse_resume_location(), &sql_function));
+    sql_function->set_resolution_catalog(catalog);
     resolved_function = std::move(sql_function);
   }
 

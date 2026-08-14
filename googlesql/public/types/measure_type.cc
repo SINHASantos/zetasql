@@ -136,7 +136,7 @@ absl::HashState MeasureType::HashValueContent(const ValueContent& value,
          captured_values->num_elements());
   for (int i = 0; i < captured_values_struct_type->num_fields(); i++) {
     const StructField& field = captured_values_struct_type->field(i);
-    NullableValueContentHasher hasher(field.type);
+    NullableValueContentHasher</*ignore_floats=*/false> hasher(field.type);
     result = absl::HashState::combine(std::move(result),
                                       hasher(captured_values->element(i)));
   }

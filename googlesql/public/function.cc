@@ -690,6 +690,13 @@ bool Function::SupportsOverClause() const {
   return function_options_.supports_over_clause;
 }
 
+bool Function::SupportsWithinClause() const {
+  // Currently, only aggregate functions support the WITHIN clause. This will
+  // change in the future when we add new functions of mode
+  // FunctionEnums::ESTIMATOR.
+  return IsAggregate();
+}
+
 bool Function::SupportsWindowOrdering() const {
   return function_options_.window_ordering_support ==
              FunctionOptions::ORDER_REQUIRED ||

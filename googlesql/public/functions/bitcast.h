@@ -23,18 +23,76 @@
 //   bool BitCast(TIN in1, TOUT *out, absl::Status* error);
 //
 // Here TIN and TOUT can be one of the following types: int32, int64, uint32,
-// uint64.
+// uint64, float, double.
 
+#include <cstdint>
+#include <string>
+#include <type_traits>
+
+#include "googlesql/public/functions/endianness.pb.h"
 #include "absl/base/casts.h"
-#include "googlesql/base/status.h"
+#include "absl/status/status.h"
+#include "absl/strings/string_view.h"
 
 namespace googlesql {
 namespace functions {
 
-template <typename TIN, typename TOUT>
-bool BitCast(TIN in, TOUT *out, absl::Status* error) {
+template <typename TIN, typename TOUT,
+          std::enable_if_t<!std::is_constructible_v<absl::string_view, TIN> &&
+                               !std::is_same_v<std::decay_t<TOUT>, std::string>,
+                           int> = 0>
+bool BitCast(TIN in, TOUT* out, absl::Status* error) {
   *out = absl::bit_cast<TOUT>(in);
   return true;
+}
+
+bool BitCast(absl::string_view in, float* out, absl::Status* error,
+             Endianness endianness = Endianness::LITTLE);
+
+bool BitCast(absl::string_view in, double* out, absl::Status* error,
+             Endianness endianness = Endianness::LITTLE);
+
+bool BitCast(absl::string_view in, int32_t* out, absl::Status* error,
+             Endianness endianness = Endianness::LITTLE);
+
+bool BitCast(absl::string_view in, uint32_t* out, absl::Status* error,
+             Endianness endianness = Endianness::LITTLE);
+
+bool BitCast(absl::string_view in, int64_t* out, absl::Status* error,
+             Endianness endianness = Endianness::LITTLE);
+
+bool BitCast(absl::string_view in, uint64_t* out, absl::Status* error,
+             Endianness endianness = Endianness::LITTLE);
+
+template <typename TOUT>
+inline bool BitCastFromBytes(absl::string_view in, TOUT* out,
+                             absl::Status* error,
+                             Endianness endianness = Endianness::LITTLE) {
+  return BitCast(in, out, error, endianness);
+}
+
+bool BitCast(float in, std::string* out, absl::Status* error,
+             Endianness endianness = Endianness::LITTLE);
+
+bool BitCast(double in, std::string* out, absl::Status* error,
+             Endianness endianness = Endianness::LITTLE);
+
+bool BitCast(int32_t in, std::string* out, absl::Status* error,
+             Endianness endianness = Endianness::LITTLE);
+
+bool BitCast(uint32_t in, std::string* out, absl::Status* error,
+             Endianness endianness = Endianness::LITTLE);
+
+bool BitCast(int64_t in, std::string* out, absl::Status* error,
+             Endianness endianness = Endianness::LITTLE);
+
+bool BitCast(uint64_t in, std::string* out, absl::Status* error,
+             Endianness endianness = Endianness::LITTLE);
+
+template <typename TIN>
+inline bool BitCastToBytes(TIN in, std::string* out, absl::Status* error,
+                           Endianness endianness = Endianness::LITTLE) {
+  return BitCast(in, out, error, endianness);
 }
 
 }  // namespace functions

@@ -99,6 +99,7 @@
 #include "absl/algorithm/container.h"
 #include "absl/base/attributes.h"
 #include "absl/base/no_destructor.h"
+#include "absl/base/nullability.h"
 #include "absl/cleanup/cleanup.h"
 #include "absl/container/flat_hash_map.h"
 #include "absl/container/flat_hash_set.h"
@@ -712,6 +713,20 @@ static bool IsBuiltinFunctionWithExtendedTypeEvaluator(
 
 }  // namespace
 
+// If the call has arguments with annotations, the re-resolved and annotated
+// body is attached and we need to treat it as a templated function call.
+static bool HasAttachedReResolvedBody(
+    const ResolvedFunctionCall& function_call) {
+  return function_call.function_call_info() != nullptr &&
+         function_call.function_call_info()->Is<TemplatedSQLFunctionCall>();
+}
+
+static bool HasAttachedReResolvedBody(
+    const ResolvedAggregateFunctionCall& function_call) {
+  return function_call.function_call_info() != nullptr &&
+         function_call.function_call_info()->Is<TemplatedSQLFunctionCall>();
+}
+
 ABSL_ATTRIBUTE_NOINLINE
 absl::StatusOr<std::vector<std::unique_ptr<AlgebraArg>>>
 Algebrizer::AlgebrizeFunctionArgs(
@@ -811,7 +826,11 @@ Algebrizer::AlgebrizeSqlFunctionCallWithAlgebrizedArgs(
   if (function_call->function()->Is<SQLFunction>()) {
     const SQLFunction* sql_function =
         function_call->function()->GetAs<SQLFunction>();
-    expr = sql_function->FunctionExpression();
+    expr = HasAttachedReResolvedBody(*function_call)
+               ? function_call->function_call_info()
+                     ->GetAs<TemplatedSQLFunctionCall>()
+                     ->expr()
+               : sql_function->FunctionExpression();
     for (const std::string& arg_name : sql_function->GetArgumentNames()) {
       argument_names.push_back(arg_name);
     }
@@ -933,9 +952,13 @@ Algebrizer::AlgebrizeBuiltinFunctionCallWithAlgebrizedArguments(
                      ConvertAlgebraArgsToValueExprs(std::move(arguments)));
     return AlgebrizeIfNull(function_call->type(), std::move(argument_exprs));
   } else if (name == "nullif" || name == "nullifzero") {
-    GOOGLESQL_ASSIGN_OR_RETURN(std::vector<std::unique_ptr<ValueExpr>> argument_exprs,
-                     ConvertAlgebraArgsToValueExprs(std::move(arguments)));
-    return AlgebrizeNullIf(function_call->type(), std::move(argument_exprs));
+    if (function_call->signature().context_id() == FN_NULLIF_WITH_LAMBDA) {
+      kind = FunctionKind::kNullIfWithLambda;
+    } else {
+      GOOGLESQL_ASSIGN_OR_RETURN(std::vector<std::unique_ptr<ValueExpr>> argument_exprs,
+                       ConvertAlgebraArgsToValueExprs(std::move(arguments)));
+      return AlgebrizeNullIf(function_call->type(), std::move(argument_exprs));
+    }
   } else if (name == "nulliferror") {
     GOOGLESQL_ASSIGN_OR_RETURN(std::vector<std::unique_ptr<ValueExpr>> argument_exprs,
                      ConvertAlgebraArgsToValueExprs(std::move(arguments)));
@@ -1075,6 +1098,13 @@ Algebrizer::AlgebrizeBuiltinFunctionCallWithAlgebrizedArguments(
         subquery_type);
   } else if (name == "float64") {
     kind = FunctionKind::kDouble;
+  } else if (name == "vector_length") {
+    // TODO: Add support for other encodings.
+    // Determine the specific VectorLengthFunction evaluator based on the
+    // encoding. Currently, it defaults to the Float32 variant. When new
+    // encodings are added, this can be extended to inspect
+    // `function_call->argument_list()[0]->type()`.
+    kind = FunctionKind::kVectorFloat32Length;
   } else if (auto mapped_kind = kSignatureIdToKindMap.find(
                  function_call->signature().context_id());
              mapped_kind != kSignatureIdToKindMap.end()) {
@@ -1561,7 +1591,8 @@ absl::StatusOr<std::unique_ptr<AggregateArg>> Algebrizer::AlgebrizeAggregateFn(
     std::unique_ptr<ValueExpr> filter, const ResolvedExpr* expr,
     const VariableId& side_effects_variable) {
   GOOGLESQL_RET_CHECK(expr->node_kind() == RESOLVED_AGGREGATE_FUNCTION_CALL ||
-            expr->node_kind() == RESOLVED_ANALYTIC_FUNCTION_CALL)
+            expr->node_kind() == RESOLVED_ANALYTIC_FUNCTION_CALL ||
+            expr->node_kind() == RESOLVED_ESTIMATOR_FUNCTION_CALL)
       << expr->node_kind_string();
   const ResolvedNonScalarFunctionCallBase* aggregate_function =
       expr->GetAs<ResolvedNonScalarFunctionCallBase>();
@@ -2088,12 +2119,29 @@ Algebrizer::CreateNonTemplatedUserDefinedAggregateFn(
       aggregate_function->function()->GetAs<SQLFunction>();
   std::vector<const ResolvedExpr*> aggregate_exprs;
   ResolvedColumnList aggregate_expr_columns;
+
+  const ResolvedAggregateFunctionCall* aggregate_function_call =
+      aggregate_function->GetAs<ResolvedAggregateFunctionCall>();
+  const auto& agg_expr_list =
+      HasAttachedReResolvedBody(*aggregate_function_call)
+          ? aggregate_function_call->function_call_info()
+                ->GetAs<TemplatedSQLFunctionCall>()
+                ->aggregate_expression_list()
+          : *sql_function->aggregate_expression_list();
+
   for (const std::unique_ptr<const ResolvedComputedColumn>& agg_expr :
-       *sql_function->aggregate_expression_list()) {
+       agg_expr_list) {
     aggregate_exprs.push_back(agg_expr->expr());
     aggregate_expr_columns.push_back(agg_expr->column());
   }
-  const ResolvedExpr* function_expr = sql_function->FunctionExpression();
+
+  GOOGLESQL_RET_CHECK(aggregate_function->Is<ResolvedAggregateFunctionCall>());
+  const ResolvedExpr* function_expr =
+      HasAttachedReResolvedBody(*aggregate_function_call)
+          ? aggregate_function_call->function_call_info()
+                ->GetAs<TemplatedSQLFunctionCall>()
+                ->expr()
+          : sql_function->FunctionExpression();
 
   GOOGLESQL_RET_CHECK_EQ(sql_function->GetArgumentNames().size(),
                aggregate_function->signature().arguments().size());
@@ -2365,9 +2413,14 @@ Algebrizer::AlgebrizeAggregateFnWithAlgebrizedArguments(
     const VariableId& side_effects_variable,
     std::vector<std::unique_ptr<KeyArg>> order_by_keys,
     const ResolvedExpr* measure_expr) {
-  GOOGLESQL_RET_CHECK(expr->node_kind() == RESOLVED_AGGREGATE_FUNCTION_CALL ||
-            expr->node_kind() == RESOLVED_ANALYTIC_FUNCTION_CALL)
-      << expr->node_kind_string();
+  switch (expr->node_kind()) {
+    case RESOLVED_AGGREGATE_FUNCTION_CALL:
+    case RESOLVED_ANALYTIC_FUNCTION_CALL:
+    case RESOLVED_ESTIMATOR_FUNCTION_CALL:
+      break;
+    default:
+      GOOGLESQL_RET_CHECK_FAIL() << "Unsupported expr kind: " << expr->node_kind_string();
+  }
   const ResolvedNonScalarFunctionCallBase* aggregate_function =
       expr->GetAs<ResolvedNonScalarFunctionCallBase>();
   const std::string name = aggregate_function->function()->FullName(false);
@@ -2601,6 +2654,30 @@ absl::StatusOr<std::unique_ptr<NewStructExpr>> Algebrizer::AlgebrizeMakeStruct(
   }
   // Build the row value.
   return NewStructExpr::Create(struct_type, std::move(arguments));
+}
+
+absl::StatusOr<std::unique_ptr<ValueExpr>> Algebrizer::AlgebrizeMakeMap(
+    const ResolvedMakeMap* make_map) {
+  GOOGLESQL_RET_CHECK(make_map->type()->IsMap());
+  const MapType* map_type = make_map->type()->AsMap();
+
+  std::vector<std::unique_ptr<ValueExpr>> keys;
+  std::vector<std::unique_ptr<ValueExpr>> values;
+  keys.reserve(make_map->entry_list_size());
+  values.reserve(make_map->entry_list_size());
+
+  for (const auto& entry : make_map->entry_list()) {
+    GOOGLESQL_RET_CHECK(entry->key()->type()->Equals(map_type->key_type()));
+    GOOGLESQL_RET_CHECK(entry->value()->type()->Equals(map_type->value_type()));
+    GOOGLESQL_ASSIGN_OR_RETURN(std::unique_ptr<ValueExpr> key_expr,
+                     AlgebrizeExpression(entry->key()));
+    GOOGLESQL_ASSIGN_OR_RETURN(std::unique_ptr<ValueExpr> val_expr,
+                     AlgebrizeExpression(entry->value()));
+    keys.push_back(std::move(key_expr));
+    values.push_back(std::move(val_expr));
+  }
+
+  return NewMapExpr::Create(map_type, std::move(keys), std::move(values));
 }
 
 absl::StatusOr<std::unique_ptr<FieldValueExpr>>
@@ -3297,6 +3374,7 @@ Algebrizer::InitializeExprMap() {
           ALGEBRIZE_EXPR(GraphIsLabeledPredicate),
           ALGEBRIZE_EXPR(GraphMakeElement),
           ALGEBRIZE_EXPR(Literal),
+          ALGEBRIZE_EXPR(MakeMap),
           ALGEBRIZE_EXPR(MakeProto),
           ALGEBRIZE_EXPR(MakeStruct),
           ALGEBRIZE_EXPR(Parameter),
@@ -3639,6 +3717,14 @@ static bool IsNonVolatile(const ResolvedExpr* expr) {
       for (const auto& field_expr :
            expr->GetAs<ResolvedMakeStruct>()->field_list()) {
         if (!IsNonVolatile(field_expr.get())) {
+          return false;
+        }
+      }
+      return true;
+    }
+    case RESOLVED_MAKE_MAP: {
+      for (const auto& entry : expr->GetAs<ResolvedMakeMap>()->entry_list()) {
+        if (!IsNonVolatile(entry->key()) || !IsNonVolatile(entry->value())) {
           return false;
         }
       }
@@ -5682,6 +5768,102 @@ Algebrizer::AlgebrizeAggregationThresholdAggregateScan(
                                     /*anonymization_options=*/std::nullopt);
 }
 
+absl::StatusOr<std::unique_ptr<WithinBoundExprArg>>
+Algebrizer::AlgebrizeWithinBoundExpr(
+    const ResolvedWithinBoundExpr* /*absl_nonnull*/ bound_expr) {
+  std::unique_ptr<ValueExpr> expr;
+  if (bound_expr->expr() != nullptr) {
+    GOOGLESQL_ASSIGN_OR_RETURN(expr, AlgebrizeExpression(bound_expr->expr()));
+  }
+  return WithinBoundExprArg::Create(bound_expr->bound_kind(), std::move(expr));
+}
+
+absl::StatusOr<std::unique_ptr<RelationalOp>> Algebrizer::AlgebrizeAlignScan(
+    const ResolvedAlignScan* align_scan) {
+  RETURN_ERROR_IF_OUT_OF_STACK_SPACE();
+
+  GOOGLESQL_ASSIGN_OR_RETURN(std::unique_ptr<RelationalOp> input,
+                   AlgebrizeScan(align_scan->input_scan()));
+
+  // Identify the variable corresponding to the input's timestamp column.
+  GOOGLESQL_ASSIGN_OR_RETURN(VariableId timestamp_var,
+                   column_to_variable_->LookupVariableNameForColumn(
+                       align_scan->timestamp_column()->column()));
+
+  GOOGLESQL_ASSIGN_OR_RETURN(std::unique_ptr<ValueExpr> period,
+                   AlgebrizeExpression(align_scan->period()));
+  std::unique_ptr<ValueExpr> origin;
+  if (align_scan->origin() != nullptr) {
+    GOOGLESQL_ASSIGN_OR_RETURN(origin, AlgebrizeExpression(align_scan->origin()));
+  }
+
+  GOOGLESQL_RET_CHECK(align_scan->output_within() != nullptr);
+  GOOGLESQL_RET_CHECK(align_scan->output_within()->lower_bound() != nullptr);
+  GOOGLESQL_RET_CHECK(align_scan->output_within()->upper_bound() != nullptr);
+  GOOGLESQL_ASSIGN_OR_RETURN(
+      std::unique_ptr<WithinBoundExprArg> lower_bound,
+      AlgebrizeWithinBoundExpr(align_scan->output_within()->lower_bound()));
+  GOOGLESQL_ASSIGN_OR_RETURN(
+      std::unique_ptr<WithinBoundExprArg> upper_bound,
+      AlgebrizeWithinBoundExpr(align_scan->output_within()->upper_bound()));
+  GOOGLESQL_ASSIGN_OR_RETURN(
+      std::unique_ptr<WithinBoundsArg> output_within,
+      WithinBoundsArg::Create(std::move(lower_bound), std::move(upper_bound)));
+
+  std::vector<std::unique_ptr<KeyArg>> partition_keys;
+  partition_keys.reserve(align_scan->partition_by_list_size());
+  for (const auto& col_ref : align_scan->partition_by_list()) {
+    GOOGLESQL_ASSIGN_OR_RETURN(
+        VariableId var,
+        column_to_variable_->LookupVariableNameForColumn(col_ref->column()));
+    GOOGLESQL_ASSIGN_OR_RETURN(std::unique_ptr<ValueExpr> expr,
+                     AlgebrizeExpression(col_ref.get()));
+    auto key_arg = std::make_unique<KeyArg>(var, std::move(expr));
+    partition_keys.push_back(std::move(key_arg));
+  }
+
+  // Assign a new VariableId for the aligned timestamp column generated by
+  // ALIGN.
+  const VariableId aligned_timestamp_var =
+      column_to_variable_->AssignNewVariableToColumn(
+          align_scan->aligned_timestamp_column());
+
+  // Algebrize the estimator functions and their WITHIN range.
+  std::vector<std::unique_ptr<EstimatorArg>> estimators;
+  estimators.reserve(align_scan->estimator_function_list_size());
+  for (const auto& computed_col : align_scan->estimator_function_list()) {
+    const VariableId var =
+        column_to_variable_->AssignNewVariableToColumn(computed_col->column());
+    const ResolvedEstimatorFunctionCall* estimator_function =
+        computed_col->expr()->GetAs<ResolvedEstimatorFunctionCall>();
+
+    GOOGLESQL_ASSIGN_OR_RETURN(
+        std::unique_ptr<AggregateArg> aggregate_arg,
+        AlgebrizeAggregateFn(var, /*anonymization_options=*/std::nullopt,
+                             /*filter=*/nullptr, estimator_function,
+                             /*side_effects_variable=*/VariableId()));
+
+    GOOGLESQL_RET_CHECK(estimator_function->within_bounds() != nullptr);
+    GOOGLESQL_ASSIGN_OR_RETURN(std::unique_ptr<WithinBoundExprArg> lower_bound,
+                     AlgebrizeWithinBoundExpr(
+                         estimator_function->within_bounds()->lower_bound()));
+    GOOGLESQL_ASSIGN_OR_RETURN(std::unique_ptr<WithinBoundExprArg> upper_bound,
+                     AlgebrizeWithinBoundExpr(
+                         estimator_function->within_bounds()->upper_bound()));
+    GOOGLESQL_ASSIGN_OR_RETURN(std::unique_ptr<WithinBoundsArg> within_bounds,
+                     WithinBoundsArg::Create(std::move(lower_bound),
+                                             std::move(upper_bound)));
+
+    estimators.push_back(std::make_unique<EstimatorArg>(
+        std::move(aggregate_arg), std::move(within_bounds)));
+  }
+
+  return AlignOp::Create(std::move(input), timestamp_var, std::move(period),
+                         std::move(origin), std::move(output_within),
+                         std::move(partition_keys), aligned_timestamp_var,
+                         std::move(estimators));
+}
+
 absl::StatusOr<std::unique_ptr<RelationalOp>> Algebrizer::AlgebrizeAnalyticScan(
     const ResolvedAnalyticScan* analytic_scan) {
   RETURN_ERROR_IF_OUT_OF_STACK_SPACE();
@@ -7160,6 +7342,7 @@ Algebrizer::InitializeScanMap() {
           // (broken link) start
           ALGEBRIZE_SCAN(AggregateScan),
           ALGEBRIZE_SCAN(AggregationThresholdAggregateScan),
+          ALGEBRIZE_SCAN(AlignScan),
           ALGEBRIZE_SCAN(AnalyticScan),
           ALGEBRIZE_SCAN(AnonymizedAggregateScan),
           ALGEBRIZE_SCAN(AssertScan),

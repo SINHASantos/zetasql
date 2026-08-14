@@ -67,8 +67,6 @@ class NonSqlFunction : public Function {
       const FunctionOptions& function_options, ModuleDetails module_details,
       const ResolvedCreateFunctionStmt* resolved_create_function_statement,
       const std::vector<std::string>& argument_names,
-      const std::vector<std::unique_ptr<const ResolvedComputedColumn>>*
-          aggregate_expression_list,
       std::optional<ParseResumeLocation> parse_resume_location,
       std::unique_ptr<NonSqlFunction>* sql_function);
 
@@ -90,9 +88,7 @@ class NonSqlFunction : public Function {
       const FunctionOptions& function_options, ModuleDetails module_details,
       const ResolvedCreateFunctionStmt* resolved_create_function_statement,
       const std::vector<std::string>& argument_names,
-      std::optional<ParseResumeLocation> parse_resume_location,
-      const std::vector<std::unique_ptr<const ResolvedComputedColumn>>*
-          aggregate_expression_list);
+      std::optional<ParseResumeLocation> parse_resume_location);
 
   const ModuleDetails module_details_;
   const ResolvedCreateFunctionStmt* resolved_create_function_statement_;

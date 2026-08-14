@@ -924,6 +924,10 @@ class Function {
   // an analytic function). If true, the mode cannot be SCALAR.
   bool SupportsOverClause() const;
 
+  // Returns true if the function supports the WITHIN clause (i.e. it can act
+  // as an estimator function).
+  bool SupportsWithinClause() const;
+
   // Returns true if ORDER BY is allowed in a window definition for this
   // function.
   bool SupportsWindowOrdering() const;

@@ -17,7 +17,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=select_star_from_pseudo_columns_table.[key#6, TestEnum#7, AnotherTestEnum#8]
-        +-tvf=select_star_from_pseudo_columns_table((ANY TABLE table_with_pseudo_columns) -> ANY TABLE)
+        +-tvf=select_star_from_pseudo_columns_table
         +-signature=(TABLE<key INT32, TestEnum ENUM<googlesql_test.TestEnum>, AnotherTestEnum ENUM<googlesql_test.AnotherTestEnum>, Filename STRING, RowId BYTES>) -> TABLE<key INT32, TestEnum ENUM<googlesql_test.TestEnum>, AnotherTestEnum ENUM<googlesql_test.AnotherTestEnum>>
         +-argument_list=
         | +-FunctionArgument
@@ -57,7 +57,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=select_pseudo_columns_from_table.[key#6, Filename#7, RowId#8]
-        +-tvf=select_pseudo_columns_from_table((ANY TABLE table_with_pseudo_columns) -> ANY TABLE)
+        +-tvf=select_pseudo_columns_from_table
         +-signature=(TABLE<key INT32, TestEnum ENUM<googlesql_test.TestEnum>, AnotherTestEnum ENUM<googlesql_test.AnotherTestEnum>, Filename STRING, RowId BYTES>) -> TABLE<key INT32, Filename STRING, RowId BYTES>
         +-argument_list=
         | +-FunctionArgument
@@ -97,7 +97,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=select_pseudo_columns_from_table.[key#6, Filename#7, RowId#8]
-        +-tvf=select_pseudo_columns_from_table((ANY TABLE table_with_pseudo_columns) -> ANY TABLE)
+        +-tvf=select_pseudo_columns_from_table
         +-signature=(TABLE<key INT32, TestEnum ENUM<googlesql_test.TestEnum>, AnotherTestEnum ENUM<googlesql_test.AnotherTestEnum>, Filename STRING, RowId BYTES>) -> TABLE<key INT32, Filename STRING, RowId BYTES>
         +-argument_list=
         | +-FunctionArgument
@@ -140,7 +140,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=select_pseudo_columns_from_table.[key#6, Filename#7, RowId#8]
-        +-tvf=select_pseudo_columns_from_table((ANY TABLE table_with_pseudo_columns) -> ANY TABLE)
+        +-tvf=select_pseudo_columns_from_table
         +-signature=(TABLE<key INT32, TestEnum ENUM<googlesql_test.TestEnum>, AnotherTestEnum ENUM<googlesql_test.AnotherTestEnum>, Filename STRING, RowId BYTES>) -> TABLE<key INT32, Filename STRING, RowId BYTES>
         +-argument_list=
         | +-FunctionArgument
@@ -198,7 +198,7 @@ QueryStmt
         +-input_scan=
         | +-TVFScan
         |   +-column_list=select_pseudo_columns_from_table.[key#6, Filename#7, RowId#8]
-        |   +-tvf=select_pseudo_columns_from_table((ANY TABLE table_with_pseudo_columns) -> ANY TABLE)
+        |   +-tvf=select_pseudo_columns_from_table
         |   +-signature=(TABLE<key INT32, TestEnum ENUM<googlesql_test.TestEnum>, AnotherTestEnum ENUM<googlesql_test.AnotherTestEnum>, Filename STRING, RowId BYTES>) -> TABLE<key INT32, Filename STRING, RowId BYTES>
         |   +-argument_list=
         |   | +-FunctionArgument
@@ -251,7 +251,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=select_all_from_pseudo_columns_value_table.[int32_val1#4, int32_val2#5, str_value#6]
-        +-tvf=select_all_from_pseudo_columns_value_table((ANY TABLE value_table_with_pseudo_columns) -> ANY TABLE)
+        +-tvf=select_all_from_pseudo_columns_value_table
         +-signature=(TABLE<PROTO<googlesql_test.TestExtraPB>, Filename STRING, RowId BYTES>) -> TABLE<int32_val1 INT32, int32_val2 INT32, str_value ARRAY<STRING>>
         +-argument_list=
         | +-FunctionArgument
@@ -313,7 +313,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=select_pseudo_columns_from_value_table.[t#4, Filename#5, RowId#6]
-        +-tvf=select_pseudo_columns_from_value_table((ANY TABLE value_table_with_pseudo_columns) -> ANY TABLE)
+        +-tvf=select_pseudo_columns_from_value_table
         +-signature=(TABLE<PROTO<googlesql_test.TestExtraPB>, Filename STRING, RowId BYTES>) -> TABLE<t PROTO<googlesql_test.TestExtraPB>, Filename STRING, RowId BYTES>
         +-argument_list=
         | +-FunctionArgument
@@ -353,7 +353,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=select_dot_pseudo_columns_from_value_table.[t#4, Filename#5, RowId#6]
-        +-tvf=select_dot_pseudo_columns_from_value_table((ANY TABLE value_table_with_pseudo_columns) -> ANY TABLE)
+        +-tvf=select_dot_pseudo_columns_from_value_table
         +-signature=(TABLE<PROTO<googlesql_test.TestExtraPB>, Filename STRING, RowId BYTES>) -> TABLE<t PROTO<googlesql_test.TestExtraPB>, Filename STRING, RowId BYTES>
         +-argument_list=
         | +-FunctionArgument

@@ -429,7 +429,8 @@ public class FunctionSignatureTest {
     Type declarativeType =
         factory1.createDeclarativeType(
             DeclarativeTypeDescriptor.builder()
-                .setTypeId(new DeclarativeTypeDescriptor.TypeId("N1", "mytype", 0))
+                .setTypeId(
+                    new DeclarativeTypeDescriptor.TypeId("N1", "mytype", /* versionId= */ ""))
                 .setDisplayName("MyType")
                 .setBackingType(TypeFactory.createSimpleType(TypeKind.TYPE_INT64))
                 .setCoercionFromBackingType(

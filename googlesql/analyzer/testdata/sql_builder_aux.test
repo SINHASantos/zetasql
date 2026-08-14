@@ -1121,6 +1121,7 @@ Lateral column alias will shadow original target: ambiguous [at 3:18]
   as ( SELECT a, a+2 AS result ) ;
                  ^
 [googlesql.DeprecationWarning] { kind: LATERAL_COLUMN_REFERENCE }
+
 [SQLBUILDER_TARGET_SYNTAX_MODE standard]
 [SQLBUILDER_OUTPUT]
 CREATE TABLE FUNCTION myfunc(a INT64)
@@ -1147,6 +1148,7 @@ Lateral column alias will shadow original target: ambiguous [at 2:18]
   as ( SELECT a, a+2 AS result ) ;
                  ^
 [googlesql.DeprecationWarning] { kind: LATERAL_COLUMN_REFERENCE }
+
 [SQLBUILDER_TARGET_SYNTAX_MODE standard]
 [SQLBUILDER_OUTPUT]
 CREATE TABLE FUNCTION myfunc(a INT64)

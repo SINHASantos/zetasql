@@ -1261,6 +1261,8 @@ absl::StatusOr<bool> FunctionSignatureMatcher::
     // need to to check for coercion given that the connections are templated.
   } else if (signature_argument.IsSequence()) {
     GOOGLESQL_RET_CHECK(input_argument.is_sequence());
+  } else if (signature_argument.IsGraph()) {
+    GOOGLESQL_RET_CHECK(input_argument.is_graph());
   } else if (signature_argument.kind() == ARG_KIND_EXPR_ARBITRARY) {
     // Arbitrary kind arguments match any input argument type.
   } else if (signature_argument.kind() == ARG_KIND_EXPR_STRING_ANY &&

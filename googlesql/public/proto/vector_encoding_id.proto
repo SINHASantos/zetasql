@@ -1,0 +1,41 @@
+//
+// Copyright 2019 Google LLC
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+
+edition = "2024";
+
+package googlesql;
+
+option java_package = "com.google.protos.googlesql";
+option java_outer_classname = "VectorEncodingIdProto";
+
+local message VectorEncodingId {
+  // Proto enums are varint encoded. IDs in the range [0, 127] occupy only 1
+  // byte on the wire. We partition the ID space as follows:
+  // - [1, 39]: Reserved for GoogleSQL canonical vector encodings.
+  // - [40, 127]: Reserved for engine-specific encodings.
+  // - [128, 16384]: Open for free use by any engine (occupies 2 bytes).
+  export enum Id {
+    UNKNOWN_VECTOR_ENCODING = 0;
+
+    // Canonical vector encodings range [1, 39].
+    FLOAT32 = 1;
+  }
+
+  // Ensures this message is recognized as a pure "namespace wrapper" by the
+  // compiler, satisfying Edition 2024 strict visibility rules for nested
+  // exports. See (broken link)
+  reserved 1 to max;
+}

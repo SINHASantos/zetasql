@@ -112,11 +112,6 @@ cc_proto_library(
     deps = [":internal_fix_suggestion_proto"],
 )
 
-java_proto_library(
-    name = "internal_fix_suggestion_java_proto",
-    deps = [":internal_fix_suggestion_proto"],
-)
-
 proto_library(
     name = "kmeans_options_proto",
     srcs = ["kmeans_options.proto"],

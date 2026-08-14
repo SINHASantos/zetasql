@@ -117,7 +117,6 @@ CreateTableFunctionStmt
 +-output_column_list=
   +-$query.x#1 AS x [INT64]
 
-
 DEPRECATION WARNING:
 Function SAMPLE_FUNCTIONS:DEPRECATION_WARNING triggers a deprecation warning with kind PROTO3_FIELD_PRESENCE [at 2:36]
   returns table<x int64> as select deprecation_warning() x ;
@@ -152,7 +151,6 @@ CreateTableFunctionStmt
 +-output_column_list=
   +-$query.x#1 AS x [INT64]
 
-
 DEPRECATION WARNING:
 Function SAMPLE_FUNCTIONS:DEPRECATION_WARNING triggers a deprecation warning with kind PROTO3_FIELD_PRESENCE [at 2:37]
   returns table<x int64> as select (deprecation_warning() + deprecation_warni...
@@ -185,7 +183,6 @@ CreateTableFunctionStmt
 |     +-SingleRowScan
 +-output_column_list=
   +-$query.x#1 AS x [INT64]
-
 
 DEPRECATION WARNING:
 Function SAMPLE_FUNCTIONS:DEPRECATION_WARNING triggers a deprecation warning with kind PROTO3_FIELD_PRESENCE [at 2:37]
@@ -224,10 +221,9 @@ CreateTableFunctionStmt
 |   +-expr_list=
 |   | +-x#3 := Literal(type=STRING, value="foo")
 |   +-input_scan=
-|     +-TVFScan(tvf=tvf_deprecation_warning(() -> TABLE<> (1 deprecation warning)), signature=() -> TABLE<column_bool BOOL, column_bytes BYTES>, function_call_signature=() -> TABLE<>)
+|     +-TVFScan(tvf=tvf_deprecation_warning, signature=() -> TABLE<column_bool BOOL, column_bytes BYTES>, function_call_signature=() -> TABLE<>)
 +-output_column_list=
   +-$query.x#3 AS x [STRING]
-
 
 DEPRECATION WARNING:
 Table-valued function TVF_DEPRECATION_WARNING triggers a deprecation warning with kind PROTO3_FIELD_PRESENCE [at 2:51]
@@ -266,7 +262,7 @@ CreateTableFunctionStmt
 |     | |   +-expr_list=
 |     | |   | +-x#3 := Literal(type=STRING, value="foo")
 |     | |   +-input_scan=
-|     | |     +-TVFScan(tvf=tvf_deprecation_warning(() -> TABLE<> (1 deprecation warning)), signature=() -> TABLE<column_bool BOOL, column_bytes BYTES>, function_call_signature=() -> TABLE<>)
+|     | |     +-TVFScan(tvf=tvf_deprecation_warning, signature=() -> TABLE<column_bool BOOL, column_bytes BYTES>, function_call_signature=() -> TABLE<>)
 |     | +-output_column_list=[$union_all1.x#3]
 |     +-SetOperationItem
 |       +-scan=
@@ -275,11 +271,10 @@ CreateTableFunctionStmt
 |       |   +-expr_list=
 |       |   | +-$col1#6 := Literal(type=STRING, value="bar")
 |       |   +-input_scan=
-|       |     +-TVFScan(tvf=tvf_deprecation_warning(() -> TABLE<> (1 deprecation warning)), signature=() -> TABLE<column_bool BOOL, column_bytes BYTES>, function_call_signature=() -> TABLE<>)
+|       |     +-TVFScan(tvf=tvf_deprecation_warning, signature=() -> TABLE<column_bool BOOL, column_bytes BYTES>, function_call_signature=() -> TABLE<>)
 |       +-output_column_list=[$union_all2.$col1#6]
 +-output_column_list=
   +-$union_all.x#7 AS x [STRING]
-
 
 DEPRECATION WARNING:
 Table-valued function TVF_DEPRECATION_WARNING triggers a deprecation warning with kind PROTO3_FIELD_PRESENCE [at 3:26]
@@ -310,10 +305,9 @@ CreateTableFunctionStmt
 |   +-expr_list=
 |   | +-x#3 := Literal(type=STRING, value="foo")
 |   +-input_scan=
-|     +-TVFScan(tvf=tvf_two_deprecation_warnings_same_kind(() -> TABLE<> (2 deprecation warnings)), signature=() -> TABLE<column_bool BOOL, column_bytes BYTES>, function_call_signature=() -> TABLE<>)
+|     +-TVFScan(tvf=tvf_two_deprecation_warnings_same_kind, signature=() -> TABLE<column_bool BOOL, column_bytes BYTES>, function_call_signature=() -> TABLE<>)
 +-output_column_list=
   +-$query.x#3 AS x [STRING]
-
 
 DEPRECATION WARNING:
 Table-valued function TVF_TWO_DEPRECATION_WARNINGS_SAME_KIND triggers a deprecation warning with kind PROTO3_FIELD_PRESENCE [at 3:26]
@@ -344,10 +338,9 @@ CreateTableFunctionStmt
 |   +-expr_list=
 |   | +-x#3 := Literal(type=STRING, value="foo")
 |   +-input_scan=
-|     +-TVFScan(tvf=tvf_two_deprecation_warnings(() -> TABLE<> (2 deprecation warnings)), signature=() -> TABLE<column_bool BOOL, column_bytes BYTES>, function_call_signature=() -> TABLE<>)
+|     +-TVFScan(tvf=tvf_two_deprecation_warnings, signature=() -> TABLE<column_bool BOOL, column_bytes BYTES>, function_call_signature=() -> TABLE<>)
 +-output_column_list=
   +-$query.x#3 AS x [STRING]
-
 
 DEPRECATION WARNING:
 Table-valued function TVF_TWO_DEPRECATION_WARNINGS triggers a deprecation warning with kind PROTO3_FIELD_PRESENCE [at 3:26]
@@ -400,7 +393,7 @@ CreateTableFunctionStmt
 |     | |   +-expr_list=
 |     | |   | +-x#3 := Literal(type=STRING, value="foo")
 |     | |   +-input_scan=
-|     | |     +-TVFScan(tvf=tvf_deprecation_warning(() -> TABLE<> (1 deprecation warning)), signature=() -> TABLE<column_bool BOOL, column_bytes BYTES>, function_call_signature=() -> TABLE<>)
+|     | |     +-TVFScan(tvf=tvf_deprecation_warning, signature=() -> TABLE<column_bool BOOL, column_bytes BYTES>, function_call_signature=() -> TABLE<>)
 |     | +-output_column_list=[$union_all1.x#3]
 |     +-SetOperationItem
 |     | +-scan=
@@ -409,7 +402,7 @@ CreateTableFunctionStmt
 |     | |   +-expr_list=
 |     | |   | +-$col1#6 := Literal(type=STRING, value="bar")
 |     | |   +-input_scan=
-|     | |     +-TVFScan(tvf=tvf_two_deprecation_warnings_same_kind(() -> TABLE<> (2 deprecation warnings)), signature=() -> TABLE<column_bool BOOL, column_bytes BYTES>, function_call_signature=() -> TABLE<>)
+|     | |     +-TVFScan(tvf=tvf_two_deprecation_warnings_same_kind, signature=() -> TABLE<column_bool BOOL, column_bytes BYTES>, function_call_signature=() -> TABLE<>)
 |     | +-output_column_list=[$union_all2.$col1#6]
 |     +-SetOperationItem
 |       +-scan=
@@ -418,11 +411,10 @@ CreateTableFunctionStmt
 |       |   +-expr_list=
 |       |   | +-$col1#9 := Literal(type=STRING, value="baz")
 |       |   +-input_scan=
-|       |     +-TVFScan(tvf=tvf_two_deprecation_warnings(() -> TABLE<> (2 deprecation warnings)), signature=() -> TABLE<column_bool BOOL, column_bytes BYTES>, function_call_signature=() -> TABLE<>)
+|       |     +-TVFScan(tvf=tvf_two_deprecation_warnings, signature=() -> TABLE<column_bool BOOL, column_bytes BYTES>, function_call_signature=() -> TABLE<>)
 |       +-output_column_list=[$union_all3.$col1#9]
 +-output_column_list=
   +-$union_all.x#10 AS x [STRING]
-
 
 DEPRECATION WARNING:
 Table-valued function TVF_DEPRECATION_WARNING triggers a deprecation warning with kind PROTO3_FIELD_PRESENCE [at 3:26]
@@ -496,7 +488,7 @@ CreateTableFunctionStmt
 |     | |   +-expr_list=
 |     | |   | +-x#3 := Literal(type=STRING, value="foo1")
 |     | |   +-input_scan=
-|     | |     +-TVFScan(tvf=tvf_deprecation_warning(() -> TABLE<> (1 deprecation warning)), signature=() -> TABLE<column_bool BOOL, column_bytes BYTES>, function_call_signature=() -> TABLE<>)
+|     | |     +-TVFScan(tvf=tvf_deprecation_warning, signature=() -> TABLE<column_bool BOOL, column_bytes BYTES>, function_call_signature=() -> TABLE<>)
 |     | +-output_column_list=[$union_all1.x#3]
 |     +-SetOperationItem
 |     | +-scan=
@@ -505,7 +497,7 @@ CreateTableFunctionStmt
 |     | |   +-expr_list=
 |     | |   | +-x#6 := Literal(type=STRING, value="foo2")
 |     | |   +-input_scan=
-|     | |     +-TVFScan(tvf=tvf_deprecation_warning(() -> TABLE<> (1 deprecation warning)), signature=() -> TABLE<column_bool BOOL, column_bytes BYTES>, function_call_signature=() -> TABLE<>)
+|     | |     +-TVFScan(tvf=tvf_deprecation_warning, signature=() -> TABLE<column_bool BOOL, column_bytes BYTES>, function_call_signature=() -> TABLE<>)
 |     | +-output_column_list=[$union_all2.x#6]
 |     +-SetOperationItem
 |     | +-scan=
@@ -514,7 +506,7 @@ CreateTableFunctionStmt
 |     | |   +-expr_list=
 |     | |   | +-$col1#9 := Literal(type=STRING, value="bar1")
 |     | |   +-input_scan=
-|     | |     +-TVFScan(tvf=tvf_two_deprecation_warnings_same_kind(() -> TABLE<> (2 deprecation warnings)), signature=() -> TABLE<column_bool BOOL, column_bytes BYTES>, function_call_signature=() -> TABLE<>)
+|     | |     +-TVFScan(tvf=tvf_two_deprecation_warnings_same_kind, signature=() -> TABLE<column_bool BOOL, column_bytes BYTES>, function_call_signature=() -> TABLE<>)
 |     | +-output_column_list=[$union_all3.$col1#9]
 |     +-SetOperationItem
 |     | +-scan=
@@ -523,7 +515,7 @@ CreateTableFunctionStmt
 |     | |   +-expr_list=
 |     | |   | +-$col1#12 := Literal(type=STRING, value="bar2")
 |     | |   +-input_scan=
-|     | |     +-TVFScan(tvf=tvf_two_deprecation_warnings_same_kind(() -> TABLE<> (2 deprecation warnings)), signature=() -> TABLE<column_bool BOOL, column_bytes BYTES>, function_call_signature=() -> TABLE<>)
+|     | |     +-TVFScan(tvf=tvf_two_deprecation_warnings_same_kind, signature=() -> TABLE<column_bool BOOL, column_bytes BYTES>, function_call_signature=() -> TABLE<>)
 |     | +-output_column_list=[$union_all4.$col1#12]
 |     +-SetOperationItem
 |     | +-scan=
@@ -532,7 +524,7 @@ CreateTableFunctionStmt
 |     | |   +-expr_list=
 |     | |   | +-$col1#15 := Literal(type=STRING, value="baz1")
 |     | |   +-input_scan=
-|     | |     +-TVFScan(tvf=tvf_two_deprecation_warnings(() -> TABLE<> (2 deprecation warnings)), signature=() -> TABLE<column_bool BOOL, column_bytes BYTES>, function_call_signature=() -> TABLE<>)
+|     | |     +-TVFScan(tvf=tvf_two_deprecation_warnings, signature=() -> TABLE<column_bool BOOL, column_bytes BYTES>, function_call_signature=() -> TABLE<>)
 |     | +-output_column_list=[$union_all5.$col1#15]
 |     +-SetOperationItem
 |       +-scan=
@@ -541,11 +533,10 @@ CreateTableFunctionStmt
 |       |   +-expr_list=
 |       |   | +-$col1#18 := Literal(type=STRING, value="baz2")
 |       |   +-input_scan=
-|       |     +-TVFScan(tvf=tvf_two_deprecation_warnings(() -> TABLE<> (2 deprecation warnings)), signature=() -> TABLE<column_bool BOOL, column_bytes BYTES>, function_call_signature=() -> TABLE<>)
+|       |     +-TVFScan(tvf=tvf_two_deprecation_warnings, signature=() -> TABLE<column_bool BOOL, column_bytes BYTES>, function_call_signature=() -> TABLE<>)
 |       +-output_column_list=[$union_all6.$col1#18]
 +-output_column_list=
   +-$union_all.x#19 AS x [STRING]
-
 
 DEPRECATION WARNING:
 Table-valued function TVF_DEPRECATION_WARNING triggers a deprecation warning with kind PROTO3_FIELD_PRESENCE [at 3:27]
@@ -2585,7 +2576,7 @@ CreateTableFunctionStmt
 |   +-input_scan=
 |     +-TVFScan
 |       +-column_list=tvf_one_relation_arg_with_fixed_output.[column_bool#2, column_bytes#3]
-|       +-tvf=tvf_one_relation_arg_with_fixed_output((ANY TABLE) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+|       +-tvf=tvf_one_relation_arg_with_fixed_output
 |       +-signature=(TABLE<col BOOL>) -> TABLE<column_bool BOOL, column_bytes BYTES>
 |       +-argument_list=
 |       | +-FunctionArgument
@@ -2630,7 +2621,7 @@ CreateTableFunctionStmt
 |       +-input_scan=
 |         +-TVFScan
 |           +-column_list=tvf_one_relation_arg_with_fixed_output.[column_bool#3, column_bytes#4]
-|           +-tvf=tvf_one_relation_arg_with_fixed_output((ANY TABLE) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+|           +-tvf=tvf_one_relation_arg_with_fixed_output
 |           +-signature=(TABLE<col INT64>) -> TABLE<column_bool BOOL, column_bytes BYTES>
 |           +-argument_list=
 |           | +-FunctionArgument
@@ -2822,7 +2813,7 @@ CreateTableFunctionStmt
 |       +-column_list=[$aggregate.count_star#5]
 |       +-input_scan=
 |       | +-TVFScan
-|       |   +-tvf=tvf_one_relation_arg_with_fixed_output((ANY TABLE) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+|       |   +-tvf=tvf_one_relation_arg_with_fixed_output
 |       |   +-signature=(TABLE<Key INT64, Value STRING>) -> TABLE<column_bool BOOL, column_bytes BYTES>
 |       |   +-argument_list=
 |       |   | +-FunctionArgument
@@ -2834,7 +2825,6 @@ CreateTableFunctionStmt
 |         +-count_star#5 := AggregateFunctionCall(GoogleSQL:$count_star() -> INT64)
 +-output_column_list=
   +-$aggregate.count_star#5 AS count_star [INT64]
-
 
 DEPRECATION WARNING:
 TABLE syntax was resolved as reference to a catalog table, when a function argument of the same name exists. This will change in the future to resolve as a reference to the function argument. If you wish to preserve this as a reference to a catalog table, rename the function argument to avoid the name collision [at 3:45]
@@ -2864,7 +2854,7 @@ CreateTableFunctionStmt
 |       +-column_list=[$aggregate.count_star#5]
 |       +-input_scan=
 |       | +-TVFScan
-|       |   +-tvf=tvf_one_relation_arg_with_fixed_output((ANY TABLE) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+|       |   +-tvf=tvf_one_relation_arg_with_fixed_output
 |       |   +-signature=(TABLE<Key INT64, Value INT64>) -> TABLE<column_bool BOOL, column_bytes BYTES>
 |       |   +-argument_list=
 |       |   | +-FunctionArgument
@@ -4234,3 +4224,85 @@ CreateTableFunctionStmt
 +-output_column_list=
   +-$subquery1.colb#2 AS colb [INT64]
 ==
+
+# WITH CONNECTION success
+[language_features=MAXIMUM,+CREATE_FUNCTION_LANGUAGE_WITH_CONNECTION]
+create table function myfunc()
+  returns table<x string>
+  with connection connection1
+  language python;
+--
+CreateTableFunctionStmt
++-name_path=myfunc
++-signature=() -> TABLE<x STRING>
++-has_explicit_return_schema=TRUE
++-language="python"
++-connection=
+  +-Connection(connection=connection1)
+==
+
+# WITH CONNECTION connection not found
+[language_features=MAXIMUM,+CREATE_FUNCTION_LANGUAGE_WITH_CONNECTION]
+create table function myfunc()
+  returns table<x string>
+  with connection connection_not_registered
+  language python;
+--
+ERROR: Connection not found: connection_not_registered [at 3:19]
+  with connection connection_not_registered
+                  ^
+==
+
+# WITH CONNECTION feature disabled
+[language_features=MAXIMUM,-CREATE_FUNCTION_LANGUAGE_WITH_CONNECTION]
+create table function myfunc()
+  returns table<x string>
+  with connection connection1
+  language python;
+--
+ERROR: WITH CONNECTION clause is not supported [at 3:3]
+  with connection connection1
+  ^
+==
+
+# WITH CONNECTION without LANGUAGE (fails in resolver)
+[language_features=MAXIMUM,+CREATE_FUNCTION_LANGUAGE_WITH_CONNECTION]
+create table function myfunc()
+  returns table<x string>
+  with connection connection1;
+--
+ERROR: WITH CONNECTION clause must be used with LANGUAGE clause [at 3:3]
+  with connection connection1;
+  ^
+==
+
+# WITH CONNECTION with non-Python language (success)
+[language_features=MAXIMUM,+CREATE_FUNCTION_LANGUAGE_WITH_CONNECTION]
+create table function myfunc()
+  returns table<x string>
+  with connection connection1
+  language javascript;
+--
+CreateTableFunctionStmt
++-name_path=myfunc
++-signature=() -> TABLE<x STRING>
++-has_explicit_return_schema=TRUE
++-language="javascript"
++-connection=
+  +-Connection(connection=connection1)
+==
+
+# WITH CONNECTION with Python case-insensitive (success)
+[language_features=MAXIMUM,+CREATE_FUNCTION_LANGUAGE_WITH_CONNECTION]
+create table function myfunc()
+  returns table<x string>
+  with connection connection1
+  language PyThOn;
+--
+CreateTableFunctionStmt
++-name_path=myfunc
++-signature=() -> TABLE<x STRING>
++-has_explicit_return_schema=TRUE
++-language="PyThOn"
++-connection=
+  +-Connection(connection=connection1)

@@ -45,7 +45,6 @@ class ListBackedType : public ContainerType {
   }
 
   friend struct MultisetValueContentContainerElementHasher;
-  friend struct HashableValueContentContainerElementIgnoringFloat;
 };
 
 }  // namespace googlesql

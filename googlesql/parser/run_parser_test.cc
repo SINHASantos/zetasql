@@ -732,20 +732,34 @@ class RunParserTest : public ::testing::Test {
       }
     }
 
-    // Whether or not the AST is CREATE TABLE AS SELECT should match that in
-    // the extracted properties.
+    // Whether or not the AST is CREATE TABLE AS SELECT or CREATE LIVE TABLE AS
+    // SELECT should match that in the extracted properties.
     const ASTCreateTableStatement* create_table_statement =
         statement->GetAsOrNull<ASTCreateTableStatement>();
     if (create_table_statement != nullptr) {
       EXPECT_EQ(extracted_statement_properties.is_create_table_as_select,
                 create_table_statement->query() != nullptr)
           << Unparse(create_table_statement);
-      if (extracted_statement_properties.is_create_table_as_select
-          != (create_table_statement->query() != nullptr)) {
+      if (extracted_statement_properties.is_create_table_as_select !=
+          (create_table_statement->query() != nullptr)) {
         test_outputs->push_back(absl::StrCat(
             "FAILED extracting is CTAS . Extracted: ",
             extracted_statement_properties.is_create_table_as_select,
             ", actual: ", create_table_statement->query() != nullptr));
+      }
+    }
+    const ASTCreateLiveTableStatement* create_live_table_statement =
+        statement->GetAsOrNull<ASTCreateLiveTableStatement>();
+    if (create_live_table_statement != nullptr) {
+      EXPECT_EQ(extracted_statement_properties.is_create_table_as_select,
+                create_live_table_statement->query() != nullptr)
+          << Unparse(create_live_table_statement);
+      if (extracted_statement_properties.is_create_table_as_select !=
+          (create_live_table_statement->query() != nullptr)) {
+        test_outputs->push_back(absl::StrCat(
+            "FAILED extracting is CTAS . Extracted: ",
+            extracted_statement_properties.is_create_table_as_select,
+            ", actual: ", create_live_table_statement->query() != nullptr));
       }
     }
   }

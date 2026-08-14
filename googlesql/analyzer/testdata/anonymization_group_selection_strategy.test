@@ -23,7 +23,6 @@ QueryStmt
         +-aggregate_list=
           +-$agg1#13 := AggregateFunctionCall(GoogleSQL:$anon_count_star(optional(0) INT64, optional(0) INT64) -> INT64)
 
-
 [REWRITTEN AST]
 QueryStmt
 +-output_column_list=
@@ -74,7 +73,6 @@ QueryStmt
         | +-$agg1#13 := AggregateFunctionCall(GoogleSQL:$anon_count_star(optional(0) INT64, optional(0) INT64) -> INT64)
         +-anonymization_option_list=
           +-group_selection_strategy := Literal(type=ENUM<DIFFERENTIAL_PRIVACY_GROUP_SELECTION_STRATEGY>, value=LAPLACE_THRESHOLD)
-
 
 [REWRITTEN AST]
 QueryStmt
@@ -130,7 +128,6 @@ QueryStmt
         | +-$agg1#13 := AggregateFunctionCall(GoogleSQL:$anon_count_star(optional(0) INT64, optional(0) INT64) -> INT64)
         +-anonymization_option_list=
           +-group_selection_strategy := Literal(type=ENUM<DIFFERENTIAL_PRIVACY_GROUP_SELECTION_STRATEGY>, value=LAPLACE_THRESHOLD)
-
 
 [REWRITTEN AST]
 QueryStmt
@@ -189,7 +186,6 @@ QueryStmt
         +-anonymization_option_list=
           +-group_selection_strategy := Literal(type=ENUM<DIFFERENTIAL_PRIVACY_GROUP_SELECTION_STRATEGY>, value=LAPLACE_THRESHOLD)
           +-max_groups_contributed := Literal(type=INT64, value=3)
-
 
 [REWRITTEN AST]
 QueryStmt
@@ -258,7 +254,6 @@ QueryStmt
         +-anonymization_option_list=
           +-group_selection_strategy := Literal(type=ENUM<DIFFERENTIAL_PRIVACY_GROUP_SELECTION_STRATEGY>, value=PUBLIC_GROUPS)
 
-
 Rewrite ERROR: Anonymization option group_selection_strategy PUBLIC_GROUPS has not been enabled
 ==
 
@@ -285,7 +280,6 @@ QueryStmt
         +-anonymization_option_list=
           +-group_selection_strategy := Literal(type=ENUM<DIFFERENTIAL_PRIVACY_GROUP_SELECTION_STRATEGY>, value=PUBLIC_GROUPS)
 
-
 Rewrite ERROR: Anonymization option group_selection_strategy PUBLIC_GROUPS is not supported without support for WITH subqueries
 ==
 
@@ -309,7 +303,6 @@ QueryStmt
         | +-$agg1#13 := AggregateFunctionCall(GoogleSQL:$anon_count_star(optional(0) INT64, optional(0) INT64) -> INT64)
         +-anonymization_option_list=
           +-group_selection_strategy := Literal(type=ENUM<DIFFERENTIAL_PRIVACY_GROUP_SELECTION_STRATEGY>, value=PUBLIC_GROUPS)
-
 
 [REWRITTEN AST]
 QueryStmt
@@ -365,7 +358,6 @@ QueryStmt
         +-anonymization_option_list=
           +-group_selection_strategy := Literal(type=ENUM<DIFFERENTIAL_PRIVACY_GROUP_SELECTION_STRATEGY>, value=PUBLIC_GROUPS)
           +-max_groups_contributed := Literal(type=INT64, value=3)
-
 
 [REWRITTEN AST]
 QueryStmt
@@ -450,7 +442,6 @@ QueryStmt
         | +-$agg1#33 := AggregateFunctionCall(GoogleSQL:$anon_count_star(optional(0) INT64, optional(0) INT64) -> INT64)
         +-anonymization_option_list=
           +-group_selection_strategy := Literal(type=ENUM<DIFFERENTIAL_PRIVACY_GROUP_SELECTION_STRATEGY>, value=PUBLIC_GROUPS)
-
 
 [REWRITTEN AST]
 QueryStmt
@@ -547,7 +538,6 @@ QueryStmt
         +-anonymization_option_list=
           +-group_selection_strategy := Literal(type=ENUM<DIFFERENTIAL_PRIVACY_GROUP_SELECTION_STRATEGY>, value=PUBLIC_GROUPS)
           +-max_groups_contributed := Literal(type=INT64, value=3)
-
 
 [REWRITTEN AST]
 QueryStmt
@@ -672,7 +662,6 @@ QueryStmt
           +-group_selection_strategy := Literal(type=ENUM<DIFFERENTIAL_PRIVACY_GROUP_SELECTION_STRATEGY>, value=PUBLIC_GROUPS)
           +-max_groups_contributed := Literal(type=INT64, value=3)
 
-
 [REWRITTEN AST]
 QueryStmt
 +-output_column_list=
@@ -796,7 +785,6 @@ QueryStmt
         +-anonymization_option_list=
           +-group_selection_strategy := Literal(type=ENUM<DIFFERENTIAL_PRIVACY_GROUP_SELECTION_STRATEGY>, value=PUBLIC_GROUPS)
           +-max_groups_contributed := Literal(type=INT64, value=3)
-
 
 [REWRITTEN AST]
 QueryStmt
@@ -924,7 +912,6 @@ QueryStmt
         +-anonymization_option_list=
           +-group_selection_strategy := Literal(type=ENUM<DIFFERENTIAL_PRIVACY_GROUP_SELECTION_STRATEGY>, value=PUBLIC_GROUPS)
           +-max_groups_contributed := Literal(type=INT64, value=3)
-
 
 [REWRITTEN AST]
 QueryStmt
@@ -1060,7 +1047,6 @@ QueryStmt
           +-group_selection_strategy := Literal(type=ENUM<DIFFERENTIAL_PRIVACY_GROUP_SELECTION_STRATEGY>, value=PUBLIC_GROUPS)
           +-max_groups_contributed := Literal(type=INT64, value=3)
 
-
 Rewrite ERROR: The left table in a LEFT OUTER join must contain user data
 ==
 
@@ -1128,7 +1114,6 @@ QueryStmt
         +-anonymization_option_list=
           +-group_selection_strategy := Literal(type=ENUM<DIFFERENTIAL_PRIVACY_GROUP_SELECTION_STRATEGY>, value=PUBLIC_GROUPS)
           +-max_groups_contributed := Literal(type=INT64, value=3)
-
 
 [REWRITTEN AST]
 QueryStmt
@@ -1273,7 +1258,6 @@ QueryStmt
           +-group_selection_strategy := Literal(type=ENUM<DIFFERENTIAL_PRIVACY_GROUP_SELECTION_STRATEGY>, value=PUBLIC_GROUPS)
           +-max_groups_contributed := Literal(type=INT64, value=3)
 
-
 [REWRITTEN AST]
 QueryStmt
 +-output_column_list=
@@ -1415,7 +1399,6 @@ QueryStmt
         +-anonymization_option_list=
           +-group_selection_strategy := Literal(type=ENUM<DIFFERENTIAL_PRIVACY_GROUP_SELECTION_STRATEGY>, value=PUBLIC_GROUPS)
 
-
 [REWRITTEN AST]
 QueryStmt
 +-output_column_list=
@@ -1510,7 +1493,6 @@ QueryStmt
             +-Cast(STRING -> ENUM<DIFFERENTIAL_PRIVACY_GROUP_SELECTION_STRATEGY>)
               +-Parameter(type=STRING, name="test_param_string")
 
-
 Rewrite ERROR: Anonymization option group_selection_strategy must be a non-NULL enum literal
 ==
 
@@ -1555,7 +1537,6 @@ QueryStmt
         +-anonymization_option_list=
           +-group_selection_strategy := Literal(type=ENUM<DIFFERENTIAL_PRIVACY_GROUP_SELECTION_STRATEGY>, value=PUBLIC_GROUPS)
           +-max_groups_contributed := Literal(type=INT64, value=3)
-
 
 Rewrite ERROR: Anonymization option group_selection_strategy PUBLIC_GROUPS expects an outer join with a SELECT DISTINCT subquery over a non-uid table for all columns in the GROUP BY, but did not find such a join for the following columns: int64
 ==
@@ -1614,7 +1595,6 @@ QueryStmt
           +-group_selection_strategy := Literal(type=ENUM<DIFFERENTIAL_PRIVACY_GROUP_SELECTION_STRATEGY>, value=PUBLIC_GROUPS)
           +-max_groups_contributed := Literal(type=INT64, value=3)
 
-
 Rewrite ERROR: Both tables in a FULL OUTER join must contain user data
 ==
 
@@ -1659,7 +1639,6 @@ QueryStmt
         | +-$agg1#26 := AggregateFunctionCall(GoogleSQL:$anon_count_star(optional(0) INT64, optional(0) INT64) -> INT64)
         +-anonymization_option_list=
           +-group_selection_strategy := Literal(type=ENUM<DIFFERENTIAL_PRIVACY_GROUP_SELECTION_STRATEGY>, value=PUBLIC_GROUPS)
-
 
 Rewrite ERROR: Anonymization option group_selection_strategy PUBLIC_GROUPS expects an outer join with a SELECT DISTINCT subquery over a non-uid table for all columns in the GROUP BY, but did not find such a join for the following columns: uid
 ==
@@ -1711,7 +1690,6 @@ QueryStmt
         +-anonymization_option_list=
           +-group_selection_strategy := Literal(type=ENUM<DIFFERENTIAL_PRIVACY_GROUP_SELECTION_STRATEGY>, value=PUBLIC_GROUPS)
 
-
 Rewrite ERROR: Anonymization option group_selection_strategy PUBLIC_GROUPS expects an outer join with a SELECT DISTINCT subquery over a non-uid table for all columns in the GROUP BY, but did not find such a join for the following columns: int64
 ==
 
@@ -1760,7 +1738,6 @@ QueryStmt
         | +-$agg1#27 := AggregateFunctionCall(GoogleSQL:$anon_count_star(optional(0) INT64, optional(0) INT64) -> INT64)
         +-anonymization_option_list=
           +-group_selection_strategy := Literal(type=ENUM<DIFFERENTIAL_PRIVACY_GROUP_SELECTION_STRATEGY>, value=PUBLIC_GROUPS)
-
 
 Rewrite ERROR: Anonymization option group_selection_strategy PUBLIC_GROUPS expects an outer join with a SELECT DISTINCT subquery over a non-uid table for all columns in the GROUP BY, but did not find such a join for the following columns: int64
 ==
@@ -1816,7 +1793,6 @@ QueryStmt
         +-anonymization_option_list=
           +-group_selection_strategy := Literal(type=ENUM<DIFFERENTIAL_PRIVACY_GROUP_SELECTION_STRATEGY>, value=PUBLIC_GROUPS)
 
-
 Rewrite ERROR: Joins between tables containing private data must also explicitly join on the user id column in each table, add 'AND uid=uid' to the join ON expression
 ==
 
@@ -1858,7 +1834,6 @@ QueryStmt
         +-anonymization_option_list=
           +-group_selection_strategy := Literal(type=ENUM<DIFFERENTIAL_PRIVACY_GROUP_SELECTION_STRATEGY>, value=PUBLIC_GROUPS)
 
-
 Rewrite ERROR: The right table in a RIGHT OUTER join must contain user data
 ==
 
@@ -1899,7 +1874,6 @@ QueryStmt
         | +-$agg1#32 := AggregateFunctionCall(GoogleSQL:$anon_count_star(optional(0) INT64, optional(0) INT64) -> INT64)
         +-anonymization_option_list=
           +-group_selection_strategy := Literal(type=ENUM<DIFFERENTIAL_PRIVACY_GROUP_SELECTION_STRATEGY>, value=PUBLIC_GROUPS)
-
 
 Rewrite ERROR: The left table in a LEFT OUTER join must contain user data
 ==
@@ -1944,7 +1918,6 @@ QueryStmt
         | +-$agg1#32 := AggregateFunctionCall(GoogleSQL:$anon_count_star(optional(0) INT64, optional(0) INT64) -> INT64)
         +-anonymization_option_list=
           +-group_selection_strategy := Literal(type=ENUM<DIFFERENTIAL_PRIVACY_GROUP_SELECTION_STRATEGY>, value=PUBLIC_GROUPS)
-
 
 Rewrite ERROR: The left table in a LEFT OUTER join must contain user data
 ==
@@ -1993,7 +1966,6 @@ QueryStmt
         +-anonymization_option_list=
           +-group_selection_strategy := Literal(type=ENUM<DIFFERENTIAL_PRIVACY_GROUP_SELECTION_STRATEGY>, value=PUBLIC_GROUPS)
           +-max_groups_contributed := Literal(type=INT64, value=3)
-
 
 [REWRITTEN AST]
 QueryStmt
@@ -2115,7 +2087,6 @@ QueryStmt
         +-anonymization_option_list=
           +-group_selection_strategy := Literal(type=ENUM<DIFFERENTIAL_PRIVACY_GROUP_SELECTION_STRATEGY>, value=PUBLIC_GROUPS)
           +-max_groups_contributed := Literal(type=INT64, value=3)
-
 
 [REWRITTEN AST]
 QueryStmt
@@ -2250,7 +2221,6 @@ QueryStmt
         +-anonymization_option_list=
           +-group_selection_strategy := Literal(type=ENUM<DIFFERENTIAL_PRIVACY_GROUP_SELECTION_STRATEGY>, value=PUBLIC_GROUPS)
           +-max_groups_contributed := Literal(type=INT64, value=3)
-
 
 [REWRITTEN AST]
 QueryStmt
@@ -2398,7 +2368,6 @@ QueryStmt
           +-group_selection_strategy := Literal(type=ENUM<DIFFERENTIAL_PRIVACY_GROUP_SELECTION_STRATEGY>, value=PUBLIC_GROUPS)
           +-max_groups_contributed := Literal(type=INT64, value=3)
 
-
 [REWRITTEN AST]
 QueryStmt
 +-output_column_list=
@@ -2538,7 +2507,6 @@ QueryStmt
           +-group_selection_strategy := Literal(type=ENUM<DIFFERENTIAL_PRIVACY_GROUP_SELECTION_STRATEGY>, value=PUBLIC_GROUPS)
           +-max_groups_contributed := Literal(type=INT64, value=3)
 
-
 Rewrite ERROR: Anonymization option group_selection_strategy PUBLIC_GROUPS only allows column names out of the public group SELECT DISTINCT subquery in the GROUP BY list.
 ==
 
@@ -2605,7 +2573,6 @@ QueryStmt
         +-anonymization_option_list=
           +-group_selection_strategy := Literal(type=ENUM<DIFFERENTIAL_PRIVACY_GROUP_SELECTION_STRATEGY>, value=PUBLIC_GROUPS)
           +-max_groups_contributed := Literal(type=INT64, value=3)
-
 
 [REWRITTEN AST]
 QueryStmt
@@ -2779,7 +2746,6 @@ QueryStmt
         +-anonymization_option_list=
           +-group_selection_strategy := Literal(type=ENUM<DIFFERENTIAL_PRIVACY_GROUP_SELECTION_STRATEGY>, value=PUBLIC_GROUPS)
           +-max_groups_contributed := Literal(type=INT64, value=3)
-
 
 [REWRITTEN AST]
 QueryStmt
@@ -2955,7 +2921,6 @@ QueryStmt
           +-group_selection_strategy := Literal(type=ENUM<DIFFERENTIAL_PRIVACY_GROUP_SELECTION_STRATEGY>, value=PUBLIC_GROUPS)
           +-max_groups_contributed := Literal(type=INT64, value=3)
 
-
 [REWRITTEN AST]
 QueryStmt
 +-output_column_list=
@@ -3095,7 +3060,6 @@ QueryStmt
           +-group_selection_strategy := Literal(type=ENUM<DIFFERENTIAL_PRIVACY_GROUP_SELECTION_STRATEGY>, value=PUBLIC_GROUPS)
           +-max_groups_contributed := Literal(type=INT64, value=3)
 
-
 Rewrite ERROR: Anonymization option group_selection_strategy PUBLIC_GROUPS expects an outer join with a SELECT DISTINCT subquery over a non-uid table for all columns in the GROUP BY, but did not find such a join for the following columns: int64, string
 ==
 
@@ -3147,7 +3111,6 @@ QueryStmt
         +-anonymization_option_list=
           +-group_selection_strategy := Literal(type=ENUM<DIFFERENTIAL_PRIVACY_GROUP_SELECTION_STRATEGY>, value=PUBLIC_GROUPS)
           +-max_groups_contributed := Literal(type=INT64, value=3)
-
 
 Rewrite ERROR: Anonymization option group_selection_strategy PUBLIC_GROUPS expects an outer join with a SELECT DISTINCT subquery over a non-uid table for all columns in the GROUP BY, but did not find such a join for the following columns: int64
 ==
@@ -3219,7 +3182,6 @@ QueryStmt
           +-group_selection_strategy := Literal(type=ENUM<DIFFERENTIAL_PRIVACY_GROUP_SELECTION_STRATEGY>, value=PUBLIC_GROUPS)
           +-max_groups_contributed := Literal(type=INT64, value=3)
 
-
 Rewrite ERROR: Joins between tables containing private data must also explicitly join on the user id column in each table, add 'AND uid=uid' to the join ON expression
 ==
 
@@ -3277,7 +3239,6 @@ QueryStmt
             +-anonymization_option_list=
               +-group_selection_strategy := Literal(type=ENUM<DIFFERENTIAL_PRIVACY_GROUP_SELECTION_STRATEGY>, value=PUBLIC_GROUPS)
               +-max_groups_contributed := Literal(type=INT64, value=3)
-
 
 [REWRITTEN AST]
 QueryStmt
@@ -3410,7 +3371,6 @@ QueryStmt
               +-group_selection_strategy := Literal(type=ENUM<DIFFERENTIAL_PRIVACY_GROUP_SELECTION_STRATEGY>, value=PUBLIC_GROUPS)
               +-max_groups_contributed := Literal(type=INT64, value=3)
 
-
 Rewrite ERROR: The right table in a RIGHT OUTER join must contain user data
 ==
 
@@ -3460,7 +3420,6 @@ QueryStmt
         +-anonymization_option_list=
           +-group_selection_strategy := Literal(type=ENUM<DIFFERENTIAL_PRIVACY_GROUP_SELECTION_STRATEGY>, value=PUBLIC_GROUPS)
           +-max_groups_contributed := Literal(type=INT64, value=3)
-
 
 [REWRITTEN AST]
 QueryStmt
@@ -3603,7 +3562,6 @@ QueryStmt
           +-max_groups_contributed := Literal(type=INT64, value=3)
           +-group_selection_strategy := Literal(type=ENUM<DIFFERENTIAL_PRIVACY_GROUP_SELECTION_STRATEGY>, value=PUBLIC_GROUPS)
 
-
 Rewrite ERROR: group_selection_strategy = PUBLIC_GROUPS does not allow JOIN operations between the public groups join and the aggregation, because they could suppress public groups from the result. Try moving the operation to an input subquery of the public groups join.
 ==
 
@@ -3663,7 +3621,6 @@ QueryStmt
         +-anonymization_option_list=
           +-max_groups_contributed := Literal(type=INT64, value=3)
           +-group_selection_strategy := Literal(type=ENUM<DIFFERENTIAL_PRIVACY_GROUP_SELECTION_STRATEGY>, value=PUBLIC_GROUPS)
-
 
 Rewrite ERROR: group_selection_strategy = PUBLIC_GROUPS does not allow operations between the public groups join and the aggregation, because they could suppress public groups from the result. Try moving the operation to an input subquery of the public groups join.
 ==
@@ -3726,7 +3683,6 @@ QueryStmt
         +-anonymization_option_list=
           +-max_groups_contributed := Literal(type=INT64, value=3)
           +-group_selection_strategy := Literal(type=ENUM<DIFFERENTIAL_PRIVACY_GROUP_SELECTION_STRATEGY>, value=PUBLIC_GROUPS)
-
 
 Rewrite ERROR: group_selection_strategy = PUBLIC_GROUPS does not allow operations between the public groups join and the aggregation, because they could suppress public groups from the result. Try moving the operation to an input subquery of the public groups join.
 ==
@@ -3791,7 +3747,6 @@ QueryStmt
         +-anonymization_option_list=
           +-max_groups_contributed := Literal(type=INT64, value=3)
           +-group_selection_strategy := Literal(type=ENUM<DIFFERENTIAL_PRIVACY_GROUP_SELECTION_STRATEGY>, value=PUBLIC_GROUPS)
-
 
 [REWRITTEN AST]
 QueryStmt
@@ -3946,7 +3901,6 @@ QueryStmt
           +-max_groups_contributed := Literal(type=INT64, value=3)
           +-group_selection_strategy := Literal(type=ENUM<DIFFERENTIAL_PRIVACY_GROUP_SELECTION_STRATEGY>, value=PUBLIC_GROUPS)
 
-
 Rewrite ERROR: group_selection_strategy = PUBLIC_GROUPS does not allow operations between the public groups join and the aggregation, because they could suppress public groups from the result. Try moving the operation to an input subquery of the public groups join.
 ==
 
@@ -4019,7 +3973,6 @@ QueryStmt
         +-anonymization_option_list=
           +-max_groups_contributed := Literal(type=INT64, value=3)
           +-group_selection_strategy := Literal(type=ENUM<DIFFERENTIAL_PRIVACY_GROUP_SELECTION_STRATEGY>, value=PUBLIC_GROUPS)
-
 
 [REWRITTEN AST]
 QueryStmt
@@ -4177,7 +4130,6 @@ QueryStmt
           +-max_groups_contributed := Literal(type=INT64, value=3)
           +-group_selection_strategy := Literal(type=ENUM<DIFFERENTIAL_PRIVACY_GROUP_SELECTION_STRATEGY>, value=PUBLIC_GROUPS)
 
-
 Rewrite ERROR: group_selection_strategy = PUBLIC_GROUPS does not allow operations between the public groups join and the aggregation, because they could suppress public groups from the result. Try moving the operation to an input subquery of the public groups join.
 ==
 
@@ -4234,7 +4186,6 @@ QueryStmt
         +-anonymization_option_list=
           +-max_groups_contributed := Literal(type=INT64, value=3)
           +-group_selection_strategy := Literal(type=ENUM<DIFFERENTIAL_PRIVACY_GROUP_SELECTION_STRATEGY>, value=PUBLIC_GROUPS)
-
 
 [REWRITTEN AST]
 QueryStmt
@@ -4402,7 +4353,6 @@ QueryStmt
           +-max_groups_contributed := Literal(type=INT64, value=3)
           +-group_selection_strategy := Literal(type=ENUM<DIFFERENTIAL_PRIVACY_GROUP_SELECTION_STRATEGY>, value=PUBLIC_GROUPS)
 
-
 Rewrite ERROR: group_selection_strategy = PUBLIC_GROUPS does not allow JOIN operations between the public groups join and the aggregation, because they could suppress public groups from the result. Try moving the operation to an input subquery of the public groups join.
 ==
 
@@ -4490,7 +4440,6 @@ QueryStmt
         +-anonymization_option_list=
           +-group_selection_strategy := Literal(type=ENUM<DIFFERENTIAL_PRIVACY_GROUP_SELECTION_STRATEGY>, value=PUBLIC_GROUPS)
 
-
 Rewrite ERROR: group_selection_strategy = PUBLIC_GROUPS does not allow JOIN operations between the public groups join and the aggregation, because they could suppress public groups from the result. Try moving the operation to an input subquery of the public groups join.
 ==
 
@@ -4572,7 +4521,6 @@ QueryStmt
     |           +-Literal(type=INT64, value=10)
     +-limit=
       +-Literal(type=INT64, value=11)
-
 
 [REWRITTEN AST]
 QueryStmt
@@ -4751,7 +4699,6 @@ QueryStmt
     +-limit=
       +-Literal(type=INT64, value=11)
 
-
 [REWRITTEN AST]
 QueryStmt
 +-output_column_list=
@@ -4915,7 +4862,6 @@ QueryStmt
             +-anonymization_option_list=
               +-max_groups_contributed := Literal(type=INT64, value=5)
               +-group_selection_strategy := Literal(type=ENUM<DIFFERENTIAL_PRIVACY_GROUP_SELECTION_STRATEGY>, value=PUBLIC_GROUPS)
-
 
 [REWRITTEN AST]
 QueryStmt
@@ -5179,7 +5125,6 @@ QueryStmt
             | +-$agg1#73 := AggregateFunctionCall(GoogleSQL:$anon_count_star(optional(0) INT64, optional(0) INT64) -> INT64)
             +-anonymization_option_list=
               +-max_groups_contributed := Literal(type=INT64, value=5)
-
 
 [REWRITTEN AST]
 QueryStmt
@@ -5513,7 +5458,6 @@ QueryStmt
               +-max_groups_contributed := Literal(type=INT64, value=5)
               +-group_selection_strategy := Literal(type=ENUM<DIFFERENTIAL_PRIVACY_GROUP_SELECTION_STRATEGY>, value=PUBLIC_GROUPS)
 
-
 [REWRITTEN AST]
 QueryStmt
 +-output_column_list=
@@ -5821,7 +5765,6 @@ QueryStmt
         +-input_scan=
           +-WithRefScan(column_list=res1.[string#36, $col2#37], with_query_name="res1")
 
-
 [REWRITTEN AST]
 QueryStmt
 +-output_column_list=
@@ -6014,7 +5957,6 @@ QueryStmt
         |         +-max_groups_contributed := Literal(type=INT64, value=3)
         |         +-group_selection_strategy := Literal(type=ENUM<DIFFERENTIAL_PRIVACY_GROUP_SELECTION_STRATEGY>, value=PUBLIC_GROUPS)
         +-output_column_list=[$groupby.string#68, $aggregate.anon_count#67]
-
 
 [REWRITTEN AST]
 QueryStmt

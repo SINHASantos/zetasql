@@ -550,6 +550,20 @@ ERROR: INSERT is not allowed in non-top-level graph statement [at 3:3]
   ^
 ==
 
+[language_features=NONE,+SQL_GRAPH,+SQL_GRAPH_ADVANCED_QUERY,+SQL_GRAPH_RETURN_EXTENSIONS,+SQL_GRAPH_TERMINAL_INSERT,+SQL_GRAPH_CALL]
+# INSERT is not allowed in a CALL subquery
+GRAPH aml_dml
+MATCH (a:Person {id: 1})
+CALL (a) {
+  INSERT (a)-[:PersonOwnsAccount]->(b:Account {id: 101})
+}
+RETURN a.id
+--
+ERROR: INSERT is not allowed in non-top-level graph statement [at 5:3]
+  INSERT (a)-[:PersonOwnsAccount]->(b:Account {id: 101})
+  ^
+==
+
 # INSERT inside a composite query with set operation not supported
 GRAPH aml
 INSERT (n:Person {name: "A"})

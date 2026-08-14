@@ -1379,14 +1379,14 @@ TEST(FunctionSignatureTests, FunctionSignatureValidityTests) {
   // Repeated relation argument is invalid.
   arguments.clear();
   arguments.push_back(FunctionArgumentType(ARG_KIND_RELATION, REPEATED));
-  signature = std::make_unique<FunctionSignature>(
-      FunctionArgumentType(factory.get_int64()), arguments,
-      /*context_id=*/-1);
-
-  EXPECT_THAT(signature->IsValidForTableValuedFunction(),
-              StatusIs(absl::StatusCode::kInternal,
-                       testing::HasSubstr(
-                           "Repeated relation argument is not supported")));
+  EXPECT_DEBUG_DEATH(signature.reset(new FunctionSignature(
+                         FunctionArgumentType(factory.get_int64()), arguments,
+                         /*context_id=*/-1)),
+                     "Repeated argument 0 must be Scalar");
+  if (!GOOGLESQL_DEBUG_MODE) {
+    EXPECT_FALSE(signature->IsValid(ProductMode::PRODUCT_EXTERNAL).ok());
+    EXPECT_FALSE(signature->init_status().ok());
+  }
 
   // Optional relation following any other optional argument is just fine.
   arguments.clear();
@@ -1447,11 +1447,10 @@ TEST(FunctionSignatureTests, FunctionSignatureValidityTests) {
   arguments.push_back(FunctionArgumentType(factory.get_int64(), OPTIONAL));
   arguments.push_back(FunctionArgumentType(ARG_KIND_RELATION, REPEATED));
   arguments.push_back(FunctionArgumentType(ARG_KIND_RELATION, REPEATED));
-  EXPECT_DEBUG_DEATH(
-      signature.reset(
-          new FunctionSignature(FunctionArgumentType(factory.get_int64()),
-                                arguments, /*context_id=*/-1)),
-      "Optional arguments must be at the end of the argument list");
+  EXPECT_DEBUG_DEATH(signature.reset(new FunctionSignature(
+                         FunctionArgumentType(factory.get_int64()), arguments,
+                         /*context_id=*/-1)),
+                     "Repeated argument 1 must be Scalar");
   if (!GOOGLESQL_DEBUG_MODE) {
     EXPECT_FALSE(signature->IsValid(ProductMode::PRODUCT_EXTERNAL).ok());
     EXPECT_FALSE(signature->init_status().ok());
@@ -2953,6 +2952,195 @@ TEST(FunctionSignatureTests, GetSQLDeclarationWithTypeModifiersError) {
                                                 /*use_external_float32=*/false);
   EXPECT_EQ("ERROR: Input collation und:ci is not compatible with type INT64",
             decl);
+}
+
+TEST(FunctionSignatureTest, ValidateSignatureConstraints) {
+  TypeFactory factory;
+  const Type* int32_type = factory.get_int32();
+
+  auto opt_with_kind = [](FunctionEnums::NamedArgumentKind kind,
+                          const std::string& name = "") {
+    FunctionArgumentTypeOptions opt;
+    if (!name.empty() || kind != FunctionEnums::POSITIONAL_ONLY) {
+      opt.set_argument_name(name, kind);
+    }
+    return opt;
+  };
+
+  // Helper to expect invalid signature.
+  auto expect_invalid = [&](auto signature_creator,
+                            const std::string& error_message) {
+    std::unique_ptr<FunctionSignature> signature;
+    EXPECT_DEBUG_DEATH(signature.reset(signature_creator()), error_message);
+    if (!GOOGLESQL_DEBUG_MODE) {
+      signature.reset(signature_creator());
+      EXPECT_THAT(signature->IsValid(ProductMode::PRODUCT_EXTERNAL),
+                  StatusIs(absl::StatusCode::kInvalidArgument,
+                           HasSubstr(error_message)));
+    }
+  };
+
+  // Valid: POSITIONAL_ONLY -> POSITIONAL_OR_NAMED -> NAMED_ONLY
+  {
+    FunctionSignature signature(
+        FunctionArgumentType(int32_type),
+        {
+            FunctionArgumentType(int32_type,
+                                 opt_with_kind(FunctionEnums::POSITIONAL_ONLY)),
+            FunctionArgumentType(
+                int32_type,
+                opt_with_kind(FunctionEnums::POSITIONAL_OR_NAMED, "a")),
+            FunctionArgumentType(int32_type,
+                                 opt_with_kind(FunctionEnums::NAMED_ONLY, "b")),
+        },
+        /*context_ptr=*/nullptr);
+    GOOGLESQL_EXPECT_OK(signature.IsValid(ProductMode::PRODUCT_EXTERNAL));
+  }
+
+  // Invalid ordering: POSITIONAL_OR_NAMED -> REQUIRED POSITIONAL_ONLY
+  expect_invalid(
+      [&]() {
+        return new FunctionSignature(
+            FunctionArgumentType(int32_type),
+            {
+                FunctionArgumentType(
+                    int32_type,
+                    opt_with_kind(FunctionEnums::POSITIONAL_OR_NAMED, "a")),
+                FunctionArgumentType(
+                    int32_type, opt_with_kind(FunctionEnums::POSITIONAL_ONLY)),
+            },
+            /*context_ptr=*/nullptr);
+      },
+      "follows an argument with a more restrictive kind");
+
+  // Valid ordering: POSITIONAL_OR_NAMED -> REPEATED POSITIONAL_ONLY
+  {
+    FunctionSignature signature(
+        FunctionArgumentType(int32_type),
+        {
+            FunctionArgumentType(
+                int32_type,
+                opt_with_kind(FunctionEnums::POSITIONAL_OR_NAMED, "a")),
+            FunctionArgumentType(int32_type,
+                                 opt_with_kind(FunctionEnums::POSITIONAL_ONLY)
+                                     .set_cardinality(FunctionEnums::REPEATED)),
+        },
+        /*context_ptr=*/nullptr);
+    GOOGLESQL_EXPECT_OK(signature.IsValid(ProductMode::PRODUCT_EXTERNAL));
+  }
+
+  // Valid ordering: POSITIONAL_OR_NAMED -> OPTIONAL POSITIONAL_ONLY
+  {
+    FunctionSignature signature(
+        FunctionArgumentType(int32_type),
+        {
+            FunctionArgumentType(
+                int32_type,
+                opt_with_kind(FunctionEnums::POSITIONAL_OR_NAMED, "a")),
+            FunctionArgumentType(int32_type,
+                                 opt_with_kind(FunctionEnums::POSITIONAL_ONLY)
+                                     .set_cardinality(FunctionEnums::OPTIONAL)),
+        },
+        /*context_ptr=*/nullptr);
+    GOOGLESQL_EXPECT_OK(signature.IsValid(ProductMode::PRODUCT_EXTERNAL));
+  }
+
+  // Valid ordering: POSITIONAL_OR_NAMED -> Lambda POSITIONAL_ONLY
+  {
+    FunctionSignature signature(
+        FunctionArgumentType(int32_type),
+        {
+            FunctionArgumentType(
+                int32_type,
+                opt_with_kind(FunctionEnums::POSITIONAL_OR_NAMED, "a")),
+            FunctionArgumentType::Lambda({FunctionArgumentType(int32_type)},
+                                         FunctionArgumentType(int32_type)),
+        },
+        /*context_ptr=*/nullptr);
+    GOOGLESQL_EXPECT_OK(signature.IsValid(ProductMode::PRODUCT_EXTERNAL));
+  }
+
+  // Invalid ordering: NAMED_ONLY -> POSITIONAL_OR_NAMED
+  expect_invalid(
+      [&]() {
+        return new FunctionSignature(
+            FunctionArgumentType(int32_type),
+            {
+                FunctionArgumentType(
+                    int32_type, opt_with_kind(FunctionEnums::NAMED_ONLY, "a")),
+                FunctionArgumentType(
+                    int32_type,
+                    opt_with_kind(FunctionEnums::POSITIONAL_OR_NAMED, "b")),
+            },
+            /*context_ptr=*/nullptr);
+      },
+      "follows an argument with a more restrictive kind");
+
+  // Invalid: NAMED_ONLY without name
+  expect_invalid(
+      [&]() {
+        return new FunctionSignature(
+            FunctionArgumentType(int32_type),
+            {
+                FunctionArgumentType(
+                    int32_type, opt_with_kind(FunctionEnums::NAMED_ONLY, "")),
+            },
+            /*context_ptr=*/nullptr);
+      },
+      "is NAMED_ONLY but has no name");
+
+  // Invalid: POSITIONAL_OR_NAMED without name
+  expect_invalid(
+      [&]() {
+        return new FunctionSignature(
+            FunctionArgumentType(int32_type),
+            {
+                FunctionArgumentType(
+                    int32_type,
+                    opt_with_kind(FunctionEnums::POSITIONAL_OR_NAMED, "")),
+            },
+            /*context_ptr=*/nullptr);
+      },
+      "is POSITIONAL_OR_NAMED but has no name");
+
+  // Valid: Repeated, POSITIONAL_ONLY, Scalar
+  {
+    FunctionSignature signature(
+        FunctionArgumentType(int32_type),
+        {
+            FunctionArgumentType(int32_type, FunctionArgumentType::REPEATED),
+        },
+        /*context_ptr=*/nullptr);
+    GOOGLESQL_EXPECT_OK(signature.IsValid(ProductMode::PRODUCT_EXTERNAL));
+  }
+
+  // Invalid: Repeated, POSITIONAL_OR_NAMED
+  expect_invalid(
+      [&]() {
+        FunctionArgumentTypeOptions opt =
+            opt_with_kind(FunctionEnums::POSITIONAL_OR_NAMED, "a");
+        opt.set_cardinality(FunctionArgumentType::REPEATED);
+        return new FunctionSignature(FunctionArgumentType(int32_type),
+                                     {
+                                         FunctionArgumentType(int32_type, opt),
+                                     },
+                                     /*context_ptr=*/nullptr);
+      },
+      "must be POSITIONAL_ONLY");
+
+  // Invalid: Repeated, non-Scalar (Relation)
+  expect_invalid(
+      [&]() {
+        FunctionArgumentTypeOptions opt;
+        opt.set_cardinality(FunctionArgumentType::REPEATED);
+        return new FunctionSignature(
+            FunctionArgumentType(int32_type),
+            {
+                FunctionArgumentType(ARG_KIND_RELATION, opt),
+            },
+            /*context_ptr=*/nullptr);
+      },
+      "must be Scalar");
 }
 
 }  // namespace googlesql

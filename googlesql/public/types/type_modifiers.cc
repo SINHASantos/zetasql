@@ -77,14 +77,18 @@ TypeParameters TypeModifiers::release_type_parameters() {
   if (type_parameters_ == nullptr) {
     return TypeParameters::EmptyTypeParameters();
   }
-  return *std::move(type_parameters_);
+  TypeParameters result = std::move(*type_parameters_);
+  type_parameters_.reset();
+  return result;
 }
 
 Collation TypeModifiers::release_collation() {
   if (collation_ == nullptr) {
     return Collation::EmptyCollation();
   }
-  return *std::move(collation_);
+  Collation result = std::move(*collation_);
+  collation_.reset();
+  return result;
 }
 
 bool TypeModifiers::Equals(const TypeModifiers& that) const {

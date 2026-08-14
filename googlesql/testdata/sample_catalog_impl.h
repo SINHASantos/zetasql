@@ -97,6 +97,28 @@ class SampleCatalogImpl {
   absl::Status LoadTables();
   absl::Status LoadProtoTables();
   absl::Status LoadMeasureTables(const LanguageOptions& language_options);
+  absl::Status LoadBasicMeasureTables(
+      AnalyzerOptions& analyzer_options,
+      const std::vector<std::vector<Value>>& singlekey_data,
+      const std::vector<std::vector<Value>>& twokeys_data);
+  absl::Status LoadDerivedMeasureTables(
+      const LanguageOptions& language_options,
+      AnalyzerOptions& analyzer_options,
+      const std::vector<std::vector<Value>>& derived_data,
+      const std::vector<std::vector<Value>>& twokeys_data,
+      const std::vector<std::vector<Value>>& sales_facts_data);
+  absl::Status LoadMeasureTablesWithAdvancedExprs(
+      AnalyzerOptions& analyzer_options,
+      const std::vector<std::vector<Value>>& singlekey_data,
+      const std::vector<std::vector<Value>>& complexexprs_data);
+  absl::Status LoadMeasureValueTables(
+      const LanguageOptions& language_options,
+      AnalyzerOptions& analyzer_options,
+      const std::vector<std::vector<Value>>& struct_value_data,
+      const std::vector<std::vector<Value>>& int64_value_data);
+  absl::Status LoadInvalidMeasureTables(AnalyzerOptions& analyzer_options);
+  absl::Status LoadRowTypeMeasureTables(const LanguageOptions& language_options,
+                                        AnalyzerOptions& analyzer_options);
   void LoadViews(const LanguageOptions& language_options);
   absl::Status LoadNestedCatalogs();
 
@@ -129,7 +151,8 @@ class SampleCatalogImpl {
       const LanguageOptions& language_options);
   absl::Status LoadFunctionsWithDefaultArguments();
   absl::Status LoadTemplatedSQLUDFs();
-  absl::Status LoadAmlBasedPropertyGraphs();
+  absl::Status LoadAmlBasedPropertyGraphs(
+      const LanguageOptions& language_options);
 
   // The basic "aml" property graph is primarily used in all our analyzer tests.
   // Keeping this succinct is useful as it makes sure our analyzer tests do not
@@ -242,7 +265,7 @@ class SampleCatalogImpl {
   // Load objects for testing ROW type ((broken link)). Some of the
   // objects here are experimental, their behavior and interfaces may change.
   // TODO: b/452955184 - Update this comment once proposal is finalized.
-  void LoadRowTypeObjects();
+  absl::Status LoadRowTypeObjects(const LanguageOptions& language_options);
 
   // This can be used force linking of a proto for the generated_pool.
   // This may be required if a proto is referenced in file-based tests

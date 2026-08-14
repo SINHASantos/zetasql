@@ -23,6 +23,7 @@
 
 #include "googlesql/common/builtin_function_internal.h"
 #include "googlesql/common/builtins_output_properties.h"
+#include "googlesql/public/builtin_function.pb.h"
 #include "googlesql/public/builtin_function_options.h"
 #include "googlesql/public/function.h"
 #include "googlesql/public/function_signature.h"
@@ -229,7 +230,8 @@ absl::Status GetBuiltinFunctionsAndTypes(
   GetRegexFunctions(&type_factory, options, &functions);
   GetErrorHandlingFunctions(&type_factory, options, &functions);
   GetConditionalFunctions(&type_factory, options, &functions);
-  GetMiscellaneousFunctions(&type_factory, options, &functions);
+  GOOGLESQL_RETURN_IF_ERROR(
+      GetMiscellaneousFunctions(&type_factory, options, &functions));
   GOOGLESQL_RETURN_IF_ERROR(
       GetVectorFunctions(&type_factory, options, &functions, &types));
   GOOGLESQL_RETURN_IF_ERROR(GetDistanceFunctions(&type_factory, options, &functions,

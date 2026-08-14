@@ -1,0 +1,205 @@
+[default show_sqlbuilder_output]
+[default no_enable_literal_replacement]
+[default sql_builder_target_syntax_mode=pipe]
+[default no_show_resolved_ast]
+[default language_features=MAXIMUM,+TABLE_VALUED_FUNCTIONS,+NAMED_ARGUMENTS]
+
+# Passthrough TVF with DROP and Extend preserving range variables from before
+# the call.
+FROM (SELECT 1 AS a, 2 AS b) AS PassthroughTable
+|> DROP b
+|> Extend 1 as c
+|> CALL PassthroughTVF()
+|> SELECT a, c, PassthroughTable.b;
+--
+[SQLBUILDER_OUTPUT]
+SELECT
+  1 AS a_1,
+  2 AS a_2
+|> AS projectscan_3
+|> SELECT
+     projectscan_3.a_1 AS a_1,
+     projectscan_3.a_2 AS a_2,
+     1 AS a_4
+|> AS projectscan_5
+|> SELECT
+     a_1 AS a,
+     a_4 AS c,
+     a_2 AS b
+|> AS tvfpassthroughalias_6
+|> DROP b
+|> CALL PASSTHROUGHTVF()
+|> SELECT
+     tvfpassthroughalias_6.a AS a,
+     tvfpassthroughalias_6.c AS c,
+     tvfpassthroughalias_6.b AS b;
+==
+
+# Non-extending Passthrough TVF with Value Table input, output should be kept as
+# a Value Table.
+FROM (SELECT AS STRUCT 1 AS a, 2 AS b) AS TableX
+|> CALL PassthroughTVF()
+|> SELECT TableX;
+--
+[SQLBUILDER_OUTPUT]
+SELECT
+  1 AS a_1,
+  2 AS a_2
+|> AS projectscan_3
+|> SELECT
+     STRUCT< a INT64, b INT64 > (projectscan_3.a_1, projectscan_3.a_2) AS a_4
+|> AS projectscan_5
+|> SELECT AS VALUE
+     a_4 AS a_4
+|> AS tvfpassthroughalias_6
+|> CALL PASSTHROUGHTVF()
+|> SELECT
+     tvfpassthroughalias_6 AS TableX;
+==
+
+# Passthrough TVF with Value Table input extending columns.
+FROM (SELECT AS STRUCT 1 AS a, 2 AS b) AS TableX
+|> CALL PassthroughExtendTVF('new_col')
+|> SELECT TableX, new_col;
+--
+[SQLBUILDER_OUTPUT]
+SELECT
+  1 AS a_1,
+  2 AS a_2
+|> AS projectscan_3
+|> SELECT
+     STRUCT< a INT64, b INT64 > (projectscan_3.a_1, projectscan_3.a_2) AS a_4
+|> AS projectscan_5
+|> SELECT AS VALUE
+     a_4 AS a_4
+|> AS tvfpassthroughalias_6
+|> CALL PASSTHROUGHEXTENDTVF("new_col")
+|> SELECT
+     tvfpassthroughalias_6 AS TableX,
+     new_col AS new_col;
+==
+
+# PassthroughDrop TVF with selecting dropped column through range variable.
+FROM (SELECT 1 AS a, 2 AS b) AS PassthroughTable
+|> CALL PassthroughDropTVF('A')
+|> SELECT PassthroughTable.a, b;
+--
+[SQLBUILDER_OUTPUT]
+SELECT
+  1 AS a_1,
+  2 AS a_2
+|> AS projectscan_3
+|> SELECT
+     a_1 AS a,
+     a_2 AS b
+|> AS tvfpassthroughalias_4
+|> CALL PASSTHROUGHDROPTVF("A")
+|> SELECT
+     tvfpassthroughalias_4.a AS a,
+     tvfpassthroughalias_4.b AS b;
+==
+
+# Passthrough TVF with DROP and Extend (same name). Passthrough alias should be
+# used to reference the column that is dropped by the TVF. The extended column
+# should be directly referenced by name.
+[no_enable_literal_replacement]
+[sql_builder_target_syntax_mode=pipe]
+FROM (SELECT 1 AS a, 2 AS b) AS PassthroughTable
+|> CALL PassthroughDropExtendTVF('a', 'a')
+|> SELECT PassthroughTable.a, a;
+--
+[SQLBUILDER_OUTPUT]
+SELECT
+  1 AS a_1,
+  2 AS a_2
+|> AS projectscan_3
+|> SELECT
+     a_1 AS a,
+     a_2 AS b
+|> AS tvfpassthroughalias_4
+|> CALL PASSTHROUGHDROPEXTENDTVF("a", "a")
+|> SELECT
+     tvfpassthroughalias_4.a AS a,
+     a AS a;
+==
+
+# Passthrough TVF with DROP and Extend under standard target syntax mode.
+[no_enable_literal_replacement]
+[sql_builder_target_syntax_mode=standard]
+FROM (SELECT 1 AS a, 2 AS b) AS PassthroughTable
+|> CALL PassthroughDropExtendTVF('a', 'a')
+|> SELECT PassthroughTable.a, a;
+--
+[SQLBUILDER_OUTPUT]
+SELECT
+  tvfpassthroughalias_4.a AS a,
+  a AS a
+FROM
+  (
+    SELECT
+      a_1 AS a,
+      a_2 AS b
+    FROM
+      (
+        SELECT
+          1 AS a_1,
+          2 AS a_2
+      ) AS projectscan_3
+    |> AS tvfpassthroughalias_4
+    |> CALL PASSTHROUGHDROPEXTENDTVF("a", "a")
+  );
+
+==
+
+[no_enable_literal_replacement]
+[sql_builder_target_syntax_mode=standard]
+SELECT *
+FROM PassthroughDropExtendTVF(TABLE TableWithTimestampColumn, 'a', 'a')
+CROSS JOIN
+(SELECT * FROM PassthroughTVF(TABLE TableWithTimestampColumn))
+--
+
+[SQLBUILDER_OUTPUT]
+SELECT
+  tvfscan_4.a_5 AS ts_col,
+  tvfscan_4.a_6 AS a,
+  projectscan_12.a_11 AS ts_col
+FROM
+  (
+    SELECT
+      tvfpassthroughalias_3.ts_col AS a_5,
+      a AS a_6
+    FROM
+      (
+        SELECT
+          a_1 AS ts_col
+        FROM
+          (
+            SELECT
+              TableWithTimestampColumn.ts_col AS a_1
+            FROM
+              TableWithTimestampColumn
+          ) AS tablewithtimestampcolumn_2
+        |> AS tvfpassthroughalias_3
+        |> CALL PASSTHROUGHDROPEXTENDTVF("a", "a")
+      )
+  ) AS tvfscan_4
+  CROSS JOIN
+  (
+    SELECT
+      tvfpassthroughalias_9.ts_col AS a_11
+    FROM
+      (
+        SELECT
+          a_7 AS ts_col
+        FROM
+          (
+            SELECT
+              TableWithTimestampColumn.ts_col AS a_7
+            FROM
+              TableWithTimestampColumn
+          ) AS tablewithtimestampcolumn_8
+        |> AS tvfpassthroughalias_9
+        |> CALL PASSTHROUGHTVF()
+      )
+  ) AS projectscan_12;

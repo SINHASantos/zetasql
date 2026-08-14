@@ -36,6 +36,7 @@
 #include "googlesql/public/types/value_representations.h"
 #include "googlesql/public/value.pb.h"
 #include "googlesql/public/value_content.h"
+#include "absl/container/inlined_vector.h"
 #include "absl/hash/hash.h"
 #include "googlesql/base/check.h"
 #include "absl/status/status.h"
@@ -225,39 +226,36 @@ absl::HashState MapType::HashTypeParameter(absl::HashState state) const {
   return value_type()->Hash(key_type()->Hash(std::move(state)));
 }
 
-struct MapType::ValueContentMapElementHasher {
-  explicit ValueContentMapElementHasher(const Type* key_type,
-                                        const Type* value_type)
-      : key_type(key_type), value_type(value_type) {}
-
-  size_t operator()(const internal::NullableValueContent& key,
-                    const internal::NullableValueContent& value) const {
-    // Since mapping a->b is not the same as mapping b->a, this hash must be
-    // ordered.
-    return absl::HashOf(absl::Hash<HashableNullableValueContent>()(
-                            HashableNullableValueContent{key, key_type}),
-                        absl::Hash<HashableNullableValueContent>()(
-                            HashableNullableValueContent{value, value_type}));
-  }
-
- private:
-  const Type* key_type;
-  const Type* value_type;
-};
-
-absl::HashState MapType::HashValueContent(const ValueContent& value,
-                                          absl::HashState state) const {
+template <typename H>
+static absl::HashState HashValueContentForMap(const ValueContent& value,
+                                              absl::HashState state,
+                                              const Type* key_type,
+                                              const Type* value_type) {
   const internal::ValueContentMap* value_content_map =
       value.GetAs<internal::ValueContentMapRef*>()->value();
-  std::vector<size_t> hashes;
+  absl::InlinedVector<size_t, 16> hashes;
   hashes.reserve(value_content_map->num_elements());
-  ValueContentMapElementHasher hasher(key_type_, value_type_);
-  for (const auto& [key, value] : *value_content_map) {
-    hashes.push_back(hasher(key, value));
+  for (const auto& [key, val] : *value_content_map) {
+    // Since mapping a->b is not the same as mapping b->a, this hash must be
+    // ordered.
+    hashes.push_back(absl::HashOf(H{key, key_type}, H{val, value_type}));
   }
 
   return absl::HashState::combine_unordered(absl::HashState::Create(&state),
                                             hashes.begin(), hashes.end());
+}
+
+absl::HashState MapType::HashValueContent(const ValueContent& value,
+                                          absl::HashState state) const {
+  return HashValueContentForMap<HashableNullableValueContent<
+      /*ignore_floats=*/false>>(value, std::move(state), key_type_,
+                                value_type_);
+}
+
+absl::HashState MapType::HashValueContentIgnoringFloat(
+    const ValueContent& value, absl::HashState state) const {
+  return HashValueContentForMap<HashableNullableValueContent<
+      /*ignore_floats=*/true>>(value, std::move(state), key_type_, value_type_);
 }
 
 bool MapType::LookupMapEntryEqualsExpected(

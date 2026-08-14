@@ -297,6 +297,22 @@ TestDatabase GetMeasureTablesTestDatabase(bool add_measures_with_udas) {
   };
   test_db.tables.insert({"MeasureTable_NoTableRowIdentityColumns",
                          measure_table_no_table_row_identity_columns});
+
+  Value measure_table_two_keys_as_value =
+      test_values::StructArray({"KEY1", "key2", "Country", "Quantity", "Price"},
+                               {{1ll, 10ll, "USA", 5ll, 15ll},
+                                {2ll, 10ll, "USA", 2ll, 10ll},
+                                {3ll, 11ll, "USA", 1ll, 20ll}},
+                               InternalValue::kIgnoresOrder);
+  std::vector<MeasureColumnDef> two_keys_measure_column_defs = {
+      {"measure_sum_price", "SUM(price)"},
+  };
+  TestTable measure_table_two_keys = {
+      .table_as_value = std::move(measure_table_two_keys_as_value),
+      .measure_column_defs = std::move(two_keys_measure_column_defs),
+      .row_identity_columns = std::vector<int>{0, 1}};
+  test_db.tables.insert({"MeasureTable_TwoKeys", measure_table_two_keys});
+
   return test_db;
 }
 }  // namespace googlesql

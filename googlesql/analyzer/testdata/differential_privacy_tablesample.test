@@ -29,6 +29,7 @@ QueryStmt
             +-AggregateFunctionCall(GoogleSQL:$differential_privacy_count_star(optional(1) STRUCT<INT64, INT64> contribution_bounds_per_group) -> INT64)
               +-parse_location=33-38
               +-Literal(parse_location=75-82, type=STRUCT<INT64, INT64>, value={0, 100})
+
 [REPLACED_LITERALS]
 select with differential_privacy count(*, contribution_bounds_per_group => @_p0_STRUCT)
 from SimpleTypesWithAnonymizationUid
@@ -107,6 +108,7 @@ QueryStmt
             +-AggregateFunctionCall(GoogleSQL:$differential_privacy_count_star(optional(1) STRUCT<INT64, INT64> contribution_bounds_per_group) -> INT64)
               +-parse_location=33-38
               +-Literal(parse_location=75-82, type=STRUCT<INT64, INT64>, value={0, 100})
+
 [REPLACED_LITERALS]
 select with differential_privacy count(*, contribution_bounds_per_group => @_p0_STRUCT)
 from SimpleTypesWithAnonymizationUid
@@ -188,6 +190,7 @@ QueryStmt
             +-AggregateFunctionCall(GoogleSQL:$differential_privacy_count_star(optional(1) STRUCT<INT64, INT64> contribution_bounds_per_group) -> INT64)
               +-parse_location=33-38
               +-Literal(parse_location=75-82, type=STRUCT<INT64, INT64>, value={0, 100})
+
 [REPLACED_LITERALS]
 select with differential_privacy count(*, contribution_bounds_per_group => @_p0_STRUCT)
 from SimpleTypesWithAnonymizationUid
@@ -280,6 +283,7 @@ QueryStmt
             +-AggregateFunctionCall(GoogleSQL:$differential_privacy_count_star(optional(1) STRUCT<INT64, INT64> contribution_bounds_per_group) -> INT64)
               +-parse_location=33-38
               +-Literal(parse_location=75-82, type=STRUCT<INT64, INT64>, value={0, 100})
+
 [REPLACED_LITERALS]
 select with differential_privacy count(*, contribution_bounds_per_group => @_p0_STRUCT)
 from (select * from SimpleTypesWithAnonymizationUid
@@ -374,6 +378,7 @@ QueryStmt
             +-AggregateFunctionCall(GoogleSQL:$differential_privacy_count_star(optional(1) STRUCT<INT64, INT64> contribution_bounds_per_group) -> INT64)
               +-parse_location=33-38
               +-Literal(parse_location=75-82, type=STRUCT<INT64, INT64>, value={0, 100})
+
 [REPLACED_LITERALS]
 select with differential_privacy count(*, contribution_bounds_per_group => @_p0_STRUCT), weight
 from SimpleTypesWithAnonymizationUid

@@ -110,6 +110,27 @@ Pipe operators have the following semantic behavior:
     Columns from earlier in the same query aren't visible. Inside subqueries,
     correlated references to outer columns are still allowed.
 
+### Order preservation 
+<a id="order_preservation"></a>
+
+The following operators preserve row order if the input table is ordered:
+
++   [`SELECT`][select-pipe-operator] (except when using `SELECT DISTINCT` or
+    window functions)
++   [`EXTEND`][extend-pipe-operator] (except when using window functions)
++   [`SET`][set-pipe-operator] (except when using window functions)
++   [`DROP`][drop-pipe-operator]
++   [`RENAME`][rename-pipe-operator]
++   [`AS`][as-pipe-operator]
++   [`LIMIT`][limit-pipe-operator]
++   [`WITH`][with-pipe-operator]
+
+When you use these operators after an
+[`ORDER BY` operator][order-by-pipe-operator], the result remains ordered.
+Additionally, if a
+[`LIMIT` operator][limit-pipe-operator] follows an order-preserving operator, the
+query computes the top rows based on that order.
+
 ### Terminal operators {: #terminal_operators}
 
 Certain pipe operators are *terminal operators*. These operators appear at the
@@ -947,8 +968,9 @@ be used before the `AGGREGATE` operator to compute window functions.
 
 The `GROUP BY` clause in the `AGGREGATE` operator corresponds to the `GROUP BY`
 clause in standard syntax. Unlike in standard syntax, aliases can be assigned to
-`GROUP BY` items. Standard grouping operators like
-`GROUPING SETS`, `ROLLUP`, and `CUBE` are supported.
+`GROUP BY` items. Standard
+grouping operators like `GROUPING SETS`, `ROLLUP`, and `CUBE` are
+supported.
 
 The output columns from the `AGGREGATE` operator include all grouping columns
 first, followed by all aggregate columns, using their assigned aliases as the
@@ -3296,6 +3318,24 @@ FROM Produce
 [query-comparison]: #query_comparison
 
 [pipe-operators]: #pipe_operators
+
+[select-pipe-operator]: #select_pipe_operator
+
+[extend-pipe-operator]: #extend_pipe_operator
+
+[set-pipe-operator]: #set_pipe_operator
+
+[drop-pipe-operator]: #drop_pipe_operator
+
+[rename-pipe-operator]: #rename_pipe_operator
+
+[as-pipe-operator]: #as_pipe_operator
+
+[limit-pipe-operator]: #limit_pipe_operator
+
+[with-pipe-operator]: #with_pipe_operator
+
+[order-by-pipe-operator]: #order_by_pipe_operator
 
 [value-tables]: https://github.com/google/googlesql/blob/master/docs/data-model.md#value_tables
 

@@ -5806,3 +5806,141 @@ GROUP BY CAST(x AS NUMERIC)
 ERROR: SELECT list expression references table alias x which is neither grouped nor aggregated [at 1:13]
 SELECT CAST(x AS NUMERIC(5,2))
             ^
+==
+
+select
+  -cast(2147483648 as int32),
+  -cast(9223372036854775808 as int64),
+  -safe_cast(2147483648 as int32),
+  -cast(1.23 as double);
+--
+QueryStmt
++-output_column_list=
+| +-$query.$col1#1 AS `$col1` [INT32]
+| +-$query.$col2#2 AS `$col2` [INT64]
+| +-$query.$col3#3 AS `$col3` [INT32]
+| +-$query.$col4#4 AS `$col4` [DOUBLE]
++-query=
+  +-ProjectScan
+    +-column_list=$query.[$col1#1, $col2#2, $col3#3, $col4#4]
+    +-expr_list=
+    | +-$col1#1 :=
+    | | +-FunctionCall(GoogleSQL:$unary_minus(INT32) -> INT32)
+    | |   +-Cast(INT64 -> INT32)
+    | |     +-Literal(type=INT64, value=2147483648)
+    | +-$col2#2 :=
+    | | +-FunctionCall(GoogleSQL:$unary_minus(INT64) -> INT64)
+    | |   +-Cast(UINT64 -> INT64)
+    | |     +-Literal(type=UINT64, value=9223372036854775808)
+    | +-$col3#3 :=
+    | | +-FunctionCall(GoogleSQL:$unary_minus(INT32) -> INT32)
+    | |   +-Literal(type=INT32, value=NULL, has_explicit_type=TRUE)
+    | +-$col4#4 :=
+    |   +-FunctionCall(GoogleSQL:$unary_minus(DOUBLE) -> DOUBLE)
+    |     +-Literal(type=DOUBLE, value=1.23, has_explicit_type=TRUE)
+    +-input_scan=
+      +-SingleRowScan
+==
+
+select {{1::int32|-2::int32|-2?::int32|"Hello World"::STRING}}
+--
+ALTERNATION GROUP: 1::int32
+--
+ERROR: CAST operators are not supported [at 1:8]
+select 1::int32
+       ^
+--
+ALTERNATION GROUP: -2::int32
+--
+ERROR: CAST operators are not supported [at 1:8]
+select -2::int32
+       ^
+--
+ALTERNATION GROUP: -2?::int32
+--
+ERROR: CAST operators are not supported [at 1:8]
+select -2?::int32
+       ^
+--
+ALTERNATION GROUP: "Hello World"::STRING
+--
+ERROR: CAST operators are not supported [at 1:8]
+select "Hello World"::STRING
+       ^
+==
+
+[language_features=NONE,+CAST_OPERATORS]
+select
+  -2147483648::int32,
+  -9223372036854775808 :: int64,
+  -9223372036854775808 ?:: int64,
+  -214.7483648::double,
+  -"2147483648"::int32,
+  -"2147483648"?::int32,
+  -(2147483648)::int32,
+  -(9223372036854775808) :: int64,
+  -(9223372036854775808) ?:: int64,
+  -(214.7483648)::double,
+  -("2147483648")::int32,
+  -("2147483648")?::int32;
+--
+QueryStmt
++-output_column_list=
+| +-$query.$col1#1 AS `$col1` [INT32]
+| +-$query.$col2#2 AS `$col2` [INT64]
+| +-$query.$col3#3 AS `$col3` [INT64]
+| +-$query.$col4#4 AS `$col4` [DOUBLE]
+| +-$query.$col5#5 AS `$col5` [INT32]
+| +-$query.$col6#6 AS `$col6` [INT32]
+| +-$query.$col7#7 AS `$col7` [INT32]
+| +-$query.$col8#8 AS `$col8` [INT64]
+| +-$query.$col9#9 AS `$col9` [INT64]
+| +-$query.$col10#10 AS `$col10` [DOUBLE]
+| +-$query.$col11#11 AS `$col11` [INT32]
+| +-$query.$col12#12 AS `$col12` [INT32]
++-query=
+  +-ProjectScan
+    +-column_list=$query.[$col1#1, $col2#2, $col3#3, $col4#4, $col5#5, $col6#6, $col7#7, $col8#8, $col9#9, $col10#10, $col11#11, $col12#12]
+    +-expr_list=
+    | +-$col1#1 := Literal(type=INT32, value=-2147483648, has_explicit_type=TRUE)
+    | +-$col2#2 := Literal(type=INT64, value=-9223372036854775808, has_explicit_type=TRUE)
+    | +-$col3#3 := Literal(type=INT64, value=-9223372036854775808, has_explicit_type=TRUE)
+    | +-$col4#4 := Literal(type=DOUBLE, value=-214.7483648, has_explicit_type=TRUE)
+    | +-$col5#5 :=
+    | | +-FunctionCall(GoogleSQL:$unary_minus(INT32) -> INT32)
+    | |   +-Cast(STRING -> INT32)
+    | |     +-Literal(type=STRING, value="2147483648")
+    | +-$col6#6 :=
+    | | +-FunctionCall(GoogleSQL:$unary_minus(INT32) -> INT32)
+    | |   +-Literal(type=INT32, value=NULL, has_explicit_type=TRUE)
+    | +-$col7#7 :=
+    | | +-FunctionCall(GoogleSQL:$unary_minus(INT32) -> INT32)
+    | |   +-Cast(INT64 -> INT32)
+    | |     +-Literal(type=INT64, value=2147483648)
+    | +-$col8#8 :=
+    | | +-FunctionCall(GoogleSQL:$unary_minus(INT64) -> INT64)
+    | |   +-Cast(UINT64 -> INT64)
+    | |     +-Literal(type=UINT64, value=9223372036854775808)
+    | +-$col9#9 :=
+    | | +-FunctionCall(GoogleSQL:$unary_minus(INT64) -> INT64)
+    | |   +-Literal(type=INT64, value=NULL, has_explicit_type=TRUE)
+    | +-$col10#10 :=
+    | | +-FunctionCall(GoogleSQL:$unary_minus(DOUBLE) -> DOUBLE)
+    | |   +-Literal(type=DOUBLE, value=214.7483648, has_explicit_type=TRUE)
+    | +-$col11#11 :=
+    | | +-FunctionCall(GoogleSQL:$unary_minus(INT32) -> INT32)
+    | |   +-Cast(STRING -> INT32)
+    | |     +-Literal(type=STRING, value="2147483648")
+    | +-$col12#12 :=
+    |   +-FunctionCall(GoogleSQL:$unary_minus(INT32) -> INT32)
+    |     +-Literal(type=INT32, value=NULL, has_explicit_type=TRUE)
+    +-input_scan=
+      +-SingleRowScan
+==
+
+[language_features=NONE,+CAST_OPERATORS]
+select -9223372036854775809::int64;
+--
+ERROR: Invalid integer literal: -9223372036854775809 [at 1:8]
+select -9223372036854775809::int64;
+       ^

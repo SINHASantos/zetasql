@@ -359,10 +359,10 @@ public abstract class TypeFactory implements Serializable {
         if (existing != null) {
           Preconditions.checkState(
               existing.isIdenticalTo(declarativeType),
-              "Conflicting declarative types found for NameSpace: %s ID: %s Counter: %s",
+              "Conflicting declarative types found for NameSpace: %s ID: %s VersionId: %s",
               typeId.getNameSpace(),
               typeId.getLocalId(),
-              typeId.getCounter());
+              typeId.getVersionId());
           return existing;
         }
         return declarativeType;
@@ -376,10 +376,10 @@ public abstract class TypeFactory implements Serializable {
       if (existing != null) {
         Preconditions.checkState(
             existing.isIdenticalTo(declarativeType),
-            "Conflicting declarative types found for NameSpace: %s ID: %s Counter: %s",
+            "Conflicting declarative types found for NameSpace: %s ID: %s VersionId: %s",
             typeId.getNameSpace(),
             typeId.getLocalId(),
-            typeId.getCounter());
+            typeId.getVersionId());
         return existing;
       }
       return declarativeType;
@@ -621,7 +621,7 @@ public abstract class TypeFactory implements Serializable {
       DeclarativeTypeProto.TypeIdProto typeIdProto = declarativeType.getTypeId();
       DeclarativeTypeDescriptor.TypeId typeId =
           new DeclarativeTypeDescriptor.TypeId(
-              typeIdProto.getNameSpace(), typeIdProto.getLocalId(), typeIdProto.getCounter());
+              typeIdProto.getNameSpace(), typeIdProto.getLocalId(), typeIdProto.getVersionId());
 
       DeclarativeTypeDescriptor descriptor =
           DeclarativeTypeDescriptor.builder()

@@ -520,7 +520,7 @@ QueryStmt
     |           |       | +-$col1#6 := Literal(type=INT64, value=1)
     |           |       +-input_scan=
     |           |         +-TVFScan
-    |           |           +-tvf=tvf_one_relation_arg_with_fixed_output((ANY TABLE) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+    |           |           +-tvf=tvf_one_relation_arg_with_fixed_output
     |           |           +-signature=(TABLE<n DOUBLE>) -> TABLE<column_bool BOOL, column_bytes BYTES>
     |           |           +-argument_list=
     |           |           | +-FunctionArgument

@@ -37,7 +37,6 @@
 #include "googlesql/public/types/type_factory.h"
 #include "googlesql/resolved_ast/column_factory.h"
 #include "googlesql/resolved_ast/resolved_ast.h"
-#include "googlesql/resolved_ast/resolved_ast_rewrite_visitor.h"
 #include "googlesql/resolved_ast/resolved_ast_visitor.h"
 #include "googlesql/resolved_ast/resolved_column.h"
 #include "googlesql/resolved_ast/resolved_node.h"
@@ -169,7 +168,8 @@ absl::StatusOr<std::unique_ptr<const T>> RemapSpecifiedColumns(
 // Implementation of in-place column remapping.
 absl::StatusOr<std::unique_ptr<const ResolvedNode>> RemapColumnsImpl(
     std::unique_ptr<const ResolvedNode> input_tree,
-    ColumnFactory* column_factory, ColumnReplacementMap& column_map);
+    ColumnFactory* /*absl_nullable*/ column_factory,
+    ColumnReplacementMap& column_map);
 
 // Returns a new column list based on `column_list` replaced with new column ids
 // if specified by the column replacement map.
@@ -193,6 +193,12 @@ ResolvedColumnList RemapColumnList(const ResolvedColumnList& column_list,
 // Ultimately, the copied/returned plan will have all column references
 // allocated by 'column_factory', either through the explicit remapping or via
 // new allocations.
+//
+// Additionally, if the ResolvedScan contains duplicate columns in its
+// column_list() (e.g. SELECT x as a, x as b), a new ResolvedProjectScan is
+// created where the expr_list() contains the duplicate columns replaced with
+// ResolvedComputedColumns that map from the 'replacement_columns_to_use' to the
+// original column.
 absl::StatusOr<std::unique_ptr<ResolvedScan>> ReplaceScanColumns(
     ColumnFactory& column_factory, const ResolvedScan& scan,
     absl::Span<const int> target_column_indices,
@@ -223,6 +229,9 @@ absl::Status CheckCatalogSupportsSafeMode(
 
 // Checks whether the ResolvedAST has ResolvedGroupingCall nodes.
 absl::StatusOr<bool> HasGroupingCallNode(const ResolvedNode* node);
+
+// Checks whether the node has any ResolvedWithScan nodes.
+absl::StatusOr<bool> ContainsWithScan(const googlesql::ResolvedNode& node);
 
 // Contains helper functions that reduce boilerplate in rewriting rules logic
 // related to constructing new ResolvedFunctionCall instances.
@@ -267,6 +276,11 @@ class FunctionCallBuilder {
       std::unique_ptr<const ResolvedExpr> condition,
       std::unique_ptr<const ResolvedExpr> then_case,
       std::unique_ptr<const ResolvedExpr> else_case);
+
+  // Construct ResolvedFunctionCall for FROM_PROTO(<arg>) -> <target_type>
+  absl::StatusOr<std::unique_ptr<ResolvedFunctionCall>> FromProto(
+      std::unique_ptr<const ResolvedExpr> arg, FunctionSignatureId signature_id,
+      const Type* target_type);
 
   // Construct ResolvedFunctionCall for <arg> IS NULL
   //
@@ -1121,7 +1135,8 @@ absl::StatusOr<const ResolvedColumn*> FindAndValidateTimestampColumnInScan(
 // validated).
 absl::StatusOr<std::unique_ptr<const ResolvedExpr>>
 BuildTimestampColumnExpression(const ResolvedTimestampColumnPath& path,
-                               const ResolvedColumn& root_column);
+                               const ResolvedColumn& root_column,
+                               FunctionCallBuilder& fn_builder);
 
 // Dynamically constructs the AST for a scalar subquery that
 // selects a single column from a CTE. This is useful for run-once semantics.
@@ -1244,26 +1259,32 @@ class CastAnnotationPropagator {
   AnnotationPropagator annotation_propagator_;
 };
 
-}  // namespace googlesql
-
-// Visitor to detect if a node contains WithScan.
-class WithScanVisitor : public googlesql::ResolvedASTVisitor {
+// Visitor that scans a Resolved AST for existing CTE names and generates
+// globally unique, non-colliding CTE query names using an monotonically
+// increasing index.
+// Example usage:
+//   CteQueryNameGenerator generator;
+//   GOOGLESQL_RETURN_IF_ERROR(node->Accept(&generator));
+//   std::string unique_cte_name = generator.MakeUniqueCteName("base_name");
+class CteQueryNameGenerator : public ResolvedASTVisitor {
  public:
-  static absl::StatusOr<bool> ContainsWithScan(
-      const googlesql::ResolvedNode& node) {
-    WithScanVisitor visitor;
-    GOOGLESQL_RETURN_IF_ERROR(node.Accept(&visitor));
-    return visitor.contains_with_scan_;
-  }
+  CteQueryNameGenerator() = default;
+
+  // Generates a unique CTE query name using `base_name` as prefix (e.g.
+  // "$hop_params"). Appends an ever-increasing integer suffix (e.g.
+  // "$hop_params_1", "$hop_params_2").
+  std::string MakeUniqueCteName(absl::string_view base_name);
+
+  // Returns the current maximum seen index.
+  int max_seen_index() const { return max_seen_index_; }
 
  private:
-  absl::Status VisitResolvedWithScan(
-      const googlesql::ResolvedWithScan* node) override {
-    contains_with_scan_ = true;
-    return absl::OkStatus();
-  }
+  absl::Status VisitResolvedWithEntry(const ResolvedWithEntry* node) override;
 
-  bool contains_with_scan_ = false;
+  absl::flat_hash_set<std::string> used_names_;
+  int max_seen_index_ = 0;
 };
+
+}  // namespace googlesql
 
 #endif  // GOOGLESQL_RESOLVED_AST_REWRITE_UTILS_H_

@@ -81,7 +81,8 @@ class MeasureCollector {
 
   // Adds the given measure `info` keyed by `key`.
   //
-  // Returns an error if `key` already exists.
+  // Returns an error if `key` already exists and `info` has `closure_column`
+  // populated.
   absl::Status AddMeasureInfo(Key key, MeasureInfo info);
 
   // Returns the measure info keyed by `key`.

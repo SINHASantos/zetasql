@@ -290,6 +290,12 @@ SCALAR_SUBQUERY_TYPE = EnumScalarType('SubqueryType', 'ResolvedSubqueryExpr')
 SCALAR_UPDATE_ITEM_MODE = EnumScalarType(
     'UpdateItemMode', 'ResolvedUpdateItemElement'
 )
+SCALAR_UPDATE_SCAN_OUTPUT_MODE = EnumScalarType(
+    'UpdateScanOutputMode', 'ResolvedUpdateScan'
+)
+SCALAR_UPDATE_COLLISION_ACTION_TYPE = EnumScalarType(
+    'UpdateCollisionActionType', 'ResolvedUpdateScan'
+)
 SCALAR_JOIN_TYPE = EnumScalarType('JoinType', 'ResolvedJoinScan')
 SCALAR_SET_OPERATION_TYPE = EnumScalarType(
     'SetOperationType', 'ResolvedSetOperationScan'
@@ -443,6 +449,7 @@ def Field(
     comment = None,
     propagate_order = False,
     override_virtual_getter = False,
+    is_pipe_input_scan = False,
 ):
   """Make a field to put in a node class.
 
@@ -475,6 +482,11 @@ def Field(
     override_virtual_getter: If true, the getter is marked with `override`. Used
       for cases where the parent class declares a virtual method interface for
       this getter, so this getter needs an 'override'.
+    is_pipe_input_scan: If true, this field (which must be a single
+      ResolvedScan-typed node pointer on a ResolvedScan subclass) is the scan
+      that acts as the pipe input for linear-mode DebugString rendering. Only
+      needed when the field has an unusual name; fields named `input_scan` or
+      `scan` are detected automatically. See ResolvedScan::GetPipeInputScan.
 
   Returns:
     The newly created field.
@@ -700,12 +712,13 @@ def Field(
       'java_to_string_method': java_to_string_method,
       'propagate_order': propagate_order,
       'not_serialize_if_default': not_serialize_if_default,
+      'is_pipe_input_scan': is_pipe_input_scan,
   }
 
 
 # You can use `tag_id=GetTempTagId()` until doing the final submit.
 # That will avoid merge conflicts when syncing in other changes.
-NEXT_NODE_TAG_ID = 325
+NEXT_NODE_TAG_ID = 333
 
 
 def GetTempTagId():
@@ -847,6 +860,55 @@ class TreeGenerator():
         for field in fields
     )
 
+    def IsScanSubclass(parent_name):
+      ancestor = parent_name
+      while ancestor != ROOT_NODE_NAME:
+        if ancestor == 'ResolvedScan':
+          return True
+        ancestor = self.node_map[ancestor]['parent']
+      return False
+
+    # Determine the pipe input scan field for linear-mode DebugString. Only
+    # meaningful on ResolvedScan subclasses, and computed from this node's own
+    # fields so an inherited pipe input field (e.g.
+    # ResolvedAggregateScanBase.input_scan) emits the GetPipeInputScan override
+    # exactly once. Nodes whose pipe input is nested inside a vector/argument
+    # (ResolvedSetOperationScan, ResolvedRecursiveScan) match nothing here and
+    # provide a hand-written override via extra_defs_node_only.
+    pipe_input_scan_getter = ''
+    if IsScanSubclass(parent):
+      # First, see if we have a field marked with `is_pipe_input_scan=True`.
+      marked_fields = [f for f in fields if f['is_pipe_input_scan']]
+      assert len(marked_fields) <= 1, (
+          'At most one field may be marked is_pipe_input_scan: %s' % name
+      )
+      if marked_fields:
+        pipe_input_field = marked_fields[0]
+      else:
+        # Second, look for a field called `scan` or `input_scan` with
+        # `ResolvedScan` type.
+        default_fields = [
+            f
+            for f in fields
+            if f['is_node_ptr']
+            and f['ctype'] == 'ResolvedScan'
+            and f['name'] in ('input_scan', 'scan')
+        ]
+        assert len(default_fields) <= 1, (
+            'Multiple default pipe-input scan fields on %s' % name
+        )
+        pipe_input_field = default_fields[0] if default_fields else None
+
+      if pipe_input_field is not None:
+        assert (
+            pipe_input_field['is_node_ptr']
+            and pipe_input_field['ctype'] == 'ResolvedScan'
+        ), (
+            'pipe-input scan field must be a single ResolvedScan pointer: %s.%s'
+            % (name, pipe_input_field['name'])
+        )
+        pipe_input_scan_getter = pipe_input_field['name']
+
     def JoinSections(a, b):
       separator = ''
       if a and b:
@@ -891,6 +953,7 @@ class TreeGenerator():
         'use_custom_debug_string': use_custom_debug_string,
         'use_custom_columns_created': use_custom_columns_created,
         'column_list_is_created_columns': column_list_is_created_columns,
+        'pipe_input_scan_getter': pipe_input_scan_getter,
         'subclasses': [],
         'superclasses': [],
     }
@@ -1112,8 +1175,17 @@ class TreeGenerator():
     def IsNodeVector(field_list):
       return [field for field in field_list if field['is_node_vector']]
 
+    def IsSubclassOf(node, parent_name):
+      if node['name'] == parent_name:
+        return True
+      for superclass in node['superclasses']:
+        if superclass['name'] == parent_name:
+          return True
+      return False
+
     jinja_env.filters['is_node_ptr'] = IsNodePtr
     jinja_env.filters['is_node_vector'] = IsNodeVector
+    jinja_env.filters['is_subclass_of'] = IsSubclassOf
 
     # This can be used to find node names in a string (e.g. a c++ return type)
     # and turn them into relative links inside the doc.
@@ -2066,6 +2138,20 @@ def main(unused_argv):
   )
 
   gen.AddNode(
+      name='ResolvedEstimatorFunctionCall',
+      tag_id=331,
+      parent='ResolvedNonScalarFunctionCallBase',
+      emit_default_constructor=False,
+      comment="""
+      An estimator function call. It computes a value by applying an aggregate
+      function to input rows falling within the range specified by the
+      <within_bounds>. This node only ever shows up as a function call in a
+      ResolvedAlignScan::estimator_function_list.
+      """,
+      fields=[Field('within_bounds', 'ResolvedWithinBounds', tag_id=2)],
+  )
+
+  gen.AddNode(
       name='ResolvedExtendedCastElement',
       tag_id=151,
       parent='ResolvedArgument',
@@ -2904,6 +2990,12 @@ value.
         // If false, columns in `column_list` were created previously (or by
         // this node, as specified by other fields) and are being referenced.
         virtual bool ColumnListIsCreatedColumns() const { return false; }
+
+        // Returns the input scan that acts as this scan's pipe input for
+        // linear-mode DebugString rendering (ResolvedNode::DebugStringConfig::
+        // linear_mode), or nullptr if there is none (leaf scans like
+        // ResolvedTableScan). For most scans this is `input_scan`.
+        virtual const ResolvedScan* GetPipeInputScan() const { return nullptr; }
       """,
   )
 
@@ -3175,7 +3267,7 @@ value.
               tag_id=2,
               ignorable=IGNORABLE_DEFAULT,
           ),
-          Field('left_scan', 'ResolvedScan', tag_id=3),
+          Field('left_scan', 'ResolvedScan', tag_id=3, is_pipe_input_scan=True),
           Field('right_scan', 'ResolvedScan', tag_id=4),
           Field(
               'join_expr', 'ResolvedExpr', tag_id=5, ignorable=IGNORABLE_DEFAULT
@@ -3637,8 +3729,13 @@ value.
       See (broken link).
 
       Compute all aggregations in <aggregate_list>.  All expressions in
-      <aggregate_list> have a ResolvedAggregateFunctionCall with mode
-      Function::AGGREGATE as their outermost node.
+      <aggregate_list> are either:
+      - a ResolvedAggregateFunctionCall with mode Function::AGGREGATE as their
+        outermost node
+      - a ResolvedSubqueryExpr evaluated once per aggregation group (enabled by
+        FEATURE_WITH_GROUP_ROWS). It may contain a ResolvedGroupRowsScan to read
+        the input rows for the current group, though a ResolvedGroupRowsScan is
+        not strictly required.
 
       The output <column_list> contains only columns produced from
       <group_by_list> and <aggregate_list>.  No other columns are visible after
@@ -3907,6 +4004,13 @@ value.
               ignorable=IGNORABLE,
           ),
       ],
+      extra_defs_node_only="""
+        // The pipe input is the first input item's scan.
+        const ResolvedScan* GetPipeInputScan() const override {
+          return input_item_list_.empty() ? nullptr
+                                          : input_item_list_[0]->scan();
+        }
+      """,
   )
 
   gen.AddNode(
@@ -4734,129 +4838,6 @@ value.
   )
 
   gen.AddNode(
-      name='ResolvedTVFScan',
-      tag_id=81,
-      parent='ResolvedScan',
-      emit_default_constructor=False,
-      column_list_is_created_columns=True,
-      comment="""
-      This scan represents a call to a table-valued function (TVF). Each TVF
-      returns an entire output relation instead of a single scalar value. The
-      enclosing query may refer to the TVF as if it were a table subquery. The
-      TVF may accept scalar arguments and/or other input relations.
-
-      Scalar arguments work the same way as arguments for non-table-valued
-      functions: in the resolved AST, their types are equal to the required
-      argument types specified in the function signature.
-
-      The function signature may also include relation arguments, and any such
-      relation argument may specify a required schema. If such a required schema
-      is present, then in the resolved AST, the ResolvedScan for each relational
-      ResolvedFunctionArgument is guaranteed to have the same number of columns
-      as the required schema, and the provided columns match position-wise with
-      the required columns. Each provided column has the same name and type as
-      the corresponding required column.
-
-      If AnalyzerOptions::prune_unused_columns is true, the <column_list> and
-      <column_index_list> will include only columns that were referenced
-      in the user query. (SELECT * counts as referencing all columns.)
-      Pruning has no effect on value tables (the value is never pruned).
-
-      <column_list> is a set of new ResolvedColumns created by this scan.
-      The <column_list>[i] should be matched to the related TVFScan's output
-      relation column by
-      <signature>.result_schema().column(<column_index_list>[i]).
-
-      <tvf> The TableValuedFunction entry that the catalog returned for this TVF
-            scan. Contains non-concrete function signatures which may include
-            arguments with templated types.
-      <signature> The concrete table function signature for this TVF call,
-                  including the types of all scalar arguments and the
-                  number and types of columns of all table-valued
-                  arguments. An engine may also subclass this object to
-                  provide extra custom information and return an instance
-                  of the subclass from the TableValuedFunction::Resolve
-                  method.
-      <argument_list> The vector of resolved concrete arguments for this TVF
-                      call, including the default values or NULLs injected for
-                      the omitted arguments (Note the NULL injection is a
-                      temporary solution to handle omitted named arguments. This
-                      is subject to change by upcoming CLs).
-
-      <column_index_list> This list matches 1:1 with the <column_list>, and
-      identifies the index of the corresponding column in the <signature>'s
-      result relation column list.
-
-      <alias> The AS alias for the scan, or empty if none.
-      <function_call_signature> The FunctionSignature object from the
-                                <tvf->signatures()> list that matched the
-                                current call. The TVFScan's
-                                <FunctionSignature::ConcreteArgument> list
-                                matches 1:1 to <argument_list>, while its
-                                <FunctionSignature::arguments> list still has
-                                the full argument list.
-                                Engines may use this object to
-                                check for the argument names and omitted
-                                arguments. SQLBuilder may also need this object
-                                in cases when the named argument notation is
-                                required for this call.
-              """,
-      fields=[
-          Field('tvf', TABLE_VALUED_FUNCTION, tag_id=2),
-          Field('signature', TVF_SIGNATURE, tag_id=3),
-          Field(
-              'argument_list', 'ResolvedFunctionArgument', tag_id=5, vector=True
-          ),
-          Field(
-              'column_index_list',
-              SCALAR_INT,
-              tag_id=8,
-              ignorable=IGNORABLE,
-              vector=True,
-              is_constructor_arg=True,
-              to_string_method='ToStringCommaSeparated',
-              java_to_string_method='toStringCommaSeparatedForInt',
-          ),
-          Field('alias', SCALAR_STRING, tag_id=6, ignorable=IGNORABLE),
-          Field(
-              'function_call_signature',
-              SCALAR_FUNCTION_SIGNATURE_PTR,
-              tag_id=7,
-              ignorable=IGNORABLE,
-          ),
-      ],
-  )
-
-  gen.AddNode(
-      name='ResolvedGroupRowsScan',
-      tag_id=176,
-      parent='ResolvedScan',
-      emit_default_constructor=False,
-      comment="""
-      ResolvedGroupRowsScan represents a call to a group rows TVF.
-
-      It can be created in two ways:
-      - WITH g() AS GROUP ROWS ... FROM g()
-      - FROM GROUP ROWS
-
-      This scan produces rows corresponding to the input of
-      ResolvedAggregateScan that belong to the current group.
-
-      <input_column_list> creates new columns that map 1:1 to columns from
-      the input of the aggregate scan. Each column contains a ResolvedColumnRef
-      referencing a non-correlated column from the pre-aggregation scan.
-              """,
-      fields=[
-          Field(
-              'input_column_list',
-              'ResolvedComputedColumn',
-              tag_id=2,
-              vector=True,
-          ),
-      ],
-  )
-
-  gen.AddNode(
       name='ResolvedFunctionRef',
       parent='ResolvedArgument',
       tag_id=320,
@@ -5009,6 +4990,141 @@ value.
               alias if its type is `expr`, but the support may be extended to
               other types, e.g. `scan` or `model` in the future.
               """,
+          ),
+      ],
+  )
+
+  gen.AddNode(
+      name='ResolvedTVFScan',
+      tag_id=81,
+      parent='ResolvedScan',
+      emit_default_constructor=False,
+      column_list_is_created_columns=True,
+      comment="""
+      This scan represents a call to a table-valued function (TVF). Each TVF
+      returns an entire output relation instead of a single scalar value. The
+      enclosing query may refer to the TVF as if it were a table subquery. The
+      TVF may accept scalar arguments and/or other input relations.
+
+      Scalar arguments work the same way as arguments for non-table-valued
+      functions: in the resolved AST, their types are equal to the required
+      argument types specified in the function signature.
+
+      The function signature may also include relation arguments, and any such
+      relation argument may specify a required schema. If such a required schema
+      is present, then in the resolved AST, the ResolvedScan for each relational
+      ResolvedFunctionArgument is guaranteed to have the same number of columns
+      as the required schema, and the provided columns match position-wise with
+      the required columns. Each provided column has the same name and type as
+      the corresponding required column.
+
+      If AnalyzerOptions::prune_unused_columns is true, the <column_list> and
+      <column_index_list> will include only columns that were referenced
+      in the user query. (SELECT * counts as referencing all columns.)
+      Pruning has no effect on value tables (the value is never pruned).
+
+      <column_list> is a set of new ResolvedColumns created by this scan.
+      The <column_list>[i] should be matched to the related TVFScan's output
+      relation column by
+      <signature>.result_schema().column(<column_index_list>[i]).
+
+      <tvf> The TableValuedFunction entry that the catalog returned for this TVF
+            scan. Contains non-concrete function signatures which may include
+            arguments with templated types.
+      <signature> The concrete table function signature for this TVF call,
+                  including the types of all scalar arguments and the
+                  number and types of columns of all table-valued
+                  arguments. An engine may also subclass this object to
+                  provide extra custom information and return an instance
+                  of the subclass from the TableValuedFunction::Resolve
+                  method.
+      <argument_list> The vector of resolved concrete arguments for this TVF
+                      call, including the default values or NULLs injected for
+                      the omitted arguments (Note the NULL injection is a
+                      temporary solution to handle omitted named arguments. This
+                      is subject to change by upcoming CLs).
+
+      <column_index_list> This list matches 1:1 with the <column_list>, and
+      identifies the index of the corresponding column in the <signature>'s
+      result relation column list.
+
+      <alias> The AS alias for the scan, or empty if none.
+      <function_call_signature> The concrete FunctionSignature based on the
+                                matching signature from <tvf->signatures()> and
+                                the function's resolved input <argument_list>.
+                                The TVFScan's
+                                <FunctionSignature::ConcreteArgument> list
+                                matches 1:1 to <argument_list>, while its
+                                <FunctionSignature::arguments> list still has
+                                the full argument list.
+                                Engines may use this object to
+                                check for the argument names and omitted
+                                arguments. SQLBuilder may also need this object
+                                in cases when the named argument notation is
+                                required for this call.
+              """,
+      fields=[
+          Field('tvf', TABLE_VALUED_FUNCTION, tag_id=2),
+          Field('signature', TVF_SIGNATURE, tag_id=3),
+          Field(
+              'argument_list', 'ResolvedFunctionArgument', tag_id=5, vector=True
+          ),
+          Field(
+              'column_index_list',
+              SCALAR_INT,
+              tag_id=8,
+              ignorable=IGNORABLE,
+              vector=True,
+              is_constructor_arg=True,
+              to_string_method='ToStringCommaSeparated',
+              java_to_string_method='toStringCommaSeparatedForInt',
+          ),
+          Field('alias', SCALAR_STRING, tag_id=6, ignorable=IGNORABLE),
+          Field(
+              'function_call_signature',
+              SCALAR_FUNCTION_SIGNATURE_PTR,
+              tag_id=7,
+              ignorable=IGNORABLE,
+          ),
+      ],
+      extra_defs_node_only="""
+        // The pipe input is the first table-typed argument, if one exists.
+        const ResolvedScan* GetPipeInputScan() const override {
+          for (const auto& argument : argument_list()) {
+            if (argument->scan() != nullptr) {
+              return argument->scan();
+            }
+          }
+          return nullptr;
+        }
+      """,
+  )
+
+  gen.AddNode(
+      name='ResolvedGroupRowsScan',
+      tag_id=176,
+      parent='ResolvedScan',
+      emit_default_constructor=False,
+      comment="""
+      ResolvedGroupRowsScan represents a call to a group rows TVF.
+
+      It can be created in two ways:
+      - WITH g() AS GROUP ROWS ... FROM g()
+      - FROM GROUP ROWS
+
+      This scan produces rows corresponding to the input of
+      ResolvedAggregateScan that belong to the current group.
+
+      <input_column_list> creates new columns that map 1:1 to columns from
+      the input of the aggregate scan. Each column contains a ResolvedColumnRef
+      referencing a non-correlated column from the pre-aggregation scan.
+              """,
+      fields=[
+          Field(
+              'input_column_list',
+              'ResolvedComputedColumn',
+              tag_id=2,
+              vector=True,
           ),
       ],
   )
@@ -5764,27 +5880,17 @@ value.
   )
 
   gen.AddNode(
-      name='ResolvedCreateTableAsSelectStmt',
-      tag_id=40,
+      name='ResolvedCreateTableAsSelectStmtBase',
+      tag_id=332,
       parent='ResolvedCreateTableStmtBase',
+      is_abstract=True,
       comment="""
-      This statement:
-        CREATE [TEMP] TABLE <name> [(column schema, ...) | LIKE <name_path>]
-        [DEFAULT COLLATE <collation_name>] [PARTITION BY expr, ...]
-        [CLUSTER BY expr, ...]
-        [WITH CONNECTION connection_name]
-        [OPTIONS (...)]
-        AS SELECT ...
-
-      Also used for the pipe operator
-        |> CREATE [TEMP] TABLE ...
-      which also has the same optional modifiers, but no AS query.
-      This occurs inside ResolvedPipeCreateTableScan, with the pipe
-      input stored in `query`.  All other modifier fields are allowed.
+      Abstract base class for CREATE TABLE and CREATE LIVE TABLE AS SELECT
+      statement nodes.
 
       The <output_column_list> matches 1:1 with the <column_definition_list> in
       ResolvedCreateTableStmtBase, and maps ResolvedColumns produced by <query>
-      into specific columns of the created table.  The output column names and
+      into specific columns of the created table or live table.  The output column names and
       types must match the column definition names and types.  If the table is
       a value table, <output_column_list> must have exactly one column, with a
       generated name such as "$struct".
@@ -5796,7 +5902,7 @@ value.
       than than <output_column_list> to determine the table schema, if possible.
 
       <query> is the query to run.
-              """,
+      """,
       fields=[
           Field(
               'partition_by_list',
@@ -5820,6 +5926,28 @@ value.
           ),
           Field('query', 'ResolvedScan', tag_id=3),
       ],
+  )
+
+  gen.AddNode(
+      name='ResolvedCreateTableAsSelectStmt',
+      tag_id=40,
+      parent='ResolvedCreateTableAsSelectStmtBase',
+      comment="""
+      This statement:
+        CREATE [TEMP] TABLE <name> [(column schema, ...) | LIKE <name_path>]
+        [DEFAULT COLLATE <collation_name>] [PARTITION BY expr, ...]
+        [CLUSTER BY expr, ...]
+        [WITH CONNECTION connection_name]
+        [OPTIONS (...)]
+        AS SELECT ...
+
+      Also used for the pipe operator
+        |> CREATE [TEMP] TABLE ...
+      which also has the same optional modifiers, but no AS query.
+      This occurs inside ResolvedPipeCreateTableScan, with the pipe
+      input stored in `query`.  All other modifier fields are allowed.
+              """,
+      fields=[],
   )
 
   gen.AddNode(
@@ -6744,6 +6872,13 @@ value.
               ignorable=IGNORABLE_DEFAULT,
           ),
       ],
+      extra_defs_node_only="""
+        // The pipe input is the non-recursive term's scan.
+        const ResolvedScan* GetPipeInputScan() const override {
+          return non_recursive_term_ == nullptr ? nullptr
+                                                : non_recursive_term_->scan();
+        }
+      """,
   )
 
   gen.AddNode(
@@ -7243,65 +7378,89 @@ value.
       This represents an INSERT statement, or a nested INSERT inside an
       UPDATE statement.
 
-      It's also used for the pipe operator
+      This node is also used for inserts inside ResolvedInsertScan.
+      When used there:
+      - `returning` must be present;
+      - `row_list` must not be present;
+      - `query` must be present and contains the flow-through input;
+      - It always returns all rows from `query`.
+      - It returns the columns from `query`, plus columns from `returning`;
+      - `insert_mode` is always OR_IGNORE.
+      This is the case for the pipe operator
         |> INSERT INTO table ...
-      which supports all the same optional modifier fields, but cannot include a
-      query or VALUES.  This occurs inside ResolvedPipeInsertScan, with the
-      pipe input stored in `query`.
+      which supports all the same optional modifier fields, but cannot include
+      query or VALUES clause.
+      If this is used for a terminal pipe insert operator, a ResolvedFinishScan
+      will wrap this node to express the terminal behavior.
 
-      For top-level INSERT statements, <table_scan> gives the table to
+      For top-level INSERT statements, `table_scan` gives the table to
       scan and creates ResolvedColumns for its columns.  Those columns can be
-      referenced in <insert_column_list>.
+      referenced in `insert_column_list`.
 
-      For nested INSERTS, there is no <table_scan> or <insert_column_list>.
+      For nested INSERTS, there is no `table_scan` or `insert_column_list`.
       There is implicitly a single column to insert, and its type is the
       element type of the array being updated in the ResolvedUpdateItem
       containing this statement.
 
-      For nested INSERTs, alternate modes are not supported and <insert_mode>
+      For nested INSERTs, alternate modes are not supported and `insert_mode`
       will always be set to OR_ERROR.
 
-      The rows to insert come from <row_list> or the result of <query>.
+      The rows to insert come from `row_list` or the result of `query`.
       Exactly one of these must be present.
 
-      If <row_list> is present, the columns in the row_list match
-      positionally with <insert_column_list>.
+      If `row_list` is present, the columns in the `row_list` match
+      positionally with `insert_column_list`.
 
-      If <query> is present, <query_output_column_list> must also be present.
-      <query_output_column_list> is the list of output columns produced by
-      <query> that correspond positionally with the target <insert_column_list>
-      on the output table.  For nested INSERTs with no <insert_column_list>,
-      <query_output_column_list> must have exactly one column.
+      If `query` is present, `query_output_column_list` must also be present.
+      `query_output_column_list` is a subset of output columns from `query` and
+      corresponds positionally with the target `insert_column_list` on the
+      output table.  For nested INSERTs with no `insert_column_list`,
+      `query_output_column_list` must have exactly one column.
 
-      <query_parameter_list> is set for nested INSERTs where <query> is set and
+      `query_parameter_list` is set for nested INSERTs where `query` is set and
       references non-target values (columns or field values) from the table. It
       is only set when FEATURE_CORRELATED_REFS_IN_NESTED_DML is enabled.
 
-      If <returning> is present, the INSERT statement will return newly inserted
-      rows. <returning> can only occur on top-level statements.
+      When `returning` is present:
+      - If the ResolvedInsertStmt is in a ResolvedInsertscan, return all
+        rows from `query` (see above for more details about ResolvedInsertScan
+        case); otherwise, return newly inserted rows.
+      - `returning->output_column_list` can access columns from the `table_scan`
+        as well as `query`. If `returning->output_column_list` is empty, no
+        `returning`-specific columns are available to reference downstream.
 
-      The returning clause has a <output_column_list> to represent the data
-      sent back to clients. It can only access columns from the <table_scan>.
-
-      <topologically_sorted_generated_column_id_list> is set for queries to
+      `topologically_sorted_generated_column_id_list` is set for queries to
       tables having generated columns. It provides the resolved column ids of
       the generated columns in topological order, which the computed generated
       column expressions can be computed in.
 
-      <generated_expr_list> has generated expressions for the corresponding
-      generated column in the topologically_sorted_generated_column_id_list.
+      `generated_expr_list` has generated expressions for the corresponding
+      generated column in the `topologically_sorted_generated_column_id_list`.
       Hence, these lists have the same size.
 
-      <column_access_list> indicates for each column in <table_scan.column_list>
+      `column_access_list` indicates for each column in `table_scan.column_list`
       whether it was read and/or written. The query engine may also require
       read or write permissions across all columns, including unreferenced
       columns, depending on the operation.
 
-      <on_conflict_clause> specifies the alternate action if the insert row
+      `on_conflict_clause` specifies the alternate action if the insert row
       causes unique constraint violations. It handles violations in both primary
       key and UNIQUE constraints. Alternate actions are (1) to do nothing
       (ignore the insert row), or (2) update the original table row using the
       specified SET clauses and the optional WHERE clause.
+
+      If <timestamp_version_column> is present, it represents the read-only
+      timestamp pseudo-column introduced by the `WITH TIMESTAMP [AS alias]` clause.
+      It is a ResolvedColumnHolder and is system-generated unless an explicit alias
+      is provided.
+
+      If <temporal_at> is present, it represents the target write time or read
+      time expression specified in the `AT(expression)` clause. Its type must
+      be TIMESTAMP.
+
+      <timestamp_version_column> and <temporal_at> are mutually exclusive.
+      Both fields are enabled by FEATURE_VERSION_AWARE_DML.
+      See (broken link) for more details.
       """,
       fields=[
           Field(
@@ -7421,6 +7580,21 @@ value.
               catalog to corresponding ResolvedColumnRef.
               """,
           ),
+          Field(
+              'timestamp_version_column',
+              'ResolvedColumnHolder',
+              column_is_created=True,
+              tag_id=17,
+              ignorable=IGNORABLE_DEFAULT,
+              is_optional_constructor_arg=True,
+          ),
+          Field(
+              'temporal_at',
+              'ResolvedExpr',
+              tag_id=18,
+              ignorable=IGNORABLE_DEFAULT,
+              is_optional_constructor_arg=True,
+          ),
       ],
       extra_defs="""
   std::string GetInsertModeString() const;
@@ -7459,6 +7633,17 @@ value.
       whether it was read and/or written. The query engine may also require
       read or write permissions across all columns, including unreferenced
       columns, depending on the operation.
+
+      If <timestamp_version_column> is present, it represents the read-only
+      timestamp pseudo-column introduced by the `WITH TIMESTAMP [AS alias]` clause.
+      It is a ResolvedColumnHolder and is system-generated unless an explicit alias
+      is provided.
+
+      Note: DELETE statements do not support the AT clause, so <temporal_at>
+      is not present.
+
+      This field is enabled by FEATURE_VERSION_AWARE_DML.
+      See (broken link) for more details.
               """,
       fields=[
           Field(
@@ -7496,6 +7681,14 @@ value.
               ignorable=IGNORABLE_DEFAULT,
           ),
           Field('where_expr', 'ResolvedExpr', tag_id=4),
+          Field(
+              'timestamp_version_column',
+              'ResolvedColumnHolder',
+              column_is_created=True,
+              tag_id=8,
+              ignorable=IGNORABLE_DEFAULT,
+              is_optional_constructor_arg=True,
+          ),
       ],
   )
 
@@ -7812,6 +8005,19 @@ value.
       generated column in the topologically_sorted_generated_column_id_list.
       Hence, these lists have the same size. This field is similar to the
       INSERT case, more details can be found in ResolvedInsertStmt.
+
+      If <timestamp_version_column> is present, it represents the read-only
+      timestamp pseudo-column introduced by the `WITH TIMESTAMP [AS alias]` clause.
+      It is a ResolvedColumnHolder and is system-generated unless an explicit alias
+      is provided.
+
+      If <temporal_at> is present, it represents the target write time or read
+      time expression specified in the `AT(expression)` clause. Its type must
+      be TIMESTAMP.
+
+      <timestamp_version_column> and <temporal_at> are mutually exclusive.
+      Both fields are enabled by FEATURE_VERSION_AWARE_DML.
+      See (broken link) for more details.
               """,
       fields=[
           Field(
@@ -7878,6 +8084,21 @@ value.
               comment="""
               TODO: refactor it with INSERT case.
               """,
+          ),
+          Field(
+              'timestamp_version_column',
+              'ResolvedColumnHolder',
+              column_is_created=True,
+              tag_id=12,
+              ignorable=IGNORABLE_DEFAULT,
+              is_optional_constructor_arg=True,
+          ),
+          Field(
+              'temporal_at',
+              'ResolvedExpr',
+              tag_id=13,
+              ignorable=IGNORABLE_DEFAULT,
+              is_optional_constructor_arg=True,
           ),
       ],
   )
@@ -8181,6 +8402,17 @@ value.
   )
 
   gen.AddNode(
+      name='ResolvedAlterDataPolicyStmt',
+      tag_id=328,
+      parent='ResolvedAlterObjectStmt',
+      comment="""
+      This statement: ALTER DATA_POLICY [IF EXISTS] <name_path>
+                      <alter_action_list>
+      """,
+      fields=[],
+  )
+
+  gen.AddNode(
       name='ResolvedAlterIndexStmt',
       tag_id=292,
       parent='ResolvedAlterObjectStmt',
@@ -8351,6 +8583,35 @@ value.
               """,
       fields=[
           Field('option_list', 'ResolvedOption', tag_id=2, vector=True),
+      ],
+  )
+
+  gen.AddNode(
+      name='ResolvedSetConditionAction',
+      tag_id=329,
+      parent='ResolvedAlterAction',
+      comment="""
+      SET CONDITION action for ALTER DATA_POLICY statement.
+      """,
+      fields=[
+          Field(
+              'expression',
+              'ResolvedExpr',
+              tag_id=2,
+              ignorable=IGNORABLE,
+          ),
+          Field(
+              'expression_string',
+              SCALAR_STRING,
+              tag_id=3,
+              ignorable=IGNORABLE,
+              comment="""
+              The original SQL text of the SET CONDITION
+              expression. This is only used by SQLBuilder for the
+              purpose of reconstructing the original sql syntax
+              and does not have semantic meaning.
+                      """,
+          ),
       ],
   )
 
@@ -8910,6 +9171,46 @@ value.
       ],
       extra_defs="""
   typedef ResolvedCreateStatement::CreateMode CreateMode;""",
+  )
+
+  gen.AddNode(
+      name='ResolvedCreateDataPolicyStmt',
+      tag_id=330,
+      parent='ResolvedCreateStatement',
+      comment="""
+      This statement: CREATE [OR REPLACE] DATA_POLICY [IF NOT EXISTS] <name_path>
+                      [OPTIONS <option_list>]
+                      [WITH CONDITION (<condition>)];
+      """,
+      fields=[
+          Field(
+              'option_list',
+              'ResolvedOption',
+              tag_id=2,
+              vector=True,
+              ignorable=IGNORABLE_DEFAULT,
+          ),
+          Field(
+              'condition',
+              'ResolvedExpr',
+              tag_id=3,
+              is_optional_constructor_arg=True,
+              ignorable=IGNORABLE,
+          ),
+          Field(
+              'condition_string',
+              SCALAR_STRING,
+              tag_id=4,
+              is_optional_constructor_arg=True,
+              ignorable=IGNORABLE,
+              comment="""
+              The original SQL text of the condition expression.
+              This is only used by SQLBuilder for the
+              purpose of reconstructing the original sql syntax
+              and does not have semantic meaning.
+                      """,
+          ),
+      ],
   )
 
   gen.AddNode(
@@ -9667,6 +9968,12 @@ ResolvedArgumentRef(y)
               'sql_security',
               SCALAR_SQL_SECURITY,
               tag_id=10,
+              ignorable=IGNORABLE_DEFAULT,
+          ),
+          Field(
+              'connection',
+              'ResolvedConnection',
+              tag_id=12,
               ignorable=IGNORABLE_DEFAULT,
           ),
       ],
@@ -10502,30 +10809,18 @@ ResolvedArgumentRef(y)
       parent='ResolvedCreateTableStmtBase',
       comment="""
       This statement:
-        CREATE [OR REPLACE] [TEMP|TEMPORARY|PUBLIC|PRIVATE] LIVE TABLE [IF NOT EXISTS] <name_path>
+        CREATE [OR REPLACE] LIVE TABLE [IF NOT EXISTS] <name_path>
         [ (column schema, ...) ]
         [DEFAULT COLLATE <collation_name>]
         [PARTITION BY expr, ...]
         [CLUSTER BY expr, ...]
         [WITH CONNECTION connection_name]
         [OPTIONS (...)]
-        AS SELECT ...
 
-      <output_column_list> has the names and types of the columns in the
-                           created live table, and maps from <query>'s column_list
-                           to these output columns.
-      <query> is the query to run.
       <partition_by_list> specifies the partitioning expressions for the table.
       <cluster_by_list> specifies the clustering expressions for the table.
               """,
       fields=[
-          Field(
-              'output_column_list',
-              'ResolvedOutputColumn',
-              tag_id=2,
-              vector=True,
-          ),
-          Field('query', 'ResolvedScan', tag_id=3),
           Field(
               'partition_by_list',
               'ResolvedExpr',
@@ -10541,6 +10836,24 @@ ResolvedArgumentRef(y)
               ignorable=IGNORABLE_DEFAULT,
           ),
       ],
+  )
+
+  gen.AddNode(
+      name='ResolvedCreateLiveTableAsSelectStmt',
+      tag_id=325,
+      parent='ResolvedCreateTableAsSelectStmtBase',
+      comment="""
+      This statement:
+        CREATE [OR REPLACE] LIVE TABLE [IF NOT EXISTS] <name_path>
+        [ (column schema, ...) ]
+        [DEFAULT COLLATE <collation_name>]
+        [PARTITION BY expr, ...]
+        [CLUSTER BY expr, ...]
+        [WITH CONNECTION connection_name]
+        [OPTIONS (...)]
+        AS SELECT ...
+      """,
+      fields=[],
   )
 
   gen.AddNode(
@@ -11160,7 +11473,18 @@ ResolvedArgumentRef(y)
               scan.
               """,
           ),
-          # TODO: b/477116035 - Add fields for estimator_function_list.
+          Field(
+              'estimator_function_list',
+              'ResolvedComputedColumnBase',
+              tag_id=9,
+              vector=True,
+              comment="""
+              The estimator functions computed by this scan for the METRICS
+              clause. This contains a list of ResolvedEstimatorFunctionCalls.
+              Any scalar operations on top of these functions to will be
+              represented by a later ResolvedProjectScan with computed columns.
+              """,
+          ),
       ],
   )
 
@@ -11525,6 +11849,78 @@ ResolvedArgumentRef(y)
   )
 
   gen.AddNode(
+      name='ResolvedCreatePropertyGraphTypeStmt',
+      tag_id=345,
+      parent='ResolvedCreateStatement',
+      comment="""
+      This statement:
+        CREATE [OR REPLACE] PROPERTY GRAPH TYPE [IF NOT EXISTS] <name_path>
+        NODE TYPES (<node_type_list>)
+        [EDGE TYPES (<edge_type_list>)]
+        [OPTIONS (<option_list>)]
+
+      A property graph type describes only the logical shape of a graph: its
+      element types, their default labels, and the property declarations exposed
+      by those labels. Unlike ResolvedCreatePropertyGraphStmt, it has no
+      physical table bindings (no input scans, key columns or property
+      definitions).
+      See (broken link):logical-graph-type for the design.
+
+      The labels and property declarations of the graph type are collected once
+      in label_list and property_declaration_list; each element type refers to
+      them by name rather than owning its own copies. See the individual fields
+      for details.
+          """,
+      fields=[
+          Field(
+              'node_type_list',
+              'ResolvedGraphElementType',
+              tag_id=2,
+              vector=True,
+              comment="""
+                The node type definitions. May be empty, e.g. `NODE TYPES ()`.
+                      """,
+          ),
+          Field(
+              'edge_type_list',
+              'ResolvedGraphElementType',
+              tag_id=3,
+              vector=True,
+              comment="""
+                The edge type definitions. Optional; may also be empty.
+                      """,
+          ),
+          Field(
+              'label_list',
+              'ResolvedGraphElementLabel',
+              tag_id=4,
+              vector=True,
+              comment="""
+                All labels defined in this property graph type (the default
+                label of each element type).
+                      """,
+          ),
+          Field(
+              'property_declaration_list',
+              'ResolvedGraphPropertyDeclaration',
+              tag_id=5,
+              vector=True,
+              comment="""
+                All property declarations exposed by labels in this property
+                graph type.
+                      """,
+          ),
+          Field(
+              'option_list',
+              'ResolvedOption',
+              ignorable=IGNORABLE_DEFAULT,
+              tag_id=6,
+              vector=True,
+          ),
+      ],
+  )
+
+  gen.AddNode(
       name='ResolvedGraphElementTable',
       tag_id=224,
       parent='ResolvedArgument',
@@ -11612,6 +12008,58 @@ ResolvedArgumentRef(y)
               'dynamic_properties',
               'ResolvedGraphDynamicPropertiesSpecification',
               tag_id=10,
+              ignorable=IGNORABLE_DEFAULT,
+              is_optional_constructor_arg=True,
+          ),
+      ],
+  )
+
+  gen.AddNode(
+      name='ResolvedGraphElementType',
+      tag_id=344,
+      parent='ResolvedArgument',
+      comment="""
+      Represents the logical type of a single element (node or edge) in a
+      property graph type. It is the type analogue of ResolvedGraphElementTable,
+      with all physical table binding stripped (no input scan, key list,
+      property definitions or dynamic label/properties):
+        <name> [FROM <source_node_type>] [TO <dest_node_type>]
+
+      <name> is the element type name, which is also the name of its default
+      label.
+      <label_name_list> lists the labels applied to this element type (at least
+      the default label). This node stores no properties of its own; the
+      element type's properties are the property declarations of these labels,
+      held in property_declaration_list on the containing
+      ResolvedCreatePropertyGraphTypeStmt.
+      <source_node_type> and <dest_node_type> name the FROM and TO node types.
+      They must only be set for edge types and are both absent for node types;
+      an edge type may set both, just one (FROM-only or TO-only), or neither.
+
+      TODO: Derived properties (`<expr> AS <name>`), measure
+      properties and property options are not supported yet.
+          """,
+      fields=[
+          Field('name', SCALAR_STRING, tag_id=2),
+          Field(
+              'label_name_list',
+              SCALAR_STRING,
+              tag_id=3,
+              vector=True,
+              to_string_method='ToStringCommaSeparated',
+              java_to_string_method='toStringCommaSeparated',
+          ),
+          Field(
+              'source_node_type',
+              SCALAR_STRING,
+              tag_id=4,
+              ignorable=IGNORABLE_DEFAULT,
+              is_optional_constructor_arg=True,
+          ),
+          Field(
+              'dest_node_type',
+              SCALAR_STRING,
+              tag_id=5,
               ignorable=IGNORABLE_DEFAULT,
               is_optional_constructor_arg=True,
           ),
@@ -12970,6 +13418,33 @@ ResolvedArgumentRef(y)
   )
 
   gen.AddNode(
+      name='ResolvedInsertScan',
+      tag_id=297,
+      parent='ResolvedScan',
+      comment="""
+      This represents an INSERT operator, typically used for pipe INSERT or
+      the rewrite of GQL INSERT (ResolvedGraphInsertScan).
+
+      This only occurs inside ResolvedGeneralizedQueryStmts, which must be
+      enabled in SupportedStatementKinds.
+
+      For every input row, it performs one insert into the target table.
+      - `insert_stmt->query` is the input, which must be present.
+      - `insert_stmt->row_list` must be null.
+      - `insert_stmt->returning` must be present. The input rows are returned.
+      - `column_list` can contain columns from `insert_stmt->query` and
+        `insert_stmt->returning`.
+      """,
+      fields=[
+          Field(
+              'insert_stmt',
+              'ResolvedInsertStmt',
+              tag_id=2,
+          ),
+      ],
+  )
+
+  gen.AddNode(
       name='ResolvedPipeExportDataScan',
       tag_id=285,
       parent='ResolvedScan',
@@ -13023,28 +13498,6 @@ ResolvedArgumentRef(y)
               don't make senes when there's an input table, including a pipe
               input table.
               """,
-          ),
-      ],
-  )
-
-  gen.AddNode(
-      name='ResolvedPipeInsertScan',
-      tag_id=297,
-      parent='ResolvedScan',
-      comment="""
-      This represents the pipe INSERT operator, which is controlled by
-      FEATURE_PIPE_INSERT.  See (broken link).
-
-      This only occurs inside ResolvedGeneralizedQueryStmts, so that statement
-      must be enabled in SupportedStatementKinds.
-
-      The pipe input is in `insert_stmt->query`, which must be present.
-      """,
-      fields=[
-          Field(
-              'insert_stmt',
-              'ResolvedInsertStmt',
-              tag_id=2,
           ),
       ],
   )
@@ -13542,6 +13995,67 @@ ResolvedArgumentRef(y)
               This is only used by SQLBuilder for the purpose of reconstructing
               the original sql syntax and does not have semantic meaning.
               """,
+          ),
+      ],
+  )
+
+  gen.AddNode(
+      name='ResolvedUpdateScan',
+      tag_id=343,
+      parent='ResolvedScan',
+      comment="""
+      This represents a pipe UPDATE operator.
+      - `output_mode` (OUTPUT_UPDATED_ROWS and OUTPUT_INPUT_ROWS) specifies what
+         rows are included in the output table.
+      - `update_collision_action_type` (COLLISION_ACTION_ERROR and
+         COLLISION_ACTION_PICK_ONE) specifies what action to take when a single
+         target table row is matched to be updated more than once.
+      The overall procedure for this operator is as follows:
+      1) Scan the pipe input table `update_stmt->from_scan` and join it with target
+         table `update_stmt->table_scan` using `update_stmt->where_clause` as a join
+         condition and also a filter.
+      2) For each input row, there can be 0, 1 or multiple matches from the target
+         table:
+         If input row gets 0 match:
+            If `output_mode` is OUTPUT_UPDATED_ROWS, the input row gets discarded.
+            If `output_mode` is OUTPUT_INPUT_ROWS, the input row gets returned, with
+            target table columns in `update_stmt->returning` being NULL.
+         If input row gets 1 match, the input row gets returned in either mode.
+         If input row gets multiple matches:
+            If `output_mode` is OUTPUT_UPDATED_ROWS, the input row gets returned.
+            If `output_mode` is OUTPUT_INPUT_ROWS, a runtime error is returned.
+      3) When a target table row gets matched more than once for update:
+         If `update_collision_action_type` is COLLISION_ACTION_ERROR (default), a
+         runtime error is returned.
+         If `update_collision_action_type` is COLLISION_ACTION_PICK_ONE,
+         engine is allowed to pick one of the value as winning update. This type is
+         not allowed when `output_mode` is set to OUTPUT_UPDATED_ROWS.
+      4) Columns from target table (`update_stmt->table_scan`) can be updated as
+         specified by `update_stmt->update_item_list`.
+      5) `column_list` can include columns from pipe input table
+         `update_stmt->from_scan` and `update_stmt->returning`.
+      This operator only occurs inside a ResolvedGeneralizedQueryStmt, which
+      must be enabled in SupportedStatementKinds.
+      A pipe update operator is typically used for rewriting a GQL DML
+      SET/REMOVE statement or inside a pipe query.
+      """,
+      fields=[
+          Field(
+              'update_stmt',
+              'ResolvedUpdateStmt',
+              tag_id=2,
+          ),
+          Field(
+              'output_mode',
+              SCALAR_UPDATE_SCAN_OUTPUT_MODE,
+              tag_id=3,
+              comment="""OUTPUT_UPDATED_ROWS and OUTPUT_INPUT_ROWS """,
+          ),
+          Field(
+              'update_collision_action_type',
+              SCALAR_UPDATE_COLLISION_ACTION_TYPE,
+              tag_id=4,
+              comment="""COLLISION_ACTION_ERROR (default) or COLLISION_ACTION_PICK_ONE """,
           ),
       ],
   )

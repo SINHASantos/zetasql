@@ -283,7 +283,7 @@ absl::Status DeclarativeType::SerializeToProtoAndDistinctFileDescriptorsImpl(
 
   type_id_proto->set_name_space(id().name_space);
   type_id_proto->set_local_id(id().local_id);
-  type_id_proto->set_counter(id().counter);
+  type_id_proto->set_version_id(id().version_id);
   declarative_type_proto->set_display_name(data_.display_name());
 
   declarative_type_proto->set_coercion_from_backing_type(
@@ -397,8 +397,13 @@ const ValueContent& DeclarativeType::GetBackingContent(
 bool DeclarativeType::ValueContentEquals(
     const ValueContent& x, const ValueContent& y,
     const ValueEqualityCheckOptions& options) const {
-  ABSL_DCHECK(std::holds_alternative<DeclarativeTypeDescriptor::EqualityDelegated>(
-      data_.equality_strategy()));
+  // We do not consider the SQL-level equality trait, which is controlled by the
+  // descriptor and is used by the resolver to reject queries attempting the
+  // equality operation in the first place.
+  //
+  // This is the low-level C++ comparison, so we blindly delegate to the
+  // backing type. This is needed for compliance testing, for example, where we
+  // have to compare the engine result vs the golden result.
   return backing_type()->ValueContentEquals(
       GetBackingContent(x, this), GetBackingContent(y, this), options);
 }
@@ -417,6 +422,12 @@ absl::HashState DeclarativeType::HashValueContent(const ValueContent& value,
                                                   absl::HashState state) const {
   return backing_type()->HashValueContent(GetBackingContent(value, this),
                                           std::move(state));
+}
+
+absl::HashState DeclarativeType::HashValueContentIgnoringFloat(
+    const ValueContent& value, absl::HashState state) const {
+  return backing_type()->HashValueContentIgnoringFloat(
+      GetBackingContent(value, this), std::move(state));
 }
 
 absl::HashState DeclarativeType::HashTypeParameter(

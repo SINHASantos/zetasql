@@ -1466,3 +1466,12 @@ ARRAY<STRUCT<product_id INT64, ARRAY<>>>[known order:
     ARRAY<STRING>["banana"]
   }
 ]
+
+==
+
+[name=measure_case_sensitivity_direct]
+SELECT
+  AGG(measure_sum_price)
+FROM MeasureTable_TwoKeys;
+--
+ARRAY<STRUCT<INT64>>[{45}]

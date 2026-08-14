@@ -170,6 +170,12 @@ class SQLFunction final : public SQLFunctionInterface {
     return parse_resume_location_;
   }
 
+  void set_resolution_catalog(Catalog* resolution_catalog) {
+    resolution_catalog_ = resolution_catalog;
+  }
+
+  Catalog* resolution_catalog() const { return resolution_catalog_; }
+
   // Returns a debug string that includes the <function_expression_> string,
   // if present.
   std::string FullDebugString() const;
@@ -188,6 +194,7 @@ class SQLFunction final : public SQLFunctionInterface {
   const ResolvedExpr* function_expression_ = nullptr;  // Not owned.
   const std::vector<std::string> argument_names_;
   const std::optional<ParseResumeLocation> parse_resume_location_;
+  Catalog* resolution_catalog_ = nullptr;  // Not owned.
   const std::vector<std::unique_ptr<const ResolvedComputedColumn>>*
       aggregate_expression_list_ = nullptr;  // Not owned.
 };

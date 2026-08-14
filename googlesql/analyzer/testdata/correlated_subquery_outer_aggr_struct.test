@@ -83,7 +83,6 @@ QueryStmt
         +-group_by_list=
           +-TestStruct#11 := ColumnRef(type=STRUCT<c INT32, d STRUCT<a INT32, b STRING>>, column=ComplexTypes.TestStruct#5)
 
-
 DEPRECATION WARNING:
 Lateral column alias will shadow original target: STRUCT<c INT32, d STRUCT<a INT32, b STRING>> (ComplexTypes.TestStruct#5) (implicit) [at 1:70]
 ...SELECT AS STRUCT ct.TestStruct, ct.TestStruct.c, TestStruct.d)
@@ -151,7 +150,6 @@ QueryStmt
         | +-TableScan(column_list=[ComplexTypes.TestStruct#5], table=ComplexTypes, column_index_list=[4], alias="ct")
         +-group_by_list=
           +-TestStruct#11 := ColumnRef(type=STRUCT<c INT32, d STRUCT<a INT32, b STRING>>, column=ComplexTypes.TestStruct#5)
-
 
 DEPRECATION WARNING:
 Lateral column alias will shadow original target: STRUCT<c INT32, d STRUCT<a INT32, b STRING>> (ComplexTypes.TestStruct#5) (implicit) [at 1:53]
@@ -221,7 +219,6 @@ QueryStmt
         +-group_by_list=
           +-TestStruct#11 := ColumnRef(type=STRUCT<c INT32, d STRUCT<a INT32, b STRING>>, column=ComplexTypes.TestStruct#5)
 
-
 DEPRECATION WARNING:
 Lateral column alias will shadow original target: STRUCT<c INT32, d STRUCT<a INT32, b STRING>> (ComplexTypes.TestStruct#5) (implicit) [at 1:67]
 SELECT TestStruct, (SELECT AS STRUCT TestStruct, ct.TestStruct.c, TestStruct.d)
@@ -289,7 +286,6 @@ QueryStmt
         | +-TableScan(column_list=[ComplexTypes.TestStruct#5], table=ComplexTypes, column_index_list=[4], alias="ct")
         +-group_by_list=
           +-TestStruct#11 := ColumnRef(type=STRUCT<c INT32, d STRUCT<a INT32, b STRING>>, column=ComplexTypes.TestStruct#5)
-
 
 DEPRECATION WARNING:
 Lateral column alias will shadow original target: STRUCT<c INT32, d STRUCT<a INT32, b STRING>> (ComplexTypes.TestStruct#5) (implicit) [at 1:50]
@@ -3519,7 +3515,6 @@ QueryStmt
         | +-TableScan(column_list=[TestStructValueTable.value#1], table=TestStructValueTable, column_index_list=[0])
         +-group_by_list=
           +-TestStructValueTable#5 := ColumnRef(type=STRUCT<a INT32, b STRING>, column=TestStructValueTable.value#1)
-
 
 DEPRECATION WARNING:
 Lateral column alias will shadow original target: RANGE_VARIABLE<value#1> (value table) [at 1:48]

@@ -283,6 +283,7 @@ QueryStmt
                       +-kind=MAX
                       +-having_expr=
                         +-Literal(type=INT64, value=3)
+
 [SQLBUILDER_TARGET_SYNTAX_MODE standard]
 [SQLBUILDER_OUTPUT]
 SELECT
@@ -626,6 +627,7 @@ QueryStmt
                     +-type=STRUCT<a_0 INT64>
                     +-field_list=
                       +-ColumnRef(type=INT64, column=$array.a#4)
+
 [SQLBUILDER_TARGET_SYNTAX_MODE standard]
 [SQLBUILDER_OUTPUT]
 SELECT
@@ -1006,6 +1008,7 @@ QueryStmt
                     +-field_list=
                       +-ColumnRef(type=INT64, column=$array.a#4)
                       +-ColumnRef(type=UINT64, column=$array.b#5)
+
 [SQLBUILDER_TARGET_SYNTAX_MODE standard]
 [SQLBUILDER_OUTPUT]
 SELECT
@@ -1455,6 +1458,7 @@ QueryStmt
                       +-kind=MIN
                       +-having_expr=
                         +-Literal(type=INT64, value=3)
+
 [SQLBUILDER_TARGET_SYNTAX_MODE standard]
 [SQLBUILDER_OUTPUT]
 SELECT
@@ -1931,6 +1935,7 @@ QueryStmt
                     +-field_list=
                       +-ColumnRef(type=INT64, column=$array.a#4)
                       +-ColumnRef(type=INT64, column=$orderby.$orderbycol1#6)
+
 [SQLBUILDER_TARGET_SYNTAX_MODE standard]
 [SQLBUILDER_OUTPUT]
 SELECT
@@ -2325,6 +2330,7 @@ QueryStmt
         |                             +-ColumnRef(type=INT64, column=t.correlated#2, is_correlated=TRUE)
         +-input_scan=
           +-WithRefScan(column_list=[t.correlated#2], with_query_name="t")
+
 [SQLBUILDER_TARGET_SYNTAX_MODE standard]
 [SQLBUILDER_OUTPUT]
 WITH

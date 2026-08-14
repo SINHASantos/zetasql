@@ -21,7 +21,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=tvf_one_relation_one_model_arg_with_fixed_output.[double#3, string#4]
-        +-tvf=tvf_one_relation_one_model_arg_with_fixed_output((TABLE<key INT64, value STRING> table_arg, ANY MODEL model_arg) -> TABLE<double DOUBLE, string STRING>)
+        +-tvf=tvf_one_relation_one_model_arg_with_fixed_output
         +-signature=(TABLE<key INT64, value STRING>, ANY MODEL) -> TABLE<double DOUBLE, string STRING>
         +-argument_list=
         | +-FunctionArgument
@@ -51,7 +51,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=[tvf_two_models_with_fixed_output.label#1]
-        +-tvf=tvf_two_models_with_fixed_output((ANY MODEL model_1, ANY MODEL model_2) -> TABLE<label DOUBLE>)
+        +-tvf=tvf_two_models_with_fixed_output
         +-signature=(ANY MODEL, ANY MODEL) -> TABLE<label DOUBLE>
         +-argument_list=
         | +-FunctionArgument
@@ -77,7 +77,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=tvf_one_relation_one_model_arg_with_fixed_output.[double#3, string#4]
-        +-tvf=tvf_one_relation_one_model_arg_with_fixed_output((TABLE<key INT64, value STRING> table_arg, ANY MODEL model_arg) -> TABLE<double DOUBLE, string STRING>)
+        +-tvf=tvf_one_relation_one_model_arg_with_fixed_output
         +-signature=(TABLE<Key INT64, Value STRING>, ANY MODEL) -> TABLE<double DOUBLE, string STRING>
         +-argument_list=
         | +-FunctionArgument
@@ -104,7 +104,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=tvf_one_relation_one_model_arg_with_fixed_output.[double#3, string#4]
-        +-tvf=tvf_one_relation_one_model_arg_with_fixed_output((TABLE<key INT64, value STRING> table_arg, ANY MODEL model_arg) -> TABLE<double DOUBLE, string STRING>)
+        +-tvf=tvf_one_relation_one_model_arg_with_fixed_output
         +-signature=(TABLE<Key INT64, Value STRING>, ANY MODEL) -> TABLE<double DOUBLE, string STRING>
         +-argument_list=
         | +-FunctionArgument
@@ -131,7 +131,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=tvf_one_relation_one_model_arg_with_fixed_output.[double#3, string#4]
-        +-tvf=tvf_one_relation_one_model_arg_with_fixed_output((TABLE<key INT64, value STRING> table_arg, ANY MODEL model_arg) -> TABLE<double DOUBLE, string STRING>)
+        +-tvf=tvf_one_relation_one_model_arg_with_fixed_output
         +-signature=(TABLE<Key INT64, Value STRING>, ANY MODEL) -> TABLE<double DOUBLE, string STRING>
         +-argument_list=
         | +-FunctionArgument
@@ -157,7 +157,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=[tvf_two_models_with_fixed_output.label#1]
-        +-tvf=tvf_two_models_with_fixed_output((ANY MODEL model_1, ANY MODEL model_2) -> TABLE<label DOUBLE>)
+        +-tvf=tvf_two_models_with_fixed_output
         +-signature=(ANY MODEL, ANY MODEL) -> TABLE<label DOUBLE>
         +-argument_list=
         | +-FunctionArgument
@@ -185,7 +185,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=tvf_model_optional_scalar_named_table.[column_bool#2, column_bytes#3]
-        +-tvf=tvf_model_optional_scalar_named_table((ANY MODEL, optional ANY TYPE, optional ANY TABLE foobar) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+        +-tvf=tvf_model_optional_scalar_named_table
         +-signature=(ANY MODEL, STRUCT<INT64>, TABLE<$col1 INT64>) -> TABLE<column_bool BOOL, column_bytes BYTES>
         +-argument_list=
         | +-FunctionArgument
@@ -225,7 +225,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=tvf_model_optional_scalar_named_table.[column_bool#2, column_bytes#3]
-        +-tvf=tvf_model_optional_scalar_named_table((ANY MODEL, optional ANY TYPE, optional ANY TABLE foobar) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+        +-tvf=tvf_model_optional_scalar_named_table
         +-signature=(ANY MODEL, null INT64, TABLE<$col1 INT64>) -> TABLE<column_bool BOOL, column_bytes BYTES>
         +-argument_list=
         | +-FunctionArgument
@@ -262,7 +262,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=tvf_model_optional_scalar_named_table.[column_bool#1, column_bytes#2]
-        +-tvf=tvf_model_optional_scalar_named_table((ANY MODEL, optional ANY TYPE, optional ANY TABLE foobar) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+        +-tvf=tvf_model_optional_scalar_named_table
         +-signature=(ANY MODEL, STRUCT<INT64>) -> TABLE<column_bool BOOL, column_bytes BYTES>
         +-argument_list=
         | +-FunctionArgument
@@ -293,7 +293,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=tvf_model_optional_table_named_string_default.[column_bool#2, column_bytes#3]
-        +-tvf=tvf_model_optional_table_named_string_default((ANY MODEL, optional ANY TABLE, optional STRING {default_value: "default"} foobar) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+        +-tvf=tvf_model_optional_table_named_string_default
         +-signature=(ANY MODEL, TABLE<$col1 STRING>, literal STRING) -> TABLE<column_bool BOOL, column_bytes BYTES>
         +-argument_list=
         | +-FunctionArgument
@@ -330,7 +330,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=tvf_model_optional_table_named_string_default.[column_bool#3, column_bytes#4]
-        +-tvf=tvf_model_optional_table_named_string_default((ANY MODEL, optional ANY TABLE, optional STRING {default_value: "default"} foobar) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+        +-tvf=tvf_model_optional_table_named_string_default
         +-signature=(ANY MODEL, TABLE<$col1 STRING>, STRING) -> TABLE<column_bool BOOL, column_bytes BYTES>
         +-argument_list=
         | +-FunctionArgument
@@ -377,7 +377,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=tvf_model_optional_string_optional_table.[column_bool#3, column_bytes#4]
-        +-tvf=tvf_model_optional_string_optional_table((ANY MODEL, optional STRING, optional ANY TABLE) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+        +-tvf=tvf_model_optional_string_optional_table
         +-signature=(ANY MODEL, STRING, TABLE<$col1 STRING>) -> TABLE<column_bool BOOL, column_bytes BYTES>
         +-argument_list=
         | +-FunctionArgument
@@ -424,7 +424,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=tvf_model_optional_string_optional_table.[column_bool#4, column_bytes#5]
-        +-tvf=tvf_model_optional_string_optional_table((ANY MODEL, optional STRING, optional ANY TABLE) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+        +-tvf=tvf_model_optional_string_optional_table
         +-signature=(ANY MODEL, STRING, TABLE<$col1 STRING, $col2 STRING>) -> TABLE<column_bool BOOL, column_bytes BYTES>
         +-argument_list=
         | +-FunctionArgument
@@ -472,7 +472,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=tvf_model_optional_string_optional_table.[column_bool#4, column_bytes#5]
-        +-tvf=tvf_model_optional_string_optional_table((ANY MODEL, optional STRING, optional ANY TABLE) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+        +-tvf=tvf_model_optional_string_optional_table
         +-signature=(ANY MODEL, STRING, TABLE<Key INT64, Value2 STRING>) -> TABLE<column_bool BOOL, column_bytes BYTES>
         +-argument_list=
         | +-FunctionArgument
@@ -513,7 +513,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=tvf_model_optional_string_optional_table.[column_bool#2, column_bytes#3]
-        +-tvf=tvf_model_optional_string_optional_table((ANY MODEL, optional STRING, optional ANY TABLE) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+        +-tvf=tvf_model_optional_string_optional_table
         +-signature=(ANY MODEL, STRING) -> TABLE<column_bool BOOL, column_bytes BYTES>
         +-argument_list=
         | +-FunctionArgument
@@ -550,7 +550,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=tvf_model_optional_string_optional_table.[column_bool#3, column_bytes#4]
-        +-tvf=tvf_model_optional_string_optional_table((ANY MODEL, optional STRING, optional ANY TABLE) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+        +-tvf=tvf_model_optional_string_optional_table
         +-signature=(ANY MODEL, null STRING, TABLE<Key INT64, Value2 STRING>) -> TABLE<column_bool BOOL, column_bytes BYTES>
         +-argument_list=
         | +-FunctionArgument
@@ -699,7 +699,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=tvf_model_optional_table_named_struct.[column_bool#1, column_bytes#2]
-        +-tvf=tvf_model_optional_table_named_struct((ANY MODEL, optional ANY TABLE, optional <struct> foobar) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+        +-tvf=tvf_model_optional_table_named_struct
         +-signature=(ANY MODEL, TABLE<>, STRUCT<INT64>) -> TABLE<column_bool BOOL, column_bytes BYTES>
         +-argument_list=
         | +-FunctionArgument

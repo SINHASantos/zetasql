@@ -267,6 +267,7 @@ QueryStmt
           +-max_groups_contributed=
             +-parse_location=41-67
             +-Literal(parse_location=66-67, type=INT64, value=0)
+
 [REPLACED_LITERALS]
 select with differential_privacy options(max_groups_contributed = @_p0_INT64) count(*)
 from SimpleTypesWithAnonymizationUid a
@@ -302,6 +303,7 @@ QueryStmt
           +-max_groups_contributed=
             +-parse_location=41-76
             +-Literal(parse_location=66-76, type=INT64, value=2147483648)
+
 [REPLACED_LITERALS]
 select with differential_privacy options(max_groups_contributed = @_p0_INT64) count(*)
 from SimpleTypesWithAnonymizationUid a
@@ -349,6 +351,7 @@ QueryStmt
               +-parse_location=66-69
               +-Literal(parse_location=66-67, type=INT64, value=1)
               +-Literal(parse_location=68-69, type=INT64, value=2)
+
 [REPLACED_LITERALS]
 select with differential_privacy options(max_groups_contributed = @_p0_INT64+@_p1_INT64) count(*)
 from SimpleTypesWithAnonymizationUid a
@@ -385,6 +388,7 @@ QueryStmt
           +-max_groups_contributed=
             +-parse_location=41-83
             +-Parameter(parse_location=66-83, type=INT64, name="test_param_int64")
+
 [REPLACED_LITERALS]
 select with differential_privacy options(max_groups_contributed = @test_param_int64) count(*)
 from SimpleTypesWithAnonymizationUid a
@@ -626,7 +630,6 @@ QueryStmt
         |     +-Literal(type=DOUBLE, value=1)
         +-anonymization_option_list=
           +-max_groups_contributed := Literal(type=INT64, value=1)
-
 
 [REWRITTEN AST]
 QueryStmt

@@ -275,9 +275,9 @@ message DeclarativeTypeProto {
     // Used for UDTs in databases that manage their storage and catalog,
     // to distinguish a type that was dropped and re-created, since that would
     // count as a different type.
-    // For GoogleSQL built-in types, this should always be 0, since there can
-    // never be multiple versions of a built-in type.
-    optional int32 counter = 3 [default = 0];
+    // For GoogleSQL built-in types, this should always be empty, since there
+    // can never be multiple versions of a built-in type.
+    optional string version_id = 3 [default = ""];
   }
 
   enum AllowCoercionMode {

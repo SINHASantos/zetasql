@@ -37,6 +37,7 @@
 #include "googlesql/public/type.pb.h"
 #include "googlesql/public/types/array_type.h"
 #include "googlesql/public/value.h"
+#include "googlesql/reference_impl/memory_accountant.h"
 #include "googlesql/reference_impl/tuple_comparator.h"
 #include "googlesql/reference_impl/variable_id.h"
 #include "absl/base/attributes.h"
@@ -641,59 +642,6 @@ inline std::vector<const TupleData*> StripSharedPtrs(
   return ret;
 }
 
-// Tracks the amount of memory used for tuples in places that accumulate a bunch
-// of them.
-class MemoryAccountant {
- public:
-  // Constructs a MemoryAccountant that can allocate at most 'total_num_bytes'
-  // at once.
-  explicit MemoryAccountant(int64_t total_num_bytes,
-                            absl::string_view name = "")
-      : total_num_bytes_(total_num_bytes),
-        remaining_bytes_(total_num_bytes),
-        name_(name) {}
-
-  MemoryAccountant(const MemoryAccountant&) = delete;
-  MemoryAccountant& operator=(const MemoryAccountant&) = delete;
-  ~MemoryAccountant() { ABSL_DCHECK_EQ(remaining_bytes_, total_num_bytes_); }
-
-  // If there are 'num_bytes' available, updates the number of remaining bytes
-  // accordingly and returns true. Else returns false and populates
-  // 'status'. Does not return absl::Status for performance reasons.
-  bool RequestBytes(int64_t num_bytes, absl::Status* status) {
-    ABSL_DCHECK_GE(num_bytes, 0);
-    if (num_bytes > remaining_bytes_) {
-      *status = absl::ResourceExhaustedError(absl::Substitute(
-          "Out of memory for MemoryAccountant($0): requested $1 bytes but only "
-          "$2 are available out of a total of $3.",
-          name_, num_bytes, remaining_bytes_, total_num_bytes_));
-
-      return false;
-    }
-    remaining_bytes_ -= num_bytes;
-    return true;
-  }
-
-  // Casts `num_bytes` to an int64_t and calls RequestBytes. Returns false and
-  // populates `status` if the cast fails (ie: if `num_bytes` is too large) or
-  // if RequestBytes returns false.
-  bool RequestUInt64Bytes(uint64_t num_bytes, absl::Status* status);
-
-  // Returns 'num_bytes' so they are available to future calls to
-  // RequestBytes().
-  void ReturnBytes(int64_t num_bytes) {
-    remaining_bytes_ += num_bytes;
-    ABSL_DCHECK_LE(remaining_bytes_, total_num_bytes_);
-  }
-
-  int64_t remaining_bytes() const { return remaining_bytes_; }
-
- private:
-  const int64_t total_num_bytes_;
-  int64_t remaining_bytes_;
-  std::string name_;
-};
-
 // Holds a deque of TupleDatas whose memory usage is tracked by a
 // MemoryAccountant, which is not owned by this object.
 class TupleDataDeque {
@@ -838,64 +786,6 @@ class TupleDataOrderedQueue {
   // We use multimap because it is a sorted container that allows duplicates
   // and allows us to associate a payload for each item.
   std::multimap<const TupleData*, ValueEntry, Comparator> entries_;
-};
-
-// Represents a memory reservation on an accountant bytes already allocated by
-// the caller.
-// Frees the bytes in the destructor.
-class MemoryReservation {
- public:
-  // Constructs an empty MemoryReservation
-  explicit MemoryReservation(MemoryAccountant* accountant)
-      : accountant_(accountant), num_bytes_(0) {}
-
-  // A memory reservation is moveable, but not copyable. Moving it transfers
-  // ownership; copying id disallowed altogether to avoid double-free.
-  MemoryReservation(const MemoryReservation&) = delete;
-  MemoryReservation operator=(const MemoryReservation&) = delete;
-  MemoryReservation(MemoryReservation&& reservation)
-      : accountant_(reservation.accountant_),
-        num_bytes_(reservation.num_bytes_) {
-    // Prevent double free when original memory reservation is destroyed.
-    // Also, avoid potential crash if the accountant is destroyed before the
-    // original reservation.
-    reservation.num_bytes_ = 0;
-    reservation.accountant_ = nullptr;
-  }
-
-  // The destructor frees allocated bytes back to the memory accountant.
-  ~MemoryReservation() {
-    if (accountant_ != nullptr) {
-      accountant_->ReturnBytes(num_bytes_);
-    }
-  }
-
-  // Allocates <num_bytes> and updates the reservation accordingly.
-  ABSL_MUST_USE_RESULT bool Increase(int64_t num_bytes, absl::Status* status) {
-    bool success = accountant_->RequestBytes(num_bytes, status);
-    if (success) {
-      num_bytes_ += num_bytes;
-    }
-    return success;
-  }
-
-  // Allocates <num_bytes> and updates the reservation accordingly.
-  ABSL_MUST_USE_RESULT bool IncreaseUInt64(uint64_t num_bytes,
-                                           absl::Status* status) {
-    bool success = accountant_->RequestUInt64Bytes(num_bytes, status);
-    if (success) {
-      // SAFETY: RequestUInt64Bytes returns false when `num_bytes` is too large
-      // to be represented as an int64_t and when `num_bytes` is greater than
-      // a certain int64_t threshold that decreases with each bytes requests.
-      // Hence, this addition is safe and will not overflow.
-      num_bytes_ += num_bytes;
-    }
-    return success;
-  }
-
- private:
-  MemoryAccountant* accountant_;
-  int64_t num_bytes_;
 };
 
 // Helper class to keep track of a distinct set of TupleData's.

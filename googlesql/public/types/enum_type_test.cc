@@ -385,6 +385,14 @@ TEST(EnumTypeTest, EnumTypeIsSupported) {
   EXPECT_TRUE(
       types::NormalizeModeEnumType()->IsSupportedType(proto_base_enabled));
 
+  LanguageOptions bitcast_enabled;
+  bitcast_enabled.EnableLanguageFeature(FEATURE_BIT_CAST_BYTES_FUNCTIONS);
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(const EnumType* endianness_enum_type,
+                       types::EndiannessEnumType());
+  EXPECT_FALSE(endianness_enum_type->IsSupportedType(product_external));
+  EXPECT_FALSE(endianness_enum_type->IsSupportedType(product_internal));
+  EXPECT_TRUE(endianness_enum_type->IsSupportedType(bitcast_enabled));
+
   EXPECT_TRUE(types::RoundingModeEnumType()->IsSupportedType(product_external));
   EXPECT_TRUE(types::RoundingModeEnumType()->IsSupportedType(product_internal));
   EXPECT_TRUE(

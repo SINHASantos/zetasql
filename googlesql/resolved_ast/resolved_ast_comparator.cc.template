@@ -22,6 +22,7 @@
 #include "googlesql/common/errors.h"
 #include "googlesql/public/catalog.h"
 #include "googlesql/public/types/annotation.h"
+#include "googlesql/public/types/row_type.h"
 
 namespace googlesql {
 
@@ -33,6 +34,11 @@ static bool Equals(const std::string& str1, const std::string& str2) {
 }
 
 static bool Equals(const Type* type1, const Type* type2) {
+  if (type1->IsRow() && type2->IsRow()) {
+    // Each GetRowField::type is unique within the resolved ast, so we check
+    // whether they point to the same underlying table instead.
+    return type1->AsRowType()->table() == type2->AsRowType()->table();
+  }
   return type1->Equals(type2);
 }
 

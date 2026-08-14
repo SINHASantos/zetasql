@@ -69,8 +69,10 @@ std::vector<const Type*> GoogleSqlComplexTestTypes(
 
   // Builtin enums & protos should only use the generated pool.
   for (const auto& [name, enum_descriptor] : GetBuiltinEnumDescriptors()) {
-    GOOGLESQL_CHECK_OK(
-        type_factory->MakeEnumType(enum_descriptor, &output.emplace_back()));
+    const EnumType* enum_type;
+    GOOGLESQL_CHECK_OK(internal::TypeFactoryHelper::MakeOpaqueEnumType(
+        type_factory, enum_descriptor, &enum_type, /*catalog_name_path=*/{}));
+    output.push_back(enum_type);
   }
   for (const auto& [name, proto_descriptor] : GetBuiltinProtoDescriptors()) {
     GOOGLESQL_CHECK_OK(
@@ -124,6 +126,7 @@ std::vector<std::string> GoogleSqlTestProtoFilepaths() {
           "googlesql/public/functions/array_find_mode.proto",
           "googlesql/public/functions/array_zip_mode.proto",
           "googlesql/public/functions/bitwise_agg_mode.proto",
+          "googlesql/proto/kmeans_options.proto",
           "googlesql/testdata/test_schema.proto",
           "googlesql/testdata/test_proto3.proto",
           "google/protobuf/duration.proto",

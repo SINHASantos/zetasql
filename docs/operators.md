@@ -381,6 +381,12 @@ ambiguity. For example:
 </tr>
 
 <tr>
+  <td><a href="#map_subscript_operator">Map subscript operator</a>
+</td>
+  <td>Gets the value in a map for a given key.</td>
+</tr>
+
+<tr>
   <td><a href="#struct_subscript_operator">Struct subscript operator</a>
 </td>
   <td>Gets the value of a field at a selected position in a struct.</td>
@@ -720,6 +726,141 @@ SELECT ["coffee", "tea", "milk"][OFFSET(6)] AS item_offset
 [array-first-function]: https://github.com/google/googlesql/blob/master/docs/array_functions.md#array_first
 
 [array-last-function]: https://github.com/google/googlesql/blob/master/docs/array_functions.md#array_last
+
+### Map subscript operator 
+<a id="map_subscript_operator"></a>
+
+```
+map_expression[map_subscript_specifier]
+
+map_subscript_specifier:
+  key_name | mode_keyword(key_name)
+
+mode_keyword:
+  { KEY | SAFE_KEY }
+```
+
+**Description**
+
+Returns the value in a [map][map-type] for a given key.
+
+Input values:
+
++   `map_expression`: A map.
++   `key_name`: When `key_name` is provided without a wrapping keyword,
+    it's the same as `SAFE_KEY(key_name)`. Note that `NULL` is a
+    valid key and can pair with non-`NULL` values. For example,
+    `MAP_FROM_ARRAY([NULL, 1])[NULL]` returns `1`.
++   `mode_keyword(key_name)`: Specifies whether to produce `NULL` or
+    an error if the key isn't present in the map.
+
+    +   `KEY(key_name)`: Returns an error if the key isn't present in the map.
+
+    +   `SAFE_KEY(key_name)`: Returns `NULL` if the key isn't present in the
+        map.
+
+**Return type**
+
+In the map, `V` as represented in `map<K,V>`.
+
+**Examples**
+
+In the following query, the map subscript operator returns the value when the
+key is present:
+
+```googlesql
+SELECT
+  input_map[KEY('B')] AS map_value
+FROM
+  MAP_FROM_ARRAY([('A', 1), ('B', 2), ('C', 3)]) AS input_map;
+
+/*-----------+
+ | map_value |
+ +-----------+
+ | 2         |
+ +-----------*/
+```
+
+In the following query, because the key doesn't exist in the map and `KEY`
+is used, an error is produced:
+
+```googlesql
+-- ERROR: Key not found in map: D
+SELECT
+  input_map[KEY('D')] AS map_value
+FROM
+  MAP_FROM_ARRAY([('A', 1), ('B', 2), ('C', 3)]) AS input_map;
+```
+
+In the following query, because the key doesn't exist in the map and
+`SAFE_KEY` is used, the map subscript operator returns `NULL`:
+
+```googlesql
+SELECT
+  input_map[SAFE_KEY('D')] AS safe_key_missing
+FROM
+  MAP_FROM_ARRAY([('A', 1), ('B', 2), ('C', 3)]) AS input_map;
+
+/*------------------+
+ | safe_key_missing |
+ +------------------+
+ | NULL             |
+ +------------------*/
+```
+
+In the following query, the subscript operator returns `NULL` when the map is
+`NULL`:
+
+```googlesql
+SELECT
+  input_map[KEY('A')] AS null_map
+FROM
+  MAP_FROM_ARRAY(CAST(NULL AS ARRAY<STRUCT<INT64, INT64>>)) AS input_map;
+
+/*-----------+
+ | null_map  |
+ +-----------+
+ | NULL      |
+ +-----------*/
+```
+
+In the following query, the subscript operator returns a non-`NULL` value for
+a `NULL` key because `NULL` is present in the map as a key:
+
+```googlesql
+SELECT
+  input_map[KEY(NULL)] AS map_value
+FROM
+  MAP_FROM_ARRAY([(NULL, -100), ('A', 1), ('B', 2)]) AS input_map;
+
+/*-----------+
+ | map_value |
+ +-----------+
+ | -100      |
+ +-----------*/
+```
+
+In the following query, because a key is used without `KEY()` or `SAFE_KEY()`,
+it has the same behavior as if `SAFE_KEY()` had been used: using keys that
+are present in the map returns the associated value, and keys not present
+return `NULL`.
+
+```googlesql
+SELECT
+  input_map['B'] AS present_key_value,
+  input_map['D'] AS missing_key_value,
+  input_map[NULL] AS missing_null_key_value
+FROM
+  MAP_FROM_ARRAY([('A', 1), ('B', 2), ('C', 3)]) AS input_map;
+
+/*----------------------------------------------------------------+
+ | present_key_value | missing_key_value | missing_null_key_value |
+ +-------------------|-------------------|------------------------+
+ | 2                 | NULL              | NULL                   |
+ +----------------------------------------------------------------*/
+```
+
+[map-type]: https://github.com/google/googlesql/blob/master/docs/data-types.md#map_type
 
 ### Struct subscript operator 
 <a id="struct_subscript_operator"></a>

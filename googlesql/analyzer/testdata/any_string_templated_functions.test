@@ -228,7 +228,7 @@ QueryStmt
         +-input_scan=
         | +-TVFScan
         |   +-column_list=[tvf.col#2{Collation:"und:ci"}]
-        |   +-tvf=tvf((ANY TABLE t, optional ANY STRING {default_value: "abc"} x, optional STRING {default_value: "xyz"} y) -> ANY TABLE)
+        |   +-tvf=tvf
         |   +-signature=(TABLE<col STRING{Collation:"und:ci"}>, literal STRING, literal STRING) -> TABLE<col STRING{Collation:"und:ci"}, x STRING>
         |   +-argument_list=
         |   | +-FunctionArgument
@@ -345,7 +345,7 @@ QueryStmt
         +-input_scan=
         | +-TVFScan
         |   +-column_list=[tvf.col#2{Collation:"und:ci"}]
-        |   +-tvf=tvf((ANY TABLE t, optional ANY STRING {default_value: "abc"} x, optional STRING {default_value: "xyz"} y) -> ANY TABLE)
+        |   +-tvf=tvf
         |   +-signature=(TABLE<col STRING{Collation:"und:ci"}>, literal STRING, literal STRING) -> TABLE<col STRING{Collation:"und:ci"}, x STRING>
         |   +-argument_list=
         |   | +-FunctionArgument

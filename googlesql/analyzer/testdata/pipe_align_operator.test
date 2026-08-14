@@ -138,18 +138,537 @@ QueryStmt
     +-aligned_timestamp_column=$align.aligned_timestamp#6
 ==
 
-# TODO: b/500603925 - Support METRICS clause.
+FROM TimeseriesTableWithTimestampColumn
+|> ALIGN (
+  TIMESTAMP timestamp + INTERVAL 1 MINUTE AS ts_col
+  PERIOD INTERVAL 1 MINUTE
+  ORIGIN TIMESTAMP('2000-01-01')
+  METRICS SUM(requests) WITHIN (1 PERIOD PRECEDING) AS t1,
+          SUM(aligned_timestamp - timestamp) WITHIN (1 PERIOD FOLLOWING) AS t2
+)
+--
+QueryStmt
++-output_column_list=
+| +-$align.t1#9 AS t1 [INT64]
+| +-$align.t2#11 AS t2 [INTERVAL]
+| +-$align.aligned_timestamp#7 AS ts_col [TIMESTAMP]
++-query=
+  +-ProjectScan
+    +-column_list=[$align.aligned_timestamp#7, $estimator.$estimator1#8, $estimator.$estimator2#10, $align.t1#9, $align.t2#11]
+    +-expr_list=
+    | +-t1#9 := ColumnRef(type=INT64, column=$estimator.$estimator1#8)
+    | +-t2#11 := ColumnRef(type=INTERVAL, column=$estimator.$estimator2#10)
+    +-input_scan=
+      +-AlignScan
+        +-column_list=[$align.aligned_timestamp#7, $estimator.$estimator1#8, $estimator.$estimator2#10]
+        +-input_scan=
+        | +-ProjectScan
+        |   +-column_list=[TimeseriesTableWithTimestampColumn.timestamp#3, TimeseriesTableWithTimestampColumn.requests#5, $align.ts_col#6]
+        |   +-expr_list=
+        |   | +-ts_col#6 :=
+        |   |   +-FunctionCall(GoogleSQL:$add(TIMESTAMP, INTERVAL) -> TIMESTAMP)
+        |   |     +-ColumnRef(type=TIMESTAMP, column=TimeseriesTableWithTimestampColumn.timestamp#3)
+        |   |     +-FunctionCall(GoogleSQL:$interval(INT64, ENUM<googlesql.functions.DateTimestampPart>) -> INTERVAL)
+        |   |       +-Literal(type=INT64, value=1)
+        |   |       +-Literal(type=ENUM<googlesql.functions.DateTimestampPart>, value=MINUTE)
+        |   +-input_scan=
+        |     +-TableScan(column_list=TimeseriesTableWithTimestampColumn.[timestamp#3, requests#5], table=TimeseriesTableWithTimestampColumn, column_index_list=[2, 4])
+        +-timestamp_column=
+        | +-ColumnRef(type=TIMESTAMP, column=$align.ts_col#6)
+        +-period=
+        | +-FunctionCall(GoogleSQL:$interval(INT64, ENUM<googlesql.functions.DateTimestampPart>) -> INTERVAL)
+        |   +-Literal(type=INT64, value=1)
+        |   +-Literal(type=ENUM<googlesql.functions.DateTimestampPart>, value=MINUTE)
+        +-origin=
+        | +-FunctionCall(GoogleSQL:timestamp(STRING, optional(0) STRING) -> TIMESTAMP)
+        |   +-Literal(type=STRING, value="2000-01-01")
+        +-output_within=
+        | +-WithinBounds
+        |   +-lower_bound=
+        |   | +-WithinBoundExpr(within_bound_kind=UNBOUNDED PRECEDING)
+        |   +-upper_bound=
+        |     +-WithinBoundExpr(within_bound_kind=ANCHOR TIMESTAMP)
+        +-aligned_timestamp_column=$align.aligned_timestamp#7
+        +-estimator_function_list=
+          +-$estimator1#8 :=
+          | +-EstimatorFunctionCall(GoogleSQL:sum(INT64) -> INT64)
+          |   +-ColumnRef(type=INT64, column=TimeseriesTableWithTimestampColumn.requests#5)
+          |   +-within_bounds=
+          |     +-WithinBounds
+          |       +-lower_bound=
+          |       | +-WithinBoundExpr(within_bound_kind=PERIOD PRECEDING)
+          |       |   +-Literal(type=INT64, value=1)
+          |       +-upper_bound=
+          |         +-WithinBoundExpr(within_bound_kind=ANCHOR TIMESTAMP)
+          +-$estimator2#10 :=
+            +-EstimatorFunctionCall(GoogleSQL:sum(INTERVAL) -> INTERVAL)
+              +-FunctionCall(GoogleSQL:$subtract(TIMESTAMP, TIMESTAMP) -> INTERVAL)
+              | +-ColumnRef(type=TIMESTAMP, column=$align.aligned_timestamp#7)
+              | +-ColumnRef(type=TIMESTAMP, column=$align.ts_col#6)
+              +-within_bounds=
+                +-WithinBounds
+                  +-lower_bound=
+                  | +-WithinBoundExpr(within_bound_kind=ANCHOR TIMESTAMP)
+                  +-upper_bound=
+                    +-WithinBoundExpr(within_bound_kind=PERIOD FOLLOWING)
+                      +-Literal(type=INT64, value=1)
+==
+
+FROM TimeseriesTableWithTimestampColumn
+|> RENAME timestamp AS t
+|> ALIGN (
+  TIMESTAMP timestamp + INTERVAL 1 MINUTE AS ts_col
+  PERIOD INTERVAL 1 MINUTE
+  ORIGIN TIMESTAMP('2000-01-01')
+  METRICS SUM(requests) WITHIN (1 PERIOD PRECEDING) AS t1,
+          SUM(aligned_timestamp - timestamp) WITHIN (1 PERIOD FOLLOWING) AS t2
+)
+--
+ERROR: Unrecognized name: timestamp [at 4:13]
+  TIMESTAMP timestamp + INTERVAL 1 MINUTE AS ts_col
+            ^
+==
+
+FROM TimeseriesTableWithTimestampColumn
+|> RENAME timestamp AS t
+|> ALIGN (
+  TIMESTAMP t + INTERVAL 1 MINUTE AS ts_col
+  PERIOD INTERVAL 1 MINUTE
+  ORIGIN TIMESTAMP('2000-01-01')
+  METRICS SUM(requests) WITHIN (1 PERIOD PRECEDING) AS t1,
+          SUM(aligned_timestamp - timestamp) WITHIN (1 PERIOD FOLLOWING) AS t2
+)
+--
+QueryStmt
++-output_column_list=
+| +-$align.t1#9 AS t1 [INT64]
+| +-$align.t2#11 AS t2 [INTERVAL]
+| +-$align.aligned_timestamp#7 AS ts_col [TIMESTAMP]
++-query=
+  +-ProjectScan
+    +-column_list=[$align.aligned_timestamp#7, $estimator.$estimator1#8, $estimator.$estimator2#10, $align.t1#9, $align.t2#11]
+    +-expr_list=
+    | +-t1#9 := ColumnRef(type=INT64, column=$estimator.$estimator1#8)
+    | +-t2#11 := ColumnRef(type=INTERVAL, column=$estimator.$estimator2#10)
+    +-input_scan=
+      +-AlignScan
+        +-column_list=[$align.aligned_timestamp#7, $estimator.$estimator1#8, $estimator.$estimator2#10]
+        +-input_scan=
+        | +-ProjectScan
+        |   +-column_list=[TimeseriesTableWithTimestampColumn.timestamp#3, TimeseriesTableWithTimestampColumn.requests#5, $align.ts_col#6]
+        |   +-expr_list=
+        |   | +-ts_col#6 :=
+        |   |   +-FunctionCall(GoogleSQL:$add(TIMESTAMP, INTERVAL) -> TIMESTAMP)
+        |   |     +-ColumnRef(type=TIMESTAMP, column=TimeseriesTableWithTimestampColumn.timestamp#3)
+        |   |     +-FunctionCall(GoogleSQL:$interval(INT64, ENUM<googlesql.functions.DateTimestampPart>) -> INTERVAL)
+        |   |       +-Literal(type=INT64, value=1)
+        |   |       +-Literal(type=ENUM<googlesql.functions.DateTimestampPart>, value=MINUTE)
+        |   +-input_scan=
+        |     +-TableScan(column_list=TimeseriesTableWithTimestampColumn.[timestamp#3, requests#5], table=TimeseriesTableWithTimestampColumn, column_index_list=[2, 4])
+        +-timestamp_column=
+        | +-ColumnRef(type=TIMESTAMP, column=$align.ts_col#6)
+        +-period=
+        | +-FunctionCall(GoogleSQL:$interval(INT64, ENUM<googlesql.functions.DateTimestampPart>) -> INTERVAL)
+        |   +-Literal(type=INT64, value=1)
+        |   +-Literal(type=ENUM<googlesql.functions.DateTimestampPart>, value=MINUTE)
+        +-origin=
+        | +-FunctionCall(GoogleSQL:timestamp(STRING, optional(0) STRING) -> TIMESTAMP)
+        |   +-Literal(type=STRING, value="2000-01-01")
+        +-output_within=
+        | +-WithinBounds
+        |   +-lower_bound=
+        |   | +-WithinBoundExpr(within_bound_kind=UNBOUNDED PRECEDING)
+        |   +-upper_bound=
+        |     +-WithinBoundExpr(within_bound_kind=ANCHOR TIMESTAMP)
+        +-aligned_timestamp_column=$align.aligned_timestamp#7
+        +-estimator_function_list=
+          +-$estimator1#8 :=
+          | +-EstimatorFunctionCall(GoogleSQL:sum(INT64) -> INT64)
+          |   +-ColumnRef(type=INT64, column=TimeseriesTableWithTimestampColumn.requests#5)
+          |   +-within_bounds=
+          |     +-WithinBounds
+          |       +-lower_bound=
+          |       | +-WithinBoundExpr(within_bound_kind=PERIOD PRECEDING)
+          |       |   +-Literal(type=INT64, value=1)
+          |       +-upper_bound=
+          |         +-WithinBoundExpr(within_bound_kind=ANCHOR TIMESTAMP)
+          +-$estimator2#10 :=
+            +-EstimatorFunctionCall(GoogleSQL:sum(INTERVAL) -> INTERVAL)
+              +-FunctionCall(GoogleSQL:$subtract(TIMESTAMP, TIMESTAMP) -> INTERVAL)
+              | +-ColumnRef(type=TIMESTAMP, column=$align.aligned_timestamp#7)
+              | +-ColumnRef(type=TIMESTAMP, column=$align.ts_col#6)
+              +-within_bounds=
+                +-WithinBounds
+                  +-lower_bound=
+                  | +-WithinBoundExpr(within_bound_kind=ANCHOR TIMESTAMP)
+                  +-upper_bound=
+                    +-WithinBoundExpr(within_bound_kind=PERIOD FOLLOWING)
+                      +-Literal(type=INT64, value=1)
+==
+
+# Non aggregate function are not supported
 FROM TimeseriesTable
 |> ALIGN (
   TIMESTAMP ts_col
   PERIOD INTERVAL 1 MINUTE
   ORIGIN TIMESTAMP('2000-01-01')
-  METRICS SUM(requests) WITHIN (1 PERIOD PRECEDING) AS total_requests
+  METRICS SQRT(requests) WITHIN (1 PERIOD PRECEDING) AS total_requests
 )
 --
-ERROR: METRICS clause is not supported [at 6:3]
-  METRICS SUM(requests) WITHIN (1 PERIOD PRECEDING) AS total_requests
-  ^
+ERROR: Function SQRT does not support a WITHIN clause [at 6:11]
+  METRICS SQRT(requests) WITHIN (1 PERIOD PRECEDING) AS total_requests
+          ^
+==
+
+# Non aggregate function are not supported
+FROM TimeseriesTable
+|> ALIGN (
+  TIMESTAMP ts_col
+  PERIOD INTERVAL 1 MINUTE
+  ORIGIN TIMESTAMP('2000-01-01')
+  METRICS udf_templated_return_one() WITHIN (1 PERIOD PRECEDING) AS total_requests
+)
+--
+ERROR: Function TEMPLATED_SQL_FUNCTION:UDF_TEMPLATED_RETURN_ONE does not support a WITHIN clause [at 6:11]
+  METRICS udf_templated_return_one() WITHIN (1 PERIOD PRECEDING) AS total_req...
+          ^
+==
+
+# metrics can't be aliased aligned_timestamp
+FROM TimeseriesTable
+|> ALIGN (
+  TIMESTAMP ts_col
+  PERIOD INTERVAL 1 MINUTE
+  ORIGIN TIMESTAMP('2000-01-01')
+  METRICS SUM(requests) WITHIN (1 PERIOD PRECEDING) AS {{aligned_timestamp|`aligned_timestamp`}}
+)
+--
+
+ALTERNATION GROUP: aligned_timestamp
+--
+ERROR: METRICS expression can't be aliased as 'timestamp' or 'aligned_timestamp' [at 6:11]
+  METRICS SUM(requests) WITHIN (1 PERIOD PRECEDING) AS aligned_timestamp
+          ^
+--
+ALTERNATION GROUP: `aligned_timestamp`
+--
+ERROR: METRICS expression can't be aliased as 'timestamp' or 'aligned_timestamp' [at 6:11]
+  METRICS SUM(requests) WITHIN (1 PERIOD PRECEDING) AS `aligned_timestamp`
+          ^
+==
+
+# metrics can't be aliased timestamp
+FROM TimeseriesTable
+|> ALIGN (
+  TIMESTAMP ts_col
+  PERIOD INTERVAL 1 MINUTE
+  ORIGIN TIMESTAMP('2000-01-01')
+  METRICS SUM(requests) WITHIN (1 PERIOD PRECEDING) AS {{timestamp|`timestamp`}}
+)
+--
+
+ALTERNATION GROUP: timestamp
+--
+ERROR: METRICS expression can't be aliased as 'timestamp' or 'aligned_timestamp' [at 6:11]
+  METRICS SUM(requests) WITHIN (1 PERIOD PRECEDING) AS timestamp
+          ^
+--
+ALTERNATION GROUP: `timestamp`
+--
+ERROR: METRICS expression can't be aliased as 'timestamp' or 'aligned_timestamp' [at 6:11]
+  METRICS SUM(requests) WITHIN (1 PERIOD PRECEDING) AS `timestamp`
+          ^
+==
+
+[language_features=NONE,+ALIGN_OPERATOR,+INTERVAL_TYPE,+PIPES,+ANALYTIC_FUNCTIONS]
+# percent_rank doesn't support within clause
+FROM TimeseriesTable
+|> ALIGN (
+  TIMESTAMP ts_col
+  PERIOD INTERVAL 1 MINUTE
+  ORIGIN TIMESTAMP('2000-01-01')
+  METRICS PERCENT_RANK() WITHIN (1 PERIOD PRECEDING) AS m
+)
+--
+ERROR: Analytic function PERCENT_RANK does not support a WITHIN clause [at 7:11]
+  METRICS PERCENT_RANK() WITHIN (1 PERIOD PRECEDING) AS m
+          ^
+==
+
+# UDAFs support within clause
+FROM TimeseriesTable
+|> ALIGN (
+  TIMESTAMP ts_col
+  PERIOD INTERVAL 1 MINUTE
+  ORIGIN TIMESTAMP('2000-01-01')
+  METRICS {{uda_valid_templated_return_sum_int64_arg(requests)|uda_valid_templated_return_int64_not_aggregate_arg(requests)|uda_valid_templated_return_int64_not_aggregate_arg(1)|uda_valid_templated_return_int64_aggregate_and_not_aggregate_arg(requests, 1)}} WITHIN (1 PERIOD PRECEDING) AS m
+)
+--
+ALTERNATION GROUP: uda_valid_templated_return_sum_int64_arg(requests)
+--
+QueryStmt
++-output_column_list=
+| +-$align.m#8 AS m [INT64]
+| +-$align.aligned_timestamp#6 AS ts_col [TIMESTAMP]
++-query=
+  +-ProjectScan
+    +-column_list=[$align.aligned_timestamp#6, $estimator.$estimator1#7, $align.m#8]
+    +-expr_list=
+    | +-m#8 := ColumnRef(type=INT64, column=$estimator.$estimator1#7)
+    +-input_scan=
+      +-AlignScan
+        +-column_list=[$align.aligned_timestamp#6, $estimator.$estimator1#7]
+        +-input_scan=
+        | +-TableScan(column_list=TimeseriesTable.[ts_col#3, requests#5], table=TimeseriesTable, column_index_list=[2, 4])
+        +-timestamp_column=
+        | +-ColumnRef(type=TIMESTAMP, column=TimeseriesTable.ts_col#3)
+        +-period=
+        | +-FunctionCall(GoogleSQL:$interval(INT64, ENUM<googlesql.functions.DateTimestampPart>) -> INTERVAL)
+        |   +-Literal(type=INT64, value=1)
+        |   +-Literal(type=ENUM<googlesql.functions.DateTimestampPart>, value=MINUTE)
+        +-origin=
+        | +-FunctionCall(GoogleSQL:timestamp(STRING, optional(0) STRING) -> TIMESTAMP)
+        |   +-Literal(type=STRING, value="2000-01-01")
+        +-output_within=
+        | +-WithinBounds
+        |   +-lower_bound=
+        |   | +-WithinBoundExpr(within_bound_kind=UNBOUNDED PRECEDING)
+        |   +-upper_bound=
+        |     +-WithinBoundExpr(within_bound_kind=ANCHOR TIMESTAMP)
+        +-aligned_timestamp_column=$align.aligned_timestamp#6
+        +-estimator_function_list=
+          +-$estimator1#7 :=
+            +-EstimatorFunctionCall(Templated_SQL_Function:uda_valid_templated_return_sum_int64_arg(INT64) -> INT64)
+              +-ColumnRef(type=INT64, column=TimeseriesTable.requests#5)
+              +-within_bounds=
+                +-WithinBounds
+                  +-lower_bound=
+                  | +-WithinBoundExpr(within_bound_kind=PERIOD PRECEDING)
+                  |   +-Literal(type=INT64, value=1)
+                  +-upper_bound=
+                    +-WithinBoundExpr(within_bound_kind=ANCHOR TIMESTAMP)
+--
+ALTERNATION GROUP: uda_valid_templated_return_int64_not_aggregate_arg(requests)
+--
+ERROR: The argument to TEMPLATED_SQL_FUNCTION:UDA_VALID_TEMPLATED_RETURN_INT64_NOT_AGGREGATE_ARG must be a literal or query parameter [at 6:62]
+...uda_valid_templated_return_int64_not_aggregate_arg(requests) WITHIN (1 PER...
+                                                      ^
+--
+ALTERNATION GROUP: uda_valid_templated_return_int64_not_aggregate_arg(1)
+--
+QueryStmt
++-output_column_list=
+| +-$align.m#8 AS m [INT64]
+| +-$align.aligned_timestamp#6 AS ts_col [TIMESTAMP]
++-query=
+  +-ProjectScan
+    +-column_list=[$align.aligned_timestamp#6, $estimator.$estimator1#7, $align.m#8]
+    +-expr_list=
+    | +-m#8 := ColumnRef(type=INT64, column=$estimator.$estimator1#7)
+    +-input_scan=
+      +-AlignScan
+        +-column_list=[$align.aligned_timestamp#6, $estimator.$estimator1#7]
+        +-input_scan=
+        | +-TableScan(column_list=[TimeseriesTable.ts_col#3], table=TimeseriesTable, column_index_list=[2])
+        +-timestamp_column=
+        | +-ColumnRef(type=TIMESTAMP, column=TimeseriesTable.ts_col#3)
+        +-period=
+        | +-FunctionCall(GoogleSQL:$interval(INT64, ENUM<googlesql.functions.DateTimestampPart>) -> INTERVAL)
+        |   +-Literal(type=INT64, value=1)
+        |   +-Literal(type=ENUM<googlesql.functions.DateTimestampPart>, value=MINUTE)
+        +-origin=
+        | +-FunctionCall(GoogleSQL:timestamp(STRING, optional(0) STRING) -> TIMESTAMP)
+        |   +-Literal(type=STRING, value="2000-01-01")
+        +-output_within=
+        | +-WithinBounds
+        |   +-lower_bound=
+        |   | +-WithinBoundExpr(within_bound_kind=UNBOUNDED PRECEDING)
+        |   +-upper_bound=
+        |     +-WithinBoundExpr(within_bound_kind=ANCHOR TIMESTAMP)
+        +-aligned_timestamp_column=$align.aligned_timestamp#6
+        +-estimator_function_list=
+          +-$estimator1#7 :=
+            +-EstimatorFunctionCall(Templated_SQL_Function:uda_valid_templated_return_int64_not_aggregate_arg(INT64) -> INT64)
+              +-Literal(type=INT64, value=1)
+              +-within_bounds=
+                +-WithinBounds
+                  +-lower_bound=
+                  | +-WithinBoundExpr(within_bound_kind=PERIOD PRECEDING)
+                  |   +-Literal(type=INT64, value=1)
+                  +-upper_bound=
+                    +-WithinBoundExpr(within_bound_kind=ANCHOR TIMESTAMP)
+--
+ALTERNATION GROUP: uda_valid_templated_return_int64_aggregate_and_not_aggregate_arg(requests, 1)
+--
+QueryStmt
++-output_column_list=
+| +-$align.m#8 AS m [INT64]
+| +-$align.aligned_timestamp#6 AS ts_col [TIMESTAMP]
++-query=
+  +-ProjectScan
+    +-column_list=[$align.aligned_timestamp#6, $estimator.$estimator1#7, $align.m#8]
+    +-expr_list=
+    | +-m#8 := ColumnRef(type=INT64, column=$estimator.$estimator1#7)
+    +-input_scan=
+      +-AlignScan
+        +-column_list=[$align.aligned_timestamp#6, $estimator.$estimator1#7]
+        +-input_scan=
+        | +-TableScan(column_list=TimeseriesTable.[ts_col#3, requests#5], table=TimeseriesTable, column_index_list=[2, 4])
+        +-timestamp_column=
+        | +-ColumnRef(type=TIMESTAMP, column=TimeseriesTable.ts_col#3)
+        +-period=
+        | +-FunctionCall(GoogleSQL:$interval(INT64, ENUM<googlesql.functions.DateTimestampPart>) -> INTERVAL)
+        |   +-Literal(type=INT64, value=1)
+        |   +-Literal(type=ENUM<googlesql.functions.DateTimestampPart>, value=MINUTE)
+        +-origin=
+        | +-FunctionCall(GoogleSQL:timestamp(STRING, optional(0) STRING) -> TIMESTAMP)
+        |   +-Literal(type=STRING, value="2000-01-01")
+        +-output_within=
+        | +-WithinBounds
+        |   +-lower_bound=
+        |   | +-WithinBoundExpr(within_bound_kind=UNBOUNDED PRECEDING)
+        |   +-upper_bound=
+        |     +-WithinBoundExpr(within_bound_kind=ANCHOR TIMESTAMP)
+        +-aligned_timestamp_column=$align.aligned_timestamp#6
+        +-estimator_function_list=
+          +-$estimator1#7 :=
+            +-EstimatorFunctionCall(Templated_SQL_Function:uda_valid_templated_return_int64_aggregate_and_not_aggregate_arg(INT64, INT64) -> INT64)
+              +-ColumnRef(type=INT64, column=TimeseriesTable.requests#5)
+              +-Literal(type=INT64, value=1)
+              +-within_bounds=
+                +-WithinBounds
+                  +-lower_bound=
+                  | +-WithinBoundExpr(within_bound_kind=PERIOD PRECEDING)
+                  |   +-Literal(type=INT64, value=1)
+                  +-upper_bound=
+                    +-WithinBoundExpr(within_bound_kind=ANCHOR TIMESTAMP)
+==
+
+# table columns are not allowed outside estimator functions
+FROM TimeseriesTable
+|> ALIGN (
+  TIMESTAMP ts_col
+  PERIOD INTERVAL 1 MINUTE
+  ORIGIN TIMESTAMP('2000-01-01')
+  METRICS requests + SUM(requests) WITHIN (1 PERIOD PRECEDING) AS m
+)
+--
+ERROR: Unrecognized name: requests [at 6:11]
+  METRICS requests + SUM(requests) WITHIN (1 PERIOD PRECEDING) AS m
+          ^
+==
+
+# metrics should contain estimator function
+FROM TimeseriesTable
+|> ALIGN (
+  TIMESTAMP ts_col
+  PERIOD INTERVAL 1 MINUTE
+  ORIGIN TIMESTAMP('2000-01-01')
+  METRICS 1 AS m
+)
+--
+ERROR: METRICS expression doesn't contain estimator function [at 6:11]
+  METRICS 1 AS m
+          ^
+==
+
+# modifiers are not supported in estimator function
+FROM TimeseriesTable
+|> ALIGN (
+  TIMESTAMP ts_col
+  PERIOD INTERVAL 1 MINUTE
+  ORIGIN TIMESTAMP('2000-01-01')
+  METRICS SUM({{requests IGNORE NULLS|requests WHERE true|requests LIMIT 5|AVG(requests) GROUP BY ts_col|AVG(requests) GROUP BY ts_col HAVING true|requests HAVING MAX ts_col|DISTINCT requests|requests CLAMPED BETWEEN 1 AND 10|requests ORDER BY ts_col|requests WITH REPORT}}) WITHIN () AS total_requests
+)
+--
+ALTERNATION GROUP: requests IGNORE NULLS
+--
+ERROR: Modifiers are not allowed in estimator functions [at 6:11]
+  METRICS SUM(requests IGNORE NULLS) WITHIN () AS total_requests
+          ^
+--
+ALTERNATION GROUP: requests WHERE true
+--
+ERROR: Modifiers are not allowed in estimator functions [at 6:11]
+  METRICS SUM(requests WHERE true) WITHIN () AS total_requests
+          ^
+--
+ALTERNATION GROUP: requests LIMIT 5
+--
+ERROR: Modifiers are not allowed in estimator functions [at 6:11]
+  METRICS SUM(requests LIMIT 5) WITHIN () AS total_requests
+          ^
+--
+ALTERNATION GROUP: AVG(requests) GROUP BY ts_col
+--
+ERROR: Modifiers are not allowed in estimator functions [at 6:11]
+  METRICS SUM(AVG(requests) GROUP BY ts_col) WITHIN () AS total_requests
+          ^
+--
+ALTERNATION GROUP: AVG(requests) GROUP BY ts_col HAVING true
+--
+ERROR: Modifiers are not allowed in estimator functions [at 6:11]
+  METRICS SUM(AVG(requests) GROUP BY ts_col HAVING true) WITHIN () AS total_r...
+          ^
+--
+ALTERNATION GROUP: requests HAVING MAX ts_col
+--
+ERROR: Modifiers are not allowed in estimator functions [at 6:11]
+  METRICS SUM(requests HAVING MAX ts_col) WITHIN () AS total_requests
+          ^
+--
+ALTERNATION GROUP: DISTINCT requests
+--
+ERROR: Modifiers are not allowed in estimator functions [at 6:11]
+  METRICS SUM(DISTINCT requests) WITHIN () AS total_requests
+          ^
+--
+ALTERNATION GROUP: requests CLAMPED BETWEEN 1 AND 10
+--
+ERROR: Modifiers are not allowed in estimator functions [at 6:11]
+  METRICS SUM(requests CLAMPED BETWEEN 1 AND 10) WITHIN () AS total_requests
+          ^
+--
+ALTERNATION GROUP: requests ORDER BY ts_col
+--
+ERROR: Modifiers are not allowed in estimator functions [at 6:11]
+  METRICS SUM(requests ORDER BY ts_col) WITHIN () AS total_requests
+          ^
+--
+ALTERNATION GROUP: requests WITH REPORT
+--
+ERROR: Modifiers are not allowed in estimator functions [at 6:11]
+  METRICS SUM(requests WITH REPORT) WITHIN () AS total_requests
+          ^
+==
+
+# aligned_timestamp is not allowed in WITHIN clause
+FROM TimeseriesTable
+|> ALIGN (
+  TIMESTAMP ts_col
+  PERIOD INTERVAL 1 MINUTE
+  ORIGIN TIMESTAMP('2000-01-01')
+  METRICS SUM(requests) WITHIN (RANGE FROM aligned_timestamp) AS total_requests
+)
+--
+ERROR: Unrecognized name: aligned_timestamp [at 6:44]
+  METRICS SUM(requests) WITHIN (RANGE FROM aligned_timestamp) AS total_requests
+                                           ^
+==
+
+# PARTITION BY alias is not allowed in WITHIN clause
+FROM TimeseriesTable
+|> ALIGN (
+  TIMESTAMP ts_col
+  PERIOD INTERVAL 1 MINUTE
+  ORIGIN TIMESTAMP('2000-01-01')
+  PARTITION BY borg_task_num AS b
+  METRICS SUM(requests) WITHIN (RANGE FROM INTERVAL b MINUTE PRECEDING) AS total_requests
+)
+--
+ERROR: Unrecognized name: b [at 7:53]
+  METRICS SUM(requests) WITHIN (RANGE FROM INTERVAL b MINUTE PRECEDING) AS to...
+                                                    ^
 ==
 
 # Correlated columns are allowed
@@ -235,3 +754,104 @@ QueryStmt
             | +-ColumnRef(type=STRING, column=$align.borg_job#11)
             | +-ColumnRef(type=INT64, column=$align.task_num#12)
             +-aligned_timestamp_column=$align.aligned_timestamp#13
+
+==
+
+[language_features=NONE,+ALIGN_OPERATOR,+INTERVAL_TYPE,+PIPES,+ENABLE_MEASURES]
+# Measure aggregate functions cannot be used as estimator functions.
+FROM TimeseriesTable
+|> ALIGN (
+  TIMESTAMP ts_col
+  PERIOD INTERVAL 1 MINUTE
+  ORIGIN TIMESTAMP('2000-01-01')
+  METRICS AGG(requests) WITHIN (1 PERIOD PRECEDING) AS total_requests
+)
+--
+ERROR: AGG function cannot be used as an estimator function [at 7:11]
+  METRICS AGG(requests) WITHIN (1 PERIOD PRECEDING) AS total_requests
+          ^
+==
+
+[language_features=NONE,+ALIGN_OPERATOR,+INTERVAL_TYPE,+PIPES,+GROUPING_BUILTIN]
+# Grouping functions cannot be used as estimator functions.
+FROM TimeseriesTable
+|> ALIGN (
+  TIMESTAMP ts_col
+  PERIOD INTERVAL 1 MINUTE
+  ORIGIN TIMESTAMP('2000-01-01')
+  METRICS GROUPING(requests) WITHIN (1 PERIOD PRECEDING) AS total_requests
+)
+--
+ERROR: GROUPING function cannot be used as an estimator function [at 7:11]
+  METRICS GROUPING(requests) WITHIN (1 PERIOD PRECEDING) AS total_requests
+          ^
+==
+
+# Estimator function cannot be nested inside another estimator function.
+FROM TimeseriesTable
+|> ALIGN (
+  TIMESTAMP ts_col
+  PERIOD INTERVAL 1 MINUTE
+  ORIGIN TIMESTAMP('2000-01-01')
+  METRICS SUM(SUM(requests) WITHIN (1 PERIOD PRECEDING)) WITHIN (1 PERIOD PRECEDING) AS total_requests
+)
+--
+ERROR: Estimator function cannot be an argument of another estimator function [at 6:11]
+  METRICS SUM(SUM(requests) WITHIN (1 PERIOD PRECEDING)) WITHIN (1 PERIOD PRE...
+          ^
+==
+
+
+# Aggregate function is not allowed in metrics.
+FROM TimeseriesTable
+|> ALIGN (
+  TIMESTAMP ts_col
+  PERIOD INTERVAL 1 MINUTE
+  ORIGIN TIMESTAMP('2000-01-01')
+  PARTITION BY borg_job, borg_task_num
+  METRICS SUM(borg_task_num) + SUM(requests) WITHIN (1 PERIOD PRECEDING) AS total_requests
+)
+--
+ERROR: Aggregate function SUM not allowed in ALIGN Operator [at 7:11]
+  METRICS SUM(borg_task_num) + SUM(requests) WITHIN (1 PERIOD PRECEDING) AS t...
+          ^
+==
+
+[language_features=NONE,+ALIGN_OPERATOR,+INTERVAL_TYPE,+PIPES,+ANALYTIC_FUNCTIONS]
+# Analytics function is not allowed in metrics.
+FROM TimeseriesTable
+|> ALIGN (
+  TIMESTAMP ts_col
+  PERIOD INTERVAL 1 MINUTE
+  ORIGIN TIMESTAMP('2000-01-01')
+  METRICS SUM(aligned_timestamp) OVER (
+    ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING
+  ) + SUM(requests) WITHIN (1 PERIOD PRECEDING) AS total_requests
+)
+--
+ERROR: Analytic function not allowed in ALIGN Operator [at 7:11]
+  METRICS SUM(aligned_timestamp) OVER (
+          ^
+==
+
+# Check estimator presence check works correctly even with nested ALIGN
+FROM TimeseriesTable
+|> ALIGN (
+  TIMESTAMP ts_col
+  PERIOD INTERVAL 1 MINUTE
+  ORIGIN TIMESTAMP('2000-01-01')
+  PARTITION BY borg_job, borg_task_num
+  METRICS
+    SUM((FROM TimeseriesTable
+         |> ALIGN (
+              TIMESTAMP ts_col
+              PERIOD INTERVAL 1 MINUTE
+              METRICS SUM(1) WITHIN () AS t)
+        |> SELECT 1
+        |> LIMIT 1)) WITHIN (1 PERIOD PRECEDING) AS b,
+    SUM(1) AS c
+)
+--
+ERROR: Aggregate function SUM not allowed in ALIGN Operator [at 15:5]
+    SUM(1) AS c
+    ^

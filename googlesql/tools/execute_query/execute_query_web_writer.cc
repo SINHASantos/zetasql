@@ -123,7 +123,7 @@ std::string DecorateASTDebugStringWithHTMLTagsImpl(
   // The string is replaced with the captured ASCII tree characters and the node
   // name wrapped in a span with the class `ast-node`.
   static LazyRE2 kNodeName = {
-      R"re((?m)(^[ │├└─|+-]*)([A-Z][A-Za-z]*)(\(|$))re"};
+      R"re((?m)(^(?:[ .│├└─|+-]|&gt;)*)([A-Z][A-Za-z]*)(\(|$))re"};
   RE2::GlobalReplace(&ast_debug_string, *kNodeName,
                      R"html(\1<span class="ast-node">\2</span>\3)html");
 
@@ -266,7 +266,9 @@ absl::Status ExecuteQueryWebWriter::resolved(const ResolvedNode& ast) {
   current_statement_params_["result_analyzed"] =
       DecorateASTDebugStringWithHTMLTags(
           ast.DebugString(ResolvedNode::DebugStringConfig{
-              .print_created_columns = true, .use_box_glyphs = true}));
+              .print_created_columns = true,
+              .use_box_glyphs = true,
+              .linear_mode = linear_resolved_ast_}));
   got_results_ = true;
   return absl::OkStatus();
 }
@@ -275,7 +277,9 @@ absl::Status ExecuteQueryWebWriter::rewritten(absl::string_view rewriter_name,
                                               const ResolvedNode& ast) {
   std::string formatted_ast = DecorateASTDebugStringWithHTMLTags(
       ast.DebugString(ResolvedNode::DebugStringConfig{
-          .print_created_columns = true, .use_box_glyphs = true}));
+          .print_created_columns = true,
+          .use_box_glyphs = true,
+          .linear_mode = linear_resolved_ast_}));
 
   current_rewrites_.push_back(mstch::map{
       {"rewriter_name", std::string(rewriter_name)},
@@ -353,14 +357,13 @@ void ExecuteQueryWebWriter::FlushStatement(bool at_end, std::string error_msg) {
     }
 
     if (!current_rewrites_.empty()) {
-      current_statement_params_.emplace("result_analyzed_final",
-                                        current_rewrites_.back()["ast"]);
-      current_statement_params_.emplace(
-          "final_rewriter_name", current_rewrites_.back()["rewriter_name"]);
-      if (current_rewrites_.size() > 1) {
-        current_statement_params_["result_analyzed_rewrites"] = mstch::array(
-            current_rewrites_.begin(), current_rewrites_.end() - 1);
+      // Assign 1-based step indices to each rewrite entry so templates and
+      // inline JS can match breadcrumbs to AST panels.
+      for (size_t i = 0; i < current_rewrites_.size(); ++i) {
+        current_rewrites_[i].emplace("step_index", static_cast<int>(i + 1));
       }
+      current_statement_params_["result_analyzed_rewrites"] =
+          mstch::array(current_rewrites_.begin(), current_rewrites_.end());
     }
 
     // This would be preferred, but I can't get it work on these boost

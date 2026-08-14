@@ -322,7 +322,6 @@ QueryStmt
         | +-Literal(type=ARRAY<INT64>, value=[1, 2])
         +-element_column_list=[$array.Value#2]
 
-
 DEPRECATION WARNING:
 UNPIVOT is not allowed with array scans. This will become an error [at 2:63]
 ...UNNEST(['a', 'b']) AS k, UNNEST([1,2]) AS Value UNPIVOT(a for b in (Key));
@@ -358,7 +357,6 @@ QueryStmt
         +-array_expr_list=
         | +-Literal(type=ARRAY<INT64>, value=[1, 2])
         +-element_column_list=[$array.Value#3]
-
 
 DEPRECATION WARNING:
 UNPIVOT is not allowed with array scans. This will become an error [at 2:48]
@@ -402,7 +400,6 @@ QueryStmt
         +-array_expr_list=
         | +-Literal(type=ARRAY<INT64>, value=[1, 2])
         +-element_column_list=[$array.Value#4]
-
 
 DEPRECATION WARNING:
 UNPIVOT is not allowed with array scans. This will become an error [at 2:73]
@@ -1008,7 +1005,7 @@ QueryStmt
       +-UnpivotScan
         +-column_list=$unpivot.[column_bool#5, a#3, b#4]
         +-input_scan=
-        | +-TVFScan(column_list=tvf_no_args.[column_bool#1, column_bytes#2], tvf=tvf_no_args(() -> TABLE<column_bool BOOL, column_bytes BYTES>), signature=() -> TABLE<column_bool BOOL, column_bytes BYTES>, column_index_list=[0, 1], function_call_signature=() -> TABLE<column_bool BOOL, column_bytes BYTES>)
+        | +-TVFScan(column_list=tvf_no_args.[column_bool#1, column_bytes#2], tvf=tvf_no_args, signature=() -> TABLE<column_bool BOOL, column_bytes BYTES>, column_index_list=[0, 1], function_call_signature=() -> TABLE<column_bool BOOL, column_bytes BYTES>)
         +-value_column_list=[$unpivot.a#3]
         +-label_column=$unpivot.b#4
         +-label_list=
@@ -1054,7 +1051,7 @@ QueryStmt
             | +-ArrayScan
             |   +-column_list=[tvf_no_args.column_bool#1, tvf_no_args.column_bytes#2, unpivot_array_0.unpivot_unnest#6]
             |   +-input_scan=
-            |   | +-TVFScan(column_list=tvf_no_args.[column_bool#1, column_bytes#2], tvf=tvf_no_args(() -> TABLE<column_bool BOOL, column_bytes BYTES>), signature=() -> TABLE<column_bool BOOL, column_bytes BYTES>, column_index_list=[0, 1], function_call_signature=() -> TABLE<column_bool BOOL, column_bytes BYTES>)
+            |   | +-TVFScan(column_list=tvf_no_args.[column_bool#1, column_bytes#2], tvf=tvf_no_args, signature=() -> TABLE<column_bool BOOL, column_bytes BYTES>, column_index_list=[0, 1], function_call_signature=() -> TABLE<column_bool BOOL, column_bytes BYTES>)
             |   +-array_expr_list=
             |   | +-FunctionCall(GoogleSQL:$make_array(repeated(1) STRUCT<a BYTES, b STRING>) -> ARRAY<STRUCT<a BYTES, b STRING>>)
             |   |   +-MakeStruct
@@ -1158,7 +1155,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=tvf_one_relation_arg_with_fixed_output.[column_bool#6, column_bytes#7]
-        +-tvf=tvf_one_relation_arg_with_fixed_output((ANY TABLE) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+        +-tvf=tvf_one_relation_arg_with_fixed_output
         +-signature=(TABLE<Value STRING, a INT64, b STRING>) -> TABLE<column_bool BOOL, column_bytes BYTES>
         +-argument_list=
         | +-FunctionArgument
@@ -1199,7 +1196,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=tvf_one_relation_arg_with_fixed_output.[column_bool#6, column_bytes#7]
-        +-tvf=tvf_one_relation_arg_with_fixed_output((ANY TABLE) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+        +-tvf=tvf_one_relation_arg_with_fixed_output
         +-signature=(TABLE<Value STRING, a INT64, b STRING>) -> TABLE<column_bool BOOL, column_bytes BYTES>
         +-argument_list=
         | +-FunctionArgument

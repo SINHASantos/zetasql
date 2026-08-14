@@ -24,7 +24,7 @@ import "google/protobuf/timestamp.proto";
 option cc_enable_arenas = true;
 option java_package = "com.google.googlesql";
 option java_outer_classname = "GoogleSQLValue";
-
+//
 // ValueProto represents the serialized form of the googlesql::Value.
 //
 // The intention is to support multiple languages including Java and C++, so we

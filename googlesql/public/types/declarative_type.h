@@ -36,6 +36,13 @@
 
 namespace googlesql {
 
+// Uniquely identifies a declaratively-defined type.
+// Any two instances with the same TypeId are identical and Type::Equals() must
+// return true, and their behaviors must be identical.
+//
+// TypeFactory currently caches DeclarativeTypes based on TypeId, and any
+// repeated calls to MakeDeclarativeType() with the same TypeId return the same
+// Type* and GOOGLESQL_RET_CHECK that the descriptors are identical.
 struct TypeId {
   static constexpr absl::string_view kGoogleSqlNamespace = "GoogleSQL";
 
@@ -45,16 +52,16 @@ struct TypeId {
   // *DO NOT* use this alone for identity checks. The whole TypeId needs to be
   // considered.
   std::string local_id;
-  // Used for UDTs in databases that manage their storage and catalog,
-  // to distinguish a type that was dropped and re-created, since that would
-  // count as a different type.
-  // For GoogleSQL built-in types, this should always be 0, since there can
-  // never be multiple versions of a built-in type.
-  int32_t counter = 0;
+  // An optional version ID.
+  // This can be used by systems managing user-defined types (UDTs) to
+  // distinguish different iterations of a type (e.g., if a type is dropped
+  // and re-created under the same name/handle).
+  // For GoogleSQL built-in types, this should always be empty.
+  std::string version_id;
 
   bool operator==(const TypeId& other) const {
     return name_space == other.name_space && local_id == other.local_id &&
-           counter == other.counter;
+           version_id == other.version_id;
   }
 
   bool IsGoogleSQLBuiltin() const { return name_space == kGoogleSqlNamespace; }
@@ -62,10 +69,43 @@ struct TypeId {
   template <typename H>
   friend H AbslHashValue(H h, const TypeId& type_id) {
     return H::combine(std::move(h), type_id.name_space, type_id.local_id,
-                      type_id.counter);
+                      type_id.version_id);
   }
 };
 
+// This contains all the information to fully specify a DeclarativeType. It
+// describes the type's properties, traits, and full behavior. It also
+// specifies its identity through the TypeId, which uniquely identifies the
+// type.
+//
+// Unlike primitive types where the analyzer code sometimes hard-codes some
+// behaviors, everything about a DeclarativeType's behavior is localized to its
+// `DeclarativeTypeDescriptor`'s setup.
+//
+// This is quite similar to how ProtoType and EnumType are created generically,
+// relying on the descriptor. However, descriptors for declaratively-defined
+// types ("declarative types" for short) define the type's identity as well, not
+// just its behavior.
+//
+// Notes:
+// * `TypeId` is always required. It uniquely identifies the type.
+//   If multiple instances are created with the same TypeId, they must be
+//   identical: they are the same type, and Type::Equals() returns true.
+//
+// * `backing_type` is always required. It is used primarily for value
+//    representation. For example:
+//   - An engine implementing a type ComplexNumber could, under the hood,
+//     represent values as a struct of two doubles.
+//   - User-created types: a `CREATE TYPE` statement normally would specify a
+//     backing type for the engine to know how to represent values.
+//     The user-visible "base type" naturally lends itself to be the
+//     `backing_type`.
+//
+//   Serialization and deserialization are delegated to the backing type. The
+//   framework also supports delegating some traits (such as equality) to the
+//   backing type.
+//
+// See (broken link) for more details.
 class DeclarativeTypeDescriptor final {
  public:
   DeclarativeTypeDescriptor() = default;
@@ -195,6 +235,23 @@ class DeclarativeTypeDescriptor final {
   std::unique_ptr<Data> data_ = std::make_unique<Data>();
 };
 
+// A declaratively-specified type ("declarative type", for short).
+// Such types are created from a `DeclarativeTypeDescriptor`, which fully
+// specifies the type's properties, traits, behavior and even identity.
+//
+// Note that DeclarativeTypes are first-class citizens in the Type system.
+// The fact that they are implemented through the declarative type framework is
+// an implementation detail which should stay hidden from the various
+// components.
+//
+// This class encapsulates the `DeclarativeTypeDescriptor` and presents the type
+// to the GoogleSQL analyzer (Resolver, Coercer, etc.) as an opaque type.
+// There is no implied semantic relationship or coercibility (in SQL) to/from
+// the backing type.
+// Value representation is delegated to the backing type.
+// Various other traits are defined in terms of the backing type, e.g. through
+// disabling or delegating.
+//
 // See (broken link) for more on declarative types.
 class DeclarativeType final : public Type {
  public:
@@ -289,6 +346,8 @@ class DeclarativeType final : public Type {
 
   absl::HashState HashValueContent(const ValueContent& value,
                                    absl::HashState state) const final;
+  absl::HashState HashValueContentIgnoringFloat(
+      const ValueContent& value, absl::HashState state) const final;
 
   std::string FormatValueContent(
       const ValueContent& value,

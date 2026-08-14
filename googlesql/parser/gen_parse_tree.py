@@ -42,7 +42,7 @@ from googlesql.parser.generator_utils import UpperCamelCase
 
 # You can use `tag_id=GetTempTagId()` until doing the final submit.
 # That will avoid merge conflicts when syncing in other changes.
-NEXT_NODE_TAG_ID = 590
+NEXT_NODE_TAG_ID = 599
 
 
 def GetTempTagId():
@@ -567,20 +567,23 @@ class TreeGenerator:
     self.root_child_nodes = {}  #  {tag_id : NodeDict}
     self.node_tag_ids = set()
 
-  def AddNode(self,
-              name,
-              tag_id,
-              parent,
-              is_abstract = False,
-              fields = None,
-              extra_public_defs = '',
-              extra_protected_defs = '',
-              extra_private_defs = '',
-              comment = None,
-              use_custom_debug_string = False,
-              custom_debug_string_comment = None,
-              init_fields_order = None,
-              gen_init_fields = None):
+  def AddNode(
+      self,
+      name,
+      tag_id,
+      parent,
+      is_abstract = False,
+      fields = None,
+      extra_public_defs = '',
+      extra_protected_defs = '',
+      extra_private_defs = '',
+      comment = None,
+      use_custom_debug_string = False,
+      custom_debug_string_comment = None,
+      init_fields_order = None,
+      gen_init_fields = None,
+      allow_non_final_concrete_class_for_legacy_migration = False,
+  ):
     """Add a node class to be generated.
 
     Args:
@@ -613,26 +616,48 @@ class TreeGenerator:
         generation of a default InitFields() method, in which case a custom
         InitFields() must be provide in extra_private_defs. Not applicable to
         non-final classes.
+      allow_non_final_concrete_class_for_legacy_migration: If True, allow a
+        non-abstract class to be marked as non-final to support legacy
+        migrations.
     """
     enum_defs = self._GenEnums(name)
     proto_type = '%sProto' % name
 
     if fields is None:
       fields = []
+
+    # For abstract classes and subclassable non-final concrete classes, we must
+    # use the wrapper proto ('AnyAST...Proto'). This wrapper contains a 'oneof'
+    # field allowing us to hold either the class itself or any of its subclasses
+    # during serialization and deserialization.
+    if is_abstract or allow_non_final_concrete_class_for_legacy_migration:
+      proto_field_type = 'Any%sProto' % name
+    else:
+      proto_field_type = proto_type
+
     if is_abstract:
       class_final = ''
-      proto_field_type = 'Any%sProto' % name
       assert gen_init_fields is None, ('gen_init_fields cannot be used for '
                                        'non-final class {}').format(name)
     else:
-      class_final = 'final '
-      proto_field_type = proto_type
+      if allow_non_final_concrete_class_for_legacy_migration:
+        # A comment is emitted so that it can be matched in gen_extra_files.py
+        # and the class can be classified as concrete.
+        class_final = '/* non-final concrete */ '
+      else:
+        class_final = 'final '
       if gen_init_fields is None:
         gen_init_fields = True
       elif not gen_init_fields:
-        assert ('absl::Status InitFields() final {' in extra_private_defs), (
+        expected_init_fields_method_signature = (
+            'absl::Status InitFields() {'
+            if allow_non_final_concrete_class_for_legacy_migration
+            else 'absl::Status InitFields() final {'
+        )
+        assert expected_init_fields_method_signature in extra_private_defs, (
             'class {} must provide InitFields() in extra_private_defs when '
-            'gen_init_fields=False').format(name)
+            'gen_init_fields=False'
+        ).format(name)
     node_kind = NameToNodeKind(name)
 
     visibility_types = ['public:', 'protected:', 'private:']
@@ -658,9 +683,10 @@ class TreeGenerator:
           f'{field_name} in node {name}\n')
       field_tag_ids.add(field_tag_id)
     assert not (
-        (has_protected_fields or extra_protected_defs) and not is_abstract), (
-            'protected fields and methods cannot be used in final class %s',
-            name)
+        (has_protected_fields or extra_protected_defs)
+        and not is_abstract
+        and not allow_non_final_concrete_class_for_legacy_migration
+    ), ('protected fields and methods cannot be used in final class %s', name)
 
     assert 'SingleNodeDebugString' not in extra_public_defs, (
         name + ': SingleNodeDebugString() should not be defined in '
@@ -677,6 +703,9 @@ class TreeGenerator:
         'parent': parent,
         'class_final': class_final,
         'is_abstract': is_abstract,
+        'allow_non_final_concrete_class_for_legacy_migration': (
+            allow_non_final_concrete_class_for_legacy_migration
+        ),
         'comment': CleanIndent(comment, prefix='// '),
         'fields': fields,
         'node_kind': node_kind,
@@ -2941,6 +2970,7 @@ def main(argv):
           ),
           Field('format', 'ASTFormatClause', tag_id=4),
           Field('is_safe_cast', SCALAR_BOOL, tag_id=5),
+          Field('is_cast_operator', SCALAR_BOOL, tag_id=6),
       ],
   )
 
@@ -5093,7 +5123,11 @@ def main(argv):
       name='ASTDropIndexStatement',
       tag_id=407,
       parent='ASTDdlStatement',
-      is_abstract=True,
+      use_custom_debug_string=True,
+      custom_debug_string_comment="""
+      This adds the "if exists" modifier to the node name.
+      """,
+      allow_non_final_concrete_class_for_legacy_migration=True,
       comment="""
       Represents a DROP SEARCH|VECTOR INDEX statement. It is different from the
       regular drop index in that it has a trailing "ON PATH" clause.
@@ -10285,7 +10319,6 @@ def main(argv):
               'query',
               'ASTQuery',
               tag_id=4,
-              field_loader=FieldLoaderMethod.REQUIRED,
           ),
       ],
       init_fields_order=[
@@ -10758,12 +10791,17 @@ def main(argv):
               'query',
               'ASTQuery',
               tag_id=3),
+          Field(
+              'with_connection_clause',
+              'ASTWithConnectionClause',
+              tag_id=4),
       ],
       init_fields_order=[
           'function_declaration',
           'return_tvf_schema',
           'options_list',
           'language',
+          'with_connection_clause',
           'code',
           'query',
       ])
@@ -12845,6 +12883,178 @@ def main(argv):
           Field(
               'path_patterns',
               'ASTGraphInsertPathPattern',
+              tag_id=2,
+              field_loader=FieldLoaderMethod.REST_AS_REPEATED,
+          ),
+      ],
+  )
+
+  gen.AddNode(
+      name='ASTGqlSetItem',
+      tag_id=590,
+      parent='ASTNode',
+      is_abstract=True,
+      comment="""
+      Base class for items in a Graph SET statement.
+      """,
+      fields=[],
+  )
+
+  gen.AddNode(
+      name='ASTGqlSetPropertyItem',
+      tag_id=591,
+      parent='ASTGqlSetItem',
+      comment="""
+      Represents a single property assignment in a Graph SET clause (e.g.,
+      `SET a.prop = expr`).
+      """,
+      fields=[
+          Field(
+              'property_path',
+              'ASTPathExpression',
+              tag_id=2,
+              field_loader=FieldLoaderMethod.REQUIRED,
+          ),
+          Field(
+              'value',
+              'ASTExpression',
+              tag_id=3,
+              field_loader=FieldLoaderMethod.REQUIRED,
+          ),
+      ],
+  )
+
+  gen.AddNode(
+      name='ASTGqlSetAllPropertiesItem',
+      tag_id=592,
+      parent='ASTGqlSetItem',
+      comment="""
+      Represents replacing all properties of a graph element using a property
+      specification (e.g., `SET a = {prop1: expr1, ...}` or `SET a = {}`).
+      If `property_specification` is nullptr, it corresponds to setting an
+      empty specification `{}`.
+      """,
+      fields=[
+          Field(
+              'element_variable',
+              'ASTIdentifier',
+              tag_id=2,
+              field_loader=FieldLoaderMethod.REQUIRED,
+          ),
+          Field(
+              'property_specification',
+              'ASTGraphPropertySpecification',
+              tag_id=3,
+              field_loader=FieldLoaderMethod.OPTIONAL,
+          ),
+      ],
+  )
+
+  gen.AddNode(
+      name='ASTGqlSetLabelItem',
+      tag_id=593,
+      parent='ASTGqlSetItem',
+      comment="""
+      Represents setting a dynamic label on a graph element in a Graph SET
+      clause (e.g., `SET a:Label` or `SET a IS Label`).
+      """,
+      fields=[
+          Field(
+              'element_variable',
+              'ASTIdentifier',
+              tag_id=2,
+              field_loader=FieldLoaderMethod.REQUIRED,
+          ),
+          Field(
+              'label_name',
+              'ASTIdentifier',
+              tag_id=3,
+              field_loader=FieldLoaderMethod.REQUIRED,
+          ),
+      ],
+  )
+
+  gen.AddNode(
+      name='ASTGqlSet',
+      tag_id=594,
+      parent='ASTGqlOperator',
+      comment="""
+      Represents a Graph SET statement (`SET <set item list>`).
+      """,
+      fields=[
+          Field(
+              'items',
+              'ASTGqlSetItem',
+              tag_id=2,
+              field_loader=FieldLoaderMethod.REST_AS_REPEATED,
+          ),
+      ],
+  )
+
+  gen.AddNode(
+      name='ASTGqlRemoveItem',
+      tag_id=595,
+      parent='ASTNode',
+      is_abstract=True,
+      comment="""
+      Base class for items in a Graph REMOVE statement.
+      """,
+      fields=[],
+  )
+
+  gen.AddNode(
+      name='ASTGqlRemovePropertyItem',
+      tag_id=596,
+      parent='ASTGqlRemoveItem',
+      comment="""
+      Represents removing a dynamic property in a Graph REMOVE clause (e.g.,
+      `REMOVE a.prop`).
+      """,
+      fields=[
+          Field(
+              'property_path',
+              'ASTPathExpression',
+              tag_id=2,
+              field_loader=FieldLoaderMethod.REQUIRED,
+          ),
+      ],
+  )
+
+  gen.AddNode(
+      name='ASTGqlRemoveLabelItem',
+      tag_id=597,
+      parent='ASTGqlRemoveItem',
+      comment="""
+      Represents removing a dynamic label in a Graph REMOVE clause (e.g.,
+      `REMOVE a:Label` or `REMOVE a IS Label`).
+      """,
+      fields=[
+          Field(
+              'element_variable',
+              'ASTIdentifier',
+              tag_id=2,
+              field_loader=FieldLoaderMethod.REQUIRED,
+          ),
+          Field(
+              'label_name',
+              'ASTIdentifier',
+              tag_id=3,
+              field_loader=FieldLoaderMethod.REQUIRED,
+          ),
+      ],
+  )
+
+  gen.AddNode(
+      name='ASTGqlRemove',
+      tag_id=598,
+      parent='ASTGqlOperator',
+      comment="""
+      Represents a Graph REMOVE statement (`REMOVE <remove item list>`).
+      """,
+      fields=[
+          Field(
+              'items',
+              'ASTGqlRemoveItem',
               tag_id=2,
               field_loader=FieldLoaderMethod.REST_AS_REPEATED,
           ),

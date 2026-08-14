@@ -290,7 +290,6 @@ QueryStmt
                   +-end_expr=
                     +-WindowFrameExpr(boundary_type=UNBOUNDED FOLLOWING)
 
-
 DEPRECATION WARNING:
 The pipe WINDOW operator is deprecated; Use EXTEND instead [at 3:1]
 |> WINDOW count(*) OVER ()

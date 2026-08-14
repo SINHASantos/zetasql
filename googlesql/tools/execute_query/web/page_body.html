@@ -85,6 +85,16 @@
                     {{#target_syntax_mode_pipe}}checked{{/target_syntax_mode_pipe}}>
                   <label for="target-syntax-mode-pipe">Pipe</label>
                 </fieldset>
+                <fieldset>
+                  <legend>Resolved AST Mode</legend>
+                  <input type="radio" name="resolved_ast_render_mode" value="tree" id="resolved-ast-render-mode-tree"
+                      {{#resolved_ast_render_mode_tree}}checked{{/resolved_ast_render_mode_tree}}>
+                  <label for="resolved-ast-render-mode-tree">Tree</label>
+
+                  <input type="radio" name="resolved_ast_render_mode" value="linear" id="resolved-ast-render-mode-linear"
+                    {{#resolved_ast_render_mode_linear}}checked{{/resolved_ast_render_mode_linear}}>
+                  <label for="resolved-ast-render-mode-linear">Linear</label>
+                </fieldset>
 
                 <fieldset>
                   <legend>Enabled Language Features</legend>
@@ -153,28 +163,21 @@
 
             {{#result_analyzed}}
             <h3>Analyze</h3>
-            <!--
-              If we have rewrites, show Pre-rewrite and all rewrite steps
-              inside collapsible details blocks, with the last step (post-rewrite)
-              open by default.
-              Otherwise, just show the single analyzed Resolved AST inline.
-            -->
             {{#has_rewrites}}
-              <details>
-                <summary>Show Rewrite Steps</summary>
-                <details>
-                  <summary>Pre-rewrite</summary>
-                  <pre class="output analyzed"><code class="language-less">{{{result_analyzed}}}</code></pre>
-                </details>
+              <div class="analyze-section rewrite-container">
+                <div class="rewrite-steps">
+                  <span class="rewrite-step-label">Rewrites:</span>
+                  <span class="rewrite-step-item" data-step="0">Pre-rewrite</span>
+                  {{#result_analyzed_rewrites}}
+                    <span class="rewrite-step-separator">&gt;</span>
+                    <span class="rewrite-step-item" data-step="{{step_index}}">{{rewriter_name}}</span>
+                  {{/result_analyzed_rewrites}}
+                </div>
+                <pre class="output analyzed rewrite-ast-panel" data-step="0"><code class="language-less">{{{result_analyzed}}}</code></pre>
                 {{#result_analyzed_rewrites}}
-                <details>
-                  <summary>Rewrite: {{rewriter_name}}</summary>
-                  <pre class="output analyzed"><code class="language-less">{{{ast}}}</code></pre>
-                </details>
+                  <pre class="output analyzed rewrite-ast-panel" data-step="{{step_index}}"><code class="language-less">{{{ast}}}</code></pre>
                 {{/result_analyzed_rewrites}}
-                <p class="final-step-note">Final step produced by: {{final_rewriter_name}}</p>
-              </details>
-              <pre class="output analyzed"><code class="language-less">{{{result_analyzed_final}}}</code></pre>
+              </div>
             {{/has_rewrites}}
             {{^has_rewrites}}
               <pre class="output analyzed"><code class="language-less">{{{result_analyzed}}}</code></pre>
@@ -211,3 +214,4 @@
         {{/statements}}
       </div>
     </main>
+    {{> inline_js}}

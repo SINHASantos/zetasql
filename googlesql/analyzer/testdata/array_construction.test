@@ -950,7 +950,6 @@ QueryStmt
     +-input_scan=
       +-SingleRowScan
 
-
 DEPRECATION WARNING:
 Array constructor with explicit type leaks collation from argument 0 [at 5:3]
   ARRAY<STRING>[COLLATE("12", "und:ci")];

@@ -646,7 +646,9 @@ window_specification:
 
 **Description**
 
-Returns an ARRAY of `expression` values.
+Returns an ARRAY of `expression` values. The order of elements
+in the returned array is arbitrary. To order
+the array elements, use an `ORDER BY` clause within the function call.
 
 To learn more about the optional aggregate clauses that you can pass
 into this function, see
@@ -1253,22 +1255,6 @@ distinct counts. For more information, see
 
 **Details**
 
-To count the number of distinct values of an expression for which a
-certain condition is satisfied, you can use the following recipe:
-
-```googlesql
-COUNT(DISTINCT IF(condition, expression, NULL))
-```
-
-`IF` returns the value of `expression` if `condition` is `TRUE`, or
-`NULL` otherwise. The surrounding `COUNT(DISTINCT ...)` ignores the `NULL`
-values, so it counts only the distinct values of `expression` for which
-`condition` is `TRUE`.
-
-To count the number of non-distinct values of an expression for which a
-certain condition is satisfied, consider using the
-[`COUNTIF`][countif] function.
-
 This function with `DISTINCT` supports specifying [collation][collation].
 
 [collation]: https://github.com/google/googlesql/blob/master/docs/collation-concepts.md
@@ -1336,7 +1322,7 @@ FROM UNNEST([1, 4, NULL, 4, 5]) AS x;
 The following query counts the number of distinct positive values of `x`:
 
 ```googlesql
-SELECT COUNT(DISTINCT IF(x > 0, x, NULL)) AS distinct_positive
+SELECT COUNT(DISTINCT x WHERE x > 0) AS distinct_positive
 FROM UNNEST([1, -2, 4, 1, -5, 4, 1, 3, -6, 1]) AS x;
 
 /*-------------------+
@@ -1364,7 +1350,7 @@ WITH Events AS (
   SELECT DATE '2021-01-04' AS event_date, 'FAILURE' AS event_type
 )
 SELECT
-  COUNT(DISTINCT IF(event_type = 'FAILURE', event_date, NULL))
+  COUNT(DISTINCT event_date WHERE event_type = 'FAILURE')
     AS distinct_dates_with_failures
 FROM Events;
 
@@ -1389,7 +1375,7 @@ WITH
     SELECT 2991, 'e' UNION ALL
     SELECT 4366, 'f')
 SELECT
-  COUNT(DISTINCT IF(id IN (SELECT id FROM customers), id, NULL)) AS result
+  COUNT(DISTINCT id WHERE id IN (SELECT id FROM customers)) AS result
 FROM vendors;
 
 /*--------+

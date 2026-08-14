@@ -114,6 +114,7 @@ QueryStmt
                           |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<quantity INT64>, key_columns STRUCT<key INT64>>, column=MeasureTable_SingleKey.struct_for_measures_from_table_MeasureTable_SingleKey#18)
                           |   +-field_idx=0
                           +-field_idx=0
+
 [SQLBUILDER_OUTPUT]
 SELECT
   aggregatescan_8.a_6 AS key,
@@ -273,6 +274,7 @@ QueryStmt
                               |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<quantity INT64>, key_columns STRUCT<key INT64>>, column=t.struct_for_measures_from_table_t#20)
                               |   +-field_idx=0
                               +-field_idx=0
+
 [SQLBUILDER_OUTPUT]
 WITH
   t AS (
@@ -457,6 +459,7 @@ QueryStmt
                               |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<quantity INT64>, key_columns STRUCT<key INT64>>, column=t2.struct_for_measures_from_table_t2#22)
                               |   +-field_idx=0
                               +-field_idx=0
+
 [SQLBUILDER_OUTPUT]
 WITH
   t1 AS (
@@ -657,6 +660,7 @@ QueryStmt
                         |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<key INT64>, key_columns STRUCT<key INT64>>, column=MeasureTable_SingleKey.struct_for_measures_from_table_MeasureTable_SingleKey#18)
                         |   +-field_idx=0
                         +-field_idx=0
+
 [SQLBUILDER_OUTPUT]
 SELECT
   aggregatescan_8.a_6 AS country,
@@ -801,6 +805,7 @@ QueryStmt
                             |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<quantity INT64, price INT64>, key_columns STRUCT<key INT64>>, column=MeasureTable_SingleKey.struct_for_measures_from_table_MeasureTable_SingleKey#20)
                             |   +-field_idx=0
                             +-field_idx=0
+
 [SQLBUILDER_OUTPUT]
 SELECT
   aggregatescan_10.a_8 AS country,
@@ -949,6 +954,7 @@ QueryStmt
                             |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<Quantity INT64, Price INT64>, key_columns STRUCT<KEY1 INT64, key2 INT64>>, column=MeasureTable_TwoKeys.struct_for_measures_from_table_MeasureTable_TwoKeys#20)
                             |   +-field_idx=0
                             +-field_idx=0
+
 [SQLBUILDER_OUTPUT]
 SELECT
   aggregatescan_11.a_9 AS country,
@@ -1087,6 +1093,7 @@ QueryStmt
                           |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<Price INT64>, key_columns STRUCT<KEY1 INT64, key2 INT64>>, column=MeasureTable_TwoKeys.struct_for_measures_from_table_MeasureTable_TwoKeys#18)
                           |   +-field_idx=0
                           +-field_idx=0
+
 [SQLBUILDER_OUTPUT]
 SELECT
   aggregatescan_9.a_7 AS price,
@@ -1255,6 +1262,7 @@ QueryStmt
                           |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<quantity INT64, price INT64>, key_columns STRUCT<key INT64>>, column=MeasureTable_SingleKey.struct_for_measures_from_table_MeasureTable_SingleKey#20)
                           |   +-field_idx=0
                           +-field_idx=0
+
 [SQLBUILDER_OUTPUT]
 SELECT
   aggregatescan_11.a_8 AS country,
@@ -1429,6 +1437,7 @@ QueryStmt
                           |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<Quantity INT64, Price INT64>, key_columns STRUCT<KEY1 INT64, key2 INT64>>, column=MeasureTable_TwoKeys.struct_for_measures_from_table_MeasureTable_TwoKeys#20)
                           |   +-field_idx=0
                           +-field_idx=0
+
 [SQLBUILDER_OUTPUT]
 SELECT
   aggregatescan_12.a_9 AS country,
@@ -1634,6 +1643,7 @@ QueryStmt
                                 |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<key INT64, quantity INT64, price INT64>, key_columns STRUCT<key INT64>>, column=MeasureTable_SingleKey.struct_for_measures_from_table_MeasureTable_SingleKey#20)
                                 |   +-field_idx=0
                                 +-field_idx=1
+
 [SQLBUILDER_OUTPUT]
 SELECT
   aggregatescan_11.a_8 AS country,
@@ -1887,6 +1897,7 @@ QueryStmt
                                 |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<key INT64, price INT64>, key_columns STRUCT<key INT64>>, column=MeasureTable_SingleKey.struct_for_measures_from_table_MeasureTable_SingleKey#19)
                                 |   +-field_idx=0
                                 +-field_idx=1
+
 [SQLBUILDER_OUTPUT]
 SELECT
   aggregatescan_10.a_7 AS country,
@@ -2066,6 +2077,7 @@ QueryStmt
                           |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<quantity INT64>, key_columns STRUCT<key INT64>>, column=MeasureTable_SingleKey.struct_for_measures_from_table_MeasureTable_SingleKey#32)
                           |   +-field_idx=0
                           +-field_idx=0
+
 [SQLBUILDER_OUTPUT]
 SELECT
   aggregatescan_11.a_9 AS country,
@@ -2233,6 +2245,7 @@ QueryStmt
                           |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<quantity INT64>, key_columns STRUCT<key INT64>>, column=MeasureTable_SingleKey.struct_for_measures_from_table_MeasureTable_SingleKey#33)
                           |   +-field_idx=0
                           +-field_idx=0
+
 [SQLBUILDER_OUTPUT]
 SELECT
   aggregatescan_10.a_8 AS country,
@@ -2415,6 +2428,7 @@ QueryStmt
                           |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<quantity INT64>, key_columns STRUCT<key INT64>>, column=MeasureTable_SingleKey.struct_for_measures_from_table_MeasureTable_SingleKey#32)
                           |   +-field_idx=0
                           +-field_idx=0
+
 [SQLBUILDER_OUTPUT]
 SELECT
   aggregatescan_11.a_9 AS country,
@@ -2594,6 +2608,7 @@ QueryStmt
                           |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<quantity INT64>, key_columns STRUCT<key INT64>>, column=MeasureTable_SingleKey.struct_for_measures_from_table_MeasureTable_SingleKey#32)
                           |   +-field_idx=0
                           +-field_idx=0
+
 [SQLBUILDER_OUTPUT]
 SELECT
   aggregatescan_11.a_9 AS country,
@@ -2798,6 +2813,7 @@ QueryStmt
                           |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<quantity INT64>, key_columns STRUCT<key INT64>>, column=MeasureTable_SingleKey.struct_for_measures_from_table_MeasureTable_SingleKey#33)
                           |   +-field_idx=0
                           +-field_idx=0
+
 [SQLBUILDER_OUTPUT]
 SELECT
   aggregatescan_14.a_12 AS country,
@@ -2978,6 +2994,7 @@ QueryStmt
                           |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<quantity INT64>, key_columns STRUCT<key INT64>>, column=MeasureTable_SingleKey.struct_for_measures_from_table_MeasureTable_SingleKey#19)
                           |   +-field_idx=0
                           +-field_idx=0
+
 [SQLBUILDER_OUTPUT]
 SELECT
   aggregatescan_9.a_8 AS a_10
@@ -3278,6 +3295,7 @@ QueryStmt
                           |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<quantity INT64>, key_columns STRUCT<key INT64>>, column=MeasureTable_SingleKey.struct_for_measures_from_table_MeasureTable_SingleKey#17)
                           |   +-field_idx=0
                           +-field_idx=0
+
 [SQLBUILDER_OUTPUT]
 SELECT
   aggregatescan_9.a_8 AS a_10
@@ -3458,6 +3476,7 @@ QueryStmt
                               |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, column=t.struct_for_measures_from_table_t#21)
                               |   +-field_idx=0
                               +-field_idx=0
+
 [SQLBUILDER_OUTPUT]
 WITH
   t AS (
@@ -3632,6 +3651,7 @@ QueryStmt
                               |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<quantity INT64>, key_columns STRUCT<key INT64>>, column=t.struct_for_measures_from_table_t#31)
                               |   +-field_idx=0
                               +-field_idx=0
+
 [SQLBUILDER_OUTPUT]
 WITH
   t AS (
@@ -3862,6 +3882,7 @@ QueryStmt
                           |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, column=MeasureTable_SingleKey.struct_for_measures_from_table_MeasureTable_SingleKey#36)
                           |   +-field_idx=0
                           +-field_idx=0
+
 [SQLBUILDER_OUTPUT]
 SELECT
   aggregatescan_13.a_11 AS a_14,
@@ -4053,6 +4074,7 @@ QueryStmt
                               |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, column=WithTable.struct_for_measures_from_table_WithTable#21)
                               |   +-field_idx=0
                               +-field_idx=0
+
 [SQLBUILDER_OUTPUT]
 WITH
   WithTable AS (
@@ -4268,6 +4290,7 @@ QueryStmt
                               |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, column=WithTable.struct_for_measures_from_table_WithTable#23)
                               |   +-field_idx=0
                               +-field_idx=0
+
 [SQLBUILDER_OUTPUT]
 WITH
   WithTable AS (
@@ -4498,6 +4521,7 @@ QueryStmt
                               |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<quantity INT64, price INT64>, key_columns STRUCT<key INT64>>, column=WithTable.struct_for_measures_from_table_WithTable#28)
                               |   +-field_idx=0
                               +-field_idx=0
+
 [SQLBUILDER_OUTPUT]
 WITH
   WithTable AS (
@@ -4698,6 +4722,7 @@ QueryStmt
                         +-expr=
                         | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<>, key_columns STRUCT<key_different_name INT64>>, column=MeasureTable_DifferentNames.struct_for_measures_from_table_MeasureTable_DifferentNames#26)
                         +-field_idx=1
+
 [SQLBUILDER_OUTPUT]
 SELECT
   aggregatescan_12.a_10 AS a_13,
@@ -5055,6 +5080,7 @@ QueryStmt
                               |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<quantity INT64, price INT64>, key_columns STRUCT<key INT64>>, column=WithTableSelfCrossJoin.struct_for_measures_from_table_WithTableSelfCrossJoin#45)
                               |   +-field_idx=0
                               +-field_idx=0
+
 [SQLBUILDER_OUTPUT]
 WITH
   WithTable AS (
@@ -5187,7 +5213,6 @@ QueryStmt
       +-col#15 :=
         +-AggregateFunctionCall(GoogleSQL:AGG(MEASURE<INT64>) -> INT64)
           +-ColumnRef(type=MEASURE<INT64>, column=MeasureTable_SingleKey.measure_sum_quantity#9)
-
 
 [REWRITTEN AST]
 QueryStmt
@@ -5420,6 +5445,7 @@ QueryStmt
                       |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<quantity INT64>, key_columns STRUCT<key INT64>>, column=MeasureTable_SingleKey.struct_for_measures_from_table_MeasureTable_SingleKey#18)
                       |   +-field_idx=0
                       +-field_idx=0
+
 [SQLBUILDER_OUTPUT]
 SELECT
   aggregatescan_7.a_6 AS col
@@ -5553,6 +5579,7 @@ QueryStmt
                           |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, column=MeasureTable_SingleKey.struct_for_measures_from_table_MeasureTable_SingleKey#18)
                           |   +-field_idx=0
                           +-field_idx=0
+
 [SQLBUILDER_OUTPUT]
 SELECT
   aggregatescan_8.a_7 AS col
@@ -5722,6 +5749,7 @@ QueryStmt
                           |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, column=MeasureTable_SingleKey.struct_for_measures_from_table_MeasureTable_SingleKey#19)
                           |   +-field_idx=0
                           +-field_idx=0
+
 [SQLBUILDER_OUTPUT]
 SELECT
   aggregatescan_10.a_9 AS col
@@ -5875,7 +5903,6 @@ GeneralizedQueryStmt
                 +-output_column_list=
                   +-$pipe_select.col#16 AS col [INT64]
 
-
 [REWRITTEN AST]
 MultiStmt
 +-statement_list=
@@ -5962,7 +5989,6 @@ GeneralizedQueryStmt
           +-OutputSchema
             +-output_column_list=
               +-$pipe_select.col#16 AS col [INT64]
-
 
 [REWRITTEN AST]
 MultiStmt
@@ -6070,6 +6096,7 @@ QueryStmt
                         +-expr=
                         | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<>, key_columns STRUCT<key INT64>>, column=MeasureTable_WithPseudoColumns.struct_for_measures_from_table_MeasureTable_WithPseudoColumns#9)
                         +-field_idx=1
+
 [SQLBUILDER_OUTPUT]
 SELECT
   aggregatescan_6.a_5 AS a_7
@@ -6398,6 +6425,7 @@ QueryStmt
                                           |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, column=MeasureTable_WithSubqueryMeasureExprs.struct_for_measures_from_table_MeasureTable_WithSubqueryMeasureExprs#19, is_correlated=TRUE)
                                           |   +-field_idx=0
                                           +-field_idx=0
+
 [SQLBUILDER_OUTPUT]
 SELECT
   aggregatescan_16.a_11 AS key,
@@ -6605,6 +6633,7 @@ QueryStmt
                                   |                     +-field_idx=0
                                   +-input_scan=
                                     +-SingleRowScan
+
 [SQLBUILDER_OUTPUT]
 SELECT
   aggregatescan_11.a_9 AS key,
@@ -6924,6 +6953,7 @@ QueryStmt
                           |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<value STRUCT<e INT32, f STRUCT<c INT32, d STRUCT<a INT32, b STRING>>>, key INT64>, key_columns STRUCT<key INT64>>, column=StructValueTable_WithMeasures.struct_for_measures_from_table_StructValueTable_WithMeasures#13)
                           |   +-field_idx=0
                           +-field_idx=1
+
 [SQLBUILDER_OUTPUT]
 SELECT
   aggregatescan_12.a_6 AS b,
@@ -7231,6 +7261,7 @@ QueryStmt
                           |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<value PROTO<googlesql_test.KitchenSinkPB>, key INT64>, key_columns STRUCT<key INT64>>, column=KitchenSinkValueTable_WithMeasures.struct_for_measures_from_table_KitchenSinkValueTable_WithMeasures#13)
                           |   +-field_idx=0
                           +-field_idx=1
+
 [SQLBUILDER_OUTPUT]
 SELECT
   aggregatescan_12.a_6 AS string_val,
@@ -7406,6 +7437,7 @@ QueryStmt
                           |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<key INT64>, key_columns STRUCT<key INT64>>, column=Int64ValueTable_WithMeasures.struct_for_measures_from_table_Int64ValueTable_WithMeasures#12)
                           |   +-field_idx=0
                           +-field_idx=0
+
 [SQLBUILDER_OUTPUT]
 SELECT
   aggregatescan_9.a_6 AS Int64ValueTable_WithMeasures,
@@ -7503,6 +7535,7 @@ QueryStmt
                 |           +-ColumnRef(type=INT64, column=MeasureTable_WithSubqueryMeasureExprs.key#14)
                 +-input_scan=
                   +-TableScan(column_list=[MeasureTable_WithSubqueryMeasureExprs.key#14], table=MeasureTable_WithSubqueryMeasureExprs, column_index_list=[0])
+
 [SQLBUILDER_OUTPUT]
 SELECT
   1 AS a_6
@@ -7639,6 +7672,7 @@ QueryStmt
             |     +-TableScan(column_list=MeasureTable_WithSubqueryMeasureExprs.[key#17, country#2], table=MeasureTable_WithSubqueryMeasureExprs, column_index_list=[0, 1])
             +-group_by_list=
               +-country#16 := ColumnRef(type=STRING, column=MeasureTable_WithSubqueryMeasureExprs.country#2)
+
 [SQLBUILDER_OUTPUT]
 SELECT
   aggregatescan_7.a_6 AS country,
@@ -7786,6 +7820,7 @@ QueryStmt
             |     +-TableScan(column_list=[Int64ValueTable_WithMeasures.key#2], table=Int64ValueTable_WithMeasures, column_index_list=[1])
             +-group_by_list=
               +-key#11 := ColumnRef(type=INT64, column=Int64ValueTable_WithMeasures.key#2)
+
 [SQLBUILDER_OUTPUT]
 SELECT
   aggregatescan_6.a_5 AS key,
@@ -8032,6 +8067,7 @@ QueryStmt
         |           +-ColumnRef(type=INT64, column=MeasureTable_SingleKey.key#1)
         +-input_scan=
           +-TableScan(column_list=MeasureTable_SingleKey.[key#1, price#32], table=MeasureTable_SingleKey, column_index_list=[0, 3], alias="OuterTable")
+
 [SQLBUILDER_OUTPUT]
 SELECT
   projectscan_5.a_1 AS key,
@@ -8230,6 +8266,7 @@ QueryStmt
         |           +-ColumnRef(type=INT64, column=MeasureTable_WithSubqueryMeasureExprs.key#1)
         +-input_scan=
           +-TableScan(column_list=MeasureTable_WithSubqueryMeasureExprs.[key#1, price#28], table=MeasureTable_WithSubqueryMeasureExprs, column_index_list=[0, 3], alias="OuterTable")
+
 [SQLBUILDER_OUTPUT]
 SELECT
   projectscan_5.a_1 AS key,
@@ -8437,6 +8474,7 @@ QueryStmt
         |           +-ColumnRef(type=INT64, column=MeasureTable_SingleKey.key#1)
         +-input_scan=
           +-TableScan(column_list=MeasureTable_SingleKey.[key#1, price#19], table=MeasureTable_SingleKey, column_index_list=[0, 3], alias="OuterTable")
+
 [SQLBUILDER_OUTPUT]
 SELECT
   projectscan_5.a_1 AS key,
@@ -8718,6 +8756,7 @@ QueryStmt
                           |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, column=MeasureTable_WithRewritableExprs.struct_for_measures_from_table_MeasureTable_WithRewritableExprs#12)
                           |   +-field_idx=0
                           +-field_idx=0
+
 [SQLBUILDER_OUTPUT]
 SELECT
   aggregatescan_10.a_7 AS country,
@@ -9047,6 +9086,7 @@ QueryStmt
                                   |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<key INT64, price INT64>, key_columns STRUCT<key INT64>>, column=MeasureTable_WithUdfs.struct_for_measures_from_table_MeasureTable_WithUdfs#15)
                                   |   +-field_idx=0
                                   +-field_idx=1
+
 [SQLBUILDER_OUTPUT]
 SELECT
   aggregatescan_11.a_6 AS key,
@@ -9445,6 +9485,7 @@ containing resolved templated expression:
 FunctionCall(GoogleSQL:$add(INT64, INT64) -> INT64)
 +-ArgumentRef(type=INT64, name="arg")
 +-ArgumentRef(type=INT64, name="arg")
+
 [SQLBUILDER_OUTPUT]
 SELECT
   aggregatescan_12.a_6 AS key,
@@ -9642,6 +9683,7 @@ QueryStmt
                               |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, column=MeasureTable_SingleKey.struct_for_measures_from_table_MeasureTable_SingleKey#33)
                               |   +-field_idx=0
                               +-field_idx=0
+
 [SQLBUILDER_OUTPUT]
 SELECT
   (
@@ -9827,6 +9869,7 @@ QueryStmt
                           |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, column=MeasureTable_SingleKey.struct_for_measures_from_table_MeasureTable_SingleKey#21)
                           |   +-field_idx=0
                           +-field_idx=0
+
 [SQLBUILDER_OUTPUT]
 SELECT
   aggregatescan_11.a_9 AS a_9,
@@ -10001,6 +10044,7 @@ QueryStmt
                                   |     +-field_idx=0
                                   +-input_scan=
                                     +-SingleRowScan
+
 [SQLBUILDER_OUTPUT]
 SELECT
   aggregatescan_9.a_8 AS a_10
@@ -10206,6 +10250,7 @@ QueryStmt
                           |         +-input_scan=
                           |           +-SingleRowScan
                           +-Literal(type=INT64, value=0)
+
 [SQLBUILDER_OUTPUT]
 SELECT
   aggregatescan_18.a_17 AS a_19
@@ -10453,6 +10498,7 @@ QueryStmt
         |           +-ColumnRef(type=INT64, column=MeasureTable_SingleKey.key#20)
         +-input_scan=
           +-TableScan(column_list=MeasureTable_SingleKey.[key#20, price#19], table=MeasureTable_SingleKey, column_index_list=[0, 3])
+
 [SQLBUILDER_OUTPUT]
 SELECT
   (
@@ -10778,6 +10824,7 @@ QueryStmt
                           |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, column=MeasureTable_SingleKey.struct_for_measures_from_table_MeasureTable_SingleKey#53)
                           |   +-field_idx=0
                           +-field_idx=0
+
 [SQLBUILDER_OUTPUT]
 SELECT
   aggregatescan_25.a_23 AS a_30,
@@ -11057,6 +11104,7 @@ QueryStmt
                           |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, column=MeasureTable_SingleKey.struct_for_measures_from_table_MeasureTable_SingleKey#36)
                           |   +-field_idx=0
                           +-field_idx=0
+
 [SQLBUILDER_OUTPUT]
 SELECT
   aggregatescan_16.a_14 AS a_14,
@@ -11440,6 +11488,7 @@ QueryStmt
             +-column_list=[MeasureTable_SingleKey.measure_sum_price#10]
             +-input_scan=
               +-TableScan(column_list=[MeasureTable_SingleKey.measure_sum_price#10], table=MeasureTable_SingleKey, column_index_list=[9])
+
 [SQLBUILDER_OUTPUT]
 SELECT
   projectscan_7.a_3 AS a_10,
@@ -11630,6 +11679,7 @@ QueryStmt
                             |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<country STRING>, key_columns STRUCT<key INT64>>, column=MeasureTable_ComplexExprs.struct_for_measures_from_table_MeasureTable_ComplexExprs#15)
                             |   +-field_idx=0
                             +-field_idx=0
+
 [SQLBUILDER_OUTPUT]
 SELECT
   aggregatescan_9.a_6 AS a_10,
@@ -11764,6 +11814,7 @@ QueryStmt
                           |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<key INT64>, key_columns STRUCT<key INT64>>, column=MeasureTable_ComplexExprs.struct_for_measures_from_table_MeasureTable_ComplexExprs#12)
                           |   +-field_idx=0
                           +-field_idx=0
+
 [SQLBUILDER_OUTPUT]
 SELECT
   ((aggregatescan_6.a_5) IN (
@@ -11892,6 +11943,7 @@ QueryStmt
                           |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, column=MeasureTable_WithUdas.struct_for_measures_from_table_MeasureTable_WithUdas#11)
                           |   +-field_idx=0
                           +-field_idx=0
+
 [SQLBUILDER_OUTPUT]
 SELECT
   aggregatescan_8.a_6 AS key,
@@ -12036,6 +12088,7 @@ QueryStmt
                                 |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<key INT64, price INT64>, key_columns STRUCT<key INT64>>, column=MeasureTable_WithUdas.struct_for_measures_from_table_MeasureTable_WithUdas#12)
                                 |   +-field_idx=0
                                 +-field_idx=1
+
 [SQLBUILDER_OUTPUT]
 SELECT
   aggregatescan_9.a_7 AS country,
@@ -12184,6 +12237,7 @@ QueryStmt
                                 |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<country STRING, price INT64>, key_columns STRUCT<key INT64>>, column=MeasureTable_WithUdas.struct_for_measures_from_table_MeasureTable_WithUdas#12)
                                 |   +-field_idx=0
                                 +-field_idx=1
+
 [SQLBUILDER_OUTPUT]
 SELECT
   aggregatescan_9.a_7 AS country,
@@ -12340,6 +12394,7 @@ QueryStmt
                           |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<quantity INT64>, key_columns STRUCT<key INT64>>, column=MeasureTable_SingleKey.struct_for_measures_from_table_MeasureTable_SingleKey#32)
                           |   +-field_idx=0
                           +-field_idx=0
+
 [SQLBUILDER_OUTPUT]
 SELECT
   aggregatescan_10.a_9 AS a_11
@@ -12556,6 +12611,7 @@ QueryStmt
             |       +-input_scan=
             |         +-WithRefScan(column_list=T.[key#18, struct_for_measures_from_table_T#28], with_query_name="T")
             +-output_column_list=[$union_all2.$col1#20]
+
 [SQLBUILDER_OUTPUT]
 WITH
   T AS (
@@ -12742,6 +12798,7 @@ QueryStmt
                               |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<quantity INT64>, key_columns STRUCT<key INT64>>, column=t2.struct_for_measures_from_table_t2#24)
                               |   +-field_idx=0
                               +-field_idx=0
+
 [SQLBUILDER_OUTPUT]
 WITH
   t AS (
@@ -12996,6 +13053,7 @@ QueryStmt
                           |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<price INT64, quantity INT64>, key_columns STRUCT<item_id INT64, store_id INT64>>, column=MeasureTable_SalesFacts.struct_for_measures_from_table_MeasureTable_SalesFacts#15)
                           |   +-field_idx=0
                           +-field_idx=1
+
 [SQLBUILDER_OUTPUT]
 SELECT
   aggregatescan_12.a_8 AS a_13,
@@ -13239,6 +13297,7 @@ QueryStmt
                           |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<price INT64, quantity INT64>, key_columns STRUCT<item_id INT64, store_id INT64>>, column=MeasureTable_NoTableKey.struct_for_measures_from_table_MeasureTable_NoTableKey#15)
                           |   +-field_idx=0
                           +-field_idx=1
+
 [SQLBUILDER_OUTPUT]
 SELECT
   aggregatescan_12.a_8 AS a_13,
@@ -13393,6 +13452,7 @@ QueryStmt
                       |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<quantity INT64>, key_columns STRUCT<key INT64>>, column=MeasureTable_SingleKey.struct_for_measures_from_table_MeasureTable_SingleKey#18)
                       |   +-field_idx=0
                       +-field_idx=0
+
 [SQLBUILDER_OUTPUT]
 SELECT
   projectscan_11.a_7 AS key
@@ -13565,6 +13625,7 @@ QueryStmt
                                       | +-$col1#13 := Literal(type=INT64, value=1)
                                       +-input_scan=
                                         +-SingleRowScan
+
 [SQLBUILDER_OUTPUT]
 SELECT
   AVG(1
@@ -13700,6 +13761,7 @@ QueryStmt
         |           +-ColumnRef(type=INT64, column=MeasureTable_WithSubqueryMeasureExprs.key#16)
         +-input_scan=
           +-TableScan(column_list=[MeasureTable_WithSubqueryMeasureExprs.key#16], table=MeasureTable_WithSubqueryMeasureExprs, column_index_list=[0])
+
 [SQLBUILDER_OUTPUT]
 SELECT
   (
@@ -13729,3 +13791,253 @@ FROM
           MeasureTable_WithSubqueryMeasureExprs
       ) AS measuretable_withsubquerymeasureexprs_2
   ) AS projectscan_4;
+==
+
+# Repro of b/540442269.
+#
+# `measure_sum_quantity` and `measure_sum_price` correspond to the same
+# closure column, but the parameter list should not have duplicate closure
+# column references because the validator does not allow it.
+SELECT
+  key
+FROM
+  MeasureTable_SingleKey AS t
+WHERE
+  key > (
+    SELECT
+      AGG(t.measure_sum_quantity) + AGG(t.measure_sum_price)
+    FROM
+      (SELECT 1)
+  );
+--
+QueryStmt
++-output_column_list=
+| +-MeasureTable_SingleKey.key#1 AS key [INT64]
++-query=
+  +-ProjectScan
+    +-column_list=[MeasureTable_SingleKey.key#1]
+    +-input_scan=
+      +-FilterScan
+        +-column_list=MeasureTable_SingleKey.[key#1, measure_sum_quantity#9, measure_sum_price#10]
+        +-input_scan=
+        | +-TableScan(column_list=MeasureTable_SingleKey.[key#1, measure_sum_quantity#9, measure_sum_price#10], table=MeasureTable_SingleKey, column_index_list=[0, 8, 9], alias="t")
+        +-filter_expr=
+          +-FunctionCall(GoogleSQL:$greater(INT64, INT64) -> BOOL)
+            +-ColumnRef(type=INT64, column=MeasureTable_SingleKey.key#1)
+            +-SubqueryExpr
+              +-type=INT64
+              +-subquery_type=SCALAR
+              +-parameter_list=
+              | +-ColumnRef(type=MEASURE<INT64>, column=MeasureTable_SingleKey.measure_sum_quantity#9)
+              | +-ColumnRef(type=MEASURE<INT64>, column=MeasureTable_SingleKey.measure_sum_price#10)
+              +-subquery=
+                +-ProjectScan
+                  +-column_list=[$expr_subquery.$col1#18]
+                  +-expr_list=
+                  | +-$col1#18 :=
+                  |   +-FunctionCall(GoogleSQL:$add(INT64, INT64) -> INT64)
+                  |     +-ColumnRef(type=INT64, column=$aggregate.$agg1#16)
+                  |     +-ColumnRef(type=INT64, column=$aggregate.$agg2#17)
+                  +-input_scan=
+                    +-AggregateScan
+                      +-column_list=$aggregate.[$agg1#16, $agg2#17]
+                      +-input_scan=
+                      | +-ProjectScan
+                      |   +-column_list=[$subquery1.$col1#15]
+                      |   +-expr_list=
+                      |   | +-$col1#15 := Literal(type=INT64, value=1)
+                      |   +-input_scan=
+                      |     +-SingleRowScan
+                      +-aggregate_list=
+                        +-$agg1#16 :=
+                        | +-AggregateFunctionCall(GoogleSQL:AGG(MEASURE<INT64>) -> INT64)
+                        |   +-ColumnRef(type=MEASURE<INT64>, column=MeasureTable_SingleKey.measure_sum_quantity#9, is_correlated=TRUE)
+                        +-$agg2#17 :=
+                          +-AggregateFunctionCall(GoogleSQL:AGG(MEASURE<INT64>) -> INT64)
+                            +-ColumnRef(type=MEASURE<INT64>, column=MeasureTable_SingleKey.measure_sum_price#10, is_correlated=TRUE)
+
+[SQLBUILDER_OUTPUT]
+SELECT
+  MeasureTable_SingleKey.key AS key
+FROM
+  MeasureTable_SingleKey
+WHERE
+  (MeasureTable_SingleKey.key) > (
+    SELECT
+      (aggregatescan_8.a_6) + (aggregatescan_8.a_7) AS a_9
+    FROM
+      (
+        SELECT
+          AGG(MeasureTable_SingleKey.measure_sum_quantity) AS a_6,
+          AGG(MeasureTable_SingleKey.measure_sum_price) AS a_7
+        FROM
+          (
+            SELECT
+              1 AS a_4
+          ) AS projectscan_5
+      ) AS aggregatescan_8
+  );
+
+[REWRITTEN AST]
+QueryStmt
++-output_column_list=
+| +-MeasureTable_SingleKey.key#1 AS key [INT64]
++-query=
+  +-ProjectScan
+    +-column_list=[MeasureTable_SingleKey.key#1]
+    +-input_scan=
+      +-FilterScan
+        +-column_list=MeasureTable_SingleKey.[key#1, struct_for_measures_from_table_MeasureTable_SingleKey#21, struct_for_measures_from_table_MeasureTable_SingleKey#21]
+        +-input_scan=
+        | +-ProjectScan
+        |   +-column_list=MeasureTable_SingleKey.[key#1, struct_for_measures_from_table_MeasureTable_SingleKey#21]
+        |   +-expr_list=
+        |   | +-struct_for_measures_from_table_MeasureTable_SingleKey#21 :=
+        |   |   +-MakeStruct
+        |   |     +-type=STRUCT<referenced_columns STRUCT<quantity INT64, price INT64>, key_columns STRUCT<key INT64>>
+        |   |     +-field_list=
+        |   |       +-MakeStruct
+        |   |       | +-type=STRUCT<quantity INT64, price INT64>
+        |   |       | +-field_list=
+        |   |       |   +-ColumnRef(type=INT64, column=MeasureTable_SingleKey.quantity#19)
+        |   |       |   +-ColumnRef(type=INT64, column=MeasureTable_SingleKey.price#20)
+        |   |       +-MakeStruct
+        |   |         +-type=STRUCT<key INT64>
+        |   |         +-field_list=
+        |   |           +-ColumnRef(type=INT64, column=MeasureTable_SingleKey.key#1)
+        |   +-input_scan=
+        |     +-TableScan(column_list=MeasureTable_SingleKey.[key#1, quantity#19, price#20], table=MeasureTable_SingleKey, column_index_list=[0, 2, 3], alias="t")
+        +-filter_expr=
+          +-FunctionCall(GoogleSQL:$greater(INT64, INT64) -> BOOL)
+            +-ColumnRef(type=INT64, column=MeasureTable_SingleKey.key#1)
+            +-SubqueryExpr
+              +-type=INT64
+              +-subquery_type=SCALAR
+              +-parameter_list=
+              | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<quantity INT64, price INT64>, key_columns STRUCT<key INT64>>, column=MeasureTable_SingleKey.struct_for_measures_from_table_MeasureTable_SingleKey#21)
+              +-subquery=
+                +-ProjectScan
+                  +-column_list=[$expr_subquery.$col1#18]
+                  +-expr_list=
+                  | +-$col1#18 :=
+                  |   +-FunctionCall(GoogleSQL:$add(INT64, INT64) -> INT64)
+                  |     +-ColumnRef(type=INT64, column=$aggregate.$agg1#16)
+                  |     +-ColumnRef(type=INT64, column=$aggregate.$agg2#17)
+                  +-input_scan=
+                    +-ProjectScan
+                      +-column_list=$aggregate.[$agg1#16, $agg2#17]
+                      +-expr_list=
+                      | +-$agg1#16 := ColumnRef(type=INT64, column=$aggregate.constituent_aggregate_1#22)
+                      | +-$agg2#17 := ColumnRef(type=INT64, column=$aggregate.constituent_aggregate_1#25)
+                      +-input_scan=
+                        +-AggregateScan
+                          +-column_list=$aggregate.[constituent_aggregate_1#22, constituent_aggregate_1#25]
+                          +-input_scan=
+                          | +-ProjectScan
+                          |   +-column_list=[$subquery1.$col1#15]
+                          |   +-expr_list=
+                          |   | +-$col1#15 := Literal(type=INT64, value=1)
+                          |   +-input_scan=
+                          |     +-SingleRowScan
+                          +-aggregate_list=
+                            +-constituent_aggregate_1#22 :=
+                            | +-AggregateFunctionCall(GoogleSQL:sum(INT64) -> INT64)
+                            |   +-ColumnRef(type=INT64, column=$aggregate.$any_value_grain_lock_0#23)
+                            |   +-where_expr=
+                            |   | +-FunctionCall(GoogleSQL:$not(BOOL) -> BOOL)
+                            |   |   +-FunctionCall(GoogleSQL:$is_null(STRUCT<referenced_columns STRUCT<quantity INT64, price INT64>, key_columns STRUCT<key INT64>>) -> BOOL)
+                            |   |     +-ColumnRef(type=STRUCT<referenced_columns STRUCT<quantity INT64, price INT64>, key_columns STRUCT<key INT64>>, column=MeasureTable_SingleKey.struct_for_measures_from_table_MeasureTable_SingleKey#21, is_correlated=TRUE)
+                            |   +-group_by_list=
+                            |   | +-grain_lock_key#24 :=
+                            |   |   +-GetStructField
+                            |   |     +-type=STRUCT<key INT64>
+                            |   |     +-expr=
+                            |   |     | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<quantity INT64, price INT64>, key_columns STRUCT<key INT64>>, column=MeasureTable_SingleKey.struct_for_measures_from_table_MeasureTable_SingleKey#21, is_correlated=TRUE)
+                            |   |     +-field_idx=1
+                            |   +-group_by_aggregate_list=
+                            |     +-$any_value_grain_lock_0#23 :=
+                            |       +-AggregateFunctionCall(GoogleSQL:any_value(INT64) -> INT64)
+                            |         +-GetStructField
+                            |           +-type=INT64
+                            |           +-expr=
+                            |           | +-GetStructField
+                            |           |   +-type=STRUCT<quantity INT64, price INT64>
+                            |           |   +-expr=
+                            |           |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<quantity INT64, price INT64>, key_columns STRUCT<key INT64>>, column=MeasureTable_SingleKey.struct_for_measures_from_table_MeasureTable_SingleKey#21, is_correlated=TRUE)
+                            |           |   +-field_idx=0
+                            |           +-field_idx=0
+                            +-constituent_aggregate_1#25 :=
+                              +-AggregateFunctionCall(GoogleSQL:sum(INT64) -> INT64)
+                                +-ColumnRef(type=INT64, column=$aggregate.$any_value_grain_lock_0#26)
+                                +-where_expr=
+                                | +-FunctionCall(GoogleSQL:$not(BOOL) -> BOOL)
+                                |   +-FunctionCall(GoogleSQL:$is_null(STRUCT<referenced_columns STRUCT<quantity INT64, price INT64>, key_columns STRUCT<key INT64>>) -> BOOL)
+                                |     +-ColumnRef(type=STRUCT<referenced_columns STRUCT<quantity INT64, price INT64>, key_columns STRUCT<key INT64>>, column=MeasureTable_SingleKey.struct_for_measures_from_table_MeasureTable_SingleKey#21, is_correlated=TRUE)
+                                +-group_by_list=
+                                | +-grain_lock_key#27 :=
+                                |   +-GetStructField
+                                |     +-type=STRUCT<key INT64>
+                                |     +-expr=
+                                |     | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<quantity INT64, price INT64>, key_columns STRUCT<key INT64>>, column=MeasureTable_SingleKey.struct_for_measures_from_table_MeasureTable_SingleKey#21, is_correlated=TRUE)
+                                |     +-field_idx=1
+                                +-group_by_aggregate_list=
+                                  +-$any_value_grain_lock_0#26 :=
+                                    +-AggregateFunctionCall(GoogleSQL:any_value(INT64) -> INT64)
+                                      +-GetStructField
+                                        +-type=INT64
+                                        +-expr=
+                                        | +-GetStructField
+                                        |   +-type=STRUCT<quantity INT64, price INT64>
+                                        |   +-expr=
+                                        |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<quantity INT64, price INT64>, key_columns STRUCT<key INT64>>, column=MeasureTable_SingleKey.struct_for_measures_from_table_MeasureTable_SingleKey#21, is_correlated=TRUE)
+                                        |   +-field_idx=0
+                                        +-field_idx=1
+
+[SQLBUILDER_OUTPUT]
+SELECT
+  projectscan_6.a_1 AS key
+FROM
+  (
+    SELECT
+      measuretable_singlekey_4.a_1 AS a_1,
+      STRUCT< referenced_columns STRUCT< quantity INT64, price INT64 >, key_columns STRUCT< key INT64 > > (STRUCT<
+        quantity INT64, price INT64 > (measuretable_singlekey_4.a_2, measuretable_singlekey_4.a_3), STRUCT< key INT64 >
+        (measuretable_singlekey_4.a_1)) AS a_5
+    FROM
+      (
+        SELECT
+          MeasureTable_SingleKey.key AS a_1,
+          MeasureTable_SingleKey.quantity AS a_2,
+          MeasureTable_SingleKey.price AS a_3
+        FROM
+          MeasureTable_SingleKey
+      ) AS measuretable_singlekey_4
+  ) AS projectscan_6
+WHERE
+  (projectscan_6.a_1) > (
+    SELECT
+      (projectscan_14.a_12) + (projectscan_14.a_13) AS a_15
+    FROM
+      (
+        SELECT
+          aggregatescan_11.a_9 AS a_12,
+          aggregatescan_11.a_10 AS a_13
+        FROM
+          (
+            SELECT
+              SUM(ANY_VALUE(projectscan_6.a_5.referenced_columns.quantity)
+                WHERE
+                  NOT((projectscan_6.a_5) IS NULL)
+                GROUP BY projectscan_6.a_5.key_columns) AS a_9,
+              SUM(ANY_VALUE(projectscan_6.a_5.referenced_columns.price)
+                WHERE
+                  NOT((projectscan_6.a_5) IS NULL)
+                GROUP BY projectscan_6.a_5.key_columns) AS a_10
+            FROM
+              (
+                SELECT
+                  1 AS a_7
+              ) AS projectscan_8
+          ) AS aggregatescan_11
+      ) AS projectscan_14
+  );

@@ -56,7 +56,12 @@ struct BoxGlyphs {
   absl::string_view tree_branch;    // ├─
   absl::string_view tree_last;      // └─
   absl::string_view tree_vertical;  // │<space>
-  absl::string_view tree_space;     // <space><space>
+  // A "lighter" vertical bar connector, used for linear pipe continuation
+  // lines. This uses periods in ascii mode and "·" (mid-dot) in unicode mode
+  // to make a dotted line. Other dashed line characters (e.g. ┊, ┆, ╎, ¦)
+  // didn't look right (e.g. the characters are too wide).
+  absl::string_view tree_vertical_light;
+  absl::string_view tree_space;  // <space><space>
 };
 
 constexpr BoxGlyphs kAsciiBoxGlyphs = {
@@ -78,6 +83,7 @@ constexpr BoxGlyphs kAsciiBoxGlyphs = {
     .tree_branch = "+-",
     .tree_last = "+-",
     .tree_vertical = "| ",
+    .tree_vertical_light = ".",
     .tree_space = "  ",
 };
 
@@ -101,6 +107,7 @@ constexpr BoxGlyphs kUnicodeBoxGlyphs = {
     .tree_branch = "├─",
     .tree_last = "└─",
     .tree_vertical = "│ ",
+    .tree_vertical_light = "·",
     .tree_space = "  ",
 };
 

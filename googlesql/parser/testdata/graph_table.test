@@ -379,7 +379,7 @@ select * from
   ) g1
 --
 
-ERROR: Syntax error: Expected keyword INSERT or keyword RETURN but got ")" [at 5:3]
+ERROR: Syntax error: Expected keyword INSERT or keyword REMOVE or keyword RETURN or keyword SET but got ")" [at 5:3]
   ) g1
   ^
 ==
@@ -1004,7 +1004,7 @@ select * from
 
 --
 
-ERROR: Syntax error: Expected keyword INSERT or keyword RETURN but got ")" [at 4:3]
+ERROR: Syntax error: Expected keyword INSERT or keyword REMOVE or keyword RETURN or keyword SET but got ")" [at 4:3]
   ) g1
   ^
 
@@ -1020,7 +1020,7 @@ select * from
 
 --
 
-ERROR: Syntax error: Expected keyword INSERT or keyword RETURN but got keyword COLUMNS [at 5:5]
+ERROR: Syntax error: Expected keyword INSERT or keyword REMOVE or keyword RETURN or keyword SET but got keyword COLUMNS [at 5:5]
     COLUMNS (n.name)
     ^
 

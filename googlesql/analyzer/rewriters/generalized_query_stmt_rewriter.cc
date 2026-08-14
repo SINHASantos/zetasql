@@ -219,12 +219,12 @@ class GeneralizedQueryStmtRewriteVisitor : public ResolvedASTRewriteVisitor {
   PostVisitResolvedPipeCreateTableScan(
       std::unique_ptr<const ResolvedPipeCreateTableScan> scan) override;
 
-  absl::Status PreVisitResolvedPipeInsertScan(
-      const ResolvedPipeInsertScan& node) override;
+  absl::Status PreVisitResolvedInsertScan(
+      const ResolvedInsertScan& node) override;
 
   absl::StatusOr<std::unique_ptr<const ResolvedNode>>
-  PostVisitResolvedPipeInsertScan(
-      std::unique_ptr<const ResolvedPipeInsertScan> scan) override;
+  PostVisitResolvedInsertScan(
+      std::unique_ptr<const ResolvedInsertScan> scan) override;
 
   absl::Status PreVisitResolvedPipeTeeScan(
       const ResolvedPipeTeeScan& node) override;
@@ -508,16 +508,16 @@ GeneralizedQueryStmtRewriteVisitor::PostVisitResolvedPipeExportDataScan(
   return fake_scan();
 }
 
-absl::Status GeneralizedQueryStmtRewriteVisitor::PreVisitResolvedPipeInsertScan(
-    const ResolvedPipeInsertScan& node) {
+absl::Status GeneralizedQueryStmtRewriteVisitor::PreVisitResolvedInsertScan(
+    const ResolvedInsertScan& node) {
   statement_list_stack_.emplace();
   return absl::OkStatus();
 }
 
 absl::StatusOr<std::unique_ptr<const ResolvedNode>>
-GeneralizedQueryStmtRewriteVisitor::PostVisitResolvedPipeInsertScan(
-    std::unique_ptr<const ResolvedPipeInsertScan> scan) {
-  ResolvedPipeInsertScanBuilder scan_builder = ToBuilder(std::move(scan));
+GeneralizedQueryStmtRewriteVisitor::PostVisitResolvedInsertScan(
+    std::unique_ptr<const ResolvedInsertScan> scan) {
+  ResolvedInsertScanBuilder scan_builder = ToBuilder(std::move(scan));
 
   // INSERT does not accept any hints in the parser.
   GOOGLESQL_RET_CHECK(scan_builder.hint_list().empty());
@@ -691,6 +691,13 @@ absl::Status GeneralizedQueryStmtRewriteVisitor::PreVisitResolvedFinishScan(
 absl::StatusOr<std::unique_ptr<const ResolvedNode>>
 GeneralizedQueryStmtRewriteVisitor::PostVisitResolvedFinishScan(
     std::unique_ptr<const ResolvedFinishScan> scan) {
+  if (scan->input_scan()->node_kind() == RESOLVED_SINGLE_ROW_SCAN) {
+    // The input was a terminal operator already rewritten to fake_scan().
+    // We don't need to generate a dummy ResolvedTerminalQueryStmt for it.
+    GOOGLESQL_RETURN_IF_ERROR(PopAndAddToPreviousStatementList());
+    return fake_scan();
+  }
+
   auto scan_builder = ToBuilder(std::move(scan));
   GOOGLESQL_ASSIGN_OR_RETURN(auto finish_scan, std::move(scan_builder).Build());
 

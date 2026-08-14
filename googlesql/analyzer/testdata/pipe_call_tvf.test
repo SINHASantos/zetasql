@@ -99,7 +99,7 @@ QueryStmt
     +-column_list=tvf_one_relation_arg_with_fixed_output.[column_bool#3, column_bytes#4]
     +-hint_list=
     | +-hint := Literal(type=INT64, value=1)
-    +-tvf=tvf_one_relation_arg_with_fixed_output((ANY TABLE) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+    +-tvf=tvf_one_relation_arg_with_fixed_output
     +-signature=(TABLE<$col1 BOOL, $col2 INT64>) -> TABLE<column_bool BOOL, column_bytes BYTES>
     +-argument_list=
     | +-FunctionArgument
@@ -181,7 +181,7 @@ QueryStmt
 +-query=
   +-TVFScan
     +-column_list=tvf_one_relation_arg_output_schema_is_input_schema.[x#3, $col2#4]
-    +-tvf=tvf_one_relation_arg_output_schema_is_input_schema((ANY TABLE) -> ANY TABLE)
+    +-tvf=tvf_one_relation_arg_output_schema_is_input_schema
     +-signature=(TABLE<x INT64, $col2 BOOL>) -> TABLE<x INT64, $col2 BOOL>
     +-argument_list=
     | +-FunctionArgument
@@ -209,7 +209,7 @@ QueryStmt
 +-query=
   +-TVFScan
     +-column_list=[tvf_one_relation_arg_output_schema_is_input_schema.$col0#4]
-    +-tvf=tvf_one_relation_arg_output_schema_is_input_schema((ANY TABLE) -> ANY TABLE)
+    +-tvf=tvf_one_relation_arg_output_schema_is_input_schema
     +-signature=(TABLE<PROTO<googlesql_test.TestExtraPB>>) -> TABLE<PROTO<googlesql_test.TestExtraPB>>
     +-argument_list=
     | +-FunctionArgument
@@ -242,7 +242,7 @@ QueryStmt
         +-input_scan=
         | +-TVFScan
         |   +-column_list=tvf_one_relation_arg_output_schema_is_input_schema.[Key#3, Value#4]
-        |   +-tvf=tvf_one_relation_arg_output_schema_is_input_schema((ANY TABLE) -> ANY TABLE)
+        |   +-tvf=tvf_one_relation_arg_output_schema_is_input_schema
         |   +-signature=(TABLE<Key INT64, Value STRING>) -> TABLE<Key INT64, Value STRING>
         |   +-argument_list=
         |   | +-FunctionArgument
@@ -268,7 +268,7 @@ QueryStmt
 +-query=
   +-TVFScan
     +-column_list=[tvf_one_optional_relation_arg_return_int64_value_table.$col0#2]
-    +-tvf=tvf_one_optional_relation_arg_return_int64_value_table((optional ANY TABLE) -> TABLE<INT64>)
+    +-tvf=tvf_one_optional_relation_arg_return_int64_value_table
     +-signature=(TABLE<$col1 STRING>) -> TABLE<INT64>
     +-argument_list=
     | +-FunctionArgument
@@ -316,7 +316,7 @@ QueryStmt
 +-query=
   +-TVFScan
     +-column_list=[tvf_two_relation_args_return_proto_value_table.$col0#4]
-    +-tvf=tvf_two_relation_args_return_proto_value_table((ANY TABLE, ANY TABLE) -> TABLE<PROTO<googlesql_test.TestExtraPB>>)
+    +-tvf=tvf_two_relation_args_return_proto_value_table
     +-signature=(TABLE<$col1 STRING>, TABLE<Key INT64, Value STRING>) -> TABLE<PROTO<googlesql_test.TestExtraPB>>
     +-argument_list=
     | +-FunctionArgument
@@ -371,7 +371,7 @@ QueryStmt
 +-query=
   +-TVFScan
     +-column_list=tvf_model_evaluation_args.[column_bool#3, column_bytes#4]
-    +-tvf=tvf_model_evaluation_args((ANY MODEL, optional ANY TABLE, optional <struct>) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+    +-tvf=tvf_model_evaluation_args
     +-signature=(ANY MODEL, TABLE<Key INT64, Value STRING>) -> TABLE<column_bool BOOL, column_bytes BYTES>
     +-argument_list=
     | +-FunctionArgument
@@ -415,7 +415,7 @@ QueryStmt
 +-query=
   +-TVFScan
     +-column_list=tvf_model_optional_table_named_string_default.[column_bool#3, column_bytes#4]
-    +-tvf=tvf_model_optional_table_named_string_default((ANY MODEL, optional ANY TABLE, optional STRING {default_value: "default"} foobar) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+    +-tvf=tvf_model_optional_table_named_string_default
     +-signature=(ANY MODEL, TABLE<Key INT64, Value STRING>, literal STRING) -> TABLE<column_bool BOOL, column_bytes BYTES>
     +-argument_list=
     | +-FunctionArgument
@@ -448,7 +448,7 @@ QueryStmt
 +-query=
   +-TVFScan
     +-column_list=tvf_model_optional_table_named_string_default.[column_bool#3, column_bytes#4]
-    +-tvf=tvf_model_optional_table_named_string_default((ANY MODEL, optional ANY TABLE, optional STRING {default_value: "default"} foobar) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+    +-tvf=tvf_model_optional_table_named_string_default
     +-signature=(ANY MODEL, TABLE<Key INT64, Value STRING>, literal STRING) -> TABLE<column_bool BOOL, column_bytes BYTES>
     +-argument_list=
     | +-FunctionArgument
@@ -523,7 +523,7 @@ QueryStmt
 +-query=
   +-TVFScan
     +-column_list=tvf_one_relation_arg_int64_string_input_columns.[column_bool#5, column_bytes#6]
-    +-tvf=tvf_one_relation_arg_int64_string_input_columns((TABLE<int64 INT64, string STRING>) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+    +-tvf=tvf_one_relation_arg_int64_string_input_columns
     +-signature=(TABLE<int64 INT64, string STRING>) -> TABLE<column_bool BOOL, column_bytes BYTES>
     +-argument_list=
     | +-FunctionArgument
@@ -558,7 +558,7 @@ QueryStmt
 +-query=
   +-TVFScan
     +-column_list=tvf_one_relation_arg_int64_string_input_columns.[column_bool#20, column_bytes#21]
-    +-tvf=tvf_one_relation_arg_int64_string_input_columns((TABLE<int64 INT64, string STRING>) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+    +-tvf=tvf_one_relation_arg_int64_string_input_columns
     +-signature=(TABLE<int64 INT64, string STRING>) -> TABLE<column_bool BOOL, column_bytes BYTES>
     +-argument_list=
     | +-FunctionArgument
@@ -587,7 +587,7 @@ QueryStmt
 +-query=
   +-TVFScan
     +-column_list=tvf_one_relation_arg_int64_string_input_columns.[column_bool#20, column_bytes#21]
-    +-tvf=tvf_one_relation_arg_int64_string_input_columns((TABLE<int64 INT64, string STRING>) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+    +-tvf=tvf_one_relation_arg_int64_string_input_columns
     +-signature=(TABLE<int64 INT64, string STRING>) -> TABLE<column_bool BOOL, column_bytes BYTES>
     +-argument_list=
     | +-FunctionArgument
@@ -620,7 +620,7 @@ QueryStmt
 +-query=
   +-TVFScan
     +-column_list=tvf_one_relation_arg_int64_string_input_columns.[column_bool#4, column_bytes#5]
-    +-tvf=tvf_one_relation_arg_int64_string_input_columns((TABLE<int64 INT64, string STRING>) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+    +-tvf=tvf_one_relation_arg_int64_string_input_columns
     +-signature=(TABLE<int64 INT64, string STRING>) -> TABLE<column_bool BOOL, column_bytes BYTES>
     +-argument_list=
     | +-FunctionArgument
@@ -675,7 +675,7 @@ QueryStmt
 +-query=
   +-TVFScan
     +-column_list=tvf_two_relation_args_uint64_string_and_date_string_input_columns.[column_bool#40, column_bytes#41]
-    +-tvf=tvf_two_relation_args_uint64_string_and_date_string_input_columns((TABLE<uint64 UINT64, string STRING>, TABLE<date DATE, string STRING>) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+    +-tvf=tvf_two_relation_args_uint64_string_and_date_string_input_columns
     +-signature=(TABLE<uint64 UINT64, string STRING>, TABLE<date DATE, string STRING>) -> TABLE<column_bool BOOL, column_bytes BYTES>
     +-argument_list=
     | +-FunctionArgument
@@ -749,7 +749,7 @@ QueryStmt
 +-query=
   +-TVFScan
     +-column_list=tvf_one_relation_arg_int64_input_value_table.[column_bool#3, column_bytes#4]
-    +-tvf=tvf_one_relation_arg_int64_input_value_table((TABLE<INT64>) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+    +-tvf=tvf_one_relation_arg_int64_input_value_table
     +-signature=(TABLE<INT64>) -> TABLE<column_bool BOOL, column_bytes BYTES>
     +-argument_list=
     | +-FunctionArgument
@@ -774,7 +774,7 @@ QueryStmt
 +-query=
   +-TVFScan
     +-column_list=tvf_one_relation_arg_int64_input_value_table.[column_bool#3, column_bytes#4]
-    +-tvf=tvf_one_relation_arg_int64_input_value_table((TABLE<INT64>) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+    +-tvf=tvf_one_relation_arg_int64_input_value_table
     +-signature=(TABLE<Key INT64>) -> TABLE<column_bool BOOL, column_bytes BYTES>
     +-argument_list=
     | +-FunctionArgument
@@ -809,14 +809,14 @@ QueryStmt
 +-query=
   +-TVFScan
     +-column_list=tvf_one_relation_arg_input_proto_value_table.[column_bool#6, column_bytes#7]
-    +-tvf=tvf_one_relation_arg_input_proto_value_table((TABLE<PROTO<googlesql_test.TestExtraPB>>) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+    +-tvf=tvf_one_relation_arg_input_proto_value_table
     +-signature=(TABLE<PROTO<googlesql_test.TestExtraPB>>) -> TABLE<column_bool BOOL, column_bytes BYTES>
     +-argument_list=
     | +-FunctionArgument
     |   +-scan=
     |   | +-TVFScan
     |   |   +-column_list=[tvf_two_relation_args_return_proto_value_table.$col0#5]
-    |   |   +-tvf=tvf_two_relation_args_return_proto_value_table((ANY TABLE, ANY TABLE) -> TABLE<PROTO<googlesql_test.TestExtraPB>>)
+    |   |   +-tvf=tvf_two_relation_args_return_proto_value_table
     |   |   +-signature=(TABLE<$col1 INT64, $col2 INT64>, TABLE<$col1 INT64, $col2 INT64>) -> TABLE<PROTO<googlesql_test.TestExtraPB>>
     |   |   +-argument_list=
     |   |   | +-FunctionArgument
@@ -865,28 +865,28 @@ QueryStmt
 +-query=
   +-TVFScan
     +-column_list=tvf_one_relation_arg_output_schema_is_input_schema.[column_bool#11, column_bytes#12]
-    +-tvf=tvf_one_relation_arg_output_schema_is_input_schema((ANY TABLE) -> ANY TABLE)
+    +-tvf=tvf_one_relation_arg_output_schema_is_input_schema
     +-signature=(TABLE<column_bool BOOL, column_bytes BYTES>) -> TABLE<column_bool BOOL, column_bytes BYTES>
     +-argument_list=
     | +-FunctionArgument
     |   +-scan=
     |   | +-TVFScan
     |   |   +-column_list=tvf_one_relation_arg_input_proto_value_table.[column_bool#9, column_bytes#10]
-    |   |   +-tvf=tvf_one_relation_arg_input_proto_value_table((TABLE<PROTO<googlesql_test.TestExtraPB>>) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+    |   |   +-tvf=tvf_one_relation_arg_input_proto_value_table
     |   |   +-signature=(TABLE<PROTO<googlesql_test.TestExtraPB>>) -> TABLE<column_bool BOOL, column_bytes BYTES>
     |   |   +-argument_list=
     |   |   | +-FunctionArgument
     |   |   |   +-scan=
     |   |   |   | +-TVFScan
     |   |   |   |   +-column_list=[tvf_one_relation_arg_output_schema_is_input_schema.$col0#8]
-    |   |   |   |   +-tvf=tvf_one_relation_arg_output_schema_is_input_schema((ANY TABLE) -> ANY TABLE)
+    |   |   |   |   +-tvf=tvf_one_relation_arg_output_schema_is_input_schema
     |   |   |   |   +-signature=(TABLE<PROTO<googlesql_test.TestExtraPB>>) -> TABLE<PROTO<googlesql_test.TestExtraPB>>
     |   |   |   |   +-argument_list=
     |   |   |   |   | +-FunctionArgument
     |   |   |   |   |   +-scan=
     |   |   |   |   |   | +-TVFScan
     |   |   |   |   |   |   +-column_list=[tvf_two_relation_args_return_proto_value_table.$col0#7]
-    |   |   |   |   |   |   +-tvf=tvf_two_relation_args_return_proto_value_table((ANY TABLE, ANY TABLE) -> TABLE<PROTO<googlesql_test.TestExtraPB>>)
+    |   |   |   |   |   |   +-tvf=tvf_two_relation_args_return_proto_value_table
     |   |   |   |   |   |   +-signature=(TABLE<$col1 INT64, $col2 INT64>, TABLE<Key INT64, Value STRING>) -> TABLE<PROTO<googlesql_test.TestExtraPB>>
     |   |   |   |   |   |   +-argument_list=
     |   |   |   |   |   |   | +-FunctionArgument
@@ -903,7 +903,7 @@ QueryStmt
     |   |   |   |   |   |   |   +-scan=
     |   |   |   |   |   |   |   | +-TVFScan
     |   |   |   |   |   |   |   |   +-column_list=tvf_one_relation_arg_output_schema_is_input_schema.[Key#5, Value#6]
-    |   |   |   |   |   |   |   |   +-tvf=tvf_one_relation_arg_output_schema_is_input_schema((ANY TABLE) -> ANY TABLE)
+    |   |   |   |   |   |   |   |   +-tvf=tvf_one_relation_arg_output_schema_is_input_schema
     |   |   |   |   |   |   |   |   +-signature=(TABLE<Key INT64, Value STRING>) -> TABLE<Key INT64, Value STRING>
     |   |   |   |   |   |   |   |   +-argument_list=
     |   |   |   |   |   |   |   |   | +-FunctionArgument
@@ -954,7 +954,7 @@ QueryStmt
     |         +-input_scan=
     |           +-TVFScan
     |             +-column_list=[tvf_one_relation_arg_one_int64_arg.column_bool#6]
-    |             +-tvf=tvf_one_relation_arg_one_int64_arg((ANY TABLE, INT64) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+    |             +-tvf=tvf_one_relation_arg_one_int64_arg
     |             +-signature=(TABLE<string STRING, int64 INT64>, INT64) -> TABLE<column_bool BOOL, column_bytes BYTES>
     |             +-argument_list=
     |             | +-FunctionArgument
@@ -1033,7 +1033,7 @@ QueryStmt
     |       +-input_scan=
     |         +-TVFScan
     |           +-column_list=[tvf_one_relation_arg_one_int64_arg.column_bool#6]
-    |           +-tvf=tvf_one_relation_arg_one_int64_arg((ANY TABLE, INT64) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+    |           +-tvf=tvf_one_relation_arg_one_int64_arg
     |           +-signature=(TABLE<string STRING, int64 INT64>, INT64) -> TABLE<column_bool BOOL, column_bytes BYTES>
     |           +-argument_list=
     |           | +-FunctionArgument
@@ -1079,7 +1079,7 @@ QueryStmt
 +-query=
   +-TVFScan
     +-column_list=tvf_key_input_column_extra_input_columns_allowed.[column_bool#3, column_bytes#4]
-    +-tvf=tvf_key_input_column_extra_input_columns_allowed((TABLE<key INT64>) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+    +-tvf=tvf_key_input_column_extra_input_columns_allowed
     +-signature=(TABLE<Key INT64>) -> TABLE<column_bool BOOL, column_bytes BYTES>
     +-argument_list=
     | +-FunctionArgument
@@ -1113,7 +1113,7 @@ QueryStmt
 +-query=
   +-TVFScan
     +-column_list=tvf_uint64_input_column_named_uint32.[column_bool#21, column_bytes#22]
-    +-tvf=tvf_uint64_input_column_named_uint32((TABLE<uint32 UINT64>) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+    +-tvf=tvf_uint64_input_column_named_uint32
     +-signature=(TABLE<uint32 UINT64>) -> TABLE<column_bool BOOL, column_bytes BYTES>
     +-argument_list=
     | +-FunctionArgument
@@ -1144,7 +1144,7 @@ QueryStmt
 +-query=
   +-TVFScan
     +-column_list=tvf_one_relation_arg_with_fixed_output.[column_bool#4, column_bytes#5]
-    +-tvf=tvf_one_relation_arg_with_fixed_output((ANY TABLE) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+    +-tvf=tvf_one_relation_arg_with_fixed_output
     +-signature=(TABLE<PROTO<googlesql_test.TestExtraPB>>) -> TABLE<column_bool BOOL, column_bytes BYTES>
     +-argument_list=
     | +-FunctionArgument
@@ -1174,7 +1174,7 @@ QueryStmt
 +-query=
   +-TVFScan
     +-column_list=[tvf_one_relation_arg_output_schema_is_input_schema.$col0#4]
-    +-tvf=tvf_one_relation_arg_output_schema_is_input_schema((ANY TABLE) -> ANY TABLE)
+    +-tvf=tvf_one_relation_arg_output_schema_is_input_schema
     +-signature=(TABLE<PROTO<googlesql_test.TestExtraPB>>) -> TABLE<PROTO<googlesql_test.TestExtraPB>>
     +-argument_list=
     | +-FunctionArgument
@@ -1215,7 +1215,7 @@ QueryStmt
 +-query=
   +-TVFScan
     +-column_list=[nested_catalog.nested_tvf_one.key#7]
-    +-tvf=nested_catalog.nested_tvf_one((TABLE<key INT64>) -> TABLE<key INT64>)
+    +-tvf=nested_catalog.nested_tvf_one
     +-signature=(TABLE<key INT64>) -> TABLE<key INT64>
     +-argument_list=
     | +-FunctionArgument
@@ -1244,7 +1244,7 @@ QueryStmt
 +-query=
   +-TVFScan
     +-column_list=tvf_templated_select_relation_arg_using_column_names.[key#4, value#5]
-    +-tvf=tvf_templated_select_relation_arg_using_column_names((ANY TABLE) -> ANY TABLE)
+    +-tvf=tvf_templated_select_relation_arg_using_column_names
     +-signature=(TABLE<value STRING, xx INT64, key INT64>) -> TABLE<key INT64, value STRING>
     +-argument_list=
     | +-FunctionArgument
@@ -1284,7 +1284,7 @@ QueryStmt
 +-query=
   +-TVFScan
     +-column_list=tvf_templated_select_relation_arg_using_column_names.[key#3, value#4]
-    +-tvf=tvf_templated_select_relation_arg_using_column_names((ANY TABLE) -> ANY TABLE)
+    +-tvf=tvf_templated_select_relation_arg_using_column_names
     +-signature=(TABLE<Key INT64, Value STRING>) -> TABLE<key INT64, value STRING>
     +-argument_list=
     | +-FunctionArgument
@@ -1326,7 +1326,7 @@ QueryStmt
 +-query=
   +-TVFScan
     +-column_list=[tvf_templated_select_scalar_and_relation_args.key#4]
-    +-tvf=tvf_templated_select_scalar_and_relation_args((INT64, TABLE<key INT64>) -> ANY TABLE)
+    +-tvf=tvf_templated_select_scalar_and_relation_args
     +-signature=(literal INT64, TABLE<key INT64>) -> TABLE<key INT64>
     +-argument_list=
     | +-FunctionArgument
@@ -1424,7 +1424,7 @@ QueryStmt
 +-query=
   +-TVFScan
     +-column_list=tvf_templated_select_two_relation_args.[key#5, Value#6, Value#7]
-    +-tvf=tvf_templated_select_two_relation_args((ANY TABLE, ANY TABLE) -> ANY TABLE)
+    +-tvf=tvf_templated_select_two_relation_args
     +-signature=(TABLE<Key INT64, Value STRING>, TABLE<Key INT64, Value STRING>) -> TABLE<key INT64, Value STRING, Value STRING>
     +-argument_list=
     | +-FunctionArgument
@@ -1503,7 +1503,7 @@ QueryStmt
 +-query=
   +-TVFScan
     +-column_list=[tvf_templated_select_a.a#2]
-    +-tvf=tvf_templated_select_a((ANY TABLE) -> ANY TABLE)
+    +-tvf=tvf_templated_select_a
     +-signature=(TABLE<STRUCT<a INT32, b STRING>>) -> TABLE<a INT32>
     +-argument_list=
     | +-FunctionArgument
@@ -1568,7 +1568,7 @@ QueryStmt
     +-query=
       +-TVFScan
         +-column_list=tvf_two_relation_args_uint64_string_and_date_string_input_columns.[column_bool#43, column_bytes#44]
-        +-tvf=tvf_two_relation_args_uint64_string_and_date_string_input_columns((TABLE<uint64 UINT64, string STRING>, TABLE<date DATE, string STRING>) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+        +-tvf=tvf_two_relation_args_uint64_string_and_date_string_input_columns
         +-signature=(TABLE<uint64 UINT64, string STRING>, TABLE<date DATE, string STRING>) -> TABLE<column_bool BOOL, column_bytes BYTES>
         +-argument_list=
         | +-FunctionArgument
@@ -1609,7 +1609,7 @@ QueryStmt
     +-query=
       +-TVFScan
         +-column_list=tvf_two_relation_args_uint64_string_and_date_string_input_columns.[column_bool#43, column_bytes#44]
-        +-tvf=tvf_two_relation_args_uint64_string_and_date_string_input_columns((TABLE<uint64 UINT64, string STRING>, TABLE<date DATE, string STRING>) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+        +-tvf=tvf_two_relation_args_uint64_string_and_date_string_input_columns
         +-signature=(TABLE<uint64 UINT64, string STRING>, TABLE<date DATE, string STRING>) -> TABLE<column_bool BOOL, column_bytes BYTES>
         +-argument_list=
         | +-FunctionArgument
@@ -1638,7 +1638,7 @@ QueryStmt
 +-query=
   +-TVFScan
     +-column_list=tvf_table_optional_scalar_named_table.[column_bool#4, column_bytes#5]
-    +-tvf=tvf_table_optional_scalar_named_table((ANY TABLE, optional ANY TYPE, optional ANY TABLE foobar) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+    +-tvf=tvf_table_optional_scalar_named_table
     +-signature=(TABLE<Key INT64, Value STRING>, literal INT64, TABLE<$col1 INT64>) -> TABLE<column_bool BOOL, column_bytes BYTES>
     +-argument_list=
     | +-FunctionArgument
@@ -1723,7 +1723,7 @@ QueryStmt
 +-query=
   +-TVFScan
     +-column_list=tvf_table_optional_scalar_named_table.[column_bool#4, column_bytes#5]
-    +-tvf=tvf_table_optional_scalar_named_table((ANY TABLE, optional ANY TYPE, optional ANY TABLE foobar) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+    +-tvf=tvf_table_optional_scalar_named_table
     +-signature=(TABLE<Key INT64, Value STRING>, literal INT64, TABLE<$col1 INT64>) -> TABLE<column_bool BOOL, column_bytes BYTES>
     +-argument_list=
     | +-FunctionArgument
@@ -1758,7 +1758,7 @@ QueryStmt
 +-query=
   +-TVFScan
     +-column_list=tvf_table_optional_scalar_named_table.[column_bool#4, column_bytes#5]
-    +-tvf=tvf_table_optional_scalar_named_table((ANY TABLE, optional ANY TYPE, optional ANY TABLE foobar) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+    +-tvf=tvf_table_optional_scalar_named_table
     +-signature=(TABLE<Key INT64, Value STRING>, null INT64, TABLE<$col1 INT64>) -> TABLE<column_bool BOOL, column_bytes BYTES>
     +-argument_list=
     | +-FunctionArgument
@@ -1830,7 +1830,7 @@ QueryStmt
 +-query=
   +-TVFScan
     +-column_list=tvf_one_relation_arg_one_descriptor.[column_bool#2, column_bytes#3]
-    +-tvf=tvf_one_relation_arg_one_descriptor((TABLE<int64a INT64>, ANY DESCRIPTOR) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+    +-tvf=tvf_one_relation_arg_one_descriptor
     +-signature=(TABLE<int64a INT64>, ANY DESCRIPTOR) -> TABLE<column_bool BOOL, column_bytes BYTES>
     +-argument_list=
     | +-FunctionArgument
@@ -1891,7 +1891,7 @@ QueryStmt
 +-query=
   +-TVFScan
     +-column_list=tvf_one_relation_arg_one_descriptor_resolved_names.[column_bool#2, column_bytes#3]
-    +-tvf=tvf_one_relation_arg_one_descriptor_resolved_names((TABLE<int64a INT64>, ANY DESCRIPTOR) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+    +-tvf=tvf_one_relation_arg_one_descriptor_resolved_names
     +-signature=(TABLE<int64a INT64>, ANY DESCRIPTOR) -> TABLE<column_bool BOOL, column_bytes BYTES>
     +-argument_list=
     | +-FunctionArgument
@@ -1930,7 +1930,7 @@ QueryStmt
 +-query=
   +-TVFScan
     +-column_list=tvf_one_relation_one_model_arg_with_fixed_output.[double#3, string#4]
-    +-tvf=tvf_one_relation_one_model_arg_with_fixed_output((TABLE<key INT64, value STRING> table_arg, ANY MODEL model_arg) -> TABLE<double DOUBLE, string STRING>)
+    +-tvf=tvf_one_relation_one_model_arg_with_fixed_output
     +-signature=(TABLE<Key INT64, Value STRING>, ANY MODEL) -> TABLE<double DOUBLE, string STRING>
     +-argument_list=
     | +-FunctionArgument
@@ -1970,7 +1970,7 @@ QueryStmt
     +-input_scan=
     | +-TVFScan
     |   +-column_list=tvf_one_relation_arg_output_schema_is_input_schema.[Key#5, Value#6]
-    |   +-tvf=tvf_one_relation_arg_output_schema_is_input_schema((ANY TABLE) -> ANY TABLE)
+    |   +-tvf=tvf_one_relation_arg_output_schema_is_input_schema
     |   +-signature=(TABLE<Key INT64, Value STRING>) -> TABLE<Key INT64, Value STRING>
     |   +-argument_list=
     |   | +-FunctionArgument
@@ -1980,7 +1980,7 @@ QueryStmt
     |   |   |   +-input_scan=
     |   |   |   | +-TVFScan
     |   |   |   |   +-column_list=tvf_one_relation_arg_output_schema_is_input_schema.[Key#3, Value#4]
-    |   |   |   |   +-tvf=tvf_one_relation_arg_output_schema_is_input_schema((ANY TABLE) -> ANY TABLE)
+    |   |   |   |   +-tvf=tvf_one_relation_arg_output_schema_is_input_schema
     |   |   |   |   +-signature=(TABLE<Key INT64, Value STRING>) -> TABLE<Key INT64, Value STRING>
     |   |   |   |   +-argument_list=
     |   |   |   |   | +-FunctionArgument
@@ -2038,7 +2038,7 @@ QueryStmt
     +-left_scan=
     | +-TVFScan
     |   +-column_list=tvf_one_relation_arg_output_schema_is_input_schema.[Key#3, Value#4]
-    |   +-tvf=tvf_one_relation_arg_output_schema_is_input_schema((ANY TABLE) -> ANY TABLE)
+    |   +-tvf=tvf_one_relation_arg_output_schema_is_input_schema
     |   +-signature=(TABLE<Key INT64, Value STRING>) -> TABLE<Key INT64, Value STRING>
     |   +-argument_list=
     |   | +-FunctionArgument
@@ -2051,7 +2051,7 @@ QueryStmt
     +-right_scan=
     | +-TVFScan
     |   +-column_list=tvf_one_relation_arg_output_schema_is_input_schema.[Key#7, Value#8]
-    |   +-tvf=tvf_one_relation_arg_output_schema_is_input_schema((ANY TABLE) -> ANY TABLE)
+    |   +-tvf=tvf_one_relation_arg_output_schema_is_input_schema
     |   +-signature=(TABLE<Key INT64, Value STRING>) -> TABLE<Key INT64, Value STRING>
     |   +-argument_list=
     |   | +-FunctionArgument
@@ -2082,7 +2082,7 @@ QueryStmt
     +-input_scan=
     | +-TVFScan
     |   +-column_list=[tvf_one_optional_relation_arg_return_int64_value_table.$col0#3]
-    |   +-tvf=tvf_one_optional_relation_arg_return_int64_value_table((optional ANY TABLE) -> TABLE<INT64>)
+    |   +-tvf=tvf_one_optional_relation_arg_return_int64_value_table
     |   +-signature=(TABLE<Key INT64, Value STRING>) -> TABLE<INT64>
     |   +-argument_list=
     |   | +-FunctionArgument
@@ -2117,7 +2117,7 @@ QueryStmt
 +-query=
   +-TVFScan
     +-column_list=tvf_one_relation_arg_one_int64_arg.[column_bool#3, column_bytes#4]
-    +-tvf=tvf_one_relation_arg_one_int64_arg((ANY TABLE, INT64) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+    +-tvf=tvf_one_relation_arg_one_int64_arg
     +-signature=(TABLE<Key INT64, Value STRING>, literal INT64) -> TABLE<column_bool BOOL, column_bytes BYTES>
     +-argument_list=
     | +-FunctionArgument
@@ -2185,7 +2185,7 @@ QueryStmt
     |         | +-key#9 := ColumnRef(type=INT64, column=KeyValue.Key#1, is_correlated=TRUE)
     |         +-input_scan=
     |           +-TVFScan
-    |             +-tvf=tvf_one_relation_arg_one_int64_arg((ANY TABLE, INT64) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+    |             +-tvf=tvf_one_relation_arg_one_int64_arg
     |             +-signature=(TABLE<Key INT64, Value STRING, inner_column INT64>, INT64) -> TABLE<column_bool BOOL, column_bytes BYTES>
     |             +-argument_list=
     |             | +-FunctionArgument
@@ -2241,7 +2241,7 @@ QueryStmt
     |         | +-key#9 := ColumnRef(type=INT64, column=KeyValue.Key#1, is_correlated=TRUE)
     |         +-input_scan=
     |           +-TVFScan
-    |             +-tvf=tvf_one_relation_arg_one_int64_arg((ANY TABLE, INT64) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+    |             +-tvf=tvf_one_relation_arg_one_int64_arg
     |             +-signature=(TABLE<Key INT64, Value STRING, inner_column INT64>, INT64) -> TABLE<column_bool BOOL, column_bytes BYTES>
     |             +-argument_list=
     |             | +-FunctionArgument
@@ -2285,7 +2285,7 @@ QueryStmt
 +-query=
   +-TVFScan
     +-column_list=tvf_one_int64_arg_one_relation_arg.[column_bool#3, column_bytes#4]
-    +-tvf=tvf_one_int64_arg_one_relation_arg((INT64, ANY TABLE) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+    +-tvf=tvf_one_int64_arg_one_relation_arg
     +-signature=(literal INT64, TABLE<Key INT64, Value STRING>) -> TABLE<column_bool BOOL, column_bytes BYTES>
     +-argument_list=
     | +-FunctionArgument
@@ -2335,7 +2335,7 @@ QueryStmt
 +-query=
   +-TVFScan
     +-column_list=tvf_one_int64_arg_one_relation_arg.[column_bool#3, column_bytes#4]
-    +-tvf=tvf_one_int64_arg_one_relation_arg((INT64, ANY TABLE) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+    +-tvf=tvf_one_int64_arg_one_relation_arg
     +-signature=(literal INT64, TABLE<Key INT64, Value STRING>) -> TABLE<column_bool BOOL, column_bytes BYTES>
     +-argument_list=
     | +-FunctionArgument
@@ -2372,7 +2372,7 @@ QueryStmt
 +-query=
   +-TVFScan
     +-column_list=tvf_one_int64_arg_one_relation_arg.[column_bool#4, column_bytes#5]
-    +-tvf=tvf_one_int64_arg_one_relation_arg((INT64, ANY TABLE) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+    +-tvf=tvf_one_int64_arg_one_relation_arg
     +-signature=(INT64, TABLE<Key INT64, Value STRING>) -> TABLE<column_bool BOOL, column_bytes BYTES>
     +-argument_list=
     | +-FunctionArgument
@@ -2460,7 +2460,7 @@ QueryStmt
 +-query=
   +-TVFScan
     +-column_list=[tvf_two_scalars_two_tables.z#6]
-    +-tvf=tvf_two_scalars_two_tables((INT64 x, INT64 y, ANY TABLE t1, ANY TABLE t2) -> TABLE<z INT64>)
+    +-tvf=tvf_two_scalars_two_tables
     +-signature=(literal INT64, literal INT64, TABLE<Key INT64, Value STRING>, TABLE<key INT32, TestEnum ENUM<googlesql_test.TestEnum>, KitchenSink PROTO<googlesql_test.KitchenSinkPB>>) -> TABLE<z INT64>
     +-argument_list=
     | +-FunctionArgument
@@ -2509,7 +2509,7 @@ QueryStmt
 +-query=
   +-TVFScan
     +-column_list=[tvf_two_scalars_two_tables.z#6]
-    +-tvf=tvf_two_scalars_two_tables((INT64 x, INT64 y, ANY TABLE t1, ANY TABLE t2) -> TABLE<z INT64>)
+    +-tvf=tvf_two_scalars_two_tables
     +-signature=(literal INT64, literal INT64, TABLE<Key INT64, Value STRING>, TABLE<key INT32, TestEnum ENUM<googlesql_test.TestEnum>, KitchenSink PROTO<googlesql_test.KitchenSinkPB>>) -> TABLE<z INT64>
     +-argument_list=
     | +-FunctionArgument
@@ -2581,7 +2581,7 @@ QueryStmt
 +-query=
   +-TVFScan
     +-column_list=[tvf_three_scalars_one_table.z#3]
-    +-tvf=tvf_three_scalars_one_table((INT64 x, INT64 y, INT64 z, ANY TABLE t1) -> TABLE<z INT64>)
+    +-tvf=tvf_three_scalars_one_table
     +-signature=(literal INT64, literal INT64, literal INT64, TABLE<Key INT64, Value STRING>) -> TABLE<z INT64>
     +-argument_list=
     | +-FunctionArgument
@@ -2640,7 +2640,7 @@ QueryStmt
 +-query=
   +-TVFScan
     +-column_list=[tvf_one_scalar_one_table.z#3]
-    +-tvf=tvf_one_scalar_one_table((INT64 x, ANY TABLE t1) -> TABLE<z INT64>)
+    +-tvf=tvf_one_scalar_one_table
     +-signature=(literal INT64, TABLE<Key INT64, Value STRING>) -> TABLE<z INT64>
     +-argument_list=
     | +-FunctionArgument
@@ -2683,7 +2683,7 @@ QueryStmt
 +-query=
   +-TVFScan
     +-column_list=[tvf_expect_a_b_c.z#9]
-    +-tvf=tvf_expect_a_b_c((TABLE<a INT64, b STRING, c DOUBLE> t) -> TABLE<z INT64>)
+    +-tvf=tvf_expect_a_b_c
     +-signature=(TABLE<a INT64, b STRING, c DOUBLE>) -> TABLE<z INT64>
     +-argument_list=
     | +-FunctionArgument
@@ -2731,7 +2731,7 @@ QueryStmt
 +-query=
   +-TVFScan
     +-column_list=[tvf_optional_relation_named_scalar.$col0#3]
-    +-tvf=tvf_optional_relation_named_scalar((optional ANY TABLE, optional STRING foobar) -> TABLE<INT64>)
+    +-tvf=tvf_optional_relation_named_scalar
     +-signature=(TABLE<Key INT64, Value STRING>, literal STRING) -> TABLE<INT64>
     +-argument_list=
     | +-FunctionArgument
@@ -2756,7 +2756,7 @@ QueryStmt
 +-query=
   +-TVFScan
     +-column_list=[tvf_optional_relations_named_scalar.$col0#3]
-    +-tvf=tvf_optional_relations_named_scalar((optional ANY TABLE, optional ANY TABLE, optional STRING foobar) -> TABLE<INT64>)
+    +-tvf=tvf_optional_relations_named_scalar
     +-signature=(TABLE<Key INT64, Value STRING>, TABLE<>, literal STRING) -> TABLE<INT64>
     +-argument_list=
     | +-FunctionArgument
@@ -2784,7 +2784,7 @@ QueryStmt
 +-query=
   +-TVFScan
     +-column_list=[tvf_optional_relations_named_scalar.$col0#5]
-    +-tvf=tvf_optional_relations_named_scalar((optional ANY TABLE, optional ANY TABLE, optional STRING foobar) -> TABLE<INT64>)
+    +-tvf=tvf_optional_relations_named_scalar
     +-signature=(TABLE<Key INT64, Value STRING>, TABLE<Key INT64, Value STRING>, literal STRING) -> TABLE<INT64>
     +-argument_list=
     | +-FunctionArgument

@@ -2,7 +2,7 @@
 
 CREATE LIVE TABLE my_live_table AS SELECT 1 AS a;
 --
-CreateLiveTableStmt
+CreateLiveTableAsSelectStmt
 +-name_path=my_live_table
 +-column_definition_list=
 | +-ColumnDefinition(name="a", type=INT64, column=my_live_table.a#2)
@@ -21,7 +21,7 @@ CREATE LIVE TABLE IF NOT EXISTS my_project.my_live_table
 OPTIONS (refresh_interval = '10m')
 AS SELECT 1 AS a, 'foo' AS b;
 --
-CreateLiveTableStmt
+CreateLiveTableAsSelectStmt
 +-name_path=my_project.my_live_table
 +-create_mode=CREATE_IF_NOT_EXISTS
 +-option_list=
@@ -44,7 +44,7 @@ CreateLiveTableStmt
 
 CREATE LIVE TABLE my_live_table (x INT64, PRIMARY KEY(x)) AS SELECT 1 AS x;
 --
-CreateLiveTableStmt
+CreateLiveTableAsSelectStmt
 +-name_path=my_live_table
 +-column_definition_list=
 | +-ColumnDefinition(name="x", type=INT64, column=my_live_table.x#1)
@@ -64,54 +64,54 @@ CreateLiveTableStmt
 [language_features=NONE,+CREATE_LIVE_TABLE,+CREATE_TABLE_PARTITION_BY]
 CREATE LIVE TABLE t PARTITION BY x AS SELECT 1 AS y, 2 AS x;
 --
-CreateLiveTableStmt
+CreateLiveTableAsSelectStmt
 +-name_path=t
 +-column_definition_list=
 | +-ColumnDefinition(name="y", type=INT64, column=t.y#3)
 | +-ColumnDefinition(name="x", type=INT64, column=t.x#4)
 +-pseudo_column_list=t.[pseudo_column_int32#5, pseudo_column_kitchensink#6, pseudo_column_timestamp#7]
++-partition_by_list=
+| +-ColumnRef(type=INT64, column=t.x#4)
 +-output_column_list=
 | +-$create_as.y#1 AS y [INT64]
 | +-$create_as.x#2 AS x [INT64]
 +-query=
-| +-ProjectScan
-|   +-column_list=$create_as.[y#1, x#2]
-|   +-expr_list=
-|   | +-y#1 := Literal(type=INT64, value=1)
-|   | +-x#2 := Literal(type=INT64, value=2)
-|   +-input_scan=
-|     +-SingleRowScan
-+-partition_by_list=
-  +-ColumnRef(type=INT64, column=t.x#4)
+  +-ProjectScan
+    +-column_list=$create_as.[y#1, x#2]
+    +-expr_list=
+    | +-y#1 := Literal(type=INT64, value=1)
+    | +-x#2 := Literal(type=INT64, value=2)
+    +-input_scan=
+      +-SingleRowScan
 ==
 
 [language_features=NONE,+CREATE_LIVE_TABLE,+CREATE_TABLE_CLUSTER_BY]
 CREATE LIVE TABLE t CLUSTER BY x AS SELECT 1 AS y, 2 AS x;
 --
-CreateLiveTableStmt
+CreateLiveTableAsSelectStmt
 +-name_path=t
 +-column_definition_list=
 | +-ColumnDefinition(name="y", type=INT64, column=t.y#3)
 | +-ColumnDefinition(name="x", type=INT64, column=t.x#4)
 +-pseudo_column_list=t.[pseudo_column_int32#5, pseudo_column_kitchensink#6, pseudo_column_timestamp#7]
++-cluster_by_list=
+| +-ColumnRef(type=INT64, column=t.x#4)
 +-output_column_list=
 | +-$create_as.y#1 AS y [INT64]
 | +-$create_as.x#2 AS x [INT64]
 +-query=
-| +-ProjectScan
-|   +-column_list=$create_as.[y#1, x#2]
-|   +-expr_list=
-|   | +-y#1 := Literal(type=INT64, value=1)
-|   | +-x#2 := Literal(type=INT64, value=2)
-|   +-input_scan=
-|     +-SingleRowScan
-+-cluster_by_list=
-  +-ColumnRef(type=INT64, column=t.x#4)
+  +-ProjectScan
+    +-column_list=$create_as.[y#1, x#2]
+    +-expr_list=
+    | +-y#1 := Literal(type=INT64, value=1)
+    | +-x#2 := Literal(type=INT64, value=2)
+    +-input_scan=
+      +-SingleRowScan
 ==
 
 CREATE OR REPLACE LIVE TABLE t AS SELECT 1 AS a;
 --
-CreateLiveTableStmt
+CreateLiveTableAsSelectStmt
 +-name_path=t
 +-create_mode=CREATE_OR_REPLACE
 +-column_definition_list=
@@ -148,7 +148,7 @@ DropStmt(object_type="LIVE TABLE", is_if_exists=TRUE, name_path=my_live_table)
 [language_features=NONE,+CREATE_LIVE_TABLE,+CREATE_TABLE_WITH_CONNECTION]
 CREATE LIVE TABLE t WITH CONNECTION connection1 AS SELECT 1 AS a;
 --
-CreateLiveTableStmt
+CreateLiveTableAsSelectStmt
 +-name_path=t
 +-column_definition_list=
 | +-ColumnDefinition(name="a", type=INT64, column=t.a#2)
@@ -167,7 +167,7 @@ CreateLiveTableStmt
 
 CREATE LIVE TABLE t AS SELECT AS VALUE STRUCT(1 AS id, 'Alice' AS name) AS a;
 --
-CreateLiveTableStmt
+CreateLiveTableAsSelectStmt
 +-name_path=t
 +-column_definition_list=
 | +-ColumnDefinition(name="$value_column", type=STRUCT<id INT64, name STRING>, column=t.$value_column#2)
@@ -187,7 +187,7 @@ CREATE LIVE TABLE dynamic_data_table
 OPTIONS (refresh_interval = '10m')
 AS SELECT 1 AS id, CURRENT_TIMESTAMP() AS last_refresh_time;
 --
-CreateLiveTableStmt
+CreateLiveTableAsSelectStmt
 +-name_path=dynamic_data_table
 +-option_list=
 | +-refresh_interval := Literal(type=STRING, value="10m")
@@ -205,3 +205,183 @@ CreateLiveTableStmt
     | +-last_refresh_time#2 := FunctionCall(GoogleSQL:current_timestamp() -> TIMESTAMP)
     +-input_scan=
       +-SingleRowScan
+==
+
+CREATE LIVE TABLE t;
+--
+CreateLiveTableStmt(name_path=t)
+==
+
+CREATE LIVE TABLE t (x INT64);
+--
+CreateLiveTableStmt
++-name_path=t
++-column_definition_list=
+  +-ColumnDefinition(name="x", type=INT64, column=t.x#1)
+==
+
+CREATE LIVE TABLE t (a INT64) AS SELECT 'not_int' AS a;
+--
+ERROR: Column 'a' has type INT64 which cannot be coerced from query output type STRING [at 1:22]
+CREATE LIVE TABLE t (a INT64) AS SELECT 'not_int' AS a;
+                     ^
+==
+
+[use_hints_allowlist]
+CREATE LIVE TABLE t OPTIONS(string_option = 123) AS SELECT 1 AS a;
+--
+ERROR: Option string_option value has type INT64 which cannot be coerced to expected type STRING [at 1:45]
+CREATE LIVE TABLE t OPTIONS(string_option = 123) AS SELECT 1 AS a;
+                                            ^
+==
+
+CREATE LIVE TABLE t (a INT64) OPTIONS(x=1) AS SELECT 1 AS a;
+--
+CreateLiveTableAsSelectStmt
++-name_path=t
++-option_list=
+| +-x := Literal(type=INT64, value=1)
++-column_definition_list=
+| +-ColumnDefinition(name="a", type=INT64, column=t.a#1)
++-output_column_list=
+| +-$create_as.a#2 AS a [INT64]
++-query=
+  +-ProjectScan
+    +-column_list=[$create_as.a#2]
+    +-expr_list=
+    | +-a#2 := Literal(type=INT64, value=1)
+    +-input_scan=
+      +-SingleRowScan
+==
+
+[language_features=NONE,+CREATE_LIVE_TABLE,+CREATE_TABLE_PARTITION_BY,+CREATE_TABLE_CLUSTER_BY]
+CREATE LIVE TABLE filtered_key_values PARTITION BY Key CLUSTER BY Value AS SELECT Key, Value FROM KeyValue WHERE Key >= 100;
+--
+CreateLiveTableAsSelectStmt
++-name_path=filtered_key_values
++-column_definition_list=
+| +-ColumnDefinition(name="Key", type=INT64, column=filtered_key_values.Key#3)
+| +-ColumnDefinition(name="Value", type=STRING, column=filtered_key_values.Value#4)
++-pseudo_column_list=filtered_key_values.[pseudo_column_int32#5, pseudo_column_kitchensink#6, pseudo_column_timestamp#7]
++-partition_by_list=
+| +-ColumnRef(type=INT64, column=filtered_key_values.Key#3)
++-cluster_by_list=
+| +-ColumnRef(type=STRING, column=filtered_key_values.Value#4)
++-output_column_list=
+| +-KeyValue.Key#1 AS Key [INT64]
+| +-KeyValue.Value#2 AS Value [STRING]
++-query=
+  +-ProjectScan
+    +-column_list=KeyValue.[Key#1, Value#2]
+    +-input_scan=
+      +-FilterScan
+        +-column_list=KeyValue.[Key#1, Value#2]
+        +-input_scan=
+        | +-TableScan(column_list=KeyValue.[Key#1, Value#2], table=KeyValue, column_index_list=[0, 1])
+        +-filter_expr=
+          +-FunctionCall(GoogleSQL:$greater_or_equal(INT64, INT64) -> BOOL)
+            +-ColumnRef(type=INT64, column=KeyValue.Key#1)
+            +-Literal(type=INT64, value=100)
+==
+
+
+[language_features=NONE,+CREATE_LIVE_TABLE,+CREATE_TABLE_WITH_CONNECTION]
+CREATE LIVE TABLE t (a INT64) WITH CONNECTION connection1 AS SELECT 1 AS a;
+--
+CreateLiveTableAsSelectStmt
++-name_path=t
++-column_definition_list=
+| +-ColumnDefinition(name="a", type=INT64, column=t.a#1)
++-connection=
+| +-Connection(connection=connection1)
++-output_column_list=
+| +-$create_as.a#2 AS a [INT64]
++-query=
+  +-ProjectScan
+    +-column_list=[$create_as.a#2]
+    +-expr_list=
+    | +-a#2 := Literal(type=INT64, value=1)
+    +-input_scan=
+      +-SingleRowScan
+==
+
+CREATE LIVE TABLE queryless_live_table;
+--
+CreateLiveTableStmt(name_path=queryless_live_table)
+==
+
+CREATE LIVE TABLE queryless_with_columns (a INT64) OPTIONS (refresh_interval = '10m');
+--
+CreateLiveTableStmt
++-name_path=queryless_with_columns
++-option_list=
+| +-refresh_interval := Literal(type=STRING, value="10m")
++-column_definition_list=
+  +-ColumnDefinition(name="a", type=INT64, column=queryless_with_columns.a#1)
+==
+
+# 1. Queryless WITH CONNECTION
+[language_features=NONE,+CREATE_LIVE_TABLE,+CREATE_TABLE_WITH_CONNECTION]
+CREATE LIVE TABLE queryless_with_connection (a INT64) WITH CONNECTION connection1;
+--
+CreateLiveTableStmt
++-name_path=queryless_with_connection
++-column_definition_list=
+| +-ColumnDefinition(name="a", type=INT64, column=queryless_with_connection.a#1)
++-connection=
+  +-Connection(connection=connection1)
+==
+
+# 2. Queryless PARTITION BY
+[language_features=NONE,+CREATE_LIVE_TABLE,+CREATE_TABLE_PARTITION_BY]
+CREATE LIVE TABLE queryless_partition (x INT64, y STRING) PARTITION BY x;
+--
+CreateLiveTableStmt
++-name_path=queryless_partition
++-column_definition_list=
+| +-ColumnDefinition(name="x", type=INT64, column=queryless_partition.x#1)
+| +-ColumnDefinition(name="y", type=STRING, column=queryless_partition.y#2)
++-pseudo_column_list=queryless_partition.[pseudo_column_int32#3, pseudo_column_kitchensink#4, pseudo_column_timestamp#5]
++-partition_by_list=
+  +-ColumnRef(type=INT64, column=queryless_partition.x#1)
+==
+
+# 3. Queryless CLUSTER BY
+[language_features=NONE,+CREATE_LIVE_TABLE,+CREATE_TABLE_CLUSTER_BY]
+CREATE LIVE TABLE queryless_cluster (x INT64, y STRING) CLUSTER BY x;
+--
+CreateLiveTableStmt
++-name_path=queryless_cluster
++-column_definition_list=
+| +-ColumnDefinition(name="x", type=INT64, column=queryless_cluster.x#1)
+| +-ColumnDefinition(name="y", type=STRING, column=queryless_cluster.y#2)
++-pseudo_column_list=queryless_cluster.[pseudo_column_int32#3, pseudo_column_kitchensink#4, pseudo_column_timestamp#5]
++-cluster_by_list=
+  +-ColumnRef(type=INT64, column=queryless_cluster.x#1)
+==
+
+# 4. Queryless DEFAULT COLLATE
+[language_features=NONE,+CREATE_LIVE_TABLE,+COLLATION_SUPPORT,+ANNOTATION_FRAMEWORK]
+[no_enable_literal_replacement]
+CREATE LIVE TABLE queryless_collate (a INT64, b STRING) DEFAULT COLLATE 'und:ci';
+--
+CreateLiveTableStmt
++-name_path=queryless_collate
++-column_definition_list=
+| +-ColumnDefinition(name="a", type=INT64, column=queryless_collate.a#1)
+| +-ColumnDefinition(name="b", type=STRING, column=queryless_collate.b#2)
++-collation_name=
+  +-Literal(type=STRING, value="und:ci")
+==
+
+
+# 6. Queryless Primary Key validation
+CREATE LIVE TABLE queryless_pk (a INT64, PRIMARY KEY(a));
+--
+CreateLiveTableStmt
++-name_path=queryless_pk
++-column_definition_list=
+| +-ColumnDefinition(name="a", type=INT64, column=queryless_pk.a#1)
++-primary_key=
+  +-PrimaryKey(column_offset_list=[0], column_name_list=[a])
+==

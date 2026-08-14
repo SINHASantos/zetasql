@@ -280,6 +280,7 @@ cc_library(
         "//googlesql/public:type_cc_proto",
         "//googlesql/public:value",
         "//googlesql/public/annotation:collation",
+        "//googlesql/public/annotation:is_versioned",
         "//googlesql/public/functions:differential_privacy_cc_proto",
         "//googlesql/public/types",
         "//googlesql/resolved_ast",

@@ -152,7 +152,7 @@ select * from graph_table(aml
   RETURN SUM(a.account_id) as col1
 )
 --
-ERROR: Syntax error: Expected keyword INSERT or keyword RETURN but got identifier "q" [at 2:20]
+ERROR: Syntax error: Expected keyword INSERT or keyword REMOVE or keyword RETURN or keyword SET but got identifier "q" [at 2:20]
   MATCH p = (a) -> q = (b)
                    ^
 

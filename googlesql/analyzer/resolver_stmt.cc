@@ -73,6 +73,7 @@
 #include "googlesql/public/types/simple_value.h"
 #include "googlesql/public/types/struct_type.h"
 #include "googlesql/public/types/type_parameters.h"
+#include "googlesql/public/types/vector_type_util.h"
 #include "googlesql/public/value.h"
 #include "googlesql/resolved_ast/resolved_ast.h"
 #include "googlesql/resolved_ast/resolved_ast_builder.h"
@@ -132,6 +133,8 @@ absl::StatusOr<std::string> GetDropIndexTypeString(
       return "VECTOR";
     case AST_DROP_AI_INDEX_STATEMENT:
       return "AI";
+    case AST_DROP_INDEX_STATEMENT:
+      return "";
     default:
       GOOGLESQL_RET_CHECK_FAIL() << "Invalid statement";
   }
@@ -235,9 +238,11 @@ absl::Status Resolver::ValidateStatementIsReturnable(
       // should itself have been checked already.
       break;
     case RESOLVED_CREATE_LIVE_TABLE_STMT:
-      GOOGLESQL_RETURN_IF_ERROR(
-          CheckOutputColumns(statement->GetAs<ResolvedCreateLiveTableStmt>()
-                                 ->output_column_list()));
+      break;
+    case RESOLVED_CREATE_LIVE_TABLE_AS_SELECT_STMT:
+      GOOGLESQL_RETURN_IF_ERROR(CheckOutputColumns(
+          statement->GetAs<ResolvedCreateLiveTableAsSelectStmt>()
+              ->output_column_list()));
       break;
     case RESOLVED_CREATE_VIEW_STMT:
       GOOGLESQL_RETURN_IF_ERROR(CheckOutputColumns(
@@ -374,6 +379,9 @@ absl::Status Resolver::ValidateStatementIsReturnable(
     case RESOLVED_ALTER_ENTITY_STMT:
     case RESOLVED_AUX_LOAD_DATA_STMT:
     case RESOLVED_CREATE_PROPERTY_GRAPH_STMT:
+    case RESOLVED_CREATE_PROPERTY_GRAPH_TYPE_STMT:
+    case RESOLVED_CREATE_DATA_POLICY_STMT:
+    case RESOLVED_ALTER_DATA_POLICY_STMT:
     case RESOLVED_TERMINAL_QUERY_STMT:
       break;
     default:
@@ -517,12 +525,19 @@ absl::Status Resolver::ResolveStatement(
       }
       break;
 
-    case AST_CREATE_LIVE_TABLE_STATEMENT:
-      if (language().SupportsStatementKind(RESOLVED_CREATE_LIVE_TABLE_STMT)) {
-        GOOGLESQL_RETURN_IF_ERROR(ResolveCreateLiveTableStatement(
-            statement->GetAsOrDie<ASTCreateLiveTableStatement>(), &stmt));
+    case AST_CREATE_LIVE_TABLE_STATEMENT: {
+      const auto* live_table_stmt =
+          statement->GetAsOrDie<ASTCreateLiveTableStatement>();
+      const ResolvedNodeKind node_kind =
+          live_table_stmt->query() == nullptr
+              ? RESOLVED_CREATE_LIVE_TABLE_STMT
+              : RESOLVED_CREATE_LIVE_TABLE_AS_SELECT_STMT;
+      if (language().SupportsStatementKind(node_kind)) {
+        GOOGLESQL_RETURN_IF_ERROR(
+            ResolveCreateLiveTableStatement(live_table_stmt, &stmt));
       }
       break;
+    }
 
     case AST_CREATE_MATERIALIZED_VIEW_STATEMENT:
       if (statement->GetAsOrDie<ASTCreateMaterializedViewStatement>()
@@ -602,11 +617,26 @@ absl::Status Resolver::ResolveStatement(
             statement->GetAsOrDie<ASTCreatePropertyGraphStatement>(), &stmt));
       }
       break;
+    case AST_CREATE_PROPERTY_GRAPH_TYPE_STATEMENT:
+      if (language().SupportsStatementKind(
+              RESOLVED_CREATE_PROPERTY_GRAPH_TYPE_STMT)) {
+        GOOGLESQL_RETURN_IF_ERROR(ResolveCreatePropertyGraphTypeStatement(
+            statement->GetAsOrDie<ASTCreatePropertyGraphTypeStatement>(),
+            &stmt));
+      }
+      break;
     case AST_CREATE_TABLE_FUNCTION_STATEMENT:
       if (language().SupportsStatementKind(
               RESOLVED_CREATE_TABLE_FUNCTION_STMT)) {
         GOOGLESQL_RETURN_IF_ERROR(ResolveCreateTableFunctionStatement(
             statement->GetAsOrDie<ASTCreateTableFunctionStatement>(), &stmt));
+      }
+      break;
+
+    case AST_CREATE_DATA_POLICY_STATEMENT:
+      if (language().SupportsStatementKind(RESOLVED_CREATE_DATA_POLICY_STMT)) {
+        GOOGLESQL_RETURN_IF_ERROR(ResolveCreateDataPolicyStatement(
+            statement->GetAsOrDie<ASTCreateDataPolicyStatement>(), &stmt));
       }
       break;
 
@@ -621,6 +651,13 @@ absl::Status Resolver::ResolveStatement(
       if (language().SupportsStatementKind(RESOLVED_ALTER_ENTITY_STMT)) {
         GOOGLESQL_RETURN_IF_ERROR(ResolveAlterEntityStatement(
             statement->GetAsOrDie<ASTAlterEntityStatement>(), &stmt));
+      }
+      break;
+
+    case AST_ALTER_DATA_POLICY_STATEMENT:
+      if (language().SupportsStatementKind(RESOLVED_ALTER_DATA_POLICY_STMT)) {
+        GOOGLESQL_RETURN_IF_ERROR(ResolveAlterDataPolicyStatement(
+            statement->GetAsOrDie<ASTAlterDataPolicyStatement>(), &stmt));
       }
       break;
 
@@ -832,6 +869,13 @@ absl::Status Resolver::ResolveStatement(
       break;
 
     case AST_DROP_AI_INDEX_STATEMENT:
+      if (language().SupportsStatementKind(RESOLVED_DROP_INDEX_STMT)) {
+        GOOGLESQL_RETURN_IF_ERROR(ResolveDropIndexStatement(
+            statement->GetAs<ASTDropIndexStatement>(), &stmt));
+      }
+      break;
+
+    case AST_DROP_INDEX_STATEMENT:
       if (language().SupportsStatementKind(RESOLVED_DROP_INDEX_STMT)) {
         GOOGLESQL_RETURN_IF_ERROR(ResolveDropIndexStatement(
             statement->GetAs<ASTDropIndexStatement>(), &stmt));
@@ -2270,8 +2314,7 @@ absl::Status Resolver::ResolveColumnSchema(
       return resolved_type_parameters_or_error.status();
     }
     if (!language().LanguageFeatureEnabled(FEATURE_VECTOR_TYPE) &&
-        (*resolved_type)->AsDeclarativeType() != nullptr &&
-        (*resolved_type)->AsDeclarativeType()->IsGoogleSQLBuiltin("VECTOR") &&
+        IsVectorType(*resolved_type) &&
         !resolved_type_parameters_or_error->IsEmpty()) {
       return MakeSqlErrorAt(ast_type_parameters)
              << "Vector type parameters are not supported";
@@ -4776,28 +4819,42 @@ absl::Status Resolver::ResolveCreateLiveTableStatement(
       resolved_properties_control_args, &statement_base_properties));
 
   if (statement_base_properties.query_scan == nullptr) {
-    return MakeSqlErrorAt(ast_statement)
-           << "Missing query in CREATE LIVE TABLE";
+    *output = MakeResolvedCreateLiveTableStmt(
+        statement_base_properties.table_name,
+        statement_base_properties.create_scope,
+        statement_base_properties.create_mode,
+        std::move(statement_base_properties.resolved_options),
+        std::move(statement_base_properties.column_definition_list),
+        std::move(statement_base_properties.pseudo_column_list),
+        std::move(statement_base_properties.primary_key),
+        std::move(statement_base_properties.foreign_key_list),
+        std::move(statement_base_properties.check_constraint_list),
+        statement_base_properties.is_value_table,
+        statement_base_properties.like_table,
+        std::move(statement_base_properties.collation),
+        std::move(statement_base_properties.connection),
+        std::move(statement_base_properties.partition_by_list),
+        std::move(statement_base_properties.cluster_by_list));
+  } else {
+    *output = MakeResolvedCreateLiveTableAsSelectStmt(
+        statement_base_properties.table_name,
+        statement_base_properties.create_scope,
+        statement_base_properties.create_mode,
+        std::move(statement_base_properties.resolved_options),
+        std::move(statement_base_properties.column_definition_list),
+        std::move(statement_base_properties.pseudo_column_list),
+        std::move(statement_base_properties.primary_key),
+        std::move(statement_base_properties.foreign_key_list),
+        std::move(statement_base_properties.check_constraint_list),
+        statement_base_properties.is_value_table,
+        statement_base_properties.like_table,
+        std::move(statement_base_properties.collation),
+        std::move(statement_base_properties.connection),
+        std::move(statement_base_properties.partition_by_list),
+        std::move(statement_base_properties.cluster_by_list),
+        std::move(statement_base_properties.output_column_list),
+        std::move(statement_base_properties.query_scan));
   }
-
-  *output = MakeResolvedCreateLiveTableStmt(
-      statement_base_properties.table_name,
-      statement_base_properties.create_scope,
-      statement_base_properties.create_mode,
-      std::move(statement_base_properties.resolved_options),
-      std::move(statement_base_properties.column_definition_list),
-      std::move(statement_base_properties.pseudo_column_list),
-      std::move(statement_base_properties.primary_key),
-      std::move(statement_base_properties.foreign_key_list),
-      std::move(statement_base_properties.check_constraint_list),
-      statement_base_properties.is_value_table,
-      statement_base_properties.like_table,
-      std::move(statement_base_properties.collation),
-      std::move(statement_base_properties.connection),
-      std::move(statement_base_properties.output_column_list),
-      std::move(statement_base_properties.query_scan),
-      std::move(statement_base_properties.partition_by_list),
-      std::move(statement_base_properties.cluster_by_list));
 
   return absl::OkStatus();
 }
@@ -5291,6 +5348,8 @@ absl::Status Resolver::ResolveCreateFunctionStatement(
 
     if (!language().LanguageFeatureEnabled(
             FEATURE_TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS)) {
+      GOOGLESQL_RET_CHECK(!language().LanguageFeatureEnabled(
+          FEATURE_ALL_TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS));
       // TODO: Support non-templated UDF with collation in the
       // return type function body.
       GOOGLESQL_RETURN_IF_ERROR(ThrowErrorIfExprHasCollation(
@@ -5299,7 +5358,10 @@ absl::Status Resolver::ResolveCreateFunctionStatement(
           "allowed",
           resolved_expr.get()));
     }
-    if (!AnnotationMap::IsNullOrEmpty(resolved_expr->type_annotation_map())) {
+    if (!language().LanguageFeatureEnabled(
+            FEATURE_ALL_TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS) &&
+        !AnnotationMap::IsNullOrEmpty(resolved_expr->type_annotation_map())) {
+      // Collation was already handled separately above.
       std::unique_ptr<AnnotationMap> annotations_to_block =
           resolved_expr->type_annotation_map()->Clone();
       annotations_to_block->UnsetAnnotationRecursively<CollationAnnotation>();
@@ -5532,6 +5594,15 @@ absl::Status Resolver::ResolveCreatePropertyGraphStatement(
       graph_ddl_resolver.ResolveCreatePropertyGraphStmt(ast_stmt, output));
   return absl::OkStatus();
 }
+
+absl::Status Resolver::ResolveCreatePropertyGraphTypeStatement(
+    const ASTCreatePropertyGraphTypeStatement* ast_stmt,
+    std::unique_ptr<ResolvedStatement>* output) {
+  GraphDdlResolver graph_ddl_resolver(*this, *id_string_pool_);
+  GOOGLESQL_RETURN_IF_ERROR(
+      graph_ddl_resolver.ResolveCreatePropertyGraphTypeStmt(ast_stmt, output));
+  return absl::OkStatus();
+}
 absl::Status Resolver::ResolveCreateTableFunctionStatement(
     const ASTCreateTableFunctionStatement* ast_statement,
     std::unique_ptr<ResolvedStatement>* output) {
@@ -5570,7 +5641,7 @@ absl::Status Resolver::ResolveCreateTableFunctionStatement(
     has_return_tvf_relation = true;
   }
 
-  const ASTIdentifier* language = ast_statement->language();
+  const ASTIdentifier* language_ident = ast_statement->language();
   const ASTStringLiteral* code = ast_statement->code();
   const ASTQuery* query = ast_statement->query();
   std::string language_string = "UNDECLARED";
@@ -5587,9 +5658,9 @@ absl::Status Resolver::ResolveCreateTableFunctionStatement(
   //     |    no    |      no      |optional|    optional    |    OK    |
   //     +----------+--------------+--------+----------------+----------+
   //
-  if (language != nullptr) {
+  if (language_ident != nullptr) {
     // LANGUAGE specified
-    language_string = language->GetAsString();
+    language_string = language_ident->GetAsString();
     if (googlesql_base::CaseEqual(language_string, "SQL")) {
       // SQL TVF
       return MakeSqlErrorAt(ast_statement->language())
@@ -5776,6 +5847,25 @@ absl::Status Resolver::ResolveCreateTableFunctionStatement(
            << scope_str << " modifier.";
   }
 
+  std::unique_ptr<const ResolvedConnection> resolved_connection;
+  const ASTWithConnectionClause* with_connection =
+      ast_statement->with_connection_clause();
+  if (with_connection != nullptr) {
+    if (!language().LanguageFeatureEnabled(
+            FEATURE_CREATE_FUNCTION_LANGUAGE_WITH_CONNECTION)) {
+      return MakeSqlErrorAt(with_connection)
+             << "WITH CONNECTION clause is not supported";
+    }
+    if (language_ident == nullptr) {
+      return MakeSqlErrorAt(with_connection)
+             << "WITH CONNECTION clause must be used with LANGUAGE clause";
+    }
+
+    GOOGLESQL_RETURN_IF_ERROR(ResolveConnection(
+        with_connection->connection_clause()->connection_path(),
+        &resolved_connection));
+  }
+
   // Option resolution is done with an empty namescope. That includes any
   // function arguments. Function arguments have values at function invocation
   // time, but not at function create time when options are evaluated.
@@ -5790,7 +5880,8 @@ absl::Status Resolver::ResolveCreateTableFunctionStatement(
       signature, has_explicit_return_schema, std::move(resolved_options),
       language_string, code_string, std::move(resolved_query),
       std::move(resolved_output_column_list),
-      return_tvf_relation.is_value_table(), sql_security);
+      return_tvf_relation.is_value_table(), sql_security,
+      std::move(resolved_connection));
   MaybeRecordParseLocation(ast_statement->function_declaration()->name(),
                            output->get());
   return absl::OkStatus();
@@ -5951,7 +6042,9 @@ absl::Status Resolver::CheckSQLBodyReturnTypesAndCoerceIfNeeded(
     // with collation in the explicit result schema is not supported yet, and we
     // are not sure whether to propagate or drop the collation of TVF query
     // output when the explicit result schema has no collation.
-    if (!AnnotationMap::IsNullOrEmpty(provided_column.type_annotation_map())) {
+    if (!language().LanguageFeatureEnabled(
+            FEATURE_ALL_TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS) &&
+        !AnnotationMap::IsNullOrEmpty(provided_column.type_annotation_map())) {
       std::string output_column_str =
           return_tvf_relation.is_value_table()
               ? "value-table column"
@@ -5964,6 +6057,8 @@ absl::Status Resolver::CheckSQLBodyReturnTypesAndCoerceIfNeeded(
               FEATURE_TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS) &&
           !language().LanguageFeatureEnabled(
               FEATURE_TYPE_MODIFIERS_IN_EXPLICIT_CONSTRUCTORS_AND_UDF)) {
+        GOOGLESQL_RET_CHECK(!language().LanguageFeatureEnabled(
+            FEATURE_ALL_TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS));
         if (CollationAnnotation::ExistsIn(
                 provided_column.type_annotation_map())) {
           const std::string error = absl::StrCat(
@@ -5995,12 +6090,11 @@ absl::Status Resolver::CheckSQLBodyReturnTypesAndCoerceIfNeeded(
           return MakeSqlError() << error;
         }
       }
+    }
 
-      if (CollationAnnotation::ExistsIn(
-              provided_column.type_annotation_map())) {
-        analyzer_output_properties_.AddFeatureLabel(
-            kCollationPropagatedToSqlFunctionFeatureLabel);
-      }
+    if (CollationAnnotation::ExistsIn(provided_column.type_annotation_map())) {
+      analyzer_output_properties_.AddFeatureLabel(
+          kCollationPropagatedToSqlFunctionFeatureLabel);
     }
 
     const Type* provided_col_type = provided_column.type();
@@ -6117,9 +6211,13 @@ absl::Status Resolver::CheckSQLBodyReturnTypesAndCoerceIfNeeded(
         if (!return_tvf_relation.is_value_table()) {
           column_name_id = MakeIdString(required_col_name);
         }
+        // The new column doesn't directly use `required_annotated_col_type`
+        // because there may be additional annotations on the output column that
+        // propagated along the coercion.
         new_column_list.emplace_back(AllocateColumnId(), new_project_alias,
                                      column_name_id,
                                      resolved_expr->annotated_type());
+
         new_project_columns.push_back(MakeResolvedComputedColumn(
             new_column_list.back(), std::move(resolved_expr)));
         RecordColumnAccess(new_column_list.back());
@@ -7970,25 +8068,41 @@ absl::Status Resolver::ResolveDropIndexStatement(
   GOOGLESQL_RET_CHECK(ast_statement->name() != nullptr);
   GOOGLESQL_ASSIGN_OR_RETURN(std::string index_type_for_error,
                    GetDropIndexTypeString(ast_statement));
-  if (ast_statement->name()->names().size() != 1) {
+  ResolvedDropIndexStmt::IndexType index_type = GetDropIndexType(ast_statement);
+  // TODO: Allow paths in non-default index types.
+  if (index_type != ResolvedDropIndexStmt::INDEX_DEFAULT &&
+      ast_statement->name()->names().size() != 1) {
     return MakeSqlErrorAt(ast_statement->name())
            << "The DROP " << index_type_for_error
            << " INDEX statement requires an index name, not a path";
   }
   std::vector<std::string> table_name;
   if (ast_statement->table_name() != nullptr) {
+    // TODO: Extend the catalog check to non-default index types.
+    if (index_type == ResolvedDropIndexStmt::INDEX_DEFAULT) {
+      const Table* table = nullptr;
+      GOOGLESQL_RETURN_IF_ERROR(FindTable(ast_statement->table_name(), &table));
+    }
     table_name = ast_statement->table_name()->ToIdentifierVector();
   }
-  ResolvedDropIndexStmt::IndexType index_type = GetDropIndexType(ast_statement);
+  // TODO: Flattening the path expression to a single scalar
+  // string causes quoting information (like backticks) to be stripped away.
+  // For example, "DROP INDEX `foo.bar` ON tbl" (single index identifier) is
+  // indistinguishable from "DROP INDEX foo.bar ON tbl" (two identifiers).
+  // So, in order to extend the path expressions support for statements like
+  // "DROP (AI|SEARCH|VECTOR)? INDEX idx_path ON table_path", we should consider
+  // refactoring the `ResolvedDropIndexStmt` node to use an `index_name_path`
+  // vector instead of just a `name` string.
+  const std::string index_name =
+      absl::StrJoin(ast_statement->name()->ToIdentifierVector(), ".");
 
-  GOOGLESQL_ASSIGN_OR_RETURN(
-      auto drop_index_stmt,
-      ResolvedDropIndexStmtBuilder()
-          .set_is_if_exists(ast_statement->is_if_exists())
-          .set_name(ast_statement->name()->first_name()->GetAsString())
-          .set_table_name_path(table_name)
-          .set_index_type(index_type)
-          .Build());
+  GOOGLESQL_ASSIGN_OR_RETURN(auto drop_index_stmt,
+                   ResolvedDropIndexStmtBuilder()
+                       .set_is_if_exists(ast_statement->is_if_exists())
+                       .set_name(index_name)
+                       .set_table_name_path(table_name)
+                       .set_index_type(index_type)
+                       .Build());
   *output = absl::WrapUnique(
       const_cast<ResolvedDropIndexStmt*>(drop_index_stmt.release()));
   return absl::OkStatus();
@@ -8609,6 +8723,53 @@ absl::Status Resolver::ResolveCreateSequenceStatement(
   *output = MakeResolvedCreateSequenceStmt(
       ast_statement->name()->ToIdentifierVector(), create_scope, create_mode,
       std::move(resolved_options));
+  return absl::OkStatus();
+}
+
+absl::Status Resolver::ResolveCreateDataPolicyStatement(
+    const ASTCreateDataPolicyStatement* ast_statement,
+    std::unique_ptr<ResolvedStatement>* output) {
+  if (!language().LanguageFeatureEnabled(FEATURE_TAG_DATA_POLICY_DDL)) {
+    return MakeSqlErrorAt(ast_statement)
+           << "CREATE DATA_POLICY is not supported";
+  }
+  ResolvedCreateStatement::CreateScope create_scope;
+  ResolvedCreateStatement::CreateMode create_mode;
+  GOOGLESQL_RETURN_IF_ERROR(ResolveCreateStatementOptions(
+      ast_statement, /*statement_type=*/"CREATE DATA_POLICY", &create_scope,
+      &create_mode));
+
+  std::vector<std::unique_ptr<const ResolvedOption>> resolved_options;
+  GOOGLESQL_RETURN_IF_ERROR(ResolveOptionsList(ast_statement->options_list(),
+                                     /*allow_alter_array_operators=*/false,
+                                     &resolved_options));
+
+  std::unique_ptr<const ResolvedExpr> resolved_condition;
+  std::string condition_string;
+  if (ast_statement->condition() != nullptr) {
+    ExprResolutionInfo expr_resolution_info(empty_name_scope_.get(),
+                                            "WITH CONDITION");
+    googlesql_base::VarSetter<absl::string_view> disallow_params(
+        &disallowing_query_parameters_with_error_,
+        "Query parameters cannot be used inside WITH CONDITION expression of "
+        "CREATE DATA_POLICY statement");
+    GOOGLESQL_RETURN_IF_ERROR(ResolveExpr(ast_statement->condition(),
+                                &expr_resolution_info, &resolved_condition));
+    if (resolved_condition->type() == nullptr ||
+        !resolved_condition->type()->IsBool()) {
+      return MakeSqlErrorAt(ast_statement->condition())
+             << "WITH CONDITION expression must be a boolean expression";
+    }
+    parser::Unparser condition_unparser(&condition_string);
+    ast_statement->condition()->Accept(&condition_unparser, /*data=*/nullptr);
+    condition_unparser.FlushLine();
+    absl::StripAsciiWhitespace(&condition_string);
+  }
+
+  *output = MakeResolvedCreateDataPolicyStmt(
+      ast_statement->name()->ToIdentifierVector(), create_scope, create_mode,
+      std::move(resolved_options), std::move(resolved_condition),
+      std::move(condition_string));
   return absl::OkStatus();
 }
 

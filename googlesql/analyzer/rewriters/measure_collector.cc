@@ -32,8 +32,18 @@ absl::Status MeasureCollector::AddMeasureInfo(Key key, MeasureInfo info) {
   GOOGLESQL_RET_CHECK(key != nullptr);
   auto [it, inserted] = measure_infos_.try_emplace(key, info);
   if (!inserted) {
-    return absl::AlreadyExistsError(absl::StrCat(
-        "Measure definition for key ", key->DebugString(), " already exists."));
+    const MeasureInfo& existing_info = it->second;
+    GOOGLESQL_RET_CHECK(existing_info.closure_column.has_value() ==
+              info.closure_column.has_value());
+
+    // A single catalog measure column can be used by multiple derived measure
+    // definitions, so the same MeasureInfo can be added multiple times.
+    //
+    // This is ok as long as there is no `closure_column`, i.e., the
+    // `MeasureInfo` is not tied to a specific projected ResolvedColumn. We will
+    // only use the MeasureInfo to look up the measure's def_expr and key
+    // columns.
+    GOOGLESQL_RET_CHECK(!info.closure_column.has_value());
   }
   return absl::OkStatus();
 }

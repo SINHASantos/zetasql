@@ -31,6 +31,7 @@
 #include "googlesql/public/rewriter_interface.h"
 #include "googlesql/resolved_ast/column_factory.h"
 #include "googlesql/resolved_ast/resolved_ast.h"
+#include "googlesql/resolved_ast/resolved_ast_builder.h"
 #include "googlesql/resolved_ast/resolved_ast_deep_copy_visitor.h"
 #include "googlesql/resolved_ast/resolved_node.h"
 #include "googlesql/resolved_ast/rewrite_utils.h"
@@ -120,11 +121,16 @@ class UnusedCorrelatedColumnPruner : public ResolvedASTDeepCopyVisitor {
         correlated_column_references_list_.back();
     correlated_column_references_list_.pop_back();
     std::vector<std::unique_ptr<const ResolvedColumnRef>> new_parameter_list;
+    absl::flat_hash_set<ResolvedColumn> seen_parameters;
     for (std::unique_ptr<const ResolvedColumnRef>& parameter :
          builder.release_parameter_list()) {
       // Skip any parameters that are not used in the subquery. Else, preserve
       // it.
       if (!current_correlated_column_references.contains(parameter->column())) {
+        continue;
+      }
+      // The validator does not allow duplicate parameters.
+      if (!seen_parameters.insert(parameter->column()).second) {
         continue;
       }
       new_parameter_list.push_back(std::move(parameter));

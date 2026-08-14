@@ -516,6 +516,7 @@ QueryStmt
     |       +-output_column_list=[$rewrite_describe.$describe#7]
     +-filter_expr=
       +-Literal(type=BOOL, value=true)
+
 [SQLBUILDER_TARGET_SYNTAX_MODE standard]
 [SQLBUILDER_OUTPUT]
 SELECT

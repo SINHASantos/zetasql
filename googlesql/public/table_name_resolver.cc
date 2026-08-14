@@ -472,11 +472,13 @@ absl::Status TableNameResolver::FindInStatement(const ASTStatement* statement) {
         return absl::OkStatus();
       }
       break;
-    case AST_CREATE_LIVE_TABLE_STATEMENT:
-      if (analyzer_options_->language().SupportsStatementKind(
-              RESOLVED_CREATE_LIVE_TABLE_STMT)) {
-        const ASTCreateLiveTableStatement* stmt =
-            statement->GetAs<ASTCreateLiveTableStatement>();
+    case AST_CREATE_LIVE_TABLE_STATEMENT: {
+      const ASTCreateLiveTableStatement* stmt =
+          statement->GetAs<ASTCreateLiveTableStatement>();
+      const ResolvedNodeKind node_kind =
+          stmt->query() == nullptr ? RESOLVED_CREATE_LIVE_TABLE_STMT
+                                   : RESOLVED_CREATE_LIVE_TABLE_AS_SELECT_STMT;
+      if (analyzer_options_->language().SupportsStatementKind(node_kind)) {
         const ASTTableElementList* table_elements = stmt->table_element_list();
         if (table_elements != nullptr) {
           GOOGLESQL_RETURN_IF_ERROR(FindInTableElements(table_elements));
@@ -487,6 +489,7 @@ absl::Status TableNameResolver::FindInStatement(const ASTStatement* statement) {
         return absl::OkStatus();
       }
       break;
+    }
     case AST_CREATE_TABLE_STATEMENT: {
       const ASTCreateTableStatement* stmt =
           statement->GetAs<ASTCreateTableStatement>();
@@ -615,6 +618,19 @@ absl::Status TableNameResolver::FindInStatement(const ASTStatement* statement) {
       }
       break;
 
+    case AST_CREATE_DATA_POLICY_STATEMENT:
+      if (analyzer_options_->language().SupportsStatementKind(
+              RESOLVED_CREATE_DATA_POLICY_STMT)) {
+        const auto* stmt =
+            statement->GetAsOrDie<ASTCreateDataPolicyStatement>();
+        if (stmt->condition() != nullptr) {
+          return FindInExpressionsUnder(stmt->condition(),
+                                        /*visible_aliases=*/{});
+        }
+        return absl::OkStatus();
+      }
+      break;
+
     case AST_CREATE_CONSTANT_STATEMENT:
       if (analyzer_options_->language().SupportsStatementKind(
               RESOLVED_CREATE_CONSTANT_STMT)) {
@@ -657,6 +673,15 @@ absl::Status TableNameResolver::FindInStatement(const ASTStatement* statement) {
               RESOLVED_CREATE_PROPERTY_GRAPH_STMT)) {
         return FindInCreatePropertyGraphStatement(
             statement->GetAs<ASTCreatePropertyGraphStatement>());
+      }
+      break;
+
+    case AST_CREATE_PROPERTY_GRAPH_TYPE_STATEMENT:
+      // A property graph type describes only the logical shape of a graph and
+      // references no catalog tables, so there are no table names to extract.
+      if (analyzer_options_->language().SupportsStatementKind(
+              RESOLVED_CREATE_PROPERTY_GRAPH_TYPE_STMT)) {
+        return absl::OkStatus();
       }
       break;
 
@@ -884,9 +909,10 @@ absl::Status TableNameResolver::FindInStatement(const ASTStatement* statement) {
     case AST_DROP_SEARCH_INDEX_STATEMENT:
     case AST_DROP_VECTOR_INDEX_STATEMENT:
     case AST_DROP_AI_INDEX_STATEMENT:
+    case AST_DROP_INDEX_STATEMENT:
       if (analyzer_options_->language().SupportsStatementKind(
               RESOLVED_DROP_INDEX_STMT)) {
-        // For a "DROP [SEARCH|VECTOR|AI] INDEX <name> [ON <table>]" statement,
+        // For a "DROP (SEARCH|VECTOR|AI)? INDEX <name> [ON <table>]" statement,
         // the table name is not inserted into table_names_. Engines that need
         // to know about the target table should handle that themselves.
         return absl::OkStatus();
@@ -969,6 +995,24 @@ absl::Status TableNameResolver::FindInStatement(const ASTStatement* statement) {
         return absl::OkStatus();
       }
       break;
+
+    case AST_ALTER_DATA_POLICY_STATEMENT:
+      if (analyzer_options_->language().SupportsStatementKind(
+              RESOLVED_ALTER_DATA_POLICY_STMT)) {
+        const auto* stmt = statement->GetAsOrDie<ASTAlterDataPolicyStatement>();
+        if (stmt->action_list() != nullptr) {
+          for (const ASTAlterAction* action : stmt->action_list()->actions()) {
+            if (action->node_kind() == AST_SET_CONDITION_ACTION) {
+              GOOGLESQL_RETURN_IF_ERROR(FindInExpressionsUnder(
+                  action->GetAsOrDie<ASTSetConditionAction>()->condition(),
+                  /*visible_aliases=*/{}));
+            }
+          }
+        }
+        return absl::OkStatus();
+      }
+      break;
+
     case AST_ALTER_ALL_ROW_ACCESS_POLICIES_STATEMENT:
       if (analyzer_options_->language().SupportsStatementKind(
               RESOLVED_ALTER_ALL_ROW_ACCESS_POLICIES_STMT)) {

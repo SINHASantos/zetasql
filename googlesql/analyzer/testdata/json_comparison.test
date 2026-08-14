@@ -282,6 +282,7 @@ QueryStmt
     |     +-Parameter(parse_location=18-20, type=JSON, name="p")
     +-input_scan=
       +-SingleRowScan
+
 [UNDECLARED_PARAMETERS]
 p: JSON
 
@@ -515,6 +516,7 @@ QueryStmt
     | +-$col1#1 := Parameter(parse_location=12-14, type=JSON, name="p")
     +-input_scan=
       +-SingleRowScan
+
 [UNDECLARED_PARAMETERS]
 p: JSON
 
@@ -1003,6 +1005,7 @@ QueryStmt
     |     +-Literal(type=JSON, value=2)
     +-input_scan=
       +-SingleRowScan
+
 [UNDECLARED_PARAMETERS]
 JSON
 ==
@@ -1243,6 +1246,7 @@ QueryStmt
     |     +-Literal(type=JSON, value=2)
     +-input_scan=
       +-SingleRowScan
+
 [UNDECLARED_PARAMETERS]
 JSON
 ==

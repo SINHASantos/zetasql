@@ -724,6 +724,14 @@ std::string ASTDropSnapshotTableStatement::SingleNodeDebugString() const {
   return absl::StrCat(node_name, "(is_if_exists)");
 }
 
+std::string ASTDropIndexStatement::SingleNodeDebugString() const {
+  const std::string node_name = ASTNode::SingleNodeDebugString();
+  if (!is_if_exists()) {
+    return node_name;
+  }
+  return absl::StrCat(node_name, "(is_if_exists)");
+}
+
 std::string ASTDropVectorIndexStatement::SingleNodeDebugString() const {
   const std::string node_name = ASTNode::SingleNodeDebugString();
   if (!is_if_exists()) {

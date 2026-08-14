@@ -30,7 +30,10 @@ def gen_analyzer_test(filename):
             ":run_analyzer_test_lib",
             "//googlesql/base/testing:googlesql_gtest_main",
         ],
-        args = ["--test_file=$(location " + datafile + ")"],
+        args = [
+            "--test_file=$(location " + datafile + ")",
+            "--googlesql_omit_tvf_signatures_in_resolved_ast_debug_string=true",
+        ],
     )
 
     return name

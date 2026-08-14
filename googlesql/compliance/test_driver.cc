@@ -25,6 +25,7 @@
 #include "googlesql/common/measure_analysis_utils.h"
 #include "googlesql/common/type_visitors.h"
 #include "googlesql/compliance/test_driver.pb.h"
+#include "googlesql/compliance/test_util.h"
 #include "googlesql/public/annotation.pb.h"
 #include "googlesql/public/options.pb.h"
 #include "googlesql/public/types/annotation.h"
@@ -153,36 +154,49 @@ class TypeConsolidator : public TypeRewriter {
   const ::google::protobuf::DescriptorPool* descriptor_pool_;
 };
 
-// TODO: Should we care about descriptors used in builtins? Probably not coz we
-// only care about ptr equality only during the generation phase.
 absl::StatusOr<AnnotatedType> TypeConsolidator::PostVisit(
     AnnotatedType annotated_type) {
   const auto& [type, annotation_map] = annotated_type;
   if (type->IsProto()) {
     const auto* descriptor = type->AsProto()->descriptor();
-    GOOGLESQL_RET_CHECK(descriptor_pool_->FindFileByName(descriptor->file()->name()))
-        << "Filed to find file: " << descriptor->file()->name()
-        << " for message: " << descriptor->full_name();
-    descriptor =
-        descriptor_pool_->FindMessageTypeByName(descriptor->full_name());
-    GOOGLESQL_RET_CHECK(descriptor != nullptr)
-        << "Failed to load message: " << descriptor->full_name();
+    auto builtin_it =
+        GetBuiltinProtoDescriptors().find(descriptor->full_name());
+    if (builtin_it != GetBuiltinProtoDescriptors().end()) {
+      descriptor = builtin_it->second;
+    } else {
+      GOOGLESQL_RET_CHECK(descriptor_pool_->FindFileByName(descriptor->file()->name()))
+          << "Failed to find file: " << descriptor->file()->name()
+          << " for message: " << descriptor->full_name();
+      descriptor =
+          descriptor_pool_->FindMessageTypeByName(descriptor->full_name());
+      GOOGLESQL_RET_CHECK(descriptor != nullptr)
+          << "Failed to load message: " << descriptor->full_name();
+    }
 
     const ProtoType* proto_type;
     GOOGLESQL_RETURN_IF_ERROR(type_factory().MakeProtoType(descriptor, &proto_type));
     return AnnotatedType(proto_type, annotation_map);
   } else if (type->IsEnum()) {
     const auto* enum_descriptor = type->AsEnum()->enum_descriptor();
-    GOOGLESQL_RET_CHECK(descriptor_pool_->FindFileByName(enum_descriptor->file()->name()))
-        << "Filed to find file: " << enum_descriptor->file()->name()
-        << " for enum: " << enum_descriptor->full_name();
-    enum_descriptor =
-        descriptor_pool_->FindEnumTypeByName(enum_descriptor->full_name());
-    GOOGLESQL_RET_CHECK(enum_descriptor != nullptr)
-        << "Failed to load enum: " << enum_descriptor->full_name();
-
+    auto builtin_it =
+        GetBuiltinEnumDescriptors().find(enum_descriptor->full_name());
     const EnumType* enum_type;
-    GOOGLESQL_RETURN_IF_ERROR(type_factory().MakeEnumType(enum_descriptor, &enum_type));
+    if (builtin_it != GetBuiltinEnumDescriptors().end()) {
+      enum_descriptor = builtin_it->second;
+      GOOGLESQL_RETURN_IF_ERROR(internal::TypeFactoryHelper::MakeOpaqueEnumType(
+          &type_factory(), enum_descriptor, &enum_type,
+          /*catalog_name_path=*/{}));
+    } else {
+      GOOGLESQL_RET_CHECK(
+          descriptor_pool_->FindFileByName(enum_descriptor->file()->name()))
+          << "Failed to find file: " << enum_descriptor->file()->name()
+          << " for enum: " << enum_descriptor->full_name();
+      enum_descriptor =
+          descriptor_pool_->FindEnumTypeByName(enum_descriptor->full_name());
+      GOOGLESQL_RET_CHECK(enum_descriptor != nullptr)
+          << "Failed to load enum: " << enum_descriptor->full_name();
+      GOOGLESQL_RETURN_IF_ERROR(type_factory().MakeEnumType(enum_descriptor, &enum_type));
+    }
     return AnnotatedType(enum_type, annotation_map);
   }
   return annotated_type;

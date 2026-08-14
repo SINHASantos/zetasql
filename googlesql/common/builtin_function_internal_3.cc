@@ -873,6 +873,20 @@ static FunctionSignatureOnHeap ZeroIfNullSig(const Type* type,
                                  SetDefinitionForInlining(kZeroIfNullTemplate));
 }
 
+static absl::Status CheckNullIfArguments(
+    const FunctionSignature& signature,
+    const std::vector<InputArgumentType>& arguments,
+    const LanguageOptions& language_options) {
+  if (signature.context_id() == FN_NULLIF_WITH_LAMBDA) {
+    // This validation runs post-resolution. Therefore, if we get here, the
+    // resolution of the lambda argument has already implicitly checked the
+    // argument types.
+    return absl::OkStatus();
+  }
+  return CheckArgumentsSupportEquality("NULLIF", signature, arguments,
+                                       language_options);
+}
+
 void GetConditionalFunctions(TypeFactory* type_factory,
                              const GoogleSQLBuiltinFunctionOptions& options,
                              NameToFunctionMap* functions) {
@@ -912,16 +926,37 @@ void GetConditionalFunctions(TypeFactory* type_factory,
   bool uses_operation_collation_for_nullif =
       options.language_options.LanguageFeatureEnabled(
           googlesql::FEATURE_USE_OPERATION_COLLATION_FOR_NULLIF);
+
+  std::vector<FunctionSignatureOnHeap> nullif_signatures;
+  nullif_signatures.push_back(
+      {ARG_KIND_EXPR_ANY_1,
+       {ARG_KIND_EXPR_ANY_1, ARG_KIND_EXPR_ANY_1},
+       FN_NULLIF,
+       FunctionSignatureOptions().set_uses_operation_collation(
+           uses_operation_collation_for_nullif)});
+
+  if (options.language_options.LanguageFeatureEnabled(
+          FEATURE_NULLIF_WITH_LAMBDA)) {
+    constexpr absl::string_view kNullIfLambdaTemplate = R"sql(
+      IF(value IS NULL, NULL, IF(condition(value), NULL, value))
+    )sql";
+    nullif_signatures.push_back(
+        {ARG_KIND_EXPR_ANY_1,
+         {{ARG_KIND_EXPR_ANY_1, FunctionArgumentTypeOptions().set_argument_name(
+                                    "value", kPositionalOnly)},
+          FunctionArgumentType::Lambda(
+              {ARG_KIND_EXPR_ANY_1}, bool_type,
+              FunctionArgumentTypeOptions().set_argument_name(
+                  "condition", kPositionalOnly))},
+         FN_NULLIF_WITH_LAMBDA,
+         SetDefinitionForInlining(kNullIfLambdaTemplate)
+             .AddRequiredLanguageFeature(FEATURE_INLINE_LAMBDA_ARGUMENT)});
+  }
+
   // NULLIF(expr1, expr2): NULL if expr1 = expr2, otherwise returns expr1.
-  InsertFunction(
-      functions, options, "nullif", SCALAR,
-      {{ARG_KIND_EXPR_ANY_1,
-        {ARG_KIND_EXPR_ANY_1, ARG_KIND_EXPR_ANY_1},
-        FN_NULLIF,
-        FunctionSignatureOptions().set_uses_operation_collation(
-            uses_operation_collation_for_nullif)}},
-      FunctionOptions().set_post_resolution_argument_constraint(
-          absl::bind_front(&CheckArgumentsSupportEquality, "NULLIF")));
+  InsertFunction(functions, options, "nullif", SCALAR, nullif_signatures,
+                 FunctionOptions().set_post_resolution_argument_constraint(
+                     &CheckNullIfArguments));
 
   if (options.language_options.LanguageFeatureEnabled(
           FEATURE_NULLIFZERO_ZEROIFNULL)) {
@@ -1036,17 +1071,19 @@ void GetConditionalFunctions(TypeFactory* type_factory,
               LanguageFeature::FEATURE_ENFORCE_CONDITIONAL_EVALUATION));
 }
 
-void GetMiscellaneousFunctions(TypeFactory* type_factory,
-                               const GoogleSQLBuiltinFunctionOptions& options,
-                               NameToFunctionMap* functions) {
+absl::Status GetMiscellaneousFunctions(
+    TypeFactory* type_factory, const GoogleSQLBuiltinFunctionOptions& options,
+    NameToFunctionMap* functions) {
   const Type* int32_type = type_factory->get_int32();
   const Type* int64_type = type_factory->get_int64();
   const Type* uint32_type = type_factory->get_uint32();
   const Type* uint64_type = type_factory->get_uint64();
+  const Type* float_type = type_factory->get_float();
   const Type* double_type = type_factory->get_double();
   const Type* string_type = type_factory->get_string();
   const Type* bytes_type = type_factory->get_bytes();
   const Type* uuid_type = type_factory->get_uuid();
+  GOOGLESQL_ASSIGN_OR_RETURN(const Type* endianness_type, types::EndiannessEnumType());
 
   const Function::Mode SCALAR = Function::SCALAR;
 
@@ -1155,26 +1192,88 @@ void GetMiscellaneousFunctions(TypeFactory* type_factory,
                  FunctionOptions().set_pre_resolution_argument_constraint(
                      &CheckRangeBucketArguments));
 
-  InsertSimpleFunction(
+  InsertFunction(
       functions, options, "bit_cast_to_int32", SCALAR,
       {{int32_type, {int32_type}, FN_BIT_CAST_INT32_TO_INT32},
-       {int32_type, {uint32_type}, FN_BIT_CAST_UINT32_TO_INT32}},
+       {int32_type, {uint32_type}, FN_BIT_CAST_UINT32_TO_INT32},
+       {int32_type,
+        {bytes_type, {endianness_type, FunctionArgumentType::OPTIONAL}},
+        FN_BIT_CAST_BYTES_TO_INT32,
+        FunctionSignatureOptions().AddRequiredLanguageFeature(
+            LanguageFeature::FEATURE_BIT_CAST_BYTES_FUNCTIONS)}},
       FunctionOptions().set_allow_external_usage(false));
-  InsertSimpleFunction(
+  InsertFunction(
       functions, options, "bit_cast_to_int64", SCALAR,
       {{int64_type, {int64_type}, FN_BIT_CAST_INT64_TO_INT64},
-       {int64_type, {uint64_type}, FN_BIT_CAST_UINT64_TO_INT64}},
+       {int64_type, {uint64_type}, FN_BIT_CAST_UINT64_TO_INT64},
+       {int64_type,
+        {bytes_type, {endianness_type, FunctionArgumentType::OPTIONAL}},
+        FN_BIT_CAST_BYTES_TO_INT64,
+        FunctionSignatureOptions().AddRequiredLanguageFeature(
+            LanguageFeature::FEATURE_BIT_CAST_BYTES_FUNCTIONS)}},
       FunctionOptions().set_allow_external_usage(false));
-  InsertSimpleFunction(
+  InsertFunction(
       functions, options, "bit_cast_to_uint32", SCALAR,
       {{uint32_type, {uint32_type}, FN_BIT_CAST_UINT32_TO_UINT32},
-       {uint32_type, {int32_type}, FN_BIT_CAST_INT32_TO_UINT32}},
+       {uint32_type, {int32_type}, FN_BIT_CAST_INT32_TO_UINT32},
+       {uint32_type,
+        {bytes_type, {endianness_type, FunctionArgumentType::OPTIONAL}},
+        FN_BIT_CAST_BYTES_TO_UINT32,
+        FunctionSignatureOptions().AddRequiredLanguageFeature(
+            LanguageFeature::FEATURE_BIT_CAST_BYTES_FUNCTIONS)}},
       FunctionOptions().set_allow_external_usage(false));
-  InsertSimpleFunction(
+  InsertFunction(
       functions, options, "bit_cast_to_uint64", SCALAR,
       {{uint64_type, {uint64_type}, FN_BIT_CAST_UINT64_TO_UINT64},
-       {uint64_type, {int64_type}, FN_BIT_CAST_INT64_TO_UINT64}},
+       {uint64_type, {int64_type}, FN_BIT_CAST_INT64_TO_UINT64},
+       {uint64_type,
+        {bytes_type, {endianness_type, FunctionArgumentType::OPTIONAL}},
+        FN_BIT_CAST_BYTES_TO_UINT64,
+        FunctionSignatureOptions().AddRequiredLanguageFeature(
+            LanguageFeature::FEATURE_BIT_CAST_BYTES_FUNCTIONS)}},
       FunctionOptions().set_allow_external_usage(false));
+  InsertSimpleFunction(
+      functions, options, "bit_cast_to_bytes", SCALAR,
+      {{bytes_type,
+        {float_type, {endianness_type, FunctionArgumentType::OPTIONAL}},
+        FN_BIT_CAST_FLOAT_TO_BYTES},
+       {bytes_type,
+        {double_type, {endianness_type, FunctionArgumentType::OPTIONAL}},
+        FN_BIT_CAST_DOUBLE_TO_BYTES},
+       {bytes_type,
+        {int32_type, {endianness_type, FunctionArgumentType::OPTIONAL}},
+        FN_BIT_CAST_INT32_TO_BYTES},
+       {bytes_type,
+        {uint32_type, {endianness_type, FunctionArgumentType::OPTIONAL}},
+        FN_BIT_CAST_UINT32_TO_BYTES},
+       {bytes_type,
+        {int64_type, {endianness_type, FunctionArgumentType::OPTIONAL}},
+        FN_BIT_CAST_INT64_TO_BYTES},
+       {bytes_type,
+        {uint64_type, {endianness_type, FunctionArgumentType::OPTIONAL}},
+        FN_BIT_CAST_UINT64_TO_BYTES}},
+      FunctionOptions()
+          .AddRequiredLanguageFeature(
+              LanguageFeature::FEATURE_BIT_CAST_BYTES_FUNCTIONS)
+          .set_allow_external_usage(false));
+  InsertSimpleFunction(
+      functions, options, "bit_cast_to_float", SCALAR,
+      {{float_type,
+        {bytes_type, {endianness_type, FunctionArgumentType::OPTIONAL}},
+        FN_BIT_CAST_BYTES_TO_FLOAT}},
+      FunctionOptions()
+          .AddRequiredLanguageFeature(
+              LanguageFeature::FEATURE_BIT_CAST_BYTES_FUNCTIONS)
+          .set_allow_external_usage(false));
+  InsertSimpleFunction(
+      functions, options, "bit_cast_to_double", SCALAR,
+      {{double_type,
+        {bytes_type, {endianness_type, FunctionArgumentType::OPTIONAL}},
+        FN_BIT_CAST_BYTES_TO_DOUBLE}},
+      FunctionOptions()
+          .AddRequiredLanguageFeature(
+              LanguageFeature::FEATURE_BIT_CAST_BYTES_FUNCTIONS)
+          .set_allow_external_usage(false));
 
   FunctionOptions function_is_stable;
   function_is_stable.set_volatility(FunctionEnums::STABLE);
@@ -1238,7 +1337,7 @@ void GetMiscellaneousFunctions(TypeFactory* type_factory,
   if (options.language_options.LanguageFeatureEnabled(
           FEATURE_ENUM_VALUE_DESCRIPTOR_PROTO)) {
     const Type* enum_value_descriptor_proto_type = nullptr;
-    GOOGLESQL_CHECK_OK(type_factory->MakeProtoType(
+    GOOGLESQL_RETURN_IF_ERROR(type_factory->MakeProtoType(
         google::protobuf::EnumValueDescriptorProto::descriptor(),
         &enum_value_descriptor_proto_type));
     // ENUM_VALUE_DESCRIPTOR_PROTO(ENUM): Returns the
@@ -1273,6 +1372,7 @@ void GetMiscellaneousFunctions(TypeFactory* type_factory,
       FunctionOptions().set_supports_safe_error_mode(
           options.language_options.LanguageFeatureEnabled(
               FEATURE_SAFE_FUNCTION_CALL_WITH_LAMBDA_ARGS)));
+  return absl::OkStatus();
 }
 
 // This function requires <type_factory>, <functions> to be not nullptr.

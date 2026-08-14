@@ -35,7 +35,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=[tvf_one_connection_arg_with_fixed_output.string#1]
-        +-tvf=tvf_one_connection_arg_with_fixed_output((ANY CONNECTION) -> TABLE<string STRING>)
+        +-tvf=tvf_one_connection_arg_with_fixed_output
         +-signature=(ANY CONNECTION) -> TABLE<string STRING>
         +-argument_list=
         | +-FunctionArgument
@@ -58,7 +58,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=[tvf_one_connection_arg_with_fixed_output.string#1]
-        +-tvf=tvf_one_connection_arg_with_fixed_output((ANY CONNECTION) -> TABLE<string STRING>)
+        +-tvf=tvf_one_connection_arg_with_fixed_output
         +-signature=(ANY CONNECTION) -> TABLE<string STRING>
         +-argument_list=
         | +-FunctionArgument
@@ -81,7 +81,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=[tvf_one_connection_arg_with_fixed_output.string#1]
-        +-tvf=tvf_one_connection_arg_with_fixed_output((ANY CONNECTION) -> TABLE<string STRING>)
+        +-tvf=tvf_one_connection_arg_with_fixed_output
         +-signature=(ANY CONNECTION) -> TABLE<string STRING>
         +-argument_list=
         | +-FunctionArgument
@@ -105,7 +105,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=tvf_one_connection_one_string_arg_with_fixed_output.[int64#1, string#2]
-        +-tvf=tvf_one_connection_one_string_arg_with_fixed_output((ANY CONNECTION, STRING) -> TABLE<int64 INT64, string STRING>)
+        +-tvf=tvf_one_connection_one_string_arg_with_fixed_output
         +-signature=(ANY CONNECTION, literal STRING) -> TABLE<int64 INT64, string STRING>
         +-argument_list=
         | +-FunctionArgument
@@ -131,7 +131,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=tvf_two_connections_with_fixed_output.[double#1, string#2]
-        +-tvf=tvf_two_connections_with_fixed_output((ANY CONNECTION, ANY CONNECTION) -> TABLE<double DOUBLE, string STRING>)
+        +-tvf=tvf_two_connections_with_fixed_output
         +-signature=(ANY CONNECTION, ANY CONNECTION) -> TABLE<double DOUBLE, string STRING>
         +-argument_list=
         | +-FunctionArgument

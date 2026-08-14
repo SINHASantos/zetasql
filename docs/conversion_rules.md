@@ -319,6 +319,16 @@ literals and parameters can also be coerced. See
     </tr>
 
     <tr>
+      <td><code>MAP</code></td>
+      <td><code>MAP</code> (with castable key and value types)
+        
+
+<span><code>JSON</code></span><br />
+</td>
+      <td><code>MAP</code> (with coercible key and value types)</td>
+    </tr>
+
+    <tr>
       <td><code>STRUCT</code></td>
       <td>
 
@@ -498,6 +508,21 @@ GoogleSQL supports the following query parameter coercions:
 
 <span><code>ENUM</code></span><br />
 </td>
+    </tr>
+
+    <tr>
+      <td><code>MAP</code> parameter</td>
+      <td>
+        
+
+<span><code>MAP</code></span><br />
+
+        <p>
+          Coercion is allowed from <code>MAP&lt;K1, V1&gt;</code> to
+          <code>MAP&lt;K2, V2&gt;</code> if <code>K2</code> and <code>V2</code>
+          are supertypes of <code>K1</code> and <code>V1</code>.
+        </p>
+      </td>
     </tr>
 
     <tr>
@@ -713,6 +738,15 @@ or more supertypes, including itself, which defines its set of supertypes.
     <tr>
       <td><code>ARRAY</code></td>
       <td><code>ARRAY</code> with the same element types.</td>
+    </tr>
+
+    <tr>
+      <td><code>MAP</code></td>
+      <td>
+        <code>MAP&lt;K1, V1&gt;</code> is a supertype of
+        <code>MAP&lt;K2, V2&gt;</code> if <code>K1</code> and <code>V1</code>
+        are supertypes of <code>K2</code> and <code>V2</code>.
+      </td>
     </tr>
 
     <tr>

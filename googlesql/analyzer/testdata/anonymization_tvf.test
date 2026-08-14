@@ -29,13 +29,14 @@ QueryStmt
       +-AnonymizedAggregateScan
         +-column_list=[$aggregate.$agg1#3]
         +-input_scan=
-        | +-TVFScan(parse_location=71-82, tvf=tvf_no_args(() -> TABLE<column_bool BOOL, column_bytes BYTES>), signature=() -> TABLE<column_bool BOOL, column_bytes BYTES>, function_call_signature=() -> TABLE<column_bool BOOL, column_bytes BYTES>)
+        | +-TVFScan(parse_location=71-82, tvf=tvf_no_args, signature=() -> TABLE<column_bool BOOL, column_bytes BYTES>, function_call_signature=() -> TABLE<column_bool BOOL, column_bytes BYTES>)
         +-aggregate_list=
           +-$agg1#3 :=
             +-AggregateFunctionCall(GoogleSQL:$anon_count_star(optional(1) INT64, optional(1) INT64) -> INT64)
               +-parse_location=26-36
               +-Literal(parse_location=55-56, type=INT64, value=0)
               +-Literal(parse_location=61-64, type=INT64, value=100)
+
 [REPLACED_LITERALS]
 select with anonymization anon_count(* CLAMPED BETWEEN @_p0_INT64 AND @_p1_INT64)
 from tvf_no_args();
@@ -61,7 +62,7 @@ QueryStmt
         +-column_list=[$aggregate.$agg1#13]
         +-input_scan=
         | +-TVFScan
-        |   +-tvf=tvf_one_templated_arg_with_anonymization_uid((ANY TYPE) -> TABLE<column_bool BOOL, column_bytes BYTES, column_date DATE, column_double DOUBLE, column_float FLOAT, column_int32 INT32, column_int64 INT64, column_string STRING, column_time TIME, column_uint32 UINT32, column_uint64 UINT64>)
+        |   +-tvf=tvf_one_templated_arg_with_anonymization_uid
         |   +-signature=(BOOL) -> TABLE<column_bool BOOL, column_bytes BYTES, column_date DATE, column_double DOUBLE, column_float FLOAT, column_int32 INT32, column_int64 INT64, column_string STRING, column_time TIME, column_uint32 UINT32, column_uint64 UINT64>
         |   +-argument_list=
         |   | +-FunctionArgument
@@ -96,7 +97,7 @@ QueryStmt
         |   +-input_scan=
         |   | +-TVFScan
         |   |   +-column_list=[tvf_one_templated_arg_with_anonymization_uid.column_int64#14]
-        |   |   +-tvf=tvf_one_templated_arg_with_anonymization_uid((ANY TYPE) -> TABLE<column_bool BOOL, column_bytes BYTES, column_date DATE, column_double DOUBLE, column_float FLOAT, column_int32 INT32, column_int64 INT64, column_string STRING, column_time TIME, column_uint32 UINT32, column_uint64 UINT64>)
+        |   |   +-tvf=tvf_one_templated_arg_with_anonymization_uid
         |   |   +-signature=(BOOL) -> TABLE<column_bool BOOL, column_bytes BYTES, column_date DATE, column_double DOUBLE, column_float FLOAT, column_int32 INT32, column_int64 INT64, column_string STRING, column_time TIME, column_uint32 UINT32, column_uint64 UINT64>
         |   |   +-argument_list=
         |   |   | +-FunctionArgument
@@ -146,7 +147,7 @@ QueryStmt
         +-column_list=[$aggregate.$agg1#25]
         +-input_scan=
         | +-TVFScan
-        |   +-tvf=tvf_one_templated_arg_with_anonymization_uid((ANY TYPE) -> TABLE<column_bool BOOL, column_bytes BYTES, column_date DATE, column_double DOUBLE, column_float FLOAT, column_int32 INT32, column_int64 INT64, column_string STRING, column_time TIME, column_uint32 UINT32, column_uint64 UINT64>)
+        |   +-tvf=tvf_one_templated_arg_with_anonymization_uid
         |   +-signature=(BOOL) -> TABLE<column_bool BOOL, column_bytes BYTES, column_date DATE, column_double DOUBLE, column_float FLOAT, column_int32 INT32, column_int64 INT64, column_string STRING, column_time TIME, column_uint32 UINT32, column_uint64 UINT64>
         |   +-argument_list=
         |   | +-FunctionArgument
@@ -181,7 +182,7 @@ QueryStmt
         |   +-input_scan=
         |   | +-TVFScan
         |   |   +-column_list=[tvf_one_templated_arg_with_anonymization_uid.column_int64#26]
-        |   |   +-tvf=tvf_one_templated_arg_with_anonymization_uid((ANY TYPE) -> TABLE<column_bool BOOL, column_bytes BYTES, column_date DATE, column_double DOUBLE, column_float FLOAT, column_int32 INT32, column_int64 INT64, column_string STRING, column_time TIME, column_uint32 UINT32, column_uint64 UINT64>)
+        |   |   +-tvf=tvf_one_templated_arg_with_anonymization_uid
         |   |   +-signature=(BOOL) -> TABLE<column_bool BOOL, column_bytes BYTES, column_date DATE, column_double DOUBLE, column_float FLOAT, column_int32 INT32, column_int64 INT64, column_string STRING, column_time TIME, column_uint32 UINT32, column_uint64 UINT64>
         |   |   +-argument_list=
         |   |   | +-FunctionArgument
@@ -231,7 +232,7 @@ QueryStmt
         +-column_list=[$aggregate.$agg1#31]
         +-input_scan=
         | +-TVFScan
-        |   +-tvf=tvf_one_relation_arg_with_anonymization_uid((ANY TABLE) -> TABLE<column_bool BOOL, column_bytes BYTES, column_date DATE, column_double DOUBLE, column_float FLOAT, column_int32 INT32, column_int64 INT64, column_string STRING, column_time TIME, column_uint32 UINT32, column_uint64 UINT64>)
+        |   +-tvf=tvf_one_relation_arg_with_anonymization_uid
         |   +-signature=(TABLE<int32 INT32, int64 INT64, uint32 UINT32, uint64 UINT64, string STRING, bytes BYTES, bool BOOL, float FLOAT, double DOUBLE, date DATE, timestamp_seconds TIMESTAMP, timestamp_millis TIMESTAMP, timestamp_micros TIMESTAMP, timestamp_nanos TIMESTAMP, timestamp TIMESTAMP, numeric NUMERIC, bignumeric BIGNUMERIC, json JSON, uuid UUID>) -> TABLE<column_bool BOOL, column_bytes BYTES, column_date DATE, column_double DOUBLE, column_float FLOAT, column_int32 INT32, column_int64 INT64, column_string STRING, column_time TIME, column_uint32 UINT32, column_uint64 UINT64>
         |   +-argument_list=
         |   | +-FunctionArgument
@@ -261,7 +262,7 @@ QueryStmt
         |   +-input_scan=
         |   | +-TVFScan
         |   |   +-column_list=[tvf_one_relation_arg_with_anonymization_uid.column_int64#32]
-        |   |   +-tvf=tvf_one_relation_arg_with_anonymization_uid((ANY TABLE) -> TABLE<column_bool BOOL, column_bytes BYTES, column_date DATE, column_double DOUBLE, column_float FLOAT, column_int32 INT32, column_int64 INT64, column_string STRING, column_time TIME, column_uint32 UINT32, column_uint64 UINT64>)
+        |   |   +-tvf=tvf_one_relation_arg_with_anonymization_uid
         |   |   +-signature=(TABLE<int32 INT32, int64 INT64, uint32 UINT32, uint64 UINT64, string STRING, bytes BYTES, bool BOOL, float FLOAT, double DOUBLE, date DATE, timestamp_seconds TIMESTAMP, timestamp_millis TIMESTAMP, timestamp_micros TIMESTAMP, timestamp_nanos TIMESTAMP, timestamp TIMESTAMP, numeric NUMERIC, bignumeric BIGNUMERIC, json JSON, uuid UUID>) -> TABLE<column_bool BOOL, column_bytes BYTES, column_date DATE, column_double DOUBLE, column_float FLOAT, column_int32 INT32, column_int64 INT64, column_string STRING, column_time TIME, column_uint32 UINT32, column_uint64 UINT64>
         |   |   +-argument_list=
         |   |   | +-FunctionArgument
@@ -305,7 +306,7 @@ QueryStmt
         +-column_list=[$aggregate.$agg1#31]
         +-input_scan=
         | +-TVFScan
-        |   +-tvf=tvf_one_relation_arg_with_anonymization_uid((ANY TABLE) -> TABLE<column_bool BOOL, column_bytes BYTES, column_date DATE, column_double DOUBLE, column_float FLOAT, column_int32 INT32, column_int64 INT64, column_string STRING, column_time TIME, column_uint32 UINT32, column_uint64 UINT64>)
+        |   +-tvf=tvf_one_relation_arg_with_anonymization_uid
         |   +-signature=(TABLE<int32 INT32, int64 INT64, uint32 UINT32, uint64 UINT64, string STRING, bytes BYTES, bool BOOL, float FLOAT, double DOUBLE, date DATE, timestamp_seconds TIMESTAMP, timestamp_millis TIMESTAMP, timestamp_micros TIMESTAMP, timestamp_nanos TIMESTAMP, timestamp TIMESTAMP, numeric NUMERIC, bignumeric BIGNUMERIC, json JSON, uuid UUID>) -> TABLE<column_bool BOOL, column_bytes BYTES, column_date DATE, column_double DOUBLE, column_float FLOAT, column_int32 INT32, column_int64 INT64, column_string STRING, column_time TIME, column_uint32 UINT32, column_uint64 UINT64>
         |   +-argument_list=
         |   | +-FunctionArgument
@@ -332,7 +333,7 @@ QueryStmt
         |   +-input_scan=
         |   | +-TVFScan
         |   |   +-column_list=[tvf_one_relation_arg_with_anonymization_uid.column_int64#32]
-        |   |   +-tvf=tvf_one_relation_arg_with_anonymization_uid((ANY TABLE) -> TABLE<column_bool BOOL, column_bytes BYTES, column_date DATE, column_double DOUBLE, column_float FLOAT, column_int32 INT32, column_int64 INT64, column_string STRING, column_time TIME, column_uint32 UINT32, column_uint64 UINT64>)
+        |   |   +-tvf=tvf_one_relation_arg_with_anonymization_uid
         |   |   +-signature=(TABLE<int32 INT32, int64 INT64, uint32 UINT32, uint64 UINT64, string STRING, bytes BYTES, bool BOOL, float FLOAT, double DOUBLE, date DATE, timestamp_seconds TIMESTAMP, timestamp_millis TIMESTAMP, timestamp_micros TIMESTAMP, timestamp_nanos TIMESTAMP, timestamp TIMESTAMP, numeric NUMERIC, bignumeric BIGNUMERIC, json JSON, uuid UUID>) -> TABLE<column_bool BOOL, column_bytes BYTES, column_date DATE, column_double DOUBLE, column_float FLOAT, column_int32 INT32, column_int64 INT64, column_string STRING, column_time TIME, column_uint32 UINT32, column_uint64 UINT64>
         |   |   +-argument_list=
         |   |   | +-FunctionArgument
@@ -374,7 +375,7 @@ QueryStmt
         +-column_list=[$aggregate.$agg1#14]
         +-input_scan=
         | +-TVFScan
-        |   +-tvf=tvf_one_relation_arg_with_anonymization_uid((ANY TABLE) -> TABLE<column_bool BOOL, column_bytes BYTES, column_date DATE, column_double DOUBLE, column_float FLOAT, column_int32 INT32, column_int64 INT64, column_string STRING, column_time TIME, column_uint32 UINT32, column_uint64 UINT64>)
+        |   +-tvf=tvf_one_relation_arg_with_anonymization_uid
         |   +-signature=(TABLE<column_bool BOOL, column_bytes BYTES>) -> TABLE<column_bool BOOL, column_bytes BYTES, column_date DATE, column_double DOUBLE, column_float FLOAT, column_int32 INT32, column_int64 INT64, column_string STRING, column_time TIME, column_uint32 UINT32, column_uint64 UINT64>
         |   +-argument_list=
         |   | +-FunctionArgument
@@ -382,7 +383,7 @@ QueryStmt
         |   |   | +-ProjectScan
         |   |   |   +-column_list=tvf_no_args.[column_bool#1, column_bytes#2]
         |   |   |   +-input_scan=
-        |   |   |     +-TVFScan(column_list=tvf_no_args.[column_bool#1, column_bytes#2], tvf=tvf_no_args(() -> TABLE<column_bool BOOL, column_bytes BYTES>), signature=() -> TABLE<column_bool BOOL, column_bytes BYTES>, column_index_list=[0, 1], function_call_signature=() -> TABLE<column_bool BOOL, column_bytes BYTES>)
+        |   |   |     +-TVFScan(column_list=tvf_no_args.[column_bool#1, column_bytes#2], tvf=tvf_no_args, signature=() -> TABLE<column_bool BOOL, column_bytes BYTES>, column_index_list=[0, 1], function_call_signature=() -> TABLE<column_bool BOOL, column_bytes BYTES>)
         |   |   +-argument_column_list=tvf_no_args.[column_bool#1, column_bytes#2]
         |   +-function_call_signature=(ANY TABLE) -> TABLE<column_bool BOOL, column_bytes BYTES, column_date DATE, column_double DOUBLE, column_float FLOAT, column_int32 INT32, column_int64 INT64, column_string STRING, column_time TIME, column_uint32 UINT32, column_uint64 UINT64>
         +-aggregate_list=
@@ -404,7 +405,7 @@ QueryStmt
         |   +-input_scan=
         |   | +-TVFScan
         |   |   +-column_list=[tvf_one_relation_arg_with_anonymization_uid.column_int64#15]
-        |   |   +-tvf=tvf_one_relation_arg_with_anonymization_uid((ANY TABLE) -> TABLE<column_bool BOOL, column_bytes BYTES, column_date DATE, column_double DOUBLE, column_float FLOAT, column_int32 INT32, column_int64 INT64, column_string STRING, column_time TIME, column_uint32 UINT32, column_uint64 UINT64>)
+        |   |   +-tvf=tvf_one_relation_arg_with_anonymization_uid
         |   |   +-signature=(TABLE<column_bool BOOL, column_bytes BYTES>) -> TABLE<column_bool BOOL, column_bytes BYTES, column_date DATE, column_double DOUBLE, column_float FLOAT, column_int32 INT32, column_int64 INT64, column_string STRING, column_time TIME, column_uint32 UINT32, column_uint64 UINT64>
         |   |   +-argument_list=
         |   |   | +-FunctionArgument
@@ -412,7 +413,7 @@ QueryStmt
         |   |   |   | +-ProjectScan
         |   |   |   |   +-column_list=tvf_no_args.[column_bool#1, column_bytes#2]
         |   |   |   |   +-input_scan=
-        |   |   |   |     +-TVFScan(column_list=tvf_no_args.[column_bool#1, column_bytes#2], tvf=tvf_no_args(() -> TABLE<column_bool BOOL, column_bytes BYTES>), signature=() -> TABLE<column_bool BOOL, column_bytes BYTES>, column_index_list=[0, 1], function_call_signature=() -> TABLE<column_bool BOOL, column_bytes BYTES>)
+        |   |   |   |     +-TVFScan(column_list=tvf_no_args.[column_bool#1, column_bytes#2], tvf=tvf_no_args, signature=() -> TABLE<column_bool BOOL, column_bytes BYTES>, column_index_list=[0, 1], function_call_signature=() -> TABLE<column_bool BOOL, column_bytes BYTES>)
         |   |   |   +-argument_column_list=tvf_no_args.[column_bool#1, column_bytes#2]
         |   |   +-column_index_list=[6]
         |   |   +-function_call_signature=(ANY TABLE) -> TABLE<column_bool BOOL, column_bytes BYTES, column_date DATE, column_double DOUBLE, column_float FLOAT, column_int32 INT32, column_int64 INT64, column_string STRING, column_time TIME, column_uint32 UINT32, column_uint64 UINT64>
@@ -451,7 +452,7 @@ QueryStmt
         +-column_list=[$aggregate.$agg1#25]
         +-input_scan=
         | +-TVFScan
-        |   +-tvf=tvf_one_relation_arg_with_anonymization_uid((ANY TABLE) -> TABLE<column_bool BOOL, column_bytes BYTES, column_date DATE, column_double DOUBLE, column_float FLOAT, column_int32 INT32, column_int64 INT64, column_string STRING, column_time TIME, column_uint32 UINT32, column_uint64 UINT64>)
+        |   +-tvf=tvf_one_relation_arg_with_anonymization_uid
         |   +-signature=(TABLE<column_bool BOOL, column_bytes BYTES, column_date DATE, column_double DOUBLE, column_float FLOAT, column_int32 INT32, column_int64 INT64, column_string STRING, column_time TIME, column_uint32 UINT32, column_uint64 UINT64>) -> TABLE<column_bool BOOL, column_bytes BYTES, column_date DATE, column_double DOUBLE, column_float FLOAT, column_int32 INT32, column_int64 INT64, column_string STRING, column_time TIME, column_uint32 UINT32, column_uint64 UINT64>
         |   +-argument_list=
         |   | +-FunctionArgument
@@ -461,7 +462,7 @@ QueryStmt
         |   |   |   +-input_scan=
         |   |   |     +-TVFScan
         |   |   |       +-column_list=tvf_one_relation_arg_with_anonymization_uid.[column_bool#3, column_bytes#4, column_date#5, column_double#6, column_float#7, column_int32#8, column_int64#9, column_string#10, column_time#11, column_uint32#12, column_uint64#13]
-        |   |   |       +-tvf=tvf_one_relation_arg_with_anonymization_uid((ANY TABLE) -> TABLE<column_bool BOOL, column_bytes BYTES, column_date DATE, column_double DOUBLE, column_float FLOAT, column_int32 INT32, column_int64 INT64, column_string STRING, column_time TIME, column_uint32 UINT32, column_uint64 UINT64>)
+        |   |   |       +-tvf=tvf_one_relation_arg_with_anonymization_uid
         |   |   |       +-signature=(TABLE<column_bool BOOL, column_bytes BYTES>) -> TABLE<column_bool BOOL, column_bytes BYTES, column_date DATE, column_double DOUBLE, column_float FLOAT, column_int32 INT32, column_int64 INT64, column_string STRING, column_time TIME, column_uint32 UINT32, column_uint64 UINT64>
         |   |   |       +-argument_list=
         |   |   |       | +-FunctionArgument
@@ -469,7 +470,7 @@ QueryStmt
         |   |   |       |   | +-ProjectScan
         |   |   |       |   |   +-column_list=tvf_no_args.[column_bool#1, column_bytes#2]
         |   |   |       |   |   +-input_scan=
-        |   |   |       |   |     +-TVFScan(column_list=tvf_no_args.[column_bool#1, column_bytes#2], tvf=tvf_no_args(() -> TABLE<column_bool BOOL, column_bytes BYTES>), signature=() -> TABLE<column_bool BOOL, column_bytes BYTES>, column_index_list=[0, 1], function_call_signature=() -> TABLE<column_bool BOOL, column_bytes BYTES>)
+        |   |   |       |   |     +-TVFScan(column_list=tvf_no_args.[column_bool#1, column_bytes#2], tvf=tvf_no_args, signature=() -> TABLE<column_bool BOOL, column_bytes BYTES>, column_index_list=[0, 1], function_call_signature=() -> TABLE<column_bool BOOL, column_bytes BYTES>)
         |   |   |       |   +-argument_column_list=tvf_no_args.[column_bool#1, column_bytes#2]
         |   |   |       +-column_index_list=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
         |   |   |       +-function_call_signature=(ANY TABLE) -> TABLE<column_bool BOOL, column_bytes BYTES, column_date DATE, column_double DOUBLE, column_float FLOAT, column_int32 INT32, column_int64 INT64, column_string STRING, column_time TIME, column_uint32 UINT32, column_uint64 UINT64>
@@ -494,7 +495,7 @@ QueryStmt
         |   +-input_scan=
         |   | +-TVFScan
         |   |   +-column_list=[tvf_one_relation_arg_with_anonymization_uid.column_int64#26]
-        |   |   +-tvf=tvf_one_relation_arg_with_anonymization_uid((ANY TABLE) -> TABLE<column_bool BOOL, column_bytes BYTES, column_date DATE, column_double DOUBLE, column_float FLOAT, column_int32 INT32, column_int64 INT64, column_string STRING, column_time TIME, column_uint32 UINT32, column_uint64 UINT64>)
+        |   |   +-tvf=tvf_one_relation_arg_with_anonymization_uid
         |   |   +-signature=(TABLE<column_bool BOOL, column_bytes BYTES, column_date DATE, column_double DOUBLE, column_float FLOAT, column_int32 INT32, column_int64 INT64, column_string STRING, column_time TIME, column_uint32 UINT32, column_uint64 UINT64>) -> TABLE<column_bool BOOL, column_bytes BYTES, column_date DATE, column_double DOUBLE, column_float FLOAT, column_int32 INT32, column_int64 INT64, column_string STRING, column_time TIME, column_uint32 UINT32, column_uint64 UINT64>
         |   |   +-argument_list=
         |   |   | +-FunctionArgument
@@ -504,7 +505,7 @@ QueryStmt
         |   |   |   |   +-input_scan=
         |   |   |   |     +-TVFScan
         |   |   |   |       +-column_list=tvf_one_relation_arg_with_anonymization_uid.[column_bool#3, column_bytes#4, column_date#5, column_double#6, column_float#7, column_int32#8, column_int64#9, column_string#10, column_time#11, column_uint32#12, column_uint64#13]
-        |   |   |   |       +-tvf=tvf_one_relation_arg_with_anonymization_uid((ANY TABLE) -> TABLE<column_bool BOOL, column_bytes BYTES, column_date DATE, column_double DOUBLE, column_float FLOAT, column_int32 INT32, column_int64 INT64, column_string STRING, column_time TIME, column_uint32 UINT32, column_uint64 UINT64>)
+        |   |   |   |       +-tvf=tvf_one_relation_arg_with_anonymization_uid
         |   |   |   |       +-signature=(TABLE<column_bool BOOL, column_bytes BYTES>) -> TABLE<column_bool BOOL, column_bytes BYTES, column_date DATE, column_double DOUBLE, column_float FLOAT, column_int32 INT32, column_int64 INT64, column_string STRING, column_time TIME, column_uint32 UINT32, column_uint64 UINT64>
         |   |   |   |       +-argument_list=
         |   |   |   |       | +-FunctionArgument
@@ -512,7 +513,7 @@ QueryStmt
         |   |   |   |       |   | +-ProjectScan
         |   |   |   |       |   |   +-column_list=tvf_no_args.[column_bool#1, column_bytes#2]
         |   |   |   |       |   |   +-input_scan=
-        |   |   |   |       |   |     +-TVFScan(column_list=tvf_no_args.[column_bool#1, column_bytes#2], tvf=tvf_no_args(() -> TABLE<column_bool BOOL, column_bytes BYTES>), signature=() -> TABLE<column_bool BOOL, column_bytes BYTES>, column_index_list=[0, 1], function_call_signature=() -> TABLE<column_bool BOOL, column_bytes BYTES>)
+        |   |   |   |       |   |     +-TVFScan(column_list=tvf_no_args.[column_bool#1, column_bytes#2], tvf=tvf_no_args, signature=() -> TABLE<column_bool BOOL, column_bytes BYTES>, column_index_list=[0, 1], function_call_signature=() -> TABLE<column_bool BOOL, column_bytes BYTES>)
         |   |   |   |       |   +-argument_column_list=tvf_no_args.[column_bool#1, column_bytes#2]
         |   |   |   |       +-column_index_list=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
         |   |   |   |       +-function_call_signature=(ANY TABLE) -> TABLE<column_bool BOOL, column_bytes BYTES, column_date DATE, column_double DOUBLE, column_float FLOAT, column_int32 INT32, column_int64 INT64, column_string STRING, column_time TIME, column_uint32 UINT32, column_uint64 UINT64>
@@ -557,7 +558,7 @@ QueryStmt
         +-input_scan=
         | +-TVFScan
         |   +-parse_location=45-83
-        |   +-tvf=tvf_one_relation_arg_with_fixed_output((ANY TABLE) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+        |   +-tvf=tvf_one_relation_arg_with_fixed_output
         |   +-signature=(TABLE<int32 INT32, int64 INT64, uint32 UINT32, uint64 UINT64, string STRING, bytes BYTES, bool BOOL, float FLOAT, double DOUBLE, date DATE, uid INT64, numeric NUMERIC>) -> TABLE<column_bool BOOL, column_bytes BYTES>
         |   +-argument_list=
         |   | +-FunctionArgument
@@ -571,6 +572,7 @@ QueryStmt
         |   +-function_call_signature=(ANY TABLE) -> TABLE<column_bool BOOL, column_bytes BYTES>
         +-aggregate_list=
           +-$agg1#15 := AggregateFunctionCall(GoogleSQL:$anon_count_star(optional(0) INT64, optional(0) INT64) -> INT64)(parse_location=26-36)
+
 [REPLACED_LITERALS]
 select with anonymization anon_count(*)
 from tvf_one_relation_arg_with_fixed_output(
@@ -602,7 +604,7 @@ QueryStmt
         +-input_scan=
         | +-TVFScan
         |   +-parse_location=45-83
-        |   +-tvf=tvf_one_relation_arg_with_fixed_output((ANY TABLE) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+        |   +-tvf=tvf_one_relation_arg_with_fixed_output
         |   +-signature=(TABLE<int32 INT32, int64 INT64, uint32 UINT32, uint64 UINT64, string STRING, bytes BYTES, bool BOOL, float FLOAT, double DOUBLE, date DATE, uid INT64, numeric NUMERIC>) -> TABLE<column_bool BOOL, column_bytes BYTES>
         |   +-argument_list=
         |   | +-FunctionArgument
@@ -612,6 +614,7 @@ QueryStmt
         |   +-function_call_signature=(ANY TABLE) -> TABLE<column_bool BOOL, column_bytes BYTES>
         +-aggregate_list=
           +-$agg1#15 := AggregateFunctionCall(GoogleSQL:$anon_count_star(optional(0) INT64, optional(0) INT64) -> INT64)(parse_location=26-36)
+
 [REPLACED_LITERALS]
 select with anonymization anon_count(*)
 from tvf_one_relation_arg_with_fixed_output(
@@ -643,7 +646,7 @@ QueryStmt
         +-input_scan=
         | +-TVFScan
         |   +-parse_location=45-88
-        |   +-tvf=tvf_one_relation_arg_with_anonymization_uid((ANY TABLE) -> TABLE<column_bool BOOL, column_bytes BYTES, column_date DATE, column_double DOUBLE, column_float FLOAT, column_int32 INT32, column_int64 INT64, column_string STRING, column_time TIME, column_uint32 UINT32, column_uint64 UINT64>)
+        |   +-tvf=tvf_one_relation_arg_with_anonymization_uid
         |   +-signature=(TABLE<$col1 INT64>) -> TABLE<column_bool BOOL, column_bytes BYTES, column_date DATE, column_double DOUBLE, column_float FLOAT, column_int32 INT32, column_int64 INT64, column_string STRING, column_time TIME, column_uint32 UINT32, column_uint64 UINT64>
         |   +-argument_list=
         |   | +-FunctionArgument
@@ -662,6 +665,7 @@ QueryStmt
         |   +-function_call_signature=(ANY TABLE) -> TABLE<column_bool BOOL, column_bytes BYTES, column_date DATE, column_double DOUBLE, column_float FLOAT, column_int32 INT32, column_int64 INT64, column_string STRING, column_time TIME, column_uint32 UINT32, column_uint64 UINT64>
         +-aggregate_list=
           +-$agg1#25 := AggregateFunctionCall(GoogleSQL:$anon_count_star(optional(0) INT64, optional(0) INT64) -> INT64)(parse_location=26-36)
+
 [REPLACED_LITERALS]
 select with anonymization anon_count(*)
 from tvf_one_relation_arg_with_anonymization_uid(
@@ -709,7 +713,7 @@ QueryStmt
         |       +-column_list=[$aggregate.$agg1#29]
         |       +-input_scan=
         |       | +-TVFScan
-        |       |   +-tvf=tvf_one_relation_arg_with_fixed_output((ANY TABLE) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+        |       |   +-tvf=tvf_one_relation_arg_with_fixed_output
         |       |   +-signature=(TABLE<bool_column BOOL>) -> TABLE<column_bool BOOL, column_bytes BYTES>
         |       |   +-argument_list=
         |       |   | +-FunctionArgument
@@ -772,7 +776,7 @@ QueryStmt
         |       +-column_list=[$aggregate.$agg1#29]
         |       +-input_scan=
         |       | +-TVFScan
-        |       |   +-tvf=tvf_one_relation_arg_with_fixed_output((ANY TABLE) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+        |       |   +-tvf=tvf_one_relation_arg_with_fixed_output
         |       |   +-signature=(TABLE<bool_column BOOL>) -> TABLE<column_bool BOOL, column_bytes BYTES>
         |       |   +-argument_list=
         |       |   | +-FunctionArgument
@@ -811,7 +815,7 @@ QueryStmt
         +-input_scan=
         | +-TVFScan
         |   +-parse_location=45-88
-        |   +-tvf=tvf_one_relation_arg_with_anonymization_uid((ANY TABLE) -> TABLE<column_bool BOOL, column_bytes BYTES, column_date DATE, column_double DOUBLE, column_float FLOAT, column_int32 INT32, column_int64 INT64, column_string STRING, column_time TIME, column_uint32 UINT32, column_uint64 UINT64>)
+        |   +-tvf=tvf_one_relation_arg_with_anonymization_uid
         |   +-signature=(TABLE<$col1 INT64>) -> TABLE<column_bool BOOL, column_bytes BYTES, column_date DATE, column_double DOUBLE, column_float FLOAT, column_int32 INT32, column_int64 INT64, column_string STRING, column_time TIME, column_uint32 UINT32, column_uint64 UINT64>
         |   +-argument_list=
         |   | +-FunctionArgument
@@ -830,6 +834,7 @@ QueryStmt
         |   +-function_call_signature=(ANY TABLE) -> TABLE<column_bool BOOL, column_bytes BYTES, column_date DATE, column_double DOUBLE, column_float FLOAT, column_int32 INT32, column_int64 INT64, column_string STRING, column_time TIME, column_uint32 UINT32, column_uint64 UINT64>
         +-aggregate_list=
           +-$agg1#32 := AggregateFunctionCall(GoogleSQL:$anon_count_star(optional(0) INT64, optional(0) INT64) -> INT64)(parse_location=26-36)
+
 [REPLACED_LITERALS]
 select with anonymization anon_count(*)
 from tvf_one_relation_arg_with_anonymization_uid(
@@ -854,7 +859,7 @@ QueryStmt
       +-AnonymizedAggregateScan
         +-column_list=[$aggregate.$agg1#12]
         +-input_scan=
-        | +-TVFScan(tvf=tvf_no_args_with_anonymization_uid(() -> TABLE<column_bool BOOL, column_bytes BYTES, column_date DATE, column_double DOUBLE, column_float FLOAT, column_int32 INT32, column_int64 INT64, column_string STRING, column_time TIME, column_uint32 UINT32, column_uint64 UINT64>), signature=() -> TABLE<column_bool BOOL, column_bytes BYTES, column_date DATE, column_double DOUBLE, column_float FLOAT, column_int32 INT32, column_int64 INT64, column_string STRING, column_time TIME, column_uint32 UINT32, column_uint64 UINT64>, function_call_signature=() -> TABLE<column_bool BOOL, column_bytes BYTES, column_date DATE, column_double DOUBLE, column_float FLOAT, column_int32 INT32, column_int64 INT64, column_string STRING, column_time TIME, column_uint32 UINT32, column_uint64 UINT64>)
+        | +-TVFScan(tvf=tvf_no_args_with_anonymization_uid, signature=() -> TABLE<column_bool BOOL, column_bytes BYTES, column_date DATE, column_double DOUBLE, column_float FLOAT, column_int32 INT32, column_int64 INT64, column_string STRING, column_time TIME, column_uint32 UINT32, column_uint64 UINT64>, function_call_signature=() -> TABLE<column_bool BOOL, column_bytes BYTES, column_date DATE, column_double DOUBLE, column_float FLOAT, column_int32 INT32, column_int64 INT64, column_string STRING, column_time TIME, column_uint32 UINT32, column_uint64 UINT64>)
         +-aggregate_list=
           +-$agg1#12 := AggregateFunctionCall(GoogleSQL:$anon_count_star(optional(0) INT64, optional(0) INT64) -> INT64)
 
@@ -872,7 +877,7 @@ QueryStmt
         | +-AggregateScan
         |   +-column_list=[$aggregate.$agg1_partial#15, $group_by.$uid#16]
         |   +-input_scan=
-        |   | +-TVFScan(column_list=[tvf_no_args_with_anonymization_uid.column_int64#13], tvf=tvf_no_args_with_anonymization_uid(() -> TABLE<column_bool BOOL, column_bytes BYTES, column_date DATE, column_double DOUBLE, column_float FLOAT, column_int32 INT32, column_int64 INT64, column_string STRING, column_time TIME, column_uint32 UINT32, column_uint64 UINT64>), signature=() -> TABLE<column_bool BOOL, column_bytes BYTES, column_date DATE, column_double DOUBLE, column_float FLOAT, column_int32 INT32, column_int64 INT64, column_string STRING, column_time TIME, column_uint32 UINT32, column_uint64 UINT64>, column_index_list=[6], function_call_signature=() -> TABLE<column_bool BOOL, column_bytes BYTES, column_date DATE, column_double DOUBLE, column_float FLOAT, column_int32 INT32, column_int64 INT64, column_string STRING, column_time TIME, column_uint32 UINT32, column_uint64 UINT64>)
+        |   | +-TVFScan(column_list=[tvf_no_args_with_anonymization_uid.column_int64#13], tvf=tvf_no_args_with_anonymization_uid, signature=() -> TABLE<column_bool BOOL, column_bytes BYTES, column_date DATE, column_double DOUBLE, column_float FLOAT, column_int32 INT32, column_int64 INT64, column_string STRING, column_time TIME, column_uint32 UINT32, column_uint64 UINT64>, column_index_list=[6], function_call_signature=() -> TABLE<column_bool BOOL, column_bytes BYTES, column_date DATE, column_double DOUBLE, column_float FLOAT, column_int32 INT32, column_int64 INT64, column_string STRING, column_time TIME, column_uint32 UINT32, column_uint64 UINT64>)
         |   +-group_by_list=
         |   | +-$uid#16 := ColumnRef(type=INT64, column=tvf_no_args_with_anonymization_uid.column_int64#13)
         |   +-aggregate_list=
@@ -907,7 +912,7 @@ QueryStmt
       +-AnonymizedAggregateScan
         +-column_list=[$aggregate.$agg1#3]
         +-input_scan=
-        | +-TVFScan(tvf=NullarySelectWithUserId(() -> TABLE<a INT64, b INT64>), signature=() -> TABLE<a INT64, b INT64>, function_call_signature=() -> TABLE<a INT64, b INT64>)
+        | +-TVFScan(tvf=NullarySelectWithUserId, signature=() -> TABLE<a INT64, b INT64>, function_call_signature=() -> TABLE<a INT64, b INT64>)
         +-aggregate_list=
           +-$agg1#3 := AggregateFunctionCall(GoogleSQL:$anon_count_star(optional(0) INT64, optional(0) INT64) -> INT64)
 
@@ -925,7 +930,7 @@ QueryStmt
         | +-AggregateScan
         |   +-column_list=[$aggregate.$agg1_partial#6, $group_by.$uid#7]
         |   +-input_scan=
-        |   | +-TVFScan(column_list=[NullarySelectWithUserId.a#4], tvf=NullarySelectWithUserId(() -> TABLE<a INT64, b INT64>), signature=() -> TABLE<a INT64, b INT64>, column_index_list=[0], function_call_signature=() -> TABLE<a INT64, b INT64>)
+        |   | +-TVFScan(column_list=[NullarySelectWithUserId.a#4], tvf=NullarySelectWithUserId, signature=() -> TABLE<a INT64, b INT64>, column_index_list=[0], function_call_signature=() -> TABLE<a INT64, b INT64>)
         |   +-group_by_list=
         |   | +-$uid#7 := ColumnRef(type=INT64, column=NullarySelectWithUserId.a#4)
         |   +-aggregate_list=
@@ -963,7 +968,7 @@ QueryStmt
       +-AnonymizedAggregateScan
         +-column_list=[$groupby.column_int32#13, $groupby.column_string#14, $aggregate.$agg1#12]
         +-input_scan=
-        | +-TVFScan(column_list=tvf_no_args_with_anonymization_uid.[column_int32#6, column_string#8], tvf=tvf_no_args_with_anonymization_uid(() -> TABLE<column_bool BOOL, column_bytes BYTES, column_date DATE, column_double DOUBLE, column_float FLOAT, column_int32 INT32, column_int64 INT64, column_string STRING, column_time TIME, column_uint32 UINT32, column_uint64 UINT64>), signature=() -> TABLE<column_bool BOOL, column_bytes BYTES, column_date DATE, column_double DOUBLE, column_float FLOAT, column_int32 INT32, column_int64 INT64, column_string STRING, column_time TIME, column_uint32 UINT32, column_uint64 UINT64>, column_index_list=[5, 7], function_call_signature=() -> TABLE<column_bool BOOL, column_bytes BYTES, column_date DATE, column_double DOUBLE, column_float FLOAT, column_int32 INT32, column_int64 INT64, column_string STRING, column_time TIME, column_uint32 UINT32, column_uint64 UINT64>)
+        | +-TVFScan(column_list=tvf_no_args_with_anonymization_uid.[column_int32#6, column_string#8], tvf=tvf_no_args_with_anonymization_uid, signature=() -> TABLE<column_bool BOOL, column_bytes BYTES, column_date DATE, column_double DOUBLE, column_float FLOAT, column_int32 INT32, column_int64 INT64, column_string STRING, column_time TIME, column_uint32 UINT32, column_uint64 UINT64>, column_index_list=[5, 7], function_call_signature=() -> TABLE<column_bool BOOL, column_bytes BYTES, column_date DATE, column_double DOUBLE, column_float FLOAT, column_int32 INT32, column_int64 INT64, column_string STRING, column_time TIME, column_uint32 UINT32, column_uint64 UINT64>)
         +-group_by_list=
         | +-column_int32#13 := ColumnRef(type=INT32, column=tvf_no_args_with_anonymization_uid.column_int32#6)
         | +-column_string#14 := ColumnRef(type=STRING, column=tvf_no_args_with_anonymization_uid.column_string#8)
@@ -986,7 +991,7 @@ QueryStmt
         | +-AggregateScan
         |   +-column_list=[$aggregate.$agg1_partial#17, $groupby.column_int32_partial#18, $groupby.column_string_partial#19, $group_by.$uid#20]
         |   +-input_scan=
-        |   | +-TVFScan(column_list=tvf_no_args_with_anonymization_uid.[column_int32#6, column_int64#15, column_string#8], tvf=tvf_no_args_with_anonymization_uid(() -> TABLE<column_bool BOOL, column_bytes BYTES, column_date DATE, column_double DOUBLE, column_float FLOAT, column_int32 INT32, column_int64 INT64, column_string STRING, column_time TIME, column_uint32 UINT32, column_uint64 UINT64>), signature=() -> TABLE<column_bool BOOL, column_bytes BYTES, column_date DATE, column_double DOUBLE, column_float FLOAT, column_int32 INT32, column_int64 INT64, column_string STRING, column_time TIME, column_uint32 UINT32, column_uint64 UINT64>, column_index_list=[5, 6, 7], function_call_signature=() -> TABLE<column_bool BOOL, column_bytes BYTES, column_date DATE, column_double DOUBLE, column_float FLOAT, column_int32 INT32, column_int64 INT64, column_string STRING, column_time TIME, column_uint32 UINT32, column_uint64 UINT64>)
+        |   | +-TVFScan(column_list=tvf_no_args_with_anonymization_uid.[column_int32#6, column_int64#15, column_string#8], tvf=tvf_no_args_with_anonymization_uid, signature=() -> TABLE<column_bool BOOL, column_bytes BYTES, column_date DATE, column_double DOUBLE, column_float FLOAT, column_int32 INT32, column_int64 INT64, column_string STRING, column_time TIME, column_uint32 UINT32, column_uint64 UINT64>, column_index_list=[5, 6, 7], function_call_signature=() -> TABLE<column_bool BOOL, column_bytes BYTES, column_date DATE, column_double DOUBLE, column_float FLOAT, column_int32 INT32, column_int64 INT64, column_string STRING, column_time TIME, column_uint32 UINT32, column_uint64 UINT64>)
         |   +-group_by_list=
         |   | +-column_int32_partial#18 := ColumnRef(type=INT32, column=tvf_no_args_with_anonymization_uid.column_int32#6)
         |   | +-column_string_partial#19 := ColumnRef(type=STRING, column=tvf_no_args_with_anonymization_uid.column_string#8)
@@ -1024,7 +1029,7 @@ QueryStmt
       +-AnonymizedAggregateScan
         +-column_list=[$aggregate.$agg1#12]
         +-input_scan=
-        | +-TVFScan(column_list=[tvf_no_args_with_anonymization_uid.column_int64#7], tvf=tvf_no_args_with_anonymization_uid(() -> TABLE<column_bool BOOL, column_bytes BYTES, column_date DATE, column_double DOUBLE, column_float FLOAT, column_int32 INT32, column_int64 INT64, column_string STRING, column_time TIME, column_uint32 UINT32, column_uint64 UINT64>), signature=() -> TABLE<column_bool BOOL, column_bytes BYTES, column_date DATE, column_double DOUBLE, column_float FLOAT, column_int32 INT32, column_int64 INT64, column_string STRING, column_time TIME, column_uint32 UINT32, column_uint64 UINT64>, column_index_list=[6], function_call_signature=() -> TABLE<column_bool BOOL, column_bytes BYTES, column_date DATE, column_double DOUBLE, column_float FLOAT, column_int32 INT32, column_int64 INT64, column_string STRING, column_time TIME, column_uint32 UINT32, column_uint64 UINT64>)
+        | +-TVFScan(column_list=[tvf_no_args_with_anonymization_uid.column_int64#7], tvf=tvf_no_args_with_anonymization_uid, signature=() -> TABLE<column_bool BOOL, column_bytes BYTES, column_date DATE, column_double DOUBLE, column_float FLOAT, column_int32 INT32, column_int64 INT64, column_string STRING, column_time TIME, column_uint32 UINT32, column_uint64 UINT64>, column_index_list=[6], function_call_signature=() -> TABLE<column_bool BOOL, column_bytes BYTES, column_date DATE, column_double DOUBLE, column_float FLOAT, column_int32 INT32, column_int64 INT64, column_string STRING, column_time TIME, column_uint32 UINT32, column_uint64 UINT64>)
         +-aggregate_list=
           +-$agg1#12 :=
             +-AggregateFunctionCall(GoogleSQL:anon_sum(INT64, optional(0) INT64, optional(0) INT64) -> INT64)
@@ -1044,7 +1049,7 @@ QueryStmt
         | +-AggregateScan
         |   +-column_list=[$aggregate.$agg1_partial#14, $group_by.$uid#15]
         |   +-input_scan=
-        |   | +-TVFScan(column_list=[tvf_no_args_with_anonymization_uid.column_int64#7], tvf=tvf_no_args_with_anonymization_uid(() -> TABLE<column_bool BOOL, column_bytes BYTES, column_date DATE, column_double DOUBLE, column_float FLOAT, column_int32 INT32, column_int64 INT64, column_string STRING, column_time TIME, column_uint32 UINT32, column_uint64 UINT64>), signature=() -> TABLE<column_bool BOOL, column_bytes BYTES, column_date DATE, column_double DOUBLE, column_float FLOAT, column_int32 INT32, column_int64 INT64, column_string STRING, column_time TIME, column_uint32 UINT32, column_uint64 UINT64>, column_index_list=[6], function_call_signature=() -> TABLE<column_bool BOOL, column_bytes BYTES, column_date DATE, column_double DOUBLE, column_float FLOAT, column_int32 INT32, column_int64 INT64, column_string STRING, column_time TIME, column_uint32 UINT32, column_uint64 UINT64>)
+        |   | +-TVFScan(column_list=[tvf_no_args_with_anonymization_uid.column_int64#7], tvf=tvf_no_args_with_anonymization_uid, signature=() -> TABLE<column_bool BOOL, column_bytes BYTES, column_date DATE, column_double DOUBLE, column_float FLOAT, column_int32 INT32, column_int64 INT64, column_string STRING, column_time TIME, column_uint32 UINT32, column_uint64 UINT64>, column_index_list=[6], function_call_signature=() -> TABLE<column_bool BOOL, column_bytes BYTES, column_date DATE, column_double DOUBLE, column_float FLOAT, column_int32 INT32, column_int64 INT64, column_string STRING, column_time TIME, column_uint32 UINT32, column_uint64 UINT64>)
         |   +-group_by_list=
         |   | +-$uid#15 := ColumnRef(type=INT64, column=tvf_no_args_with_anonymization_uid.column_int64#7)
         |   +-aggregate_list=
@@ -1082,7 +1087,7 @@ QueryStmt
         | +-JoinScan
         |   +-column_list=[tvf_no_args_with_anonymization_uid.column_int64#7, SimpleTypesWithAnonymizationUid.uid#22]
         |   +-left_scan=
-        |   | +-TVFScan(column_list=[tvf_no_args_with_anonymization_uid.column_int64#7], tvf=tvf_no_args_with_anonymization_uid(() -> TABLE<column_bool BOOL, column_bytes BYTES, column_date DATE, column_double DOUBLE, column_float FLOAT, column_int32 INT32, column_int64 INT64, column_string STRING, column_time TIME, column_uint32 UINT32, column_uint64 UINT64>), signature=() -> TABLE<column_bool BOOL, column_bytes BYTES, column_date DATE, column_double DOUBLE, column_float FLOAT, column_int32 INT32, column_int64 INT64, column_string STRING, column_time TIME, column_uint32 UINT32, column_uint64 UINT64>, column_index_list=[6], alias="a", function_call_signature=() -> TABLE<column_bool BOOL, column_bytes BYTES, column_date DATE, column_double DOUBLE, column_float FLOAT, column_int32 INT32, column_int64 INT64, column_string STRING, column_time TIME, column_uint32 UINT32, column_uint64 UINT64>)
+        |   | +-TVFScan(column_list=[tvf_no_args_with_anonymization_uid.column_int64#7], tvf=tvf_no_args_with_anonymization_uid, signature=() -> TABLE<column_bool BOOL, column_bytes BYTES, column_date DATE, column_double DOUBLE, column_float FLOAT, column_int32 INT32, column_int64 INT64, column_string STRING, column_time TIME, column_uint32 UINT32, column_uint64 UINT64>, column_index_list=[6], alias="a", function_call_signature=() -> TABLE<column_bool BOOL, column_bytes BYTES, column_date DATE, column_double DOUBLE, column_float FLOAT, column_int32 INT32, column_int64 INT64, column_string STRING, column_time TIME, column_uint32 UINT32, column_uint64 UINT64>)
         |   +-right_scan=
         |   | +-TableScan(column_list=[SimpleTypesWithAnonymizationUid.uid#22], table=SimpleTypesWithAnonymizationUid, column_index_list=[10], alias="b")
         |   +-join_expr=
@@ -1109,7 +1114,7 @@ QueryStmt
         |   | +-JoinScan
         |   |   +-column_list=[tvf_no_args_with_anonymization_uid.column_int64#7, SimpleTypesWithAnonymizationUid.uid#22]
         |   |   +-left_scan=
-        |   |   | +-TVFScan(column_list=[tvf_no_args_with_anonymization_uid.column_int64#7], tvf=tvf_no_args_with_anonymization_uid(() -> TABLE<column_bool BOOL, column_bytes BYTES, column_date DATE, column_double DOUBLE, column_float FLOAT, column_int32 INT32, column_int64 INT64, column_string STRING, column_time TIME, column_uint32 UINT32, column_uint64 UINT64>), signature=() -> TABLE<column_bool BOOL, column_bytes BYTES, column_date DATE, column_double DOUBLE, column_float FLOAT, column_int32 INT32, column_int64 INT64, column_string STRING, column_time TIME, column_uint32 UINT32, column_uint64 UINT64>, column_index_list=[6], alias="a", function_call_signature=() -> TABLE<column_bool BOOL, column_bytes BYTES, column_date DATE, column_double DOUBLE, column_float FLOAT, column_int32 INT32, column_int64 INT64, column_string STRING, column_time TIME, column_uint32 UINT32, column_uint64 UINT64>)
+        |   |   | +-TVFScan(column_list=[tvf_no_args_with_anonymization_uid.column_int64#7], tvf=tvf_no_args_with_anonymization_uid, signature=() -> TABLE<column_bool BOOL, column_bytes BYTES, column_date DATE, column_double DOUBLE, column_float FLOAT, column_int32 INT32, column_int64 INT64, column_string STRING, column_time TIME, column_uint32 UINT32, column_uint64 UINT64>, column_index_list=[6], alias="a", function_call_signature=() -> TABLE<column_bool BOOL, column_bytes BYTES, column_date DATE, column_double DOUBLE, column_float FLOAT, column_int32 INT32, column_int64 INT64, column_string STRING, column_time TIME, column_uint32 UINT32, column_uint64 UINT64>)
         |   |   +-right_scan=
         |   |   | +-TableScan(column_list=[SimpleTypesWithAnonymizationUid.uid#22], table=SimpleTypesWithAnonymizationUid, column_index_list=[10], alias="b")
         |   |   +-join_expr=
@@ -1155,11 +1160,12 @@ QueryStmt
         | +-JoinScan
         |   +-parse_location=84-94
         |   +-left_scan=
-        |   | +-TVFScan(parse_location=45-79, tvf=tvf_no_args_with_anonymization_uid(() -> TABLE<column_bool BOOL, column_bytes BYTES, column_date DATE, column_double DOUBLE, column_float FLOAT, column_int32 INT32, column_int64 INT64, column_string STRING, column_time TIME, column_uint32 UINT32, column_uint64 UINT64>), signature=() -> TABLE<column_bool BOOL, column_bytes BYTES, column_date DATE, column_double DOUBLE, column_float FLOAT, column_int32 INT32, column_int64 INT64, column_string STRING, column_time TIME, column_uint32 UINT32, column_uint64 UINT64>, alias="a", function_call_signature=() -> TABLE<column_bool BOOL, column_bytes BYTES, column_date DATE, column_double DOUBLE, column_float FLOAT, column_int32 INT32, column_int64 INT64, column_string STRING, column_time TIME, column_uint32 UINT32, column_uint64 UINT64>)
+        |   | +-TVFScan(parse_location=45-79, tvf=tvf_no_args_with_anonymization_uid, signature=() -> TABLE<column_bool BOOL, column_bytes BYTES, column_date DATE, column_double DOUBLE, column_float FLOAT, column_int32 INT32, column_int64 INT64, column_string STRING, column_time TIME, column_uint32 UINT32, column_uint64 UINT64>, alias="a", function_call_signature=() -> TABLE<column_bool BOOL, column_bytes BYTES, column_date DATE, column_double DOUBLE, column_float FLOAT, column_int32 INT32, column_int64 INT64, column_string STRING, column_time TIME, column_uint32 UINT32, column_uint64 UINT64>)
         |   +-right_scan=
         |     +-TableScan(parse_location=95-126, table=SimpleTypesWithAnonymizationUid, alias="b")
         +-aggregate_list=
           +-$agg1#24 := AggregateFunctionCall(GoogleSQL:$anon_count_star(optional(0) INT64, optional(0) INT64) -> INT64)(parse_location=26-36)
+
 [REPLACED_LITERALS]
 select with anonymization anon_count(*)
 from tvf_no_args_with_anonymization_uid() a
@@ -1187,7 +1193,7 @@ QueryStmt
         +-input_scan=
         | +-JoinScan
         |   +-left_scan=
-        |   | +-TVFScan(tvf=tvf_no_args_with_anonymization_uid(() -> TABLE<column_bool BOOL, column_bytes BYTES, column_date DATE, column_double DOUBLE, column_float FLOAT, column_int32 INT32, column_int64 INT64, column_string STRING, column_time TIME, column_uint32 UINT32, column_uint64 UINT64>), signature=() -> TABLE<column_bool BOOL, column_bytes BYTES, column_date DATE, column_double DOUBLE, column_float FLOAT, column_int32 INT32, column_int64 INT64, column_string STRING, column_time TIME, column_uint32 UINT32, column_uint64 UINT64>, alias="a", function_call_signature=() -> TABLE<column_bool BOOL, column_bytes BYTES, column_date DATE, column_double DOUBLE, column_float FLOAT, column_int32 INT32, column_int64 INT64, column_string STRING, column_time TIME, column_uint32 UINT32, column_uint64 UINT64>)
+        |   | +-TVFScan(tvf=tvf_no_args_with_anonymization_uid, signature=() -> TABLE<column_bool BOOL, column_bytes BYTES, column_date DATE, column_double DOUBLE, column_float FLOAT, column_int32 INT32, column_int64 INT64, column_string STRING, column_time TIME, column_uint32 UINT32, column_uint64 UINT64>, alias="a", function_call_signature=() -> TABLE<column_bool BOOL, column_bytes BYTES, column_date DATE, column_double DOUBLE, column_float FLOAT, column_int32 INT32, column_int64 INT64, column_string STRING, column_time TIME, column_uint32 UINT32, column_uint64 UINT64>)
         |   +-right_scan=
         |     +-TableScan(table=SimpleTypes, alias="b")
         +-aggregate_list=
@@ -1210,7 +1216,7 @@ QueryStmt
         |   | +-JoinScan
         |   |   +-column_list=[tvf_no_args_with_anonymization_uid.column_int64#32]
         |   |   +-left_scan=
-        |   |   | +-TVFScan(column_list=[tvf_no_args_with_anonymization_uid.column_int64#32], tvf=tvf_no_args_with_anonymization_uid(() -> TABLE<column_bool BOOL, column_bytes BYTES, column_date DATE, column_double DOUBLE, column_float FLOAT, column_int32 INT32, column_int64 INT64, column_string STRING, column_time TIME, column_uint32 UINT32, column_uint64 UINT64>), signature=() -> TABLE<column_bool BOOL, column_bytes BYTES, column_date DATE, column_double DOUBLE, column_float FLOAT, column_int32 INT32, column_int64 INT64, column_string STRING, column_time TIME, column_uint32 UINT32, column_uint64 UINT64>, column_index_list=[6], alias="a", function_call_signature=() -> TABLE<column_bool BOOL, column_bytes BYTES, column_date DATE, column_double DOUBLE, column_float FLOAT, column_int32 INT32, column_int64 INT64, column_string STRING, column_time TIME, column_uint32 UINT32, column_uint64 UINT64>)
+        |   |   | +-TVFScan(column_list=[tvf_no_args_with_anonymization_uid.column_int64#32], tvf=tvf_no_args_with_anonymization_uid, signature=() -> TABLE<column_bool BOOL, column_bytes BYTES, column_date DATE, column_double DOUBLE, column_float FLOAT, column_int32 INT32, column_int64 INT64, column_string STRING, column_time TIME, column_uint32 UINT32, column_uint64 UINT64>, column_index_list=[6], alias="a", function_call_signature=() -> TABLE<column_bool BOOL, column_bytes BYTES, column_date DATE, column_double DOUBLE, column_float FLOAT, column_int32 INT32, column_int64 INT64, column_string STRING, column_time TIME, column_uint32 UINT32, column_uint64 UINT64>)
         |   |   +-right_scan=
         |   |     +-TableScan(table=SimpleTypes, alias="b")
         |   +-group_by_list=
@@ -1247,7 +1253,7 @@ QueryStmt
         +-input_scan=
         | +-JoinScan
         |   +-left_scan=
-        |   | +-TVFScan(tvf=tvf_no_args(() -> TABLE<column_bool BOOL, column_bytes BYTES>), signature=() -> TABLE<column_bool BOOL, column_bytes BYTES>, alias="a", function_call_signature=() -> TABLE<column_bool BOOL, column_bytes BYTES>)
+        |   | +-TVFScan(tvf=tvf_no_args, signature=() -> TABLE<column_bool BOOL, column_bytes BYTES>, alias="a", function_call_signature=() -> TABLE<column_bool BOOL, column_bytes BYTES>)
         |   +-right_scan=
         |     +-TableScan(table=SimpleTypesWithAnonymizationUid, alias="b")
         +-aggregate_list=
@@ -1270,7 +1276,7 @@ QueryStmt
         |   | +-JoinScan
         |   |   +-column_list=[SimpleTypesWithAnonymizationUid.uid#16]
         |   |   +-left_scan=
-        |   |   | +-TVFScan(tvf=tvf_no_args(() -> TABLE<column_bool BOOL, column_bytes BYTES>), signature=() -> TABLE<column_bool BOOL, column_bytes BYTES>, alias="a", function_call_signature=() -> TABLE<column_bool BOOL, column_bytes BYTES>)
+        |   |   | +-TVFScan(tvf=tvf_no_args, signature=() -> TABLE<column_bool BOOL, column_bytes BYTES>, alias="a", function_call_signature=() -> TABLE<column_bool BOOL, column_bytes BYTES>)
         |   |   +-right_scan=
         |   |     +-TableScan(column_list=[SimpleTypesWithAnonymizationUid.uid#16], table=SimpleTypesWithAnonymizationUid, column_index_list=[10], alias="b")
         |   +-group_by_list=
@@ -1307,9 +1313,10 @@ QueryStmt
       +-AnonymizedAggregateScan
         +-column_list=[$aggregate.$agg1#2]
         +-input_scan=
-        | +-TVFScan(parse_location=45-86, tvf=tvf_no_args_with_nested_anonymization_uid(() -> TABLE<user_info PROTO<googlesql_test.TestExtraPB>>), signature=() -> TABLE<user_info PROTO<googlesql_test.TestExtraPB>>, function_call_signature=() -> TABLE<user_info PROTO<googlesql_test.TestExtraPB>>)
+        | +-TVFScan(parse_location=45-86, tvf=tvf_no_args_with_nested_anonymization_uid, signature=() -> TABLE<user_info PROTO<googlesql_test.TestExtraPB>>, function_call_signature=() -> TABLE<user_info PROTO<googlesql_test.TestExtraPB>>)
         +-aggregate_list=
           +-$agg1#2 := AggregateFunctionCall(GoogleSQL:$anon_count_star(optional(0) INT64, optional(0) INT64) -> INT64)(parse_location=26-36)
+
 [REPLACED_LITERALS]
 select with anonymization anon_count(*)
 from tvf_no_args_with_nested_anonymization_uid();
@@ -1333,7 +1340,7 @@ QueryStmt
       +-AnonymizedAggregateScan
         +-column_list=[$aggregate.$agg1#2]
         +-input_scan=
-        | +-TVFScan(tvf=tvf_no_args_value_table_with_anonymization_uid(() -> TABLE<PROTO<googlesql_test.TestExtraPB>>), signature=() -> TABLE<PROTO<googlesql_test.TestExtraPB>>, function_call_signature=() -> TABLE<PROTO<googlesql_test.TestExtraPB>>)
+        | +-TVFScan(tvf=tvf_no_args_value_table_with_anonymization_uid, signature=() -> TABLE<PROTO<googlesql_test.TestExtraPB>>, function_call_signature=() -> TABLE<PROTO<googlesql_test.TestExtraPB>>)
         +-aggregate_list=
           +-$agg1#2 := AggregateFunctionCall(GoogleSQL:$anon_count_star(optional(0) INT64, optional(0) INT64) -> INT64)
 
@@ -1362,7 +1369,7 @@ QueryStmt
         |   |   |     +-field_descriptor=int32_val1
         |   |   |     +-default_value=0
         |   |   +-input_scan=
-        |   |     +-TVFScan(column_list=[tvf_no_args_value_table_with_anonymization_uid.$value#3], tvf=tvf_no_args_value_table_with_anonymization_uid(() -> TABLE<PROTO<googlesql_test.TestExtraPB>>), signature=() -> TABLE<PROTO<googlesql_test.TestExtraPB>>, column_index_list=[0], function_call_signature=() -> TABLE<PROTO<googlesql_test.TestExtraPB>>)
+        |   |     +-TVFScan(column_list=[tvf_no_args_value_table_with_anonymization_uid.$value#3], tvf=tvf_no_args_value_table_with_anonymization_uid, signature=() -> TABLE<PROTO<googlesql_test.TestExtraPB>>, column_index_list=[0], function_call_signature=() -> TABLE<PROTO<googlesql_test.TestExtraPB>>)
         |   +-group_by_list=
         |   | +-$uid#7 := ColumnRef(type=INT32, column=$project.$int32_val1#4)
         |   +-aggregate_list=
@@ -1394,7 +1401,7 @@ QueryStmt
       +-AnonymizedAggregateScan
         +-column_list=[$aggregate.$agg1#2]
         +-input_scan=
-        | +-TVFScan(tvf=tvf_no_args_value_table_with_nested_anonymization_uid(() -> TABLE<PROTO<googlesql_test.KitchenSinkPB>>), signature=() -> TABLE<PROTO<googlesql_test.KitchenSinkPB>>, function_call_signature=() -> TABLE<PROTO<googlesql_test.KitchenSinkPB>>)
+        | +-TVFScan(tvf=tvf_no_args_value_table_with_nested_anonymization_uid, signature=() -> TABLE<PROTO<googlesql_test.KitchenSinkPB>>, function_call_signature=() -> TABLE<PROTO<googlesql_test.KitchenSinkPB>>)
         +-aggregate_list=
           +-$agg1#2 := AggregateFunctionCall(GoogleSQL:$anon_count_star(optional(0) INT64, optional(0) INT64) -> INT64)
 
@@ -1428,7 +1435,7 @@ QueryStmt
         |   |   |     +-field_descriptor=nested_int64
         |   |   |     +-default_value=88
         |   |   +-input_scan=
-        |   |     +-TVFScan(column_list=[tvf_no_args_value_table_with_nested_anonymization_uid.$value#3], tvf=tvf_no_args_value_table_with_nested_anonymization_uid(() -> TABLE<PROTO<googlesql_test.KitchenSinkPB>>), signature=() -> TABLE<PROTO<googlesql_test.KitchenSinkPB>>, column_index_list=[0], function_call_signature=() -> TABLE<PROTO<googlesql_test.KitchenSinkPB>>)
+        |   |     +-TVFScan(column_list=[tvf_no_args_value_table_with_nested_anonymization_uid.$value#3], tvf=tvf_no_args_value_table_with_nested_anonymization_uid, signature=() -> TABLE<PROTO<googlesql_test.KitchenSinkPB>>, column_index_list=[0], function_call_signature=() -> TABLE<PROTO<googlesql_test.KitchenSinkPB>>)
         |   +-group_by_list=
         |   | +-$uid#8 := ColumnRef(type=INT64, column=$project.$nested_int64#5)
         |   +-aggregate_list=
@@ -1464,7 +1471,7 @@ QueryStmt
       +-AnonymizedAggregateScan
         +-column_list=$aggregate.[$agg1#2, $agg2#3, $agg3#4]
         +-input_scan=
-        | +-TVFScan(column_list=[tvf_no_args_value_table_with_nested_anonymization_uid.$col0#1], tvf=tvf_no_args_value_table_with_nested_anonymization_uid(() -> TABLE<PROTO<googlesql_test.KitchenSinkPB>>), signature=() -> TABLE<PROTO<googlesql_test.KitchenSinkPB>>, column_index_list=[0], function_call_signature=() -> TABLE<PROTO<googlesql_test.KitchenSinkPB>>)
+        | +-TVFScan(column_list=[tvf_no_args_value_table_with_nested_anonymization_uid.$col0#1], tvf=tvf_no_args_value_table_with_nested_anonymization_uid, signature=() -> TABLE<PROTO<googlesql_test.KitchenSinkPB>>, column_index_list=[0], function_call_signature=() -> TABLE<PROTO<googlesql_test.KitchenSinkPB>>)
         +-aggregate_list=
           +-$agg1#2 :=
           | +-AggregateFunctionCall(GoogleSQL:anon_sum(INT64, optional(0) INT64, optional(0) INT64) -> INT64)
@@ -1535,7 +1542,7 @@ QueryStmt
         |   |   |     +-field_descriptor=nested_int64
         |   |   |     +-default_value=88
         |   |   +-input_scan=
-        |   |     +-TVFScan(column_list=[tvf_no_args_value_table_with_nested_anonymization_uid.$col0#1], tvf=tvf_no_args_value_table_with_nested_anonymization_uid(() -> TABLE<PROTO<googlesql_test.KitchenSinkPB>>), signature=() -> TABLE<PROTO<googlesql_test.KitchenSinkPB>>, column_index_list=[0], function_call_signature=() -> TABLE<PROTO<googlesql_test.KitchenSinkPB>>)
+        |   |     +-TVFScan(column_list=[tvf_no_args_value_table_with_nested_anonymization_uid.$col0#1], tvf=tvf_no_args_value_table_with_nested_anonymization_uid, signature=() -> TABLE<PROTO<googlesql_test.KitchenSinkPB>>, column_index_list=[0], function_call_signature=() -> TABLE<PROTO<googlesql_test.KitchenSinkPB>>)
         |   +-group_by_list=
         |   | +-$uid#13 := ColumnRef(type=INT64, column=$project.$nested_int64#6)
         |   +-aggregate_list=
@@ -1616,7 +1623,7 @@ QueryStmt
         |     +-AggregateScan
         |       +-column_list=[$groupby.int32_val1#3, $aggregate.$agg1#2]
         |       +-input_scan=
-        |       | +-TVFScan(column_list=[tvf_no_args_value_table_with_anonymization_uid.$col0#1], tvf=tvf_no_args_value_table_with_anonymization_uid(() -> TABLE<PROTO<googlesql_test.TestExtraPB>>), signature=() -> TABLE<PROTO<googlesql_test.TestExtraPB>>, column_index_list=[0], function_call_signature=() -> TABLE<PROTO<googlesql_test.TestExtraPB>>)
+        |       | +-TVFScan(column_list=[tvf_no_args_value_table_with_anonymization_uid.$col0#1], tvf=tvf_no_args_value_table_with_anonymization_uid, signature=() -> TABLE<PROTO<googlesql_test.TestExtraPB>>, column_index_list=[0], function_call_signature=() -> TABLE<PROTO<googlesql_test.TestExtraPB>>)
         |       +-group_by_list=
         |       | +-int32_val1#3 :=
         |       |   +-GetProtoField
@@ -1661,7 +1668,7 @@ QueryStmt
         |   |       |   |     +-field_descriptor=int32_val1
         |   |       |   |     +-default_value=0
         |   |       |   +-input_scan=
-        |   |       |     +-TVFScan(column_list=[tvf_no_args_value_table_with_anonymization_uid.$col0#1], tvf=tvf_no_args_value_table_with_anonymization_uid(() -> TABLE<PROTO<googlesql_test.TestExtraPB>>), signature=() -> TABLE<PROTO<googlesql_test.TestExtraPB>>, column_index_list=[0], function_call_signature=() -> TABLE<PROTO<googlesql_test.TestExtraPB>>)
+        |   |       |     +-TVFScan(column_list=[tvf_no_args_value_table_with_anonymization_uid.$col0#1], tvf=tvf_no_args_value_table_with_anonymization_uid, signature=() -> TABLE<PROTO<googlesql_test.TestExtraPB>>, column_index_list=[0], function_call_signature=() -> TABLE<PROTO<googlesql_test.TestExtraPB>>)
         |   |       +-group_by_list=
         |   |       | +-int32_val1#3 := ColumnRef(type=INT32, column=$project.$int32_val1#5)
         |   |       +-aggregate_list=
@@ -1717,7 +1724,7 @@ QueryStmt
         |       |   |     +-field_descriptor=int32_val1
         |       |   |     +-default_value=0
         |       |   +-input_scan=
-        |       |     +-TVFScan(column_list=[tvf_no_args_value_table_with_anonymization_uid.$col0#1], tvf=tvf_no_args_value_table_with_anonymization_uid(() -> TABLE<PROTO<googlesql_test.TestExtraPB>>), signature=() -> TABLE<PROTO<googlesql_test.TestExtraPB>>, column_index_list=[0], function_call_signature=() -> TABLE<PROTO<googlesql_test.TestExtraPB>>)
+        |       |     +-TVFScan(column_list=[tvf_no_args_value_table_with_anonymization_uid.$col0#1], tvf=tvf_no_args_value_table_with_anonymization_uid, signature=() -> TABLE<PROTO<googlesql_test.TestExtraPB>>, column_index_list=[0], function_call_signature=() -> TABLE<PROTO<googlesql_test.TestExtraPB>>)
         |       +-group_by_list=
         |       | +-int32_val1#4 := ColumnRef(type=INT32, column=$subquery2.int32_val1#2)
         |       +-aggregate_list=
@@ -1761,7 +1768,7 @@ QueryStmt
         |   |       |       |     +-field_descriptor=int32_val1
         |   |       |       |     +-default_value=0
         |   |       |       +-input_scan=
-        |   |       |         +-TVFScan(column_list=[tvf_no_args_value_table_with_anonymization_uid.$col0#1], tvf=tvf_no_args_value_table_with_anonymization_uid(() -> TABLE<PROTO<googlesql_test.TestExtraPB>>), signature=() -> TABLE<PROTO<googlesql_test.TestExtraPB>>, column_index_list=[0], function_call_signature=() -> TABLE<PROTO<googlesql_test.TestExtraPB>>)
+        |   |       |         +-TVFScan(column_list=[tvf_no_args_value_table_with_anonymization_uid.$col0#1], tvf=tvf_no_args_value_table_with_anonymization_uid, signature=() -> TABLE<PROTO<googlesql_test.TestExtraPB>>, column_index_list=[0], function_call_signature=() -> TABLE<PROTO<googlesql_test.TestExtraPB>>)
         |   |       +-group_by_list=
         |   |       | +-int32_val1#4 := ColumnRef(type=INT32, column=$subquery2.int32_val1#2)
         |   |       +-aggregate_list=
@@ -1805,7 +1812,7 @@ QueryStmt
         |     +-AggregateScan
         |       +-column_list=[$groupby.nested_int64#3, $aggregate.$agg1#2]
         |       +-input_scan=
-        |       | +-TVFScan(column_list=[tvf_no_args_value_table_with_nested_anonymization_uid.$col0#1], tvf=tvf_no_args_value_table_with_nested_anonymization_uid(() -> TABLE<PROTO<googlesql_test.KitchenSinkPB>>), signature=() -> TABLE<PROTO<googlesql_test.KitchenSinkPB>>, column_index_list=[0], function_call_signature=() -> TABLE<PROTO<googlesql_test.KitchenSinkPB>>)
+        |       | +-TVFScan(column_list=[tvf_no_args_value_table_with_nested_anonymization_uid.$col0#1], tvf=tvf_no_args_value_table_with_nested_anonymization_uid, signature=() -> TABLE<PROTO<googlesql_test.KitchenSinkPB>>, column_index_list=[0], function_call_signature=() -> TABLE<PROTO<googlesql_test.KitchenSinkPB>>)
         |       +-group_by_list=
         |       | +-nested_int64#3 :=
         |       |   +-GetProtoField
@@ -1860,7 +1867,7 @@ QueryStmt
         |   |       |   |     +-field_descriptor=nested_int64
         |   |       |   |     +-default_value=88
         |   |       |   +-input_scan=
-        |   |       |     +-TVFScan(column_list=[tvf_no_args_value_table_with_nested_anonymization_uid.$col0#1], tvf=tvf_no_args_value_table_with_nested_anonymization_uid(() -> TABLE<PROTO<googlesql_test.KitchenSinkPB>>), signature=() -> TABLE<PROTO<googlesql_test.KitchenSinkPB>>, column_index_list=[0], function_call_signature=() -> TABLE<PROTO<googlesql_test.KitchenSinkPB>>)
+        |   |       |     +-TVFScan(column_list=[tvf_no_args_value_table_with_nested_anonymization_uid.$col0#1], tvf=tvf_no_args_value_table_with_nested_anonymization_uid, signature=() -> TABLE<PROTO<googlesql_test.KitchenSinkPB>>, column_index_list=[0], function_call_signature=() -> TABLE<PROTO<googlesql_test.KitchenSinkPB>>)
         |   |       +-group_by_list=
         |   |       | +-nested_int64#3 := ColumnRef(type=INT64, column=$project.$nested_int64#6)
         |   |       +-aggregate_list=
@@ -1904,7 +1911,7 @@ QueryStmt
         |     +-AggregateScan
         |       +-column_list=[$aggregate.$agg1#2]
         |       +-input_scan=
-        |       | +-TVFScan(tvf=tvf_no_args_value_table_with_anonymization_uid(() -> TABLE<PROTO<googlesql_test.TestExtraPB>>), signature=() -> TABLE<PROTO<googlesql_test.TestExtraPB>>, alias="t", function_call_signature=() -> TABLE<PROTO<googlesql_test.TestExtraPB>>)
+        |       | +-TVFScan(tvf=tvf_no_args_value_table_with_anonymization_uid, signature=() -> TABLE<PROTO<googlesql_test.TestExtraPB>>, alias="t", function_call_signature=() -> TABLE<PROTO<googlesql_test.TestExtraPB>>)
         |       +-aggregate_list=
         |         +-$agg1#2 := AggregateFunctionCall(GoogleSQL:$count_star() -> INT64)
         +-aggregate_list=
@@ -1935,7 +1942,7 @@ QueryStmt
         |     +-AggregateScan
         |       +-column_list=[$aggregate.$agg1#2]
         |       +-input_scan=
-        |       | +-TVFScan(tvf=tvf_no_args_value_table_with_nested_anonymization_uid(() -> TABLE<PROTO<googlesql_test.KitchenSinkPB>>), signature=() -> TABLE<PROTO<googlesql_test.KitchenSinkPB>>, alias="t", function_call_signature=() -> TABLE<PROTO<googlesql_test.KitchenSinkPB>>)
+        |       | +-TVFScan(tvf=tvf_no_args_value_table_with_nested_anonymization_uid, signature=() -> TABLE<PROTO<googlesql_test.KitchenSinkPB>>, alias="t", function_call_signature=() -> TABLE<PROTO<googlesql_test.KitchenSinkPB>>)
         |       +-aggregate_list=
         |         +-$agg1#2 := AggregateFunctionCall(GoogleSQL:$count_star() -> INT64)
         +-aggregate_list=
@@ -1961,7 +1968,7 @@ QueryStmt
       +-AnonymizedAggregateScan
         +-column_list=[$aggregate.$agg1#2]
         +-input_scan=
-        | +-TVFScan(tvf=tvf_no_args_value_table_with_invalid_nested_anonymization_uid(() -> TABLE<PROTO<googlesql_test.KitchenSinkPB>>), signature=() -> TABLE<PROTO<googlesql_test.KitchenSinkPB>>, function_call_signature=() -> TABLE<PROTO<googlesql_test.KitchenSinkPB>>)
+        | +-TVFScan(tvf=tvf_no_args_value_table_with_invalid_nested_anonymization_uid, signature=() -> TABLE<PROTO<googlesql_test.KitchenSinkPB>>, function_call_signature=() -> TABLE<PROTO<googlesql_test.KitchenSinkPB>>)
         +-aggregate_list=
           +-$agg1#2 := AggregateFunctionCall(GoogleSQL:$anon_count_star(optional(0) INT64, optional(0) INT64) -> INT64)
 
@@ -1991,7 +1998,7 @@ QueryStmt
         +-input_scan=
         | +-TVFScan
         |   +-parse_location=69-113
-        |   +-tvf=tvf_one_templated_arg_with_anonymization_uid((ANY TYPE) -> TABLE<column_bool BOOL, column_bytes BYTES, column_date DATE, column_double DOUBLE, column_float FLOAT, column_int32 INT32, column_int64 INT64, column_string STRING, column_time TIME, column_uint32 UINT32, column_uint64 UINT64>)
+        |   +-tvf=tvf_one_templated_arg_with_anonymization_uid
         |   +-signature=(BOOL) -> TABLE<column_bool BOOL, column_bytes BYTES, column_date DATE, column_double DOUBLE, column_float FLOAT, column_int32 INT32, column_int64 INT64, column_string STRING, column_time TIME, column_uint32 UINT32, column_uint64 UINT64>
         |   +-argument_list=
         |   | +-FunctionArgument
@@ -2015,6 +2022,7 @@ QueryStmt
               +-parse_location=26-36
               +-Literal(parse_location=55-56, type=INT64, value=0)
               +-Literal(parse_location=61-62, type=INT64, value=1)
+
 [REPLACED_LITERALS]
 select with anonymization anon_count(* clamped between @_p0_INT64 and @_p1_INT64)
 from tvf_one_templated_arg_with_anonymization_uid(
@@ -2038,7 +2046,7 @@ QueryStmt
         |   | +-TVFScan
         |   |   +-parse_location=69-113
         |   |   +-column_list=[tvf_one_templated_arg_with_anonymization_uid.column_int64#14]
-        |   |   +-tvf=tvf_one_templated_arg_with_anonymization_uid((ANY TYPE) -> TABLE<column_bool BOOL, column_bytes BYTES, column_date DATE, column_double DOUBLE, column_float FLOAT, column_int32 INT32, column_int64 INT64, column_string STRING, column_time TIME, column_uint32 UINT32, column_uint64 UINT64>)
+        |   |   +-tvf=tvf_one_templated_arg_with_anonymization_uid
         |   |   +-signature=(BOOL) -> TABLE<column_bool BOOL, column_bytes BYTES, column_date DATE, column_double DOUBLE, column_float FLOAT, column_int32 INT32, column_int64 INT64, column_string STRING, column_time TIME, column_uint32 UINT32, column_uint64 UINT64>
         |   |   +-argument_list=
         |   |   | +-FunctionArgument

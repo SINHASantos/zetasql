@@ -46,6 +46,7 @@
 #include "googlesql/scripting/script_segment.h"
 #include "googlesql/scripting/stack_frame.h"
 #include "googlesql/scripting/type_aliases.h"
+#include "absl/base/no_destructor.h"
 #include "absl/container/flat_hash_map.h"
 #include "absl/container/flat_hash_set.h"
 #include "absl/status/status.h"
@@ -105,22 +106,38 @@ class ScriptExecutorImpl : public ScriptExecutor {
       AnalyzerOptions& analyzer_options) const override;
   const std::optional<std::variant<ParameterValueList, ParameterValueMap>>&
   GetCurrentParameterValues() const override {
+    if (callstack_.empty()) {
+      static const absl::NoDestructor<
+          std::optional<std::variant<ParameterValueList, ParameterValueMap>>>
+          null_result;
+      return *null_result;
+    }
     return callstack_.back().parameters();
   }
   absl::Status UpdateAnalyzerOptionParameters(AnalyzerOptions* options) const;
 
   const VariableMap& GetCurrentVariables() const override {
+    if (callstack_.empty()) {
+      static const absl::NoDestructor<VariableMap> empty_variables;
+      return *empty_variables;
+    }
     return callstack_.back().variables();
   }
   const VariableTypeParametersMap& GetCurrentVariableTypeParameters()
       const override {
+    if (callstack_.empty()) {
+      static const absl::NoDestructor<VariableTypeParametersMap> empty_map;
+      return *empty_map;
+    }
     return callstack_.back().variable_type_params();
   }
   ParsedScript::StringSet GetCurrentNamedParameters() const {
+    if (callstack_.empty()) return {};
     return callstack_.back().parsed_script()->GetNamedParameters(
         callstack_.back().parsed_script()->script()->location());
   }
   PositionalParameterRange GetCurrentPositionalParameters() const {
+    if (callstack_.empty()) return {0, 0};
     return callstack_.back().parsed_script()->GetPositionalParameters(
         callstack_.back().parsed_script()->script()->location());
   }
@@ -265,6 +282,7 @@ class ScriptExecutorImpl : public ScriptExecutor {
   ScriptExecutorImpl& operator=(const ScriptExecutorImpl&) = delete;
 
   absl::Status ExecuteNextImpl();
+  absl::Status SetStateInternal(const ScriptExecutorStateProto& state);
 
   // Evaluates the given expression as a condition.
   //
@@ -692,6 +710,8 @@ class ScriptExecutorImpl : public ScriptExecutor {
   // If true, the script has executed a RETURN statement from the main script
   // body.
   bool returned_from_script_ = false;
+
+  std::string script_text_;
 };
 
 }  // namespace googlesql

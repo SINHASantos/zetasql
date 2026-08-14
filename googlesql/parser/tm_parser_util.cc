@@ -28,10 +28,12 @@
 #include "googlesql/public/parse_location.h"
 #include "absl/base/no_destructor.h"
 #include "absl/status/status.h"
+#include "absl/status/statusor.h"
 #include "absl/strings/ascii.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
 #include "absl/strings/substitute.h"
+#include "absl/types/span.h"
 #include "googlesql/base/ret_check.h"
 
 namespace googlesql {
@@ -74,6 +76,36 @@ absl::Status ErrorIfUnparenthesizedNotExpression(ASTNode* rhs_expr) {
            << "Syntax error: Unexpected keyword NOT";
   }
   return absl::OkStatus();
+}
+
+absl::StatusOr<TVFDeclarationOptions> ProcessTVFDeclarationOptions(
+    absl::Span<ASTNode* const> nodes) {
+  TVFDeclarationOptions result;
+  for (ASTNode* node : nodes) {
+    if (node->Is<ASTIdentifier>()) {
+      if (result.language != nullptr) {
+        return MakeSyntaxError(node->location(),
+                               "Syntax error: Duplicate LANGUAGE clause");
+      }
+      result.language = node->GetAsOrDie<ASTIdentifier>();
+    } else if (node->Is<ASTWithConnectionClause>()) {
+      if (result.connection != nullptr) {
+        return MakeSyntaxError(
+            node->location(), "Syntax error: Duplicate WITH CONNECTION clause");
+      }
+      result.connection = node->GetAsOrDie<ASTWithConnectionClause>();
+    } else if (node->Is<ASTOptionsList>()) {
+      if (result.options != nullptr) {
+        return MakeSyntaxError(node->location(),
+                               "Syntax error: Duplicate OPTIONS clause");
+      }
+      result.options = node->GetAsOrDie<ASTOptionsList>();
+    } else {
+      GOOGLESQL_RET_CHECK_FAIL() << "Unexpected node type in TVF declaration options: "
+                       << node->GetNodeKindString();
+    }
+  }
+  return result;
 }
 
 const auto& GetWarningKeywords() {

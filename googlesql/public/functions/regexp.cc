@@ -45,6 +45,7 @@
 #include "absl/status/status.h"
 #include "googlesql/base/status_macros.h"
 #include "absl/status/statusor.h"
+#include "absl/strings/escaping.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
 #include "absl/strings/substitute.h"
@@ -56,6 +57,24 @@
 
 namespace googlesql {
 namespace functions {
+
+namespace {
+
+// Truncates and escapes an error string before it is embedded into an error
+// message.
+std::string TruncateErrorText(absl::string_view text) {
+  // Real regexp patterns are typically far smaller than this; the cap keeps
+  // enough context to be useful for debugging while bounding the resulting
+  // message size.
+  static constexpr size_t kMaxErrorTextBytes = 1024;
+  if (text.length() > kMaxErrorTextBytes) {
+    return absl::StrCat(absl::CEscape(text.substr(0, kMaxErrorTextBytes)),
+                        "...");
+  }
+  return absl::CEscape(text);
+}
+
+}  // namespace
 
 bool RegExp::InitializePatternUtf8(absl::string_view pattern,
                                    absl::Status* error) {
@@ -588,8 +607,8 @@ absl::StatusOr<std::unique_ptr<const RegExp>> MakeRegExpWithOptions(
     absl::string_view pattern, const RE2::Options& options) {
   auto re = std::make_unique<const RE2>(pattern, options);
   if (!re->ok()) {
-    return internal::CreateFunctionError(
-        absl::StrCat("Cannot parse regular expression: ", re->error()));
+    return internal::CreateFunctionError(absl::StrCat(
+        "Cannot parse regular expression: ", TruncateErrorText(re->error())));
   }
   return absl::WrapUnique(new RegExp(std::move(re)));
 }

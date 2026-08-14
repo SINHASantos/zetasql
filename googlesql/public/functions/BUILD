@@ -228,6 +228,7 @@ cc_test(
         "//googlesql/public:value",
         "//googlesql/testing:test_function",
         "@com_google_absl//absl/flags:flag",
+        "@com_google_absl//absl/status",
         "@com_google_absl//absl/strings",
     ],
 )
@@ -420,10 +421,14 @@ cc_test(
 
 cc_library(
     name = "bitcast",
+    srcs = ["bitcast.cc"],
     hdrs = ["bitcast.h"],
     deps = [
-        "//googlesql/base:status",
+        ":endianness_cc_proto",
+        "//googlesql/base:endian",
         "@com_google_absl//absl/base",
+        "@com_google_absl//absl/status",
+        "@com_google_absl//absl/strings",
     ],
 )
 
@@ -433,8 +438,11 @@ cc_test(
     srcs = ["bitcast_test.cc"],
     deps = [
         ":bitcast",
-        "//googlesql/base:status",
+        ":endianness_cc_proto",
         "//googlesql/base/testing:googlesql_gtest_main",
+        "@com_google_absl//absl/base",
+        "@com_google_absl//absl/status",
+        "@com_google_absl//absl/strings:string_view",
     ],
 )
 
@@ -849,6 +857,7 @@ cc_test(
         "//googlesql/testing:test_function",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/status:statusor",
+        "@com_google_absl//absl/strings",
         "@com_google_absl//absl/strings:string_view",
         "@com_googlesource_code_re2//:re2",
     ],
@@ -882,6 +891,24 @@ cc_proto_library(
 java_proto_library(
     name = "normalize_mode_java_proto",
     deps = [":normalize_mode_proto"],
+)
+
+proto_library(
+    name = "endianness_proto",
+    srcs = ["endianness.proto"],
+    deps = [
+        "//googlesql/public:type_proto",
+    ],
+)
+
+cc_proto_library(
+    name = "endianness_cc_proto",
+    deps = ["endianness_proto"],
+)
+
+java_proto_library(
+    name = "endianness_java_proto",
+    deps = [":endianness_proto"],
 )
 
 proto_library(

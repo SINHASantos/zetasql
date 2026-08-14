@@ -240,7 +240,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=tvf_named_required_scalar_args.[column_bool#1, column_bytes#2]
-        +-tvf=tvf_named_required_scalar_args((STRING format_string, STRING date_string) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+        +-tvf=tvf_named_required_scalar_args
         +-signature=(literal STRING, literal STRING) -> TABLE<column_bool BOOL, column_bytes BYTES>
         +-argument_list=
         | +-FunctionArgument
@@ -267,7 +267,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=tvf_named_optional_scalar_args.[column_bool#1, column_bytes#2]
-        +-tvf=tvf_named_optional_scalar_args((optional STRING format_string, optional STRING date_string) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+        +-tvf=tvf_named_optional_scalar_args
         +-signature=(literal STRING, literal STRING) -> TABLE<column_bool BOOL, column_bytes BYTES>
         +-argument_list=
         | +-FunctionArgument
@@ -294,7 +294,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=tvf_named_optional_scalar_args.[column_bool#1, column_bytes#2]
-        +-tvf=tvf_named_optional_scalar_args((optional STRING format_string, optional STRING date_string) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+        +-tvf=tvf_named_optional_scalar_args
         +-signature=(literal STRING, null STRING) -> TABLE<column_bool BOOL, column_bytes BYTES>
         +-argument_list=
         | +-FunctionArgument
@@ -321,7 +321,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=tvf_named_optional_scalar_args.[column_bool#1, column_bytes#2]
-        +-tvf=tvf_named_optional_scalar_args((optional STRING format_string, optional STRING date_string) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+        +-tvf=tvf_named_optional_scalar_args
         +-signature=(null STRING, literal STRING) -> TABLE<column_bool BOOL, column_bytes BYTES>
         +-argument_list=
         | +-FunctionArgument
@@ -349,7 +349,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=tvf_named_optional_any_relation_arg.[column_bool#2, column_bytes#3]
-        +-tvf=tvf_named_optional_any_relation_arg((optional ANY TABLE any_relation_arg) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+        +-tvf=tvf_named_optional_any_relation_arg
         +-signature=(TABLE<x INT64>) -> TABLE<column_bool BOOL, column_bytes BYTES>
         +-argument_list=
         | +-FunctionArgument
@@ -391,7 +391,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=tvf_named_optional_any_relation_arg.[column_bool#3, column_bytes#4]
-        +-tvf=tvf_named_optional_any_relation_arg((optional ANY TABLE any_relation_arg) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+        +-tvf=tvf_named_optional_any_relation_arg
         +-signature=(TABLE<Key INT64, Value STRING>) -> TABLE<column_bool BOOL, column_bytes BYTES>
         +-argument_list=
         | +-FunctionArgument
@@ -417,7 +417,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=tvf_named_optional_any_relation_arg.[column_bool#5, column_bytes#6]
-        +-tvf=tvf_named_optional_any_relation_arg((optional ANY TABLE any_relation_arg) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+        +-tvf=tvf_named_optional_any_relation_arg
         +-signature=(TABLE<column_bool BOOL, column_bytes BYTES>) -> TABLE<column_bool BOOL, column_bytes BYTES>
         +-argument_list=
         | +-FunctionArgument
@@ -425,7 +425,7 @@ QueryStmt
         |   | +-TVFScan
         |   |   +-column_list=tvf_named_optional_any_relation_arg.[column_bool#3, column_bytes#4]
         |   |   +-node_source="table_clause"
-        |   |   +-tvf=tvf_named_optional_any_relation_arg((optional ANY TABLE any_relation_arg) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+        |   |   +-tvf=tvf_named_optional_any_relation_arg
         |   |   +-signature=(TABLE<Key INT64, Value STRING>) -> TABLE<column_bool BOOL, column_bytes BYTES>
         |   |   +-argument_list=
         |   |   | +-FunctionArgument
@@ -469,7 +469,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=tvf_named_optional_any_relation_arg_optional_scalar_arg.[column_bool#2, column_bytes#3]
-        +-tvf=tvf_named_optional_any_relation_arg_optional_scalar_arg((optional ANY TABLE any_relation_arg, optional STRING format_string) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+        +-tvf=tvf_named_optional_any_relation_arg_optional_scalar_arg
         +-signature=(TABLE<x INT64>, literal STRING) -> TABLE<column_bool BOOL, column_bytes BYTES>
         +-argument_list=
         | +-FunctionArgument
@@ -505,7 +505,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=tvf_named_optional_any_relation_arg_optional_scalar_arg.[column_bool#1, column_bytes#2]
-        +-tvf=tvf_named_optional_any_relation_arg_optional_scalar_arg((optional ANY TABLE any_relation_arg, optional STRING format_string) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+        +-tvf=tvf_named_optional_any_relation_arg_optional_scalar_arg
         +-signature=(TABLE<>, literal STRING) -> TABLE<column_bool BOOL, column_bytes BYTES>
         +-argument_list=
         | +-FunctionArgument
@@ -554,7 +554,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=tvf_named_optional_any_relation_arg_optional_scalar_arg.[column_bool#2, column_bytes#3]
-        +-tvf=tvf_named_optional_any_relation_arg_optional_scalar_arg((optional ANY TABLE any_relation_arg, optional STRING format_string) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+        +-tvf=tvf_named_optional_any_relation_arg_optional_scalar_arg
         +-signature=(TABLE<x INT64>, null STRING) -> TABLE<column_bool BOOL, column_bytes BYTES>
         +-argument_list=
         | +-FunctionArgument
@@ -587,7 +587,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=tvf_named_required_any_relation_arg.[column_bool#3, column_bytes#4]
-        +-tvf=tvf_named_required_any_relation_arg((ANY TABLE any_relation_arg) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+        +-tvf=tvf_named_required_any_relation_arg
         +-signature=(TABLE<Key INT64, Value STRING>) -> TABLE<column_bool BOOL, column_bytes BYTES>
         +-argument_list=
         | +-FunctionArgument
@@ -616,7 +616,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=tvf_named_required_schema_relation_arg.[column_bool#3, column_bytes#4]
-        +-tvf=tvf_named_required_schema_relation_arg((TABLE<column_bool BOOL, column_bytes BYTES> schema_relation_arg) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+        +-tvf=tvf_named_required_schema_relation_arg
         +-signature=(TABLE<column_bool BOOL, column_bytes BYTES>) -> TABLE<column_bool BOOL, column_bytes BYTES>
         +-argument_list=
         | +-FunctionArgument
@@ -647,7 +647,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=tvf_named_required_value_table_relation_arg.[column_bool#4, column_bytes#5]
-        +-tvf=tvf_named_required_value_table_relation_arg((TABLE<PROTO<googlesql_test.TestExtraPB>> value_table_relation_arg) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+        +-tvf=tvf_named_required_value_table_relation_arg
         +-signature=(TABLE<PROTO<googlesql_test.TestExtraPB>>) -> TABLE<column_bool BOOL, column_bytes BYTES>
         +-argument_list=
         | +-FunctionArgument
@@ -679,7 +679,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=tvf_named_scalar_and_relation_args.[column_bool#3, column_bytes#4]
-        +-tvf=tvf_named_scalar_and_relation_args((STRING format_string, TABLE<column_bool BOOL, column_bytes BYTES> schema_relation_arg) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+        +-tvf=tvf_named_scalar_and_relation_args
         +-signature=(literal STRING, TABLE<column_bool BOOL, column_bytes BYTES>) -> TABLE<column_bool BOOL, column_bytes BYTES>
         +-argument_list=
         | +-FunctionArgument
@@ -715,7 +715,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=tvf_named_scalar_and_relation_args.[column_bool#3, column_bytes#4]
-        +-tvf=tvf_named_scalar_and_relation_args((STRING format_string, TABLE<column_bool BOOL, column_bytes BYTES> schema_relation_arg) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+        +-tvf=tvf_named_scalar_and_relation_args
         +-signature=(literal STRING, TABLE<column_bool BOOL, column_bytes BYTES>) -> TABLE<column_bool BOOL, column_bytes BYTES>
         +-argument_list=
         | +-FunctionArgument
@@ -2472,7 +2472,7 @@ QueryStmt
       | |   +-input_scan=
       | |     +-TVFScan
       | |       +-column_list=[tvf_optional_unnamed_named.x#2]
-      | |       +-tvf=tvf_optional_unnamed_named((ANY TABLE, BOOL, optional STRING, optional STRING o1) -> ANY TABLE)
+      | |       +-tvf=tvf_optional_unnamed_named
       | |       +-signature=(TABLE<x INT64>, literal BOOL) -> TABLE<x INT64>
       | |       +-argument_list=
       | |       | +-FunctionArgument
@@ -2497,7 +2497,7 @@ QueryStmt
       | |   +-input_scan=
       | |     +-TVFScan
       | |       +-column_list=[tvf_optional_unnamed_named.x#4]
-      | |       +-tvf=tvf_optional_unnamed_named((ANY TABLE, BOOL, optional STRING, optional STRING o1) -> ANY TABLE)
+      | |       +-tvf=tvf_optional_unnamed_named
       | |       +-signature=(TABLE<x INT64>, literal BOOL, literal STRING) -> TABLE<x INT64>
       | |       +-argument_list=
       | |       | +-FunctionArgument
@@ -2525,7 +2525,7 @@ QueryStmt
       | |   +-input_scan=
       | |     +-TVFScan
       | |       +-column_list=[tvf_optional_unnamed_named.x#6]
-      | |       +-tvf=tvf_optional_unnamed_named((ANY TABLE, BOOL, optional STRING, optional STRING o1) -> ANY TABLE)
+      | |       +-tvf=tvf_optional_unnamed_named
       | |       +-signature=(TABLE<x INT64>, literal BOOL, literal STRING, literal STRING) -> TABLE<x INT64>
       | |       +-argument_list=
       | |       | +-FunctionArgument
@@ -2556,7 +2556,7 @@ QueryStmt
         |   +-input_scan=
         |     +-TVFScan
         |       +-column_list=[tvf_optional_unnamed_named.x#8]
-        |       +-tvf=tvf_optional_unnamed_named((ANY TABLE, BOOL, optional STRING, optional STRING o1) -> ANY TABLE)
+        |       +-tvf=tvf_optional_unnamed_named
         |       +-signature=(TABLE<x INT64>, literal BOOL, literal STRING, literal STRING) -> TABLE<x INT64>
         |       +-argument_list=
         |       | +-FunctionArgument
@@ -2611,7 +2611,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=tvf_named_struct_args.[column_bool#2, column_bytes#3]
-        +-tvf=tvf_named_struct_args((STRUCT<field1 ARRAY<STRING>, field2 ARRAY<STRING>> struct_arg1, STRUCT<field1 ARRAY<STRING>, field2 ARRAY<STRING>, field3 ARRAY<STRING>> struct_arg2) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+        +-tvf=tvf_named_struct_args
         +-signature=(STRUCT<field1 ARRAY<STRING>, field2 ARRAY<STRING>>, STRUCT<field1 ARRAY<STRING>, field2 ARRAY<STRING>, field3 ARRAY<STRING>>) -> TABLE<column_bool BOOL, column_bytes BYTES>
         +-argument_list=
         | +-FunctionArgument
@@ -2935,7 +2935,7 @@ QueryStmt
     |         +-input_scan=
     |           +-TVFScan
     |             +-column_list=[tvf_named_scalar_args_with_constraints.column_bool#20]
-    |             +-tvf=tvf_named_scalar_args_with_constraints((optional INT64 {must_be_non_null: true} arg_1, optional STRING {must_be_constant: true} arg_2, optional DOUBLE {must_be_constant_expression: true} arg_3, optional <struct> arg_4, optional <T1> arg_5, optional <T2> arg_6, optional <array<T3>> arg_7, optional <array<T4>> arg_8, optional <array<T5>> arg_9, optional DOUBLE {must_be_non_null: true, default_value: 3.14} arg_10) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+    |             +-tvf=tvf_named_scalar_args_with_constraints
     |             +-signature=(literal INT64, literal STRING, DOUBLE, STRUCT<INT64, STRING>, STRING, DOUBLE, ARRAY<INT64>, ARRAY<STRING>, ARRAY<DOUBLE>, literal DOUBLE) -> TABLE<column_bool BOOL, column_bytes BYTES>
     |             +-argument_list=
     |             | +-FunctionArgument
@@ -3016,8 +3016,6 @@ ERROR: Argument 1 to table-valued function TVF_NAMED_SCALAR_ARGS_WITH_CONSTRAINT
 # arguments.
 # There is currently a bug (b/330392311) which leads to confusing error message
 # in this scenario, therefore we need to explicly specify arg_1.
-# TODO: b/459308331 - Fix analyzer debug string for untyped empty array in Java.
-[no_java]
 select (select column_bool from
   tvf_named_scalar_args_with_constraints(
     arg_1 => 7,  -- must_be_non_null
@@ -3044,7 +3042,7 @@ QueryStmt
     |         +-input_scan=
     |           +-TVFScan
     |             +-column_list=[tvf_named_scalar_args_with_constraints.column_bool#20]
-    |             +-tvf=tvf_named_scalar_args_with_constraints((optional INT64 {must_be_non_null: true} arg_1, optional STRING {must_be_constant: true} arg_2, optional DOUBLE {must_be_constant_expression: true} arg_3, optional <struct> arg_4, optional <T1> arg_5, optional <T2> arg_6, optional <array<T3>> arg_7, optional <array<T4>> arg_8, optional <array<T5>> arg_9, optional DOUBLE {must_be_non_null: true, default_value: 3.14} arg_10) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+    |             +-tvf=tvf_named_scalar_args_with_constraints
     |             +-signature=(literal INT64, null STRING, null DOUBLE, STRUCT<INT64, STRING>, null INT64, null INT64, null ARRAY<INT64>, null ARRAY<INT64>, null ARRAY<INT64>, literal DOUBLE) -> TABLE<column_bool BOOL, column_bytes BYTES>
     |             +-argument_list=
     |             | +-FunctionArgument
@@ -3185,7 +3183,7 @@ QueryStmt
     |         +-input_scan=
     |           +-TVFScan
     |             +-column_list=[tvf_named_scalar_args_with_constraints.column_bool#20]
-    |             +-tvf=tvf_named_scalar_args_with_constraints((optional INT64 {must_be_non_null: true} arg_1, optional STRING {must_be_constant: true} arg_2, optional DOUBLE {must_be_constant_expression: true} arg_3, optional <struct> arg_4, optional <T1> arg_5, optional <T2> arg_6, optional <array<T3>> arg_7, optional <array<T4>> arg_8, optional <array<T5>> arg_9, optional DOUBLE {must_be_non_null: true, default_value: 3.14} arg_10) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+    |             +-tvf=tvf_named_scalar_args_with_constraints
     |             +-signature=(literal INT64, literal STRING, DOUBLE, STRUCT<INT64, STRING>, STRING, DOUBLE, ARRAY<INT64>, ARRAY<STRING>, ARRAY<DOUBLE>, literal DOUBLE) -> TABLE<column_bool BOOL, column_bytes BYTES>
     |             +-argument_list=
     |             | +-FunctionArgument

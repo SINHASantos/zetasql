@@ -18,6 +18,7 @@ syntax = "proto2";
 
 package googlesql;
 
+import "googlesql/public/proto/vector_encoding_id.proto";
 import "googlesql/public/simple_value.proto";
 
 option java_package = "com.google.googlesql";
@@ -121,4 +122,5 @@ message ExtendedTypeParametersProto {
 // Type parameters for VECTOR type.
 message VectorTypeParametersProto {
   optional int64 length = 1;
+  optional googlesql.VectorEncodingId.Id encoding = 2;
 }

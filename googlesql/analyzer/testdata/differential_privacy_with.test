@@ -115,6 +115,7 @@ QueryStmt
                 +-AggregateFunctionCall(GoogleSQL:$differential_privacy_count_star(optional(1) STRUCT<INT64, INT64> contribution_bounds_per_group) -> INT64)
                   +-parse_location=62-67
                   +-Literal(parse_location=104-112, type=STRUCT<INT64, INT64>, value={0, 100})
+
 [REPLACED_LITERALS]
 with with_scan as (select @_p0_INT64)
 select with differential_privacy count(*, contribution_bounds_per_group => @_p1_STRUCT)
@@ -166,6 +167,7 @@ QueryStmt
                 +-AggregateFunctionCall(GoogleSQL:$differential_privacy_count_star(optional(1) STRUCT<INT64, INT64> contribution_bounds_per_group) -> INT64)
                   +-parse_location=92-97
                   +-Literal(parse_location=134-142, type=STRUCT<INT64, INT64>, value={0, 100})
+
 [REPLACED_LITERALS]
 with t1 as (select @_p0_INT64 from SimpleTypesWithAnonymizationUid)
 select with differential_privacy count(*, contribution_bounds_per_group => @_p1_STRUCT)
@@ -438,6 +440,7 @@ QueryStmt
     |             +-parse_location=171-176
     |             +-Literal(type=STRUCT<INT64, INT64>, value=NULL)
     +-recursive=TRUE
+
 [REPLACED_LITERALS]
 with recursive t1 as (
   (select int64, uid from SimpleTypesWithAnonymizationUid)
@@ -644,6 +647,7 @@ QueryStmt
     |   +-input_scan=
     |     +-WithRefScan(parse_location=195-197, column_list=t1.[int64#19, uid#20], with_query_name="t1")
     +-recursive=TRUE
+
 [REPLACED_LITERALS]
 with recursive t1 as (
   (select int64, uid from SimpleTypesWithAnonymizationUid)
@@ -705,6 +709,7 @@ QueryStmt
                 +-AggregateFunctionCall(GoogleSQL:$differential_privacy_count_star(optional(1) STRUCT<INT64, INT64> contribution_bounds_per_group) -> INT64)
                   +-parse_location=178-183
                   +-Literal(type=STRUCT<INT64, INT64>, value=NULL)
+
 [REPLACED_LITERALS]
 with t as (select with differential_privacy uid, count(*)
                   from SimpleTypesWithAnonymizationUid
@@ -1215,6 +1220,7 @@ QueryStmt
                 +-AggregateFunctionCall(GoogleSQL:$differential_privacy_count_star(optional(1) STRUCT<INT64, INT64> contribution_bounds_per_group) -> INT64)
                   +-parse_location=92-97
                   +-Literal(type=STRUCT<INT64, INT64>, value=NULL)
+
 [REPLACED_LITERALS]
 WITH t1 as (select * from SimpleTypesWithAnonymizationUid)
 SELECT WITH DIFFERENTIAL_PRIVACY count(*) as count
@@ -1567,6 +1573,7 @@ QueryStmt
                 +-AggregateFunctionCall(GoogleSQL:$differential_privacy_count_star(optional(1) STRUCT<INT64, INT64> contribution_bounds_per_group) -> INT64)
                   +-parse_location=152-157
                   +-Literal(type=STRUCT<INT64, INT64>, value=NULL)
+
 [REPLACED_LITERALS]
 WITH t1 as (select * from SimpleTypesWithAnonymizationUid),
      t2 as (select * from SimpleTypesWithAnonymizationUid)
@@ -2360,6 +2367,7 @@ QueryStmt
             +-AggregateFunctionCall(GoogleSQL:$differential_privacy_count_star(optional(1) STRUCT<INT64, INT64> contribution_bounds_per_group) -> INT64)
               +-parse_location=33-38
               +-Literal(parse_location=75-83, type=STRUCT<INT64, INT64>, value={0, 100})
+
 [REPLACED_LITERALS]
 select with differential_privacy count(*, contribution_bounds_per_group => @_p0_STRUCT)
 from (
@@ -2431,6 +2439,7 @@ QueryStmt
               +-delta=
                 +-parse_location=151-161
                 +-Literal(parse_location=157-161, type=DOUBLE, value=1e-05)
+
 [REPLACED_LITERALS]
 WITH t AS (
   SELECT int64
@@ -2482,6 +2491,7 @@ QueryStmt
                 +-AggregateFunctionCall(GoogleSQL:$differential_privacy_count_star(optional(1) STRUCT<INT64, INT64> contribution_bounds_per_group) -> INT64)
                   +-parse_location=102-107
                   +-Literal(parse_location=144-150, type=STRUCT<INT64, INT64>, value={0, 1})
+
 [REPLACED_LITERALS]
 WITH t as (select *
            from SimpleTypesWithAnonymizationUid)
@@ -2579,6 +2589,7 @@ QueryStmt
         +-column_list=[second.$col1#26]
         +-input_scan=
           +-WithRefScan(parse_location=220-226, column_list=[second.$col1#26], with_query_name="second")
+
 [REPLACED_LITERALS]
 \# Test SELECT WITH DIFFERENTIAL_PRIVACY in a CTE.
 WITH

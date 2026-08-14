@@ -707,7 +707,6 @@ QueryStmt
         |       +-default_value=0
         +-element_column_list=[$array.Value#21]
 
-
 DEPRECATION WARNING:
 PIVOT is not allowed with array scans. This will become an error [at 1:57]
 ...FROM ArrayTypes.ProtoArray.int32_val1 AS Value PIVOT(COUNT(Value) FOR int3...
@@ -784,7 +783,6 @@ QueryStmt
         |       +-field_descriptor=int32_val1
         |       +-default_value=0
         +-element_column_list=[$array.int32_val1#21]
-
 
 DEPRECATION WARNING:
 UNPIVOT is not allowed with array scans. This will become an error [at 1:48]

@@ -1,0 +1,3206 @@
+[default no_java]
+[default language_features=MAXIMUM,+MEASURES_IN_STRUCT,+DERIVED_MEASURE]
+[default enabled_ast_rewrites=DEFAULTS,+MEASURE_TYPE]
+[default show_sqlbuilder_output]
+# 1. Struct of derived measures as columns.
+
+## Base Case
+WITH t AS (
+  SELECT key, STRUCT(measure_derived_sum_price_plus_one AS m) AS s
+  FROM MeasureTable_Derived
+)
+SELECT key, AGG(s.m) FROM t GROUP BY key;
+--
+QueryStmt
++-output_column_list=
+| +-$groupby.key#32 AS key [INT64]
+| +-$aggregate.$agg1#31 AS `$col2` [INT64]
++-query=
+  +-WithScan
+    +-column_list=[$groupby.key#32, $aggregate.$agg1#31]
+    +-with_entry_list=
+    | +-WithEntry
+    |   +-with_query_name="t"
+    |   +-with_subquery=
+    |     +-ProjectScan
+    |       +-column_list=[MeasureTable_Derived.key#1, t.s#28]
+    |       +-expr_list=
+    |       | +-s#28 :=
+    |       |   +-MakeStruct
+    |       |     +-type=STRUCT<m MEASURE<INT64>>
+    |       |     +-field_list=
+    |       |       +-ColumnRef(type=MEASURE<INT64>, column=MeasureTable_Derived.measure_derived_sum_price_plus_one#11)
+    |       +-input_scan=
+    |         +-TableScan(column_list=MeasureTable_Derived.[key#1, measure_derived_sum_price_plus_one#11], table=MeasureTable_Derived, column_index_list=[0, 10])
+    +-query=
+      +-ProjectScan
+        +-column_list=[$groupby.key#32, $aggregate.$agg1#31]
+        +-input_scan=
+          +-AggregateScan
+            +-column_list=[$groupby.key#32, $aggregate.$agg1#31]
+            +-input_scan=
+            | +-WithRefScan(column_list=t.[key#29, s#30], with_query_name="t")
+            +-group_by_list=
+            | +-key#32 := ColumnRef(type=INT64, column=t.key#29)
+            +-aggregate_list=
+              +-$agg1#31 :=
+                +-AggregateFunctionCall(GoogleSQL:AGG(MEASURE<INT64>) -> INT64)
+                  +-GetStructField
+                    +-type=MEASURE<INT64>
+                    +-expr=
+                    | +-ColumnRef(type=STRUCT<m MEASURE<INT64>>, column=t.s#30)
+                    +-field_idx=0
+
+[SQLBUILDER_TARGET_SYNTAX_MODE standard]
+[SQLBUILDER_OUTPUT]
+WITH
+  t AS (
+    SELECT
+      measuretable_derived_3.a_1 AS a_1,
+      STRUCT(measuretable_derived_3.a_2 AS m) AS a_4
+    FROM
+      (
+        SELECT
+          MeasureTable_Derived.key AS a_1,
+          MeasureTable_Derived.measure_derived_sum_price_plus_one AS a_2
+        FROM
+          MeasureTable_Derived
+      ) AS measuretable_derived_3
+  )
+SELECT
+  withrefscan_5.a_1 AS key,
+  AGG(withrefscan_5.a_4.m) AS a_7
+FROM
+  t AS withrefscan_5
+GROUP BY 1;
+
+[SQLBUILDER_TARGET_SYNTAX_MODE pipe]
+[SQLBUILDER_OUTPUT]
+WITH
+  t AS (
+    FROM
+      MeasureTable_Derived
+    |> SELECT
+         MeasureTable_Derived.key AS a_1,
+         MeasureTable_Derived.measure_derived_sum_price_plus_one AS a_2
+    |> AS measuretable_derived_3
+    |> SELECT
+         measuretable_derived_3.a_1 AS a_1,
+         STRUCT(measuretable_derived_3.a_2 AS m) AS a_4
+  )
+FROM
+  t AS withrefscan_5
+|> EXTEND
+     withrefscan_5.a_1 AS a_6
+|> AGGREGATE
+     AGG(withrefscan_5.a_4.m) AS a_7
+   GROUP BY a_6
+|> AS aggregatescan_8
+|> SELECT
+     aggregatescan_8.a_6 AS key,
+     aggregatescan_8.a_7 AS a_7;
+
+[REWRITTEN AST]
+QueryStmt
++-output_column_list=
+| +-$groupby.key#32 AS key [INT64]
+| +-$aggregate.$agg1#31 AS `$col2` [INT64]
++-query=
+  +-WithScan
+    +-column_list=[$groupby.key#32, $aggregate.$agg1#31]
+    +-with_entry_list=
+    | +-WithEntry
+    |   +-with_query_name="t"
+    |   +-with_subquery=
+    |     +-ProjectScan
+    |       +-column_list=[MeasureTable_Derived.key#1, t.s#28]
+    |       +-expr_list=
+    |       | +-s#28 :=
+    |       |   +-MakeStruct
+    |       |     +-type=STRUCT<m STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>>
+    |       |     +-field_list=
+    |       |       +-ColumnRef(type=STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>, column=MeasureTable_Derived.struct_for_measures_from_table_MeasureTable_Derived#35)
+    |       +-input_scan=
+    |         +-ProjectScan
+    |           +-column_list=MeasureTable_Derived.[key#1, struct_for_measures_from_table_MeasureTable_Derived#35]
+    |           +-expr_list=
+    |           | +-struct_for_measures_from_table_MeasureTable_Derived#35 :=
+    |           |   +-MakeStruct
+    |           |     +-type=STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>
+    |           |     +-field_list=
+    |           |       +-MakeStruct
+    |           |       | +-type=STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>
+    |           |       | +-field_list=
+    |           |       |   +-ColumnRef(type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, column=MeasureTable_Derived.struct_for_measures_from_table_MeasureTable_Derived#34)
+    |           |       +-MakeStruct
+    |           |         +-type=STRUCT<key INT64>
+    |           |         +-field_list=
+    |           |           +-ColumnRef(type=INT64, column=MeasureTable_Derived.key#1)
+    |           +-input_scan=
+    |             +-ProjectScan
+    |               +-column_list=MeasureTable_Derived.[key#1, struct_for_measures_from_table_MeasureTable_Derived#34]
+    |               +-expr_list=
+    |               | +-struct_for_measures_from_table_MeasureTable_Derived#34 :=
+    |               |   +-MakeStruct
+    |               |     +-type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>
+    |               |     +-field_list=
+    |               |       +-MakeStruct
+    |               |       | +-type=STRUCT<price INT64>
+    |               |       | +-field_list=
+    |               |       |   +-ColumnRef(type=INT64, column=MeasureTable_Derived.price#33)
+    |               |       +-MakeStruct
+    |               |         +-type=STRUCT<key INT64>
+    |               |         +-field_list=
+    |               |           +-ColumnRef(type=INT64, column=MeasureTable_Derived.key#1)
+    |               +-input_scan=
+    |                 +-TableScan(column_list=MeasureTable_Derived.[key#1, price#33], table=MeasureTable_Derived, column_index_list=[0, 3])
+    +-query=
+      +-ProjectScan
+        +-column_list=[$groupby.key#32, $aggregate.$agg1#31]
+        +-input_scan=
+          +-ProjectScan
+            +-column_list=[$groupby.key#32, $aggregate.$agg1#31]
+            +-expr_list=
+            | +-$agg1#31 :=
+            |   +-FunctionCall(GoogleSQL:$add(INT64, INT64) -> INT64)
+            |     +-ColumnRef(type=INT64, column=$aggregate.constituent_aggregate_1#39)
+            |     +-Literal(type=INT64, value=1)
+            +-input_scan=
+              +-AggregateScan
+                +-column_list=[$groupby.key#32, $aggregate.constituent_aggregate_1#39]
+                +-input_scan=
+                | +-ProjectScan
+                |   +-column_list=[t.key#29, t.s#30, $aggregate.agg_arg#36, $aggregate.dep_closure#38]
+                |   +-expr_list=
+                |   | +-dep_closure#38 :=
+                |   |   +-GetStructField
+                |   |     +-type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>
+                |   |     +-expr=
+                |   |     | +-GetStructField
+                |   |     |   +-type=STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>
+                |   |     |   +-expr=
+                |   |     |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>, column=$aggregate.agg_arg#36)
+                |   |     |   +-field_idx=0
+                |   |     +-field_idx=0
+                |   +-input_scan=
+                |     +-ProjectScan
+                |       +-column_list=[t.key#29, t.s#30, $aggregate.agg_arg#36]
+                |       +-expr_list=
+                |       | +-agg_arg#36 :=
+                |       |   +-GetStructField
+                |       |     +-type=STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>
+                |       |     +-expr=
+                |       |     | +-ColumnRef(type=STRUCT<m STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>>, column=t.s#30)
+                |       |     +-field_idx=0
+                |       +-input_scan=
+                |         +-WithRefScan(column_list=t.[key#29, s#30], with_query_name="t")
+                +-group_by_list=
+                | +-key#32 := ColumnRef(type=INT64, column=t.key#29)
+                +-aggregate_list=
+                  +-constituent_aggregate_1#39 :=
+                    +-AggregateFunctionCall(GoogleSQL:sum(INT64) -> INT64)
+                      +-ColumnRef(type=INT64, column=$aggregate.$any_value_grain_lock_0#40)
+                      +-where_expr=
+                      | +-FunctionCall(GoogleSQL:$not(BOOL) -> BOOL)
+                      |   +-FunctionCall(GoogleSQL:$is_null(STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>) -> BOOL)
+                      |     +-ColumnRef(type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, column=$aggregate.dep_closure#38)
+                      +-group_by_list=
+                      | +-grain_lock_key#41 :=
+                      |   +-GetStructField
+                      |     +-type=STRUCT<key INT64>
+                      |     +-expr=
+                      |     | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, column=$aggregate.dep_closure#38)
+                      |     +-field_idx=1
+                      +-group_by_aggregate_list=
+                        +-$any_value_grain_lock_0#40 :=
+                          +-AggregateFunctionCall(GoogleSQL:any_value(INT64) -> INT64)
+                            +-GetStructField
+                              +-type=INT64
+                              +-expr=
+                              | +-GetStructField
+                              |   +-type=STRUCT<price INT64>
+                              |   +-expr=
+                              |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, column=$aggregate.dep_closure#38)
+                              |   +-field_idx=0
+                              +-field_idx=0
+
+[SQLBUILDER_TARGET_SYNTAX_MODE standard]
+[SQLBUILDER_OUTPUT]
+WITH
+  t AS (
+    SELECT
+      projectscan_7.a_1 AS a_1,
+      STRUCT< m STRUCT< referenced_columns STRUCT< measure_sum_price STRUCT< referenced_columns STRUCT< price INT64 >
+      , key_columns STRUCT< key INT64 > > >, key_columns STRUCT< key INT64 > > > (projectscan_7.a_6) AS a_8
+    FROM
+      (
+        SELECT
+          projectscan_5.a_1 AS a_1,
+          STRUCT< referenced_columns STRUCT< measure_sum_price STRUCT< referenced_columns STRUCT< price INT64 >
+          , key_columns STRUCT< key INT64 > > >, key_columns STRUCT< key INT64 > > (STRUCT< measure_sum_price STRUCT<
+            referenced_columns STRUCT< price INT64 >, key_columns STRUCT< key INT64 > > > (projectscan_5.a_4), STRUCT<
+            key INT64 > (projectscan_5.a_1)) AS a_6
+        FROM
+          (
+            SELECT
+              measuretable_derived_3.a_1 AS a_1,
+              STRUCT< referenced_columns STRUCT< price INT64 >, key_columns STRUCT< key INT64 > > (STRUCT< price INT64 >
+                (measuretable_derived_3.a_2), STRUCT< key INT64 > (measuretable_derived_3.a_1)) AS a_4
+            FROM
+              (
+                SELECT
+                  MeasureTable_Derived.key AS a_1,
+                  MeasureTable_Derived.price AS a_2
+                FROM
+                  MeasureTable_Derived
+              ) AS measuretable_derived_3
+          ) AS projectscan_5
+      ) AS projectscan_7
+  )
+SELECT
+  aggregatescan_16.a_14 AS key,
+  (aggregatescan_16.a_15) + 1 AS a_17
+FROM
+  (
+    SELECT
+      projectscan_13.a_1 AS a_14,
+      SUM(ANY_VALUE(projectscan_13.a_12.referenced_columns.price)
+        WHERE
+          NOT((projectscan_13.a_12) IS NULL)
+        GROUP BY projectscan_13.a_12.key_columns) AS a_15
+    FROM
+      (
+        SELECT
+          projectscan_11.a_1 AS a_1,
+          projectscan_11.a_8 AS a_8,
+          projectscan_11.a_10 AS a_10,
+          projectscan_11.a_10.referenced_columns.measure_sum_price AS a_12
+        FROM
+          (
+            SELECT
+              withrefscan_9.a_1 AS a_1,
+              withrefscan_9.a_8 AS a_8,
+              withrefscan_9.a_8.m AS a_10
+            FROM
+              t AS withrefscan_9
+          ) AS projectscan_11
+      ) AS projectscan_13
+    GROUP BY 1
+  ) AS aggregatescan_16;
+
+[SQLBUILDER_TARGET_SYNTAX_MODE pipe]
+[SQLBUILDER_OUTPUT]
+WITH
+  t AS (
+    FROM
+      MeasureTable_Derived
+    |> SELECT
+         MeasureTable_Derived.key AS a_1,
+         MeasureTable_Derived.price AS a_2
+    |> AS measuretable_derived_3
+    |> SELECT
+         measuretable_derived_3.a_1 AS a_1,
+         STRUCT< referenced_columns STRUCT< price INT64 >, key_columns STRUCT< key INT64 > > (STRUCT< price INT64 >
+           (measuretable_derived_3.a_2), STRUCT< key INT64 > (measuretable_derived_3.a_1)) AS a_4
+    |> AS projectscan_5
+    |> SELECT
+         projectscan_5.a_1 AS a_1,
+         STRUCT< referenced_columns STRUCT< measure_sum_price STRUCT< referenced_columns STRUCT< price INT64 >
+         , key_columns STRUCT< key INT64 > > >, key_columns STRUCT< key INT64 > > (STRUCT< measure_sum_price STRUCT<
+           referenced_columns STRUCT< price INT64 >, key_columns STRUCT< key INT64 > > > (projectscan_5.a_4), STRUCT<
+           key INT64 > (projectscan_5.a_1)) AS a_6
+    |> AS projectscan_7
+    |> SELECT
+         projectscan_7.a_1 AS a_1,
+         STRUCT< m STRUCT< referenced_columns STRUCT< measure_sum_price STRUCT< referenced_columns STRUCT< price INT64 >
+         , key_columns STRUCT< key INT64 > > >, key_columns STRUCT< key INT64 > > > (projectscan_7.a_6) AS a_8
+  )
+FROM
+  t AS withrefscan_9
+|> SELECT
+     withrefscan_9.a_1 AS a_1,
+     withrefscan_9.a_8 AS a_8,
+     withrefscan_9.a_8.m AS a_10
+|> AS projectscan_11
+|> SELECT
+     projectscan_11.a_1 AS a_1,
+     projectscan_11.a_8 AS a_8,
+     projectscan_11.a_10 AS a_10,
+     projectscan_11.a_10.referenced_columns.measure_sum_price AS a_12
+|> AS projectscan_13
+|> EXTEND
+     projectscan_13.a_1 AS a_14
+|> AGGREGATE
+     SUM(ANY_VALUE(projectscan_13.a_12.referenced_columns.price)
+       WHERE
+         NOT((projectscan_13.a_12) IS NULL)
+       GROUP BY projectscan_13.a_12.key_columns) AS a_15
+   GROUP BY a_14
+|> AS aggregatescan_16
+|> SELECT
+     aggregatescan_16.a_14 AS key,
+     (aggregatescan_16.a_15) + 1 AS a_17;
+==
+
+## Variation 1.1: Measure column in struct is correlated
+FROM MeasureTable_Derived o
+|> SELECT (
+  FROM UNNEST([1])
+  |> EXTEND STRUCT(o.measure_derived_sum_price_plus_one AS m) AS s
+  |> AGGREGATE AGG(s.m)
+)
+--
+QueryStmt
++-output_column_list=
+| +-$pipe_select.$col1#31 AS `$col1` [INT64]
++-query=
+  +-ProjectScan
+    +-column_list=[$pipe_select.$col1#31]
+    +-expr_list=
+    | +-$col1#31 :=
+    |   +-SubqueryExpr
+    |     +-type=INT64
+    |     +-subquery_type=SCALAR
+    |     +-parameter_list=
+    |     | +-ColumnRef(type=MEASURE<INT64>, column=MeasureTable_Derived.measure_derived_sum_price_plus_one#11)
+    |     +-subquery=
+    |       +-AggregateScan
+    |         +-column_list=[$aggregate.$agg1#30]
+    |         +-input_scan=
+    |         | +-ProjectScan
+    |         |   +-column_list=[$pipe_extend.s#29]
+    |         |   +-expr_list=
+    |         |   | +-s#29 :=
+    |         |   |   +-MakeStruct
+    |         |   |     +-type=STRUCT<m MEASURE<INT64>>
+    |         |   |     +-field_list=
+    |         |   |       +-ColumnRef(type=MEASURE<INT64>, column=MeasureTable_Derived.measure_derived_sum_price_plus_one#11, is_correlated=TRUE)
+    |         |   +-input_scan=
+    |         |     +-ArrayScan
+    |         |       +-array_expr_list=
+    |         |       | +-Literal(type=ARRAY<INT64>, value=[1])
+    |         |       +-element_column_list=[$array.$unnest1#28]
+    |         +-aggregate_list=
+    |           +-$agg1#30 :=
+    |             +-AggregateFunctionCall(GoogleSQL:AGG(MEASURE<INT64>) -> INT64)
+    |               +-GetStructField
+    |                 +-type=MEASURE<INT64>
+    |                 +-expr=
+    |                 | +-ColumnRef(type=STRUCT<m MEASURE<INT64>>, column=$pipe_extend.s#29)
+    |                 +-field_idx=0
+    +-input_scan=
+      +-TableScan(column_list=[MeasureTable_Derived.measure_derived_sum_price_plus_one#11], table=MeasureTable_Derived, column_index_list=[10], alias="o")
+
+[SQLBUILDER_TARGET_SYNTAX_MODE standard]
+[SQLBUILDER_OUTPUT]
+SELECT
+  (
+    SELECT
+      AGG(projectscan_6.a_5.m) AS a_7
+    FROM
+      (
+        SELECT
+          STRUCT(measuretable_derived_2.a_1 AS m) AS a_5
+        FROM
+          UNNEST(ARRAY< INT64 >[1] AS a_4)
+      ) AS projectscan_6
+  ) AS a_3
+FROM
+  (
+    SELECT
+      MeasureTable_Derived.measure_derived_sum_price_plus_one AS a_1
+    FROM
+      MeasureTable_Derived
+  ) AS measuretable_derived_2;
+
+[SQLBUILDER_TARGET_SYNTAX_MODE pipe]
+[SQLBUILDER_OUTPUT]
+FROM
+  MeasureTable_Derived
+|> SELECT
+     MeasureTable_Derived.measure_derived_sum_price_plus_one AS a_1
+|> AS measuretable_derived_2
+|> SELECT
+     (
+       FROM
+         UNNEST(ARRAY< INT64 >[1] AS a_4)
+       |> SELECT
+            STRUCT(measuretable_derived_2.a_1 AS m) AS a_5
+       |> AS projectscan_6
+       |> AGGREGATE
+            AGG(projectscan_6.a_5.m) AS a_7) AS a_3;
+
+[REWRITTEN AST]
+QueryStmt
++-output_column_list=
+| +-$pipe_select.$col1#31 AS `$col1` [INT64]
++-query=
+  +-ProjectScan
+    +-column_list=[$pipe_select.$col1#31]
+    +-expr_list=
+    | +-$col1#31 :=
+    |   +-SubqueryExpr
+    |     +-type=INT64
+    |     +-subquery_type=SCALAR
+    |     +-parameter_list=
+    |     | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>, column=MeasureTable_Derived.struct_for_measures_from_table_MeasureTable_Derived#35)
+    |     +-subquery=
+    |       +-ProjectScan
+    |         +-column_list=[$aggregate.$agg1#30]
+    |         +-expr_list=
+    |         | +-$agg1#30 :=
+    |         |   +-FunctionCall(GoogleSQL:$add(INT64, INT64) -> INT64)
+    |         |     +-ColumnRef(type=INT64, column=$aggregate.constituent_aggregate_1#39)
+    |         |     +-Literal(type=INT64, value=1)
+    |         +-input_scan=
+    |           +-AggregateScan
+    |             +-column_list=[$aggregate.constituent_aggregate_1#39]
+    |             +-input_scan=
+    |             | +-ProjectScan
+    |             |   +-column_list=[$pipe_extend.s#29, $aggregate.agg_arg#36, $aggregate.dep_closure#38]
+    |             |   +-expr_list=
+    |             |   | +-dep_closure#38 :=
+    |             |   |   +-GetStructField
+    |             |   |     +-type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>
+    |             |   |     +-expr=
+    |             |   |     | +-GetStructField
+    |             |   |     |   +-type=STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>
+    |             |   |     |   +-expr=
+    |             |   |     |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>, column=$aggregate.agg_arg#36)
+    |             |   |     |   +-field_idx=0
+    |             |   |     +-field_idx=0
+    |             |   +-input_scan=
+    |             |     +-ProjectScan
+    |             |       +-column_list=[$pipe_extend.s#29, $aggregate.agg_arg#36]
+    |             |       +-expr_list=
+    |             |       | +-agg_arg#36 :=
+    |             |       |   +-GetStructField
+    |             |       |     +-type=STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>
+    |             |       |     +-expr=
+    |             |       |     | +-ColumnRef(type=STRUCT<m STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>>, column=$pipe_extend.s#29)
+    |             |       |     +-field_idx=0
+    |             |       +-input_scan=
+    |             |         +-ProjectScan
+    |             |           +-column_list=[$pipe_extend.s#29]
+    |             |           +-expr_list=
+    |             |           | +-s#29 :=
+    |             |           |   +-MakeStruct
+    |             |           |     +-type=STRUCT<m STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>>
+    |             |           |     +-field_list=
+    |             |           |       +-ColumnRef(type=STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>, column=MeasureTable_Derived.struct_for_measures_from_table_MeasureTable_Derived#35, is_correlated=TRUE)
+    |             |           +-input_scan=
+    |             |             +-ArrayScan
+    |             |               +-array_expr_list=
+    |             |               | +-Literal(type=ARRAY<INT64>, value=[1])
+    |             |               +-element_column_list=[$array.$unnest1#28]
+    |             +-aggregate_list=
+    |               +-constituent_aggregate_1#39 :=
+    |                 +-AggregateFunctionCall(GoogleSQL:sum(INT64) -> INT64)
+    |                   +-ColumnRef(type=INT64, column=$aggregate.$any_value_grain_lock_0#40)
+    |                   +-where_expr=
+    |                   | +-FunctionCall(GoogleSQL:$not(BOOL) -> BOOL)
+    |                   |   +-FunctionCall(GoogleSQL:$is_null(STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>) -> BOOL)
+    |                   |     +-ColumnRef(type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, column=$aggregate.dep_closure#38)
+    |                   +-group_by_list=
+    |                   | +-grain_lock_key#41 :=
+    |                   |   +-GetStructField
+    |                   |     +-type=STRUCT<key INT64>
+    |                   |     +-expr=
+    |                   |     | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, column=$aggregate.dep_closure#38)
+    |                   |     +-field_idx=1
+    |                   +-group_by_aggregate_list=
+    |                     +-$any_value_grain_lock_0#40 :=
+    |                       +-AggregateFunctionCall(GoogleSQL:any_value(INT64) -> INT64)
+    |                         +-GetStructField
+    |                           +-type=INT64
+    |                           +-expr=
+    |                           | +-GetStructField
+    |                           |   +-type=STRUCT<price INT64>
+    |                           |   +-expr=
+    |                           |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, column=$aggregate.dep_closure#38)
+    |                           |   +-field_idx=0
+    |                           +-field_idx=0
+    +-input_scan=
+      +-ProjectScan
+        +-column_list=[MeasureTable_Derived.struct_for_measures_from_table_MeasureTable_Derived#35]
+        +-expr_list=
+        | +-struct_for_measures_from_table_MeasureTable_Derived#35 :=
+        |   +-MakeStruct
+        |     +-type=STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>
+        |     +-field_list=
+        |       +-MakeStruct
+        |       | +-type=STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>
+        |       | +-field_list=
+        |       |   +-ColumnRef(type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, column=MeasureTable_Derived.struct_for_measures_from_table_MeasureTable_Derived#34)
+        |       +-MakeStruct
+        |         +-type=STRUCT<key INT64>
+        |         +-field_list=
+        |           +-ColumnRef(type=INT64, column=MeasureTable_Derived.key#33)
+        +-input_scan=
+          +-ProjectScan
+            +-column_list=MeasureTable_Derived.[key#33, struct_for_measures_from_table_MeasureTable_Derived#34]
+            +-expr_list=
+            | +-struct_for_measures_from_table_MeasureTable_Derived#34 :=
+            |   +-MakeStruct
+            |     +-type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>
+            |     +-field_list=
+            |       +-MakeStruct
+            |       | +-type=STRUCT<price INT64>
+            |       | +-field_list=
+            |       |   +-ColumnRef(type=INT64, column=MeasureTable_Derived.price#32)
+            |       +-MakeStruct
+            |         +-type=STRUCT<key INT64>
+            |         +-field_list=
+            |           +-ColumnRef(type=INT64, column=MeasureTable_Derived.key#33)
+            +-input_scan=
+              +-TableScan(column_list=MeasureTable_Derived.[key#33, price#32], table=MeasureTable_Derived, column_index_list=[0, 3], alias="o")
+
+[SQLBUILDER_TARGET_SYNTAX_MODE standard]
+[SQLBUILDER_OUTPUT]
+SELECT
+  (
+    SELECT
+      (aggregatescan_17.a_16) + 1 AS a_18
+    FROM
+      (
+        SELECT
+          SUM(ANY_VALUE(projectscan_15.a_14.referenced_columns.price)
+            WHERE
+              NOT((projectscan_15.a_14) IS NULL)
+            GROUP BY projectscan_15.a_14.key_columns) AS a_16
+        FROM
+          (
+            SELECT
+              projectscan_13.a_10 AS a_10,
+              projectscan_13.a_12 AS a_12,
+              projectscan_13.a_12.referenced_columns.measure_sum_price AS a_14
+            FROM
+              (
+                SELECT
+                  projectscan_11.a_10 AS a_10,
+                  projectscan_11.a_10.m AS a_12
+                FROM
+                  (
+                    SELECT
+                      STRUCT< m STRUCT< referenced_columns STRUCT< measure_sum_price STRUCT< referenced_columns STRUCT< price INT64 >
+                      , key_columns STRUCT< key INT64 > > >, key_columns STRUCT< key INT64 > > > (projectscan_7.a_6) AS a_10
+                    FROM
+                      UNNEST(ARRAY< INT64 >[1] AS a_9)
+                  ) AS projectscan_11
+              ) AS projectscan_13
+          ) AS projectscan_15
+      ) AS aggregatescan_17
+  ) AS a_8
+FROM
+  (
+    SELECT
+      STRUCT< referenced_columns STRUCT< measure_sum_price STRUCT< referenced_columns STRUCT< price INT64 >
+      , key_columns STRUCT< key INT64 > > >, key_columns STRUCT< key INT64 > > (STRUCT< measure_sum_price STRUCT<
+        referenced_columns STRUCT< price INT64 >, key_columns STRUCT< key INT64 > > > (projectscan_5.a_4), STRUCT<
+        key INT64 > (projectscan_5.a_1)) AS a_6
+    FROM
+      (
+        SELECT
+          measuretable_derived_3.a_1 AS a_1,
+          STRUCT< referenced_columns STRUCT< price INT64 >, key_columns STRUCT< key INT64 > > (STRUCT< price INT64 >
+            (measuretable_derived_3.a_2), STRUCT< key INT64 > (measuretable_derived_3.a_1)) AS a_4
+        FROM
+          (
+            SELECT
+              MeasureTable_Derived.key AS a_1,
+              MeasureTable_Derived.price AS a_2
+            FROM
+              MeasureTable_Derived
+          ) AS measuretable_derived_3
+      ) AS projectscan_5
+  ) AS projectscan_7;
+
+[SQLBUILDER_TARGET_SYNTAX_MODE pipe]
+[SQLBUILDER_OUTPUT]
+FROM
+  MeasureTable_Derived
+|> SELECT
+     MeasureTable_Derived.key AS a_1,
+     MeasureTable_Derived.price AS a_2
+|> AS measuretable_derived_3
+|> SELECT
+     measuretable_derived_3.a_1 AS a_1,
+     STRUCT< referenced_columns STRUCT< price INT64 >, key_columns STRUCT< key INT64 > > (STRUCT< price INT64 >
+       (measuretable_derived_3.a_2), STRUCT< key INT64 > (measuretable_derived_3.a_1)) AS a_4
+|> AS projectscan_5
+|> SELECT
+     STRUCT< referenced_columns STRUCT< measure_sum_price STRUCT< referenced_columns STRUCT< price INT64 >
+     , key_columns STRUCT< key INT64 > > >, key_columns STRUCT< key INT64 > > (STRUCT< measure_sum_price STRUCT<
+       referenced_columns STRUCT< price INT64 >, key_columns STRUCT< key INT64 > > > (projectscan_5.a_4), STRUCT<
+       key INT64 > (projectscan_5.a_1)) AS a_6
+|> AS projectscan_7
+|> SELECT
+     (
+       FROM
+         UNNEST(ARRAY< INT64 >[1] AS a_9)
+       |> SELECT
+            STRUCT< m STRUCT< referenced_columns STRUCT< measure_sum_price STRUCT< referenced_columns STRUCT< price INT64 >
+            , key_columns STRUCT< key INT64 > > >, key_columns STRUCT< key INT64 > > > (projectscan_7.a_6) AS a_10
+       |> AS projectscan_11
+       |> SELECT
+            projectscan_11.a_10 AS a_10,
+            projectscan_11.a_10.m AS a_12
+       |> AS projectscan_13
+       |> SELECT
+            projectscan_13.a_10 AS a_10,
+            projectscan_13.a_12 AS a_12,
+            projectscan_13.a_12.referenced_columns.measure_sum_price AS a_14
+       |> AS projectscan_15
+       |> AGGREGATE
+            SUM(ANY_VALUE(projectscan_15.a_14.referenced_columns.price)
+              WHERE
+                NOT((projectscan_15.a_14) IS NULL)
+              GROUP BY projectscan_15.a_14.key_columns) AS a_16
+       |> AS aggregatescan_17
+       |> SELECT
+            (aggregatescan_17.a_16) + 1 AS a_18
+     ) AS a_8;
+==
+
+## Variation 1.2: Struct itself is correlated
+WITH outer_t AS (
+  SELECT key, STRUCT(measure_derived_sum_price_plus_one AS m) AS s
+  FROM MeasureTable_Derived
+)
+SELECT key,
+  (
+    SELECT AGG(o.s.m)
+    FROM UNNEST([1])
+  )
+FROM outer_t o;
+--
+QueryStmt
++-output_column_list=
+| +-outer_t.key#29 AS key [INT64]
+| +-$query.$col2#33 AS `$col2` [INT64]
++-query=
+  +-WithScan
+    +-column_list=[outer_t.key#29, $query.$col2#33]
+    +-with_entry_list=
+    | +-WithEntry
+    |   +-with_query_name="outer_t"
+    |   +-with_subquery=
+    |     +-ProjectScan
+    |       +-column_list=[MeasureTable_Derived.key#1, outer_t.s#28]
+    |       +-expr_list=
+    |       | +-s#28 :=
+    |       |   +-MakeStruct
+    |       |     +-type=STRUCT<m MEASURE<INT64>>
+    |       |     +-field_list=
+    |       |       +-ColumnRef(type=MEASURE<INT64>, column=MeasureTable_Derived.measure_derived_sum_price_plus_one#11)
+    |       +-input_scan=
+    |         +-TableScan(column_list=MeasureTable_Derived.[key#1, measure_derived_sum_price_plus_one#11], table=MeasureTable_Derived, column_index_list=[0, 10])
+    +-query=
+      +-ProjectScan
+        +-column_list=[outer_t.key#29, $query.$col2#33]
+        +-expr_list=
+        | +-$col2#33 :=
+        |   +-SubqueryExpr
+        |     +-type=INT64
+        |     +-subquery_type=SCALAR
+        |     +-parameter_list=
+        |     | +-ColumnRef(type=STRUCT<m MEASURE<INT64>>, column=outer_t.s#30)
+        |     +-subquery=
+        |       +-ProjectScan
+        |         +-column_list=[$aggregate.$agg1#32]
+        |         +-input_scan=
+        |           +-AggregateScan
+        |             +-column_list=[$aggregate.$agg1#32]
+        |             +-input_scan=
+        |             | +-ArrayScan
+        |             |   +-array_expr_list=
+        |             |   | +-Literal(type=ARRAY<INT64>, value=[1])
+        |             |   +-element_column_list=[$array.$unnest1#31]
+        |             +-aggregate_list=
+        |               +-$agg1#32 :=
+        |                 +-AggregateFunctionCall(GoogleSQL:AGG(MEASURE<INT64>) -> INT64)
+        |                   +-GetStructField
+        |                     +-type=MEASURE<INT64>
+        |                     +-expr=
+        |                     | +-ColumnRef(type=STRUCT<m MEASURE<INT64>>, column=outer_t.s#30, is_correlated=TRUE)
+        |                     +-field_idx=0
+        +-input_scan=
+          +-WithRefScan(column_list=outer_t.[key#29, s#30], with_query_name="outer_t")
+
+[SQLBUILDER_TARGET_SYNTAX_MODE standard]
+[SQLBUILDER_OUTPUT]
+WITH
+  outer_t AS (
+    SELECT
+      measuretable_derived_3.a_1 AS a_1,
+      STRUCT(measuretable_derived_3.a_2 AS m) AS a_4
+    FROM
+      (
+        SELECT
+          MeasureTable_Derived.key AS a_1,
+          MeasureTable_Derived.measure_derived_sum_price_plus_one AS a_2
+        FROM
+          MeasureTable_Derived
+      ) AS measuretable_derived_3
+  )
+SELECT
+  withrefscan_5.a_1 AS key,
+  (
+    SELECT
+      AGG(withrefscan_5.a_4.m) AS a_8
+    FROM
+      UNNEST(ARRAY< INT64 >[1] AS a_7)
+  ) AS a_6
+FROM
+  outer_t AS withrefscan_5;
+
+[SQLBUILDER_TARGET_SYNTAX_MODE pipe]
+[SQLBUILDER_OUTPUT]
+WITH
+  outer_t AS (
+    FROM
+      MeasureTable_Derived
+    |> SELECT
+         MeasureTable_Derived.key AS a_1,
+         MeasureTable_Derived.measure_derived_sum_price_plus_one AS a_2
+    |> AS measuretable_derived_3
+    |> SELECT
+         measuretable_derived_3.a_1 AS a_1,
+         STRUCT(measuretable_derived_3.a_2 AS m) AS a_4
+  )
+FROM
+  outer_t AS withrefscan_5
+|> SELECT
+     withrefscan_5.a_1 AS key,
+     (
+       FROM
+         UNNEST(ARRAY< INT64 >[1] AS a_7)
+       |> AGGREGATE
+            AGG(withrefscan_5.a_4.m) AS a_8) AS a_6;
+
+[REWRITTEN AST]
+QueryStmt
++-output_column_list=
+| +-outer_t.key#29 AS key [INT64]
+| +-$query.$col2#33 AS `$col2` [INT64]
++-query=
+  +-WithScan
+    +-column_list=[outer_t.key#29, $query.$col2#33]
+    +-with_entry_list=
+    | +-WithEntry
+    |   +-with_query_name="outer_t"
+    |   +-with_subquery=
+    |     +-ProjectScan
+    |       +-column_list=[MeasureTable_Derived.key#1, outer_t.s#28]
+    |       +-expr_list=
+    |       | +-s#28 :=
+    |       |   +-MakeStruct
+    |       |     +-type=STRUCT<m STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>>
+    |       |     +-field_list=
+    |       |       +-ColumnRef(type=STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>, column=MeasureTable_Derived.struct_for_measures_from_table_MeasureTable_Derived#36)
+    |       +-input_scan=
+    |         +-ProjectScan
+    |           +-column_list=MeasureTable_Derived.[key#1, struct_for_measures_from_table_MeasureTable_Derived#36]
+    |           +-expr_list=
+    |           | +-struct_for_measures_from_table_MeasureTable_Derived#36 :=
+    |           |   +-MakeStruct
+    |           |     +-type=STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>
+    |           |     +-field_list=
+    |           |       +-MakeStruct
+    |           |       | +-type=STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>
+    |           |       | +-field_list=
+    |           |       |   +-ColumnRef(type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, column=MeasureTable_Derived.struct_for_measures_from_table_MeasureTable_Derived#35)
+    |           |       +-MakeStruct
+    |           |         +-type=STRUCT<key INT64>
+    |           |         +-field_list=
+    |           |           +-ColumnRef(type=INT64, column=MeasureTable_Derived.key#1)
+    |           +-input_scan=
+    |             +-ProjectScan
+    |               +-column_list=MeasureTable_Derived.[key#1, struct_for_measures_from_table_MeasureTable_Derived#35]
+    |               +-expr_list=
+    |               | +-struct_for_measures_from_table_MeasureTable_Derived#35 :=
+    |               |   +-MakeStruct
+    |               |     +-type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>
+    |               |     +-field_list=
+    |               |       +-MakeStruct
+    |               |       | +-type=STRUCT<price INT64>
+    |               |       | +-field_list=
+    |               |       |   +-ColumnRef(type=INT64, column=MeasureTable_Derived.price#34)
+    |               |       +-MakeStruct
+    |               |         +-type=STRUCT<key INT64>
+    |               |         +-field_list=
+    |               |           +-ColumnRef(type=INT64, column=MeasureTable_Derived.key#1)
+    |               +-input_scan=
+    |                 +-TableScan(column_list=MeasureTable_Derived.[key#1, price#34], table=MeasureTable_Derived, column_index_list=[0, 3])
+    +-query=
+      +-ProjectScan
+        +-column_list=[outer_t.key#29, $query.$col2#33]
+        +-expr_list=
+        | +-$col2#33 :=
+        |   +-SubqueryExpr
+        |     +-type=INT64
+        |     +-subquery_type=SCALAR
+        |     +-parameter_list=
+        |     | +-ColumnRef(type=STRUCT<m STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>>, column=outer_t.s#30)
+        |     +-subquery=
+        |       +-ProjectScan
+        |         +-column_list=[$aggregate.$agg1#32]
+        |         +-input_scan=
+        |           +-ProjectScan
+        |             +-column_list=[$aggregate.$agg1#32]
+        |             +-expr_list=
+        |             | +-$agg1#32 :=
+        |             |   +-FunctionCall(GoogleSQL:$add(INT64, INT64) -> INT64)
+        |             |     +-ColumnRef(type=INT64, column=$aggregate.constituent_aggregate_1#40)
+        |             |     +-Literal(type=INT64, value=1)
+        |             +-input_scan=
+        |               +-AggregateScan
+        |                 +-column_list=[$aggregate.constituent_aggregate_1#40]
+        |                 +-input_scan=
+        |                 | +-ProjectScan
+        |                 |   +-column_list=$aggregate.[agg_arg#37, dep_closure#39]
+        |                 |   +-expr_list=
+        |                 |   | +-dep_closure#39 :=
+        |                 |   |   +-GetStructField
+        |                 |   |     +-type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>
+        |                 |   |     +-expr=
+        |                 |   |     | +-GetStructField
+        |                 |   |     |   +-type=STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>
+        |                 |   |     |   +-expr=
+        |                 |   |     |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>, column=$aggregate.agg_arg#37)
+        |                 |   |     |   +-field_idx=0
+        |                 |   |     +-field_idx=0
+        |                 |   +-input_scan=
+        |                 |     +-ProjectScan
+        |                 |       +-column_list=[$aggregate.agg_arg#37]
+        |                 |       +-expr_list=
+        |                 |       | +-agg_arg#37 :=
+        |                 |       |   +-GetStructField
+        |                 |       |     +-type=STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>
+        |                 |       |     +-expr=
+        |                 |       |     | +-ColumnRef(type=STRUCT<m STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>>, column=outer_t.s#30, is_correlated=TRUE)
+        |                 |       |     +-field_idx=0
+        |                 |       +-input_scan=
+        |                 |         +-ArrayScan
+        |                 |           +-array_expr_list=
+        |                 |           | +-Literal(type=ARRAY<INT64>, value=[1])
+        |                 |           +-element_column_list=[$array.$unnest1#31]
+        |                 +-aggregate_list=
+        |                   +-constituent_aggregate_1#40 :=
+        |                     +-AggregateFunctionCall(GoogleSQL:sum(INT64) -> INT64)
+        |                       +-ColumnRef(type=INT64, column=$aggregate.$any_value_grain_lock_0#41)
+        |                       +-where_expr=
+        |                       | +-FunctionCall(GoogleSQL:$not(BOOL) -> BOOL)
+        |                       |   +-FunctionCall(GoogleSQL:$is_null(STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>) -> BOOL)
+        |                       |     +-ColumnRef(type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, column=$aggregate.dep_closure#39)
+        |                       +-group_by_list=
+        |                       | +-grain_lock_key#42 :=
+        |                       |   +-GetStructField
+        |                       |     +-type=STRUCT<key INT64>
+        |                       |     +-expr=
+        |                       |     | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, column=$aggregate.dep_closure#39)
+        |                       |     +-field_idx=1
+        |                       +-group_by_aggregate_list=
+        |                         +-$any_value_grain_lock_0#41 :=
+        |                           +-AggregateFunctionCall(GoogleSQL:any_value(INT64) -> INT64)
+        |                             +-GetStructField
+        |                               +-type=INT64
+        |                               +-expr=
+        |                               | +-GetStructField
+        |                               |   +-type=STRUCT<price INT64>
+        |                               |   +-expr=
+        |                               |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, column=$aggregate.dep_closure#39)
+        |                               |   +-field_idx=0
+        |                               +-field_idx=0
+        +-input_scan=
+          +-WithRefScan(column_list=outer_t.[key#29, s#30], with_query_name="outer_t")
+
+[SQLBUILDER_TARGET_SYNTAX_MODE standard]
+[SQLBUILDER_OUTPUT]
+WITH
+  outer_t AS (
+    SELECT
+      projectscan_7.a_1 AS a_1,
+      STRUCT< m STRUCT< referenced_columns STRUCT< measure_sum_price STRUCT< referenced_columns STRUCT< price INT64 >
+      , key_columns STRUCT< key INT64 > > >, key_columns STRUCT< key INT64 > > > (projectscan_7.a_6) AS a_8
+    FROM
+      (
+        SELECT
+          projectscan_5.a_1 AS a_1,
+          STRUCT< referenced_columns STRUCT< measure_sum_price STRUCT< referenced_columns STRUCT< price INT64 >
+          , key_columns STRUCT< key INT64 > > >, key_columns STRUCT< key INT64 > > (STRUCT< measure_sum_price STRUCT<
+            referenced_columns STRUCT< price INT64 >, key_columns STRUCT< key INT64 > > > (projectscan_5.a_4), STRUCT<
+            key INT64 > (projectscan_5.a_1)) AS a_6
+        FROM
+          (
+            SELECT
+              measuretable_derived_3.a_1 AS a_1,
+              STRUCT< referenced_columns STRUCT< price INT64 >, key_columns STRUCT< key INT64 > > (STRUCT< price INT64 >
+                (measuretable_derived_3.a_2), STRUCT< key INT64 > (measuretable_derived_3.a_1)) AS a_4
+            FROM
+              (
+                SELECT
+                  MeasureTable_Derived.key AS a_1,
+                  MeasureTable_Derived.price AS a_2
+                FROM
+                  MeasureTable_Derived
+              ) AS measuretable_derived_3
+          ) AS projectscan_5
+      ) AS projectscan_7
+  )
+SELECT
+  withrefscan_9.a_1 AS key,
+  (
+    SELECT
+      (aggregatescan_17.a_16) + 1 AS a_18
+    FROM
+      (
+        SELECT
+          SUM(ANY_VALUE(projectscan_15.a_14.referenced_columns.price)
+            WHERE
+              NOT((projectscan_15.a_14) IS NULL)
+            GROUP BY projectscan_15.a_14.key_columns) AS a_16
+        FROM
+          (
+            SELECT
+              projectscan_13.a_12 AS a_12,
+              projectscan_13.a_12.referenced_columns.measure_sum_price AS a_14
+            FROM
+              (
+                SELECT
+                  withrefscan_9.a_8.m AS a_12
+                FROM
+                  UNNEST(ARRAY< INT64 >[1] AS a_11)
+              ) AS projectscan_13
+          ) AS projectscan_15
+      ) AS aggregatescan_17
+  ) AS a_10
+FROM
+  outer_t AS withrefscan_9;
+
+[SQLBUILDER_TARGET_SYNTAX_MODE pipe]
+[SQLBUILDER_OUTPUT]
+WITH
+  outer_t AS (
+    FROM
+      MeasureTable_Derived
+    |> SELECT
+         MeasureTable_Derived.key AS a_1,
+         MeasureTable_Derived.price AS a_2
+    |> AS measuretable_derived_3
+    |> SELECT
+         measuretable_derived_3.a_1 AS a_1,
+         STRUCT< referenced_columns STRUCT< price INT64 >, key_columns STRUCT< key INT64 > > (STRUCT< price INT64 >
+           (measuretable_derived_3.a_2), STRUCT< key INT64 > (measuretable_derived_3.a_1)) AS a_4
+    |> AS projectscan_5
+    |> SELECT
+         projectscan_5.a_1 AS a_1,
+         STRUCT< referenced_columns STRUCT< measure_sum_price STRUCT< referenced_columns STRUCT< price INT64 >
+         , key_columns STRUCT< key INT64 > > >, key_columns STRUCT< key INT64 > > (STRUCT< measure_sum_price STRUCT<
+           referenced_columns STRUCT< price INT64 >, key_columns STRUCT< key INT64 > > > (projectscan_5.a_4), STRUCT<
+           key INT64 > (projectscan_5.a_1)) AS a_6
+    |> AS projectscan_7
+    |> SELECT
+         projectscan_7.a_1 AS a_1,
+         STRUCT< m STRUCT< referenced_columns STRUCT< measure_sum_price STRUCT< referenced_columns STRUCT< price INT64 >
+         , key_columns STRUCT< key INT64 > > >, key_columns STRUCT< key INT64 > > > (projectscan_7.a_6) AS a_8
+  )
+FROM
+  outer_t AS withrefscan_9
+|> SELECT
+     withrefscan_9.a_1 AS key,
+     (
+       FROM
+         UNNEST(ARRAY< INT64 >[1] AS a_11)
+       |> SELECT
+            withrefscan_9.a_8.m AS a_12
+       |> AS projectscan_13
+       |> SELECT
+            projectscan_13.a_12 AS a_12,
+            projectscan_13.a_12.referenced_columns.measure_sum_price AS a_14
+       |> AS projectscan_15
+       |> AGGREGATE
+            SUM(ANY_VALUE(projectscan_15.a_14.referenced_columns.price)
+              WHERE
+                NOT((projectscan_15.a_14) IS NULL)
+              GROUP BY projectscan_15.a_14.key_columns) AS a_16
+       |> AS aggregatescan_17
+       |> SELECT
+            (aggregatescan_17.a_16) + 1 AS a_18
+     ) AS a_10;
+==
+
+# 2. Ad-hoc Struct
+
+## Base Case
+SELECT key, AGG(STRUCT(measure_derived_sum_price_plus_one AS m).m)
+FROM MeasureTable_Derived
+GROUP BY key;
+--
+QueryStmt
++-output_column_list=
+| +-$groupby.key#29 AS key [INT64]
+| +-$aggregate.$agg1#28 AS `$col2` [INT64]
++-query=
+  +-ProjectScan
+    +-column_list=[$groupby.key#29, $aggregate.$agg1#28]
+    +-input_scan=
+      +-AggregateScan
+        +-column_list=[$groupby.key#29, $aggregate.$agg1#28]
+        +-input_scan=
+        | +-TableScan(column_list=MeasureTable_Derived.[key#1, measure_derived_sum_price_plus_one#11], table=MeasureTable_Derived, column_index_list=[0, 10])
+        +-group_by_list=
+        | +-key#29 := ColumnRef(type=INT64, column=MeasureTable_Derived.key#1)
+        +-aggregate_list=
+          +-$agg1#28 :=
+            +-AggregateFunctionCall(GoogleSQL:AGG(MEASURE<INT64>) -> INT64)
+              +-GetStructField
+                +-type=MEASURE<INT64>
+                +-expr=
+                | +-MakeStruct
+                |   +-type=STRUCT<m MEASURE<INT64>>
+                |   +-field_list=
+                |     +-ColumnRef(type=MEASURE<INT64>, column=MeasureTable_Derived.measure_derived_sum_price_plus_one#11)
+                +-field_idx=0
+
+[SQLBUILDER_TARGET_SYNTAX_MODE standard]
+[SQLBUILDER_OUTPUT]
+SELECT
+  measuretable_derived_3.a_1 AS key,
+  AGG(STRUCT(measuretable_derived_3.a_2 AS m).m) AS a_5
+FROM
+  (
+    SELECT
+      MeasureTable_Derived.key AS a_1,
+      MeasureTable_Derived.measure_derived_sum_price_plus_one AS a_2
+    FROM
+      MeasureTable_Derived
+  ) AS measuretable_derived_3
+GROUP BY 1;
+
+[SQLBUILDER_TARGET_SYNTAX_MODE pipe]
+[SQLBUILDER_OUTPUT]
+FROM
+  MeasureTable_Derived
+|> SELECT
+     MeasureTable_Derived.key AS a_1,
+     MeasureTable_Derived.measure_derived_sum_price_plus_one AS a_2
+|> AS measuretable_derived_3
+|> EXTEND
+     measuretable_derived_3.a_1 AS a_4
+|> AGGREGATE
+     AGG(STRUCT(measuretable_derived_3.a_2 AS m).m) AS a_5
+   GROUP BY a_4
+|> AS aggregatescan_6
+|> SELECT
+     aggregatescan_6.a_4 AS key,
+     aggregatescan_6.a_5 AS a_5;
+
+[REWRITTEN AST]
+QueryStmt
++-output_column_list=
+| +-$groupby.key#29 AS key [INT64]
+| +-$aggregate.$agg1#28 AS `$col2` [INT64]
++-query=
+  +-ProjectScan
+    +-column_list=[$groupby.key#29, $aggregate.$agg1#28]
+    +-input_scan=
+      +-ProjectScan
+        +-column_list=[$groupby.key#29, $aggregate.$agg1#28]
+        +-expr_list=
+        | +-$agg1#28 :=
+        |   +-FunctionCall(GoogleSQL:$add(INT64, INT64) -> INT64)
+        |     +-ColumnRef(type=INT64, column=$aggregate.constituent_aggregate_1#36)
+        |     +-Literal(type=INT64, value=1)
+        +-input_scan=
+          +-AggregateScan
+            +-column_list=[$groupby.key#29, $aggregate.constituent_aggregate_1#36]
+            +-input_scan=
+            | +-ProjectScan
+            |   +-column_list=[MeasureTable_Derived.key#1, MeasureTable_Derived.struct_for_measures_from_table_MeasureTable_Derived#32, $aggregate.agg_arg#33, $aggregate.dep_closure#35]
+            |   +-expr_list=
+            |   | +-dep_closure#35 :=
+            |   |   +-GetStructField
+            |   |     +-type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>
+            |   |     +-expr=
+            |   |     | +-GetStructField
+            |   |     |   +-type=STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>
+            |   |     |   +-expr=
+            |   |     |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>, column=$aggregate.agg_arg#33)
+            |   |     |   +-field_idx=0
+            |   |     +-field_idx=0
+            |   +-input_scan=
+            |     +-ProjectScan
+            |       +-column_list=[MeasureTable_Derived.key#1, MeasureTable_Derived.struct_for_measures_from_table_MeasureTable_Derived#32, $aggregate.agg_arg#33]
+            |       +-expr_list=
+            |       | +-agg_arg#33 :=
+            |       |   +-GetStructField
+            |       |     +-type=STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>
+            |       |     +-expr=
+            |       |     | +-MakeStruct
+            |       |     |   +-type=STRUCT<m STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>>
+            |       |     |   +-field_list=
+            |       |     |     +-ColumnRef(type=STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>, column=MeasureTable_Derived.struct_for_measures_from_table_MeasureTable_Derived#32)
+            |       |     +-field_idx=0
+            |       +-input_scan=
+            |         +-ProjectScan
+            |           +-column_list=MeasureTable_Derived.[key#1, struct_for_measures_from_table_MeasureTable_Derived#32]
+            |           +-expr_list=
+            |           | +-struct_for_measures_from_table_MeasureTable_Derived#32 :=
+            |           |   +-MakeStruct
+            |           |     +-type=STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>
+            |           |     +-field_list=
+            |           |       +-MakeStruct
+            |           |       | +-type=STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>
+            |           |       | +-field_list=
+            |           |       |   +-ColumnRef(type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, column=MeasureTable_Derived.struct_for_measures_from_table_MeasureTable_Derived#31)
+            |           |       +-MakeStruct
+            |           |         +-type=STRUCT<key INT64>
+            |           |         +-field_list=
+            |           |           +-ColumnRef(type=INT64, column=MeasureTable_Derived.key#1)
+            |           +-input_scan=
+            |             +-ProjectScan
+            |               +-column_list=MeasureTable_Derived.[key#1, struct_for_measures_from_table_MeasureTable_Derived#31]
+            |               +-expr_list=
+            |               | +-struct_for_measures_from_table_MeasureTable_Derived#31 :=
+            |               |   +-MakeStruct
+            |               |     +-type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>
+            |               |     +-field_list=
+            |               |       +-MakeStruct
+            |               |       | +-type=STRUCT<price INT64>
+            |               |       | +-field_list=
+            |               |       |   +-ColumnRef(type=INT64, column=MeasureTable_Derived.price#30)
+            |               |       +-MakeStruct
+            |               |         +-type=STRUCT<key INT64>
+            |               |         +-field_list=
+            |               |           +-ColumnRef(type=INT64, column=MeasureTable_Derived.key#1)
+            |               +-input_scan=
+            |                 +-TableScan(column_list=MeasureTable_Derived.[key#1, price#30], table=MeasureTable_Derived, column_index_list=[0, 3])
+            +-group_by_list=
+            | +-key#29 := ColumnRef(type=INT64, column=MeasureTable_Derived.key#1)
+            +-aggregate_list=
+              +-constituent_aggregate_1#36 :=
+                +-AggregateFunctionCall(GoogleSQL:sum(INT64) -> INT64)
+                  +-ColumnRef(type=INT64, column=$aggregate.$any_value_grain_lock_0#37)
+                  +-where_expr=
+                  | +-FunctionCall(GoogleSQL:$not(BOOL) -> BOOL)
+                  |   +-FunctionCall(GoogleSQL:$is_null(STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>) -> BOOL)
+                  |     +-ColumnRef(type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, column=$aggregate.dep_closure#35)
+                  +-group_by_list=
+                  | +-grain_lock_key#38 :=
+                  |   +-GetStructField
+                  |     +-type=STRUCT<key INT64>
+                  |     +-expr=
+                  |     | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, column=$aggregate.dep_closure#35)
+                  |     +-field_idx=1
+                  +-group_by_aggregate_list=
+                    +-$any_value_grain_lock_0#37 :=
+                      +-AggregateFunctionCall(GoogleSQL:any_value(INT64) -> INT64)
+                        +-GetStructField
+                          +-type=INT64
+                          +-expr=
+                          | +-GetStructField
+                          |   +-type=STRUCT<price INT64>
+                          |   +-expr=
+                          |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, column=$aggregate.dep_closure#35)
+                          |   +-field_idx=0
+                          +-field_idx=0
+
+[SQLBUILDER_TARGET_SYNTAX_MODE standard]
+[SQLBUILDER_OUTPUT]
+SELECT
+  aggregatescan_14.a_12 AS key,
+  (aggregatescan_14.a_13) + 1 AS a_15
+FROM
+  (
+    SELECT
+      projectscan_11.a_1 AS a_12,
+      SUM(ANY_VALUE(projectscan_11.a_10.referenced_columns.price)
+        WHERE
+          NOT((projectscan_11.a_10) IS NULL)
+        GROUP BY projectscan_11.a_10.key_columns) AS a_13
+    FROM
+      (
+        SELECT
+          projectscan_9.a_1 AS a_1,
+          projectscan_9.a_6 AS a_6,
+          projectscan_9.a_8 AS a_8,
+          projectscan_9.a_8.referenced_columns.measure_sum_price AS a_10
+        FROM
+          (
+            SELECT
+              projectscan_7.a_1 AS a_1,
+              projectscan_7.a_6 AS a_6,
+              STRUCT< m STRUCT< referenced_columns STRUCT< measure_sum_price STRUCT< referenced_columns STRUCT< price INT64 >
+              , key_columns STRUCT< key INT64 > > >, key_columns STRUCT< key INT64 > > > (projectscan_7.a_6).m AS a_8
+            FROM
+              (
+                SELECT
+                  projectscan_5.a_1 AS a_1,
+                  STRUCT< referenced_columns STRUCT< measure_sum_price STRUCT< referenced_columns STRUCT< price INT64 >
+                  , key_columns STRUCT< key INT64 > > >, key_columns STRUCT< key INT64 > > (STRUCT< measure_sum_price STRUCT<
+                    referenced_columns STRUCT< price INT64 >, key_columns STRUCT< key INT64 > > > (projectscan_5.a_4), STRUCT<
+                    key INT64 > (projectscan_5.a_1)) AS a_6
+                FROM
+                  (
+                    SELECT
+                      measuretable_derived_3.a_1 AS a_1,
+                      STRUCT< referenced_columns STRUCT< price INT64 >, key_columns STRUCT< key INT64 > > (STRUCT< price INT64 >
+                        (measuretable_derived_3.a_2), STRUCT< key INT64 > (measuretable_derived_3.a_1)) AS a_4
+                    FROM
+                      (
+                        SELECT
+                          MeasureTable_Derived.key AS a_1,
+                          MeasureTable_Derived.price AS a_2
+                        FROM
+                          MeasureTable_Derived
+                      ) AS measuretable_derived_3
+                  ) AS projectscan_5
+              ) AS projectscan_7
+          ) AS projectscan_9
+      ) AS projectscan_11
+    GROUP BY 1
+  ) AS aggregatescan_14;
+
+[SQLBUILDER_TARGET_SYNTAX_MODE pipe]
+[SQLBUILDER_OUTPUT]
+FROM
+  MeasureTable_Derived
+|> SELECT
+     MeasureTable_Derived.key AS a_1,
+     MeasureTable_Derived.price AS a_2
+|> AS measuretable_derived_3
+|> SELECT
+     measuretable_derived_3.a_1 AS a_1,
+     STRUCT< referenced_columns STRUCT< price INT64 >, key_columns STRUCT< key INT64 > > (STRUCT< price INT64 >
+       (measuretable_derived_3.a_2), STRUCT< key INT64 > (measuretable_derived_3.a_1)) AS a_4
+|> AS projectscan_5
+|> SELECT
+     projectscan_5.a_1 AS a_1,
+     STRUCT< referenced_columns STRUCT< measure_sum_price STRUCT< referenced_columns STRUCT< price INT64 >
+     , key_columns STRUCT< key INT64 > > >, key_columns STRUCT< key INT64 > > (STRUCT< measure_sum_price STRUCT<
+       referenced_columns STRUCT< price INT64 >, key_columns STRUCT< key INT64 > > > (projectscan_5.a_4), STRUCT<
+       key INT64 > (projectscan_5.a_1)) AS a_6
+|> AS projectscan_7
+|> SELECT
+     projectscan_7.a_1 AS a_1,
+     projectscan_7.a_6 AS a_6,
+     STRUCT< m STRUCT< referenced_columns STRUCT< measure_sum_price STRUCT< referenced_columns STRUCT< price INT64 >
+     , key_columns STRUCT< key INT64 > > >, key_columns STRUCT< key INT64 > > > (projectscan_7.a_6).m AS a_8
+|> AS projectscan_9
+|> SELECT
+     projectscan_9.a_1 AS a_1,
+     projectscan_9.a_6 AS a_6,
+     projectscan_9.a_8 AS a_8,
+     projectscan_9.a_8.referenced_columns.measure_sum_price AS a_10
+|> AS projectscan_11
+|> EXTEND
+     projectscan_11.a_1 AS a_12
+|> AGGREGATE
+     SUM(ANY_VALUE(projectscan_11.a_10.referenced_columns.price)
+       WHERE
+         NOT((projectscan_11.a_10) IS NULL)
+       GROUP BY projectscan_11.a_10.key_columns) AS a_13
+   GROUP BY a_12
+|> AS aggregatescan_14
+|> SELECT
+     aggregatescan_14.a_12 AS key,
+     (aggregatescan_14.a_13) + 1 AS a_15;
+==
+
+# 3. Deeply Nested Struct
+
+## Base Case
+WITH t AS (
+  SELECT key, STRUCT(STRUCT(measure_derived_sum_price_plus_one AS m) AS f) AS s
+  FROM MeasureTable_Derived
+)
+SELECT key, AGG(s.f.m) FROM t GROUP BY key;
+--
+QueryStmt
++-output_column_list=
+| +-$groupby.key#32 AS key [INT64]
+| +-$aggregate.$agg1#31 AS `$col2` [INT64]
++-query=
+  +-WithScan
+    +-column_list=[$groupby.key#32, $aggregate.$agg1#31]
+    +-with_entry_list=
+    | +-WithEntry
+    |   +-with_query_name="t"
+    |   +-with_subquery=
+    |     +-ProjectScan
+    |       +-column_list=[MeasureTable_Derived.key#1, t.s#28]
+    |       +-expr_list=
+    |       | +-s#28 :=
+    |       |   +-MakeStruct
+    |       |     +-type=STRUCT<f STRUCT<m MEASURE<INT64>>>
+    |       |     +-field_list=
+    |       |       +-MakeStruct
+    |       |         +-type=STRUCT<m MEASURE<INT64>>
+    |       |         +-field_list=
+    |       |           +-ColumnRef(type=MEASURE<INT64>, column=MeasureTable_Derived.measure_derived_sum_price_plus_one#11)
+    |       +-input_scan=
+    |         +-TableScan(column_list=MeasureTable_Derived.[key#1, measure_derived_sum_price_plus_one#11], table=MeasureTable_Derived, column_index_list=[0, 10])
+    +-query=
+      +-ProjectScan
+        +-column_list=[$groupby.key#32, $aggregate.$agg1#31]
+        +-input_scan=
+          +-AggregateScan
+            +-column_list=[$groupby.key#32, $aggregate.$agg1#31]
+            +-input_scan=
+            | +-WithRefScan(column_list=t.[key#29, s#30], with_query_name="t")
+            +-group_by_list=
+            | +-key#32 := ColumnRef(type=INT64, column=t.key#29)
+            +-aggregate_list=
+              +-$agg1#31 :=
+                +-AggregateFunctionCall(GoogleSQL:AGG(MEASURE<INT64>) -> INT64)
+                  +-GetStructField
+                    +-type=MEASURE<INT64>
+                    +-expr=
+                    | +-GetStructField
+                    |   +-type=STRUCT<m MEASURE<INT64>>
+                    |   +-expr=
+                    |   | +-ColumnRef(type=STRUCT<f STRUCT<m MEASURE<INT64>>>, column=t.s#30)
+                    |   +-field_idx=0
+                    +-field_idx=0
+
+[SQLBUILDER_TARGET_SYNTAX_MODE standard]
+[SQLBUILDER_OUTPUT]
+WITH
+  t AS (
+    SELECT
+      measuretable_derived_3.a_1 AS a_1,
+      STRUCT(STRUCT(measuretable_derived_3.a_2 AS m) AS f) AS a_4
+    FROM
+      (
+        SELECT
+          MeasureTable_Derived.key AS a_1,
+          MeasureTable_Derived.measure_derived_sum_price_plus_one AS a_2
+        FROM
+          MeasureTable_Derived
+      ) AS measuretable_derived_3
+  )
+SELECT
+  withrefscan_5.a_1 AS key,
+  AGG(withrefscan_5.a_4.f.m) AS a_7
+FROM
+  t AS withrefscan_5
+GROUP BY 1;
+
+[SQLBUILDER_TARGET_SYNTAX_MODE pipe]
+[SQLBUILDER_OUTPUT]
+WITH
+  t AS (
+    FROM
+      MeasureTable_Derived
+    |> SELECT
+         MeasureTable_Derived.key AS a_1,
+         MeasureTable_Derived.measure_derived_sum_price_plus_one AS a_2
+    |> AS measuretable_derived_3
+    |> SELECT
+         measuretable_derived_3.a_1 AS a_1,
+         STRUCT(STRUCT(measuretable_derived_3.a_2 AS m) AS f) AS a_4
+  )
+FROM
+  t AS withrefscan_5
+|> EXTEND
+     withrefscan_5.a_1 AS a_6
+|> AGGREGATE
+     AGG(withrefscan_5.a_4.f.m) AS a_7
+   GROUP BY a_6
+|> AS aggregatescan_8
+|> SELECT
+     aggregatescan_8.a_6 AS key,
+     aggregatescan_8.a_7 AS a_7;
+
+[REWRITTEN AST]
+QueryStmt
++-output_column_list=
+| +-$groupby.key#32 AS key [INT64]
+| +-$aggregate.$agg1#31 AS `$col2` [INT64]
++-query=
+  +-WithScan
+    +-column_list=[$groupby.key#32, $aggregate.$agg1#31]
+    +-with_entry_list=
+    | +-WithEntry
+    |   +-with_query_name="t"
+    |   +-with_subquery=
+    |     +-ProjectScan
+    |       +-column_list=[MeasureTable_Derived.key#1, t.s#28]
+    |       +-expr_list=
+    |       | +-s#28 :=
+    |       |   +-MakeStruct
+    |       |     +-type=STRUCT<f STRUCT<m STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>>>
+    |       |     +-field_list=
+    |       |       +-MakeStruct
+    |       |         +-type=STRUCT<m STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>>
+    |       |         +-field_list=
+    |       |           +-ColumnRef(type=STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>, column=MeasureTable_Derived.struct_for_measures_from_table_MeasureTable_Derived#35)
+    |       +-input_scan=
+    |         +-ProjectScan
+    |           +-column_list=MeasureTable_Derived.[key#1, struct_for_measures_from_table_MeasureTable_Derived#35]
+    |           +-expr_list=
+    |           | +-struct_for_measures_from_table_MeasureTable_Derived#35 :=
+    |           |   +-MakeStruct
+    |           |     +-type=STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>
+    |           |     +-field_list=
+    |           |       +-MakeStruct
+    |           |       | +-type=STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>
+    |           |       | +-field_list=
+    |           |       |   +-ColumnRef(type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, column=MeasureTable_Derived.struct_for_measures_from_table_MeasureTable_Derived#34)
+    |           |       +-MakeStruct
+    |           |         +-type=STRUCT<key INT64>
+    |           |         +-field_list=
+    |           |           +-ColumnRef(type=INT64, column=MeasureTable_Derived.key#1)
+    |           +-input_scan=
+    |             +-ProjectScan
+    |               +-column_list=MeasureTable_Derived.[key#1, struct_for_measures_from_table_MeasureTable_Derived#34]
+    |               +-expr_list=
+    |               | +-struct_for_measures_from_table_MeasureTable_Derived#34 :=
+    |               |   +-MakeStruct
+    |               |     +-type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>
+    |               |     +-field_list=
+    |               |       +-MakeStruct
+    |               |       | +-type=STRUCT<price INT64>
+    |               |       | +-field_list=
+    |               |       |   +-ColumnRef(type=INT64, column=MeasureTable_Derived.price#33)
+    |               |       +-MakeStruct
+    |               |         +-type=STRUCT<key INT64>
+    |               |         +-field_list=
+    |               |           +-ColumnRef(type=INT64, column=MeasureTable_Derived.key#1)
+    |               +-input_scan=
+    |                 +-TableScan(column_list=MeasureTable_Derived.[key#1, price#33], table=MeasureTable_Derived, column_index_list=[0, 3])
+    +-query=
+      +-ProjectScan
+        +-column_list=[$groupby.key#32, $aggregate.$agg1#31]
+        +-input_scan=
+          +-ProjectScan
+            +-column_list=[$groupby.key#32, $aggregate.$agg1#31]
+            +-expr_list=
+            | +-$agg1#31 :=
+            |   +-FunctionCall(GoogleSQL:$add(INT64, INT64) -> INT64)
+            |     +-ColumnRef(type=INT64, column=$aggregate.constituent_aggregate_1#39)
+            |     +-Literal(type=INT64, value=1)
+            +-input_scan=
+              +-AggregateScan
+                +-column_list=[$groupby.key#32, $aggregate.constituent_aggregate_1#39]
+                +-input_scan=
+                | +-ProjectScan
+                |   +-column_list=[t.key#29, t.s#30, $aggregate.agg_arg#36, $aggregate.dep_closure#38]
+                |   +-expr_list=
+                |   | +-dep_closure#38 :=
+                |   |   +-GetStructField
+                |   |     +-type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>
+                |   |     +-expr=
+                |   |     | +-GetStructField
+                |   |     |   +-type=STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>
+                |   |     |   +-expr=
+                |   |     |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>, column=$aggregate.agg_arg#36)
+                |   |     |   +-field_idx=0
+                |   |     +-field_idx=0
+                |   +-input_scan=
+                |     +-ProjectScan
+                |       +-column_list=[t.key#29, t.s#30, $aggregate.agg_arg#36]
+                |       +-expr_list=
+                |       | +-agg_arg#36 :=
+                |       |   +-GetStructField
+                |       |     +-type=STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>
+                |       |     +-expr=
+                |       |     | +-GetStructField
+                |       |     |   +-type=STRUCT<m STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>>
+                |       |     |   +-expr=
+                |       |     |   | +-ColumnRef(type=STRUCT<f STRUCT<m STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>>>, column=t.s#30)
+                |       |     |   +-field_idx=0
+                |       |     +-field_idx=0
+                |       +-input_scan=
+                |         +-WithRefScan(column_list=t.[key#29, s#30], with_query_name="t")
+                +-group_by_list=
+                | +-key#32 := ColumnRef(type=INT64, column=t.key#29)
+                +-aggregate_list=
+                  +-constituent_aggregate_1#39 :=
+                    +-AggregateFunctionCall(GoogleSQL:sum(INT64) -> INT64)
+                      +-ColumnRef(type=INT64, column=$aggregate.$any_value_grain_lock_0#40)
+                      +-where_expr=
+                      | +-FunctionCall(GoogleSQL:$not(BOOL) -> BOOL)
+                      |   +-FunctionCall(GoogleSQL:$is_null(STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>) -> BOOL)
+                      |     +-ColumnRef(type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, column=$aggregate.dep_closure#38)
+                      +-group_by_list=
+                      | +-grain_lock_key#41 :=
+                      |   +-GetStructField
+                      |     +-type=STRUCT<key INT64>
+                      |     +-expr=
+                      |     | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, column=$aggregate.dep_closure#38)
+                      |     +-field_idx=1
+                      +-group_by_aggregate_list=
+                        +-$any_value_grain_lock_0#40 :=
+                          +-AggregateFunctionCall(GoogleSQL:any_value(INT64) -> INT64)
+                            +-GetStructField
+                              +-type=INT64
+                              +-expr=
+                              | +-GetStructField
+                              |   +-type=STRUCT<price INT64>
+                              |   +-expr=
+                              |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, column=$aggregate.dep_closure#38)
+                              |   +-field_idx=0
+                              +-field_idx=0
+
+[SQLBUILDER_TARGET_SYNTAX_MODE standard]
+[SQLBUILDER_OUTPUT]
+WITH
+  t AS (
+    SELECT
+      projectscan_7.a_1 AS a_1,
+      STRUCT< f STRUCT< m STRUCT< referenced_columns STRUCT< measure_sum_price STRUCT< referenced_columns STRUCT<
+      price INT64 >, key_columns STRUCT< key INT64 > > >, key_columns STRUCT< key INT64 > > > > (STRUCT< m STRUCT<
+        referenced_columns STRUCT< measure_sum_price STRUCT< referenced_columns STRUCT< price INT64 >, key_columns STRUCT<
+        key INT64 > > >, key_columns STRUCT< key INT64 > > > (projectscan_7.a_6)) AS a_8
+    FROM
+      (
+        SELECT
+          projectscan_5.a_1 AS a_1,
+          STRUCT< referenced_columns STRUCT< measure_sum_price STRUCT< referenced_columns STRUCT< price INT64 >
+          , key_columns STRUCT< key INT64 > > >, key_columns STRUCT< key INT64 > > (STRUCT< measure_sum_price STRUCT<
+            referenced_columns STRUCT< price INT64 >, key_columns STRUCT< key INT64 > > > (projectscan_5.a_4), STRUCT<
+            key INT64 > (projectscan_5.a_1)) AS a_6
+        FROM
+          (
+            SELECT
+              measuretable_derived_3.a_1 AS a_1,
+              STRUCT< referenced_columns STRUCT< price INT64 >, key_columns STRUCT< key INT64 > > (STRUCT< price INT64 >
+                (measuretable_derived_3.a_2), STRUCT< key INT64 > (measuretable_derived_3.a_1)) AS a_4
+            FROM
+              (
+                SELECT
+                  MeasureTable_Derived.key AS a_1,
+                  MeasureTable_Derived.price AS a_2
+                FROM
+                  MeasureTable_Derived
+              ) AS measuretable_derived_3
+          ) AS projectscan_5
+      ) AS projectscan_7
+  )
+SELECT
+  aggregatescan_16.a_14 AS key,
+  (aggregatescan_16.a_15) + 1 AS a_17
+FROM
+  (
+    SELECT
+      projectscan_13.a_1 AS a_14,
+      SUM(ANY_VALUE(projectscan_13.a_12.referenced_columns.price)
+        WHERE
+          NOT((projectscan_13.a_12) IS NULL)
+        GROUP BY projectscan_13.a_12.key_columns) AS a_15
+    FROM
+      (
+        SELECT
+          projectscan_11.a_1 AS a_1,
+          projectscan_11.a_8 AS a_8,
+          projectscan_11.a_10 AS a_10,
+          projectscan_11.a_10.referenced_columns.measure_sum_price AS a_12
+        FROM
+          (
+            SELECT
+              withrefscan_9.a_1 AS a_1,
+              withrefscan_9.a_8 AS a_8,
+              withrefscan_9.a_8.f.m AS a_10
+            FROM
+              t AS withrefscan_9
+          ) AS projectscan_11
+      ) AS projectscan_13
+    GROUP BY 1
+  ) AS aggregatescan_16;
+
+[SQLBUILDER_TARGET_SYNTAX_MODE pipe]
+[SQLBUILDER_OUTPUT]
+WITH
+  t AS (
+    FROM
+      MeasureTable_Derived
+    |> SELECT
+         MeasureTable_Derived.key AS a_1,
+         MeasureTable_Derived.price AS a_2
+    |> AS measuretable_derived_3
+    |> SELECT
+         measuretable_derived_3.a_1 AS a_1,
+         STRUCT< referenced_columns STRUCT< price INT64 >, key_columns STRUCT< key INT64 > > (STRUCT< price INT64 >
+           (measuretable_derived_3.a_2), STRUCT< key INT64 > (measuretable_derived_3.a_1)) AS a_4
+    |> AS projectscan_5
+    |> SELECT
+         projectscan_5.a_1 AS a_1,
+         STRUCT< referenced_columns STRUCT< measure_sum_price STRUCT< referenced_columns STRUCT< price INT64 >
+         , key_columns STRUCT< key INT64 > > >, key_columns STRUCT< key INT64 > > (STRUCT< measure_sum_price STRUCT<
+           referenced_columns STRUCT< price INT64 >, key_columns STRUCT< key INT64 > > > (projectscan_5.a_4), STRUCT<
+           key INT64 > (projectscan_5.a_1)) AS a_6
+    |> AS projectscan_7
+    |> SELECT
+         projectscan_7.a_1 AS a_1,
+         STRUCT< f STRUCT< m STRUCT< referenced_columns STRUCT< measure_sum_price STRUCT< referenced_columns STRUCT<
+         price INT64 >, key_columns STRUCT< key INT64 > > >, key_columns STRUCT< key INT64 > > > > (STRUCT< m STRUCT<
+           referenced_columns STRUCT< measure_sum_price STRUCT< referenced_columns STRUCT< price INT64 >, key_columns STRUCT<
+           key INT64 > > >, key_columns STRUCT< key INT64 > > > (projectscan_7.a_6)) AS a_8
+  )
+FROM
+  t AS withrefscan_9
+|> SELECT
+     withrefscan_9.a_1 AS a_1,
+     withrefscan_9.a_8 AS a_8,
+     withrefscan_9.a_8.f.m AS a_10
+|> AS projectscan_11
+|> SELECT
+     projectscan_11.a_1 AS a_1,
+     projectscan_11.a_8 AS a_8,
+     projectscan_11.a_10 AS a_10,
+     projectscan_11.a_10.referenced_columns.measure_sum_price AS a_12
+|> AS projectscan_13
+|> EXTEND
+     projectscan_13.a_1 AS a_14
+|> AGGREGATE
+     SUM(ANY_VALUE(projectscan_13.a_12.referenced_columns.price)
+       WHERE
+         NOT((projectscan_13.a_12) IS NULL)
+       GROUP BY projectscan_13.a_12.key_columns) AS a_15
+   GROUP BY a_14
+|> AS aggregatescan_16
+|> SELECT
+     aggregatescan_16.a_14 AS key,
+     (aggregatescan_16.a_15) + 1 AS a_17;
+==
+
+## Variation 3.1: Measure column in deeply nested struct is correlated
+FROM MeasureTable_Derived o
+|> SELECT (
+  FROM UNNEST([1])
+  |> EXTEND STRUCT(STRUCT(o.measure_derived_sum_price_plus_one AS m) AS f) AS s
+  |> AGGREGATE AGG(s.f.m)
+)
+--
+QueryStmt
++-output_column_list=
+| +-$pipe_select.$col1#31 AS `$col1` [INT64]
++-query=
+  +-ProjectScan
+    +-column_list=[$pipe_select.$col1#31]
+    +-expr_list=
+    | +-$col1#31 :=
+    |   +-SubqueryExpr
+    |     +-type=INT64
+    |     +-subquery_type=SCALAR
+    |     +-parameter_list=
+    |     | +-ColumnRef(type=MEASURE<INT64>, column=MeasureTable_Derived.measure_derived_sum_price_plus_one#11)
+    |     +-subquery=
+    |       +-AggregateScan
+    |         +-column_list=[$aggregate.$agg1#30]
+    |         +-input_scan=
+    |         | +-ProjectScan
+    |         |   +-column_list=[$pipe_extend.s#29]
+    |         |   +-expr_list=
+    |         |   | +-s#29 :=
+    |         |   |   +-MakeStruct
+    |         |   |     +-type=STRUCT<f STRUCT<m MEASURE<INT64>>>
+    |         |   |     +-field_list=
+    |         |   |       +-MakeStruct
+    |         |   |         +-type=STRUCT<m MEASURE<INT64>>
+    |         |   |         +-field_list=
+    |         |   |           +-ColumnRef(type=MEASURE<INT64>, column=MeasureTable_Derived.measure_derived_sum_price_plus_one#11, is_correlated=TRUE)
+    |         |   +-input_scan=
+    |         |     +-ArrayScan
+    |         |       +-array_expr_list=
+    |         |       | +-Literal(type=ARRAY<INT64>, value=[1])
+    |         |       +-element_column_list=[$array.$unnest1#28]
+    |         +-aggregate_list=
+    |           +-$agg1#30 :=
+    |             +-AggregateFunctionCall(GoogleSQL:AGG(MEASURE<INT64>) -> INT64)
+    |               +-GetStructField
+    |                 +-type=MEASURE<INT64>
+    |                 +-expr=
+    |                 | +-GetStructField
+    |                 |   +-type=STRUCT<m MEASURE<INT64>>
+    |                 |   +-expr=
+    |                 |   | +-ColumnRef(type=STRUCT<f STRUCT<m MEASURE<INT64>>>, column=$pipe_extend.s#29)
+    |                 |   +-field_idx=0
+    |                 +-field_idx=0
+    +-input_scan=
+      +-TableScan(column_list=[MeasureTable_Derived.measure_derived_sum_price_plus_one#11], table=MeasureTable_Derived, column_index_list=[10], alias="o")
+
+[SQLBUILDER_TARGET_SYNTAX_MODE standard]
+[SQLBUILDER_OUTPUT]
+SELECT
+  (
+    SELECT
+      AGG(projectscan_6.a_5.f.m) AS a_7
+    FROM
+      (
+        SELECT
+          STRUCT(STRUCT(measuretable_derived_2.a_1 AS m) AS f) AS a_5
+        FROM
+          UNNEST(ARRAY< INT64 >[1] AS a_4)
+      ) AS projectscan_6
+  ) AS a_3
+FROM
+  (
+    SELECT
+      MeasureTable_Derived.measure_derived_sum_price_plus_one AS a_1
+    FROM
+      MeasureTable_Derived
+  ) AS measuretable_derived_2;
+
+[SQLBUILDER_TARGET_SYNTAX_MODE pipe]
+[SQLBUILDER_OUTPUT]
+FROM
+  MeasureTable_Derived
+|> SELECT
+     MeasureTable_Derived.measure_derived_sum_price_plus_one AS a_1
+|> AS measuretable_derived_2
+|> SELECT
+     (
+       FROM
+         UNNEST(ARRAY< INT64 >[1] AS a_4)
+       |> SELECT
+            STRUCT(STRUCT(measuretable_derived_2.a_1 AS m) AS f) AS a_5
+       |> AS projectscan_6
+       |> AGGREGATE
+            AGG(projectscan_6.a_5.f.m) AS a_7) AS a_3;
+
+[REWRITTEN AST]
+QueryStmt
++-output_column_list=
+| +-$pipe_select.$col1#31 AS `$col1` [INT64]
++-query=
+  +-ProjectScan
+    +-column_list=[$pipe_select.$col1#31]
+    +-expr_list=
+    | +-$col1#31 :=
+    |   +-SubqueryExpr
+    |     +-type=INT64
+    |     +-subquery_type=SCALAR
+    |     +-parameter_list=
+    |     | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>, column=MeasureTable_Derived.struct_for_measures_from_table_MeasureTable_Derived#35)
+    |     +-subquery=
+    |       +-ProjectScan
+    |         +-column_list=[$aggregate.$agg1#30]
+    |         +-expr_list=
+    |         | +-$agg1#30 :=
+    |         |   +-FunctionCall(GoogleSQL:$add(INT64, INT64) -> INT64)
+    |         |     +-ColumnRef(type=INT64, column=$aggregate.constituent_aggregate_1#39)
+    |         |     +-Literal(type=INT64, value=1)
+    |         +-input_scan=
+    |           +-AggregateScan
+    |             +-column_list=[$aggregate.constituent_aggregate_1#39]
+    |             +-input_scan=
+    |             | +-ProjectScan
+    |             |   +-column_list=[$pipe_extend.s#29, $aggregate.agg_arg#36, $aggregate.dep_closure#38]
+    |             |   +-expr_list=
+    |             |   | +-dep_closure#38 :=
+    |             |   |   +-GetStructField
+    |             |   |     +-type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>
+    |             |   |     +-expr=
+    |             |   |     | +-GetStructField
+    |             |   |     |   +-type=STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>
+    |             |   |     |   +-expr=
+    |             |   |     |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>, column=$aggregate.agg_arg#36)
+    |             |   |     |   +-field_idx=0
+    |             |   |     +-field_idx=0
+    |             |   +-input_scan=
+    |             |     +-ProjectScan
+    |             |       +-column_list=[$pipe_extend.s#29, $aggregate.agg_arg#36]
+    |             |       +-expr_list=
+    |             |       | +-agg_arg#36 :=
+    |             |       |   +-GetStructField
+    |             |       |     +-type=STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>
+    |             |       |     +-expr=
+    |             |       |     | +-GetStructField
+    |             |       |     |   +-type=STRUCT<m STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>>
+    |             |       |     |   +-expr=
+    |             |       |     |   | +-ColumnRef(type=STRUCT<f STRUCT<m STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>>>, column=$pipe_extend.s#29)
+    |             |       |     |   +-field_idx=0
+    |             |       |     +-field_idx=0
+    |             |       +-input_scan=
+    |             |         +-ProjectScan
+    |             |           +-column_list=[$pipe_extend.s#29]
+    |             |           +-expr_list=
+    |             |           | +-s#29 :=
+    |             |           |   +-MakeStruct
+    |             |           |     +-type=STRUCT<f STRUCT<m STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>>>
+    |             |           |     +-field_list=
+    |             |           |       +-MakeStruct
+    |             |           |         +-type=STRUCT<m STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>>
+    |             |           |         +-field_list=
+    |             |           |           +-ColumnRef(type=STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>, column=MeasureTable_Derived.struct_for_measures_from_table_MeasureTable_Derived#35, is_correlated=TRUE)
+    |             |           +-input_scan=
+    |             |             +-ArrayScan
+    |             |               +-array_expr_list=
+    |             |               | +-Literal(type=ARRAY<INT64>, value=[1])
+    |             |               +-element_column_list=[$array.$unnest1#28]
+    |             +-aggregate_list=
+    |               +-constituent_aggregate_1#39 :=
+    |                 +-AggregateFunctionCall(GoogleSQL:sum(INT64) -> INT64)
+    |                   +-ColumnRef(type=INT64, column=$aggregate.$any_value_grain_lock_0#40)
+    |                   +-where_expr=
+    |                   | +-FunctionCall(GoogleSQL:$not(BOOL) -> BOOL)
+    |                   |   +-FunctionCall(GoogleSQL:$is_null(STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>) -> BOOL)
+    |                   |     +-ColumnRef(type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, column=$aggregate.dep_closure#38)
+    |                   +-group_by_list=
+    |                   | +-grain_lock_key#41 :=
+    |                   |   +-GetStructField
+    |                   |     +-type=STRUCT<key INT64>
+    |                   |     +-expr=
+    |                   |     | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, column=$aggregate.dep_closure#38)
+    |                   |     +-field_idx=1
+    |                   +-group_by_aggregate_list=
+    |                     +-$any_value_grain_lock_0#40 :=
+    |                       +-AggregateFunctionCall(GoogleSQL:any_value(INT64) -> INT64)
+    |                         +-GetStructField
+    |                           +-type=INT64
+    |                           +-expr=
+    |                           | +-GetStructField
+    |                           |   +-type=STRUCT<price INT64>
+    |                           |   +-expr=
+    |                           |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, column=$aggregate.dep_closure#38)
+    |                           |   +-field_idx=0
+    |                           +-field_idx=0
+    +-input_scan=
+      +-ProjectScan
+        +-column_list=[MeasureTable_Derived.struct_for_measures_from_table_MeasureTable_Derived#35]
+        +-expr_list=
+        | +-struct_for_measures_from_table_MeasureTable_Derived#35 :=
+        |   +-MakeStruct
+        |     +-type=STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>
+        |     +-field_list=
+        |       +-MakeStruct
+        |       | +-type=STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>
+        |       | +-field_list=
+        |       |   +-ColumnRef(type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, column=MeasureTable_Derived.struct_for_measures_from_table_MeasureTable_Derived#34)
+        |       +-MakeStruct
+        |         +-type=STRUCT<key INT64>
+        |         +-field_list=
+        |           +-ColumnRef(type=INT64, column=MeasureTable_Derived.key#33)
+        +-input_scan=
+          +-ProjectScan
+            +-column_list=MeasureTable_Derived.[key#33, struct_for_measures_from_table_MeasureTable_Derived#34]
+            +-expr_list=
+            | +-struct_for_measures_from_table_MeasureTable_Derived#34 :=
+            |   +-MakeStruct
+            |     +-type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>
+            |     +-field_list=
+            |       +-MakeStruct
+            |       | +-type=STRUCT<price INT64>
+            |       | +-field_list=
+            |       |   +-ColumnRef(type=INT64, column=MeasureTable_Derived.price#32)
+            |       +-MakeStruct
+            |         +-type=STRUCT<key INT64>
+            |         +-field_list=
+            |           +-ColumnRef(type=INT64, column=MeasureTable_Derived.key#33)
+            +-input_scan=
+              +-TableScan(column_list=MeasureTable_Derived.[key#33, price#32], table=MeasureTable_Derived, column_index_list=[0, 3], alias="o")
+
+[SQLBUILDER_TARGET_SYNTAX_MODE standard]
+[SQLBUILDER_OUTPUT]
+SELECT
+  (
+    SELECT
+      (aggregatescan_17.a_16) + 1 AS a_18
+    FROM
+      (
+        SELECT
+          SUM(ANY_VALUE(projectscan_15.a_14.referenced_columns.price)
+            WHERE
+              NOT((projectscan_15.a_14) IS NULL)
+            GROUP BY projectscan_15.a_14.key_columns) AS a_16
+        FROM
+          (
+            SELECT
+              projectscan_13.a_10 AS a_10,
+              projectscan_13.a_12 AS a_12,
+              projectscan_13.a_12.referenced_columns.measure_sum_price AS a_14
+            FROM
+              (
+                SELECT
+                  projectscan_11.a_10 AS a_10,
+                  projectscan_11.a_10.f.m AS a_12
+                FROM
+                  (
+                    SELECT
+                      STRUCT< f STRUCT< m STRUCT< referenced_columns STRUCT< measure_sum_price STRUCT< referenced_columns STRUCT<
+                      price INT64 >, key_columns STRUCT< key INT64 > > >, key_columns STRUCT< key INT64 > > > > (STRUCT< m STRUCT<
+                        referenced_columns STRUCT< measure_sum_price STRUCT< referenced_columns STRUCT< price INT64 >, key_columns STRUCT<
+                        key INT64 > > >, key_columns STRUCT< key INT64 > > > (projectscan_7.a_6)) AS a_10
+                    FROM
+                      UNNEST(ARRAY< INT64 >[1] AS a_9)
+                  ) AS projectscan_11
+              ) AS projectscan_13
+          ) AS projectscan_15
+      ) AS aggregatescan_17
+  ) AS a_8
+FROM
+  (
+    SELECT
+      STRUCT< referenced_columns STRUCT< measure_sum_price STRUCT< referenced_columns STRUCT< price INT64 >
+      , key_columns STRUCT< key INT64 > > >, key_columns STRUCT< key INT64 > > (STRUCT< measure_sum_price STRUCT<
+        referenced_columns STRUCT< price INT64 >, key_columns STRUCT< key INT64 > > > (projectscan_5.a_4), STRUCT<
+        key INT64 > (projectscan_5.a_1)) AS a_6
+    FROM
+      (
+        SELECT
+          measuretable_derived_3.a_1 AS a_1,
+          STRUCT< referenced_columns STRUCT< price INT64 >, key_columns STRUCT< key INT64 > > (STRUCT< price INT64 >
+            (measuretable_derived_3.a_2), STRUCT< key INT64 > (measuretable_derived_3.a_1)) AS a_4
+        FROM
+          (
+            SELECT
+              MeasureTable_Derived.key AS a_1,
+              MeasureTable_Derived.price AS a_2
+            FROM
+              MeasureTable_Derived
+          ) AS measuretable_derived_3
+      ) AS projectscan_5
+  ) AS projectscan_7;
+
+[SQLBUILDER_TARGET_SYNTAX_MODE pipe]
+[SQLBUILDER_OUTPUT]
+FROM
+  MeasureTable_Derived
+|> SELECT
+     MeasureTable_Derived.key AS a_1,
+     MeasureTable_Derived.price AS a_2
+|> AS measuretable_derived_3
+|> SELECT
+     measuretable_derived_3.a_1 AS a_1,
+     STRUCT< referenced_columns STRUCT< price INT64 >, key_columns STRUCT< key INT64 > > (STRUCT< price INT64 >
+       (measuretable_derived_3.a_2), STRUCT< key INT64 > (measuretable_derived_3.a_1)) AS a_4
+|> AS projectscan_5
+|> SELECT
+     STRUCT< referenced_columns STRUCT< measure_sum_price STRUCT< referenced_columns STRUCT< price INT64 >
+     , key_columns STRUCT< key INT64 > > >, key_columns STRUCT< key INT64 > > (STRUCT< measure_sum_price STRUCT<
+       referenced_columns STRUCT< price INT64 >, key_columns STRUCT< key INT64 > > > (projectscan_5.a_4), STRUCT<
+       key INT64 > (projectscan_5.a_1)) AS a_6
+|> AS projectscan_7
+|> SELECT
+     (
+       FROM
+         UNNEST(ARRAY< INT64 >[1] AS a_9)
+       |> SELECT
+            STRUCT< f STRUCT< m STRUCT< referenced_columns STRUCT< measure_sum_price STRUCT< referenced_columns STRUCT<
+            price INT64 >, key_columns STRUCT< key INT64 > > >, key_columns STRUCT< key INT64 > > > > (STRUCT< m STRUCT<
+              referenced_columns STRUCT< measure_sum_price STRUCT< referenced_columns STRUCT< price INT64 >, key_columns STRUCT<
+              key INT64 > > >, key_columns STRUCT< key INT64 > > > (projectscan_7.a_6)) AS a_10
+       |> AS projectscan_11
+       |> SELECT
+            projectscan_11.a_10 AS a_10,
+            projectscan_11.a_10.f.m AS a_12
+       |> AS projectscan_13
+       |> SELECT
+            projectscan_13.a_10 AS a_10,
+            projectscan_13.a_12 AS a_12,
+            projectscan_13.a_12.referenced_columns.measure_sum_price AS a_14
+       |> AS projectscan_15
+       |> AGGREGATE
+            SUM(ANY_VALUE(projectscan_15.a_14.referenced_columns.price)
+              WHERE
+                NOT((projectscan_15.a_14) IS NULL)
+              GROUP BY projectscan_15.a_14.key_columns) AS a_16
+       |> AS aggregatescan_17
+       |> SELECT
+            (aggregatescan_17.a_16) + 1 AS a_18
+     ) AS a_8;
+==
+
+## Variation 3.2: Struct itself is correlated (deeply nested)
+WITH outer_t AS (
+  SELECT key, STRUCT(STRUCT(measure_derived_sum_price_plus_one AS m) AS f) AS s
+  FROM MeasureTable_Derived
+)
+SELECT key,
+  (
+    SELECT AGG(o.s.f.m)
+    FROM UNNEST([1])
+  )
+FROM outer_t o;
+--
+QueryStmt
++-output_column_list=
+| +-outer_t.key#29 AS key [INT64]
+| +-$query.$col2#33 AS `$col2` [INT64]
++-query=
+  +-WithScan
+    +-column_list=[outer_t.key#29, $query.$col2#33]
+    +-with_entry_list=
+    | +-WithEntry
+    |   +-with_query_name="outer_t"
+    |   +-with_subquery=
+    |     +-ProjectScan
+    |       +-column_list=[MeasureTable_Derived.key#1, outer_t.s#28]
+    |       +-expr_list=
+    |       | +-s#28 :=
+    |       |   +-MakeStruct
+    |       |     +-type=STRUCT<f STRUCT<m MEASURE<INT64>>>
+    |       |     +-field_list=
+    |       |       +-MakeStruct
+    |       |         +-type=STRUCT<m MEASURE<INT64>>
+    |       |         +-field_list=
+    |       |           +-ColumnRef(type=MEASURE<INT64>, column=MeasureTable_Derived.measure_derived_sum_price_plus_one#11)
+    |       +-input_scan=
+    |         +-TableScan(column_list=MeasureTable_Derived.[key#1, measure_derived_sum_price_plus_one#11], table=MeasureTable_Derived, column_index_list=[0, 10])
+    +-query=
+      +-ProjectScan
+        +-column_list=[outer_t.key#29, $query.$col2#33]
+        +-expr_list=
+        | +-$col2#33 :=
+        |   +-SubqueryExpr
+        |     +-type=INT64
+        |     +-subquery_type=SCALAR
+        |     +-parameter_list=
+        |     | +-ColumnRef(type=STRUCT<f STRUCT<m MEASURE<INT64>>>, column=outer_t.s#30)
+        |     +-subquery=
+        |       +-ProjectScan
+        |         +-column_list=[$aggregate.$agg1#32]
+        |         +-input_scan=
+        |           +-AggregateScan
+        |             +-column_list=[$aggregate.$agg1#32]
+        |             +-input_scan=
+        |             | +-ArrayScan
+        |             |   +-array_expr_list=
+        |             |   | +-Literal(type=ARRAY<INT64>, value=[1])
+        |             |   +-element_column_list=[$array.$unnest1#31]
+        |             +-aggregate_list=
+        |               +-$agg1#32 :=
+        |                 +-AggregateFunctionCall(GoogleSQL:AGG(MEASURE<INT64>) -> INT64)
+        |                   +-GetStructField
+        |                     +-type=MEASURE<INT64>
+        |                     +-expr=
+        |                     | +-GetStructField
+        |                     |   +-type=STRUCT<m MEASURE<INT64>>
+        |                     |   +-expr=
+        |                     |   | +-ColumnRef(type=STRUCT<f STRUCT<m MEASURE<INT64>>>, column=outer_t.s#30, is_correlated=TRUE)
+        |                     |   +-field_idx=0
+        |                     +-field_idx=0
+        +-input_scan=
+          +-WithRefScan(column_list=outer_t.[key#29, s#30], with_query_name="outer_t")
+
+[SQLBUILDER_TARGET_SYNTAX_MODE standard]
+[SQLBUILDER_OUTPUT]
+WITH
+  outer_t AS (
+    SELECT
+      measuretable_derived_3.a_1 AS a_1,
+      STRUCT(STRUCT(measuretable_derived_3.a_2 AS m) AS f) AS a_4
+    FROM
+      (
+        SELECT
+          MeasureTable_Derived.key AS a_1,
+          MeasureTable_Derived.measure_derived_sum_price_plus_one AS a_2
+        FROM
+          MeasureTable_Derived
+      ) AS measuretable_derived_3
+  )
+SELECT
+  withrefscan_5.a_1 AS key,
+  (
+    SELECT
+      AGG(withrefscan_5.a_4.f.m) AS a_8
+    FROM
+      UNNEST(ARRAY< INT64 >[1] AS a_7)
+  ) AS a_6
+FROM
+  outer_t AS withrefscan_5;
+
+[SQLBUILDER_TARGET_SYNTAX_MODE pipe]
+[SQLBUILDER_OUTPUT]
+WITH
+  outer_t AS (
+    FROM
+      MeasureTable_Derived
+    |> SELECT
+         MeasureTable_Derived.key AS a_1,
+         MeasureTable_Derived.measure_derived_sum_price_plus_one AS a_2
+    |> AS measuretable_derived_3
+    |> SELECT
+         measuretable_derived_3.a_1 AS a_1,
+         STRUCT(STRUCT(measuretable_derived_3.a_2 AS m) AS f) AS a_4
+  )
+FROM
+  outer_t AS withrefscan_5
+|> SELECT
+     withrefscan_5.a_1 AS key,
+     (
+       FROM
+         UNNEST(ARRAY< INT64 >[1] AS a_7)
+       |> AGGREGATE
+            AGG(withrefscan_5.a_4.f.m) AS a_8) AS a_6;
+
+[REWRITTEN AST]
+QueryStmt
++-output_column_list=
+| +-outer_t.key#29 AS key [INT64]
+| +-$query.$col2#33 AS `$col2` [INT64]
++-query=
+  +-WithScan
+    +-column_list=[outer_t.key#29, $query.$col2#33]
+    +-with_entry_list=
+    | +-WithEntry
+    |   +-with_query_name="outer_t"
+    |   +-with_subquery=
+    |     +-ProjectScan
+    |       +-column_list=[MeasureTable_Derived.key#1, outer_t.s#28]
+    |       +-expr_list=
+    |       | +-s#28 :=
+    |       |   +-MakeStruct
+    |       |     +-type=STRUCT<f STRUCT<m STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>>>
+    |       |     +-field_list=
+    |       |       +-MakeStruct
+    |       |         +-type=STRUCT<m STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>>
+    |       |         +-field_list=
+    |       |           +-ColumnRef(type=STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>, column=MeasureTable_Derived.struct_for_measures_from_table_MeasureTable_Derived#36)
+    |       +-input_scan=
+    |         +-ProjectScan
+    |           +-column_list=MeasureTable_Derived.[key#1, struct_for_measures_from_table_MeasureTable_Derived#36]
+    |           +-expr_list=
+    |           | +-struct_for_measures_from_table_MeasureTable_Derived#36 :=
+    |           |   +-MakeStruct
+    |           |     +-type=STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>
+    |           |     +-field_list=
+    |           |       +-MakeStruct
+    |           |       | +-type=STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>
+    |           |       | +-field_list=
+    |           |       |   +-ColumnRef(type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, column=MeasureTable_Derived.struct_for_measures_from_table_MeasureTable_Derived#35)
+    |           |       +-MakeStruct
+    |           |         +-type=STRUCT<key INT64>
+    |           |         +-field_list=
+    |           |           +-ColumnRef(type=INT64, column=MeasureTable_Derived.key#1)
+    |           +-input_scan=
+    |             +-ProjectScan
+    |               +-column_list=MeasureTable_Derived.[key#1, struct_for_measures_from_table_MeasureTable_Derived#35]
+    |               +-expr_list=
+    |               | +-struct_for_measures_from_table_MeasureTable_Derived#35 :=
+    |               |   +-MakeStruct
+    |               |     +-type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>
+    |               |     +-field_list=
+    |               |       +-MakeStruct
+    |               |       | +-type=STRUCT<price INT64>
+    |               |       | +-field_list=
+    |               |       |   +-ColumnRef(type=INT64, column=MeasureTable_Derived.price#34)
+    |               |       +-MakeStruct
+    |               |         +-type=STRUCT<key INT64>
+    |               |         +-field_list=
+    |               |           +-ColumnRef(type=INT64, column=MeasureTable_Derived.key#1)
+    |               +-input_scan=
+    |                 +-TableScan(column_list=MeasureTable_Derived.[key#1, price#34], table=MeasureTable_Derived, column_index_list=[0, 3])
+    +-query=
+      +-ProjectScan
+        +-column_list=[outer_t.key#29, $query.$col2#33]
+        +-expr_list=
+        | +-$col2#33 :=
+        |   +-SubqueryExpr
+        |     +-type=INT64
+        |     +-subquery_type=SCALAR
+        |     +-parameter_list=
+        |     | +-ColumnRef(type=STRUCT<f STRUCT<m STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>>>, column=outer_t.s#30)
+        |     +-subquery=
+        |       +-ProjectScan
+        |         +-column_list=[$aggregate.$agg1#32]
+        |         +-input_scan=
+        |           +-ProjectScan
+        |             +-column_list=[$aggregate.$agg1#32]
+        |             +-expr_list=
+        |             | +-$agg1#32 :=
+        |             |   +-FunctionCall(GoogleSQL:$add(INT64, INT64) -> INT64)
+        |             |     +-ColumnRef(type=INT64, column=$aggregate.constituent_aggregate_1#40)
+        |             |     +-Literal(type=INT64, value=1)
+        |             +-input_scan=
+        |               +-AggregateScan
+        |                 +-column_list=[$aggregate.constituent_aggregate_1#40]
+        |                 +-input_scan=
+        |                 | +-ProjectScan
+        |                 |   +-column_list=$aggregate.[agg_arg#37, dep_closure#39]
+        |                 |   +-expr_list=
+        |                 |   | +-dep_closure#39 :=
+        |                 |   |   +-GetStructField
+        |                 |   |     +-type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>
+        |                 |   |     +-expr=
+        |                 |   |     | +-GetStructField
+        |                 |   |     |   +-type=STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>
+        |                 |   |     |   +-expr=
+        |                 |   |     |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>, column=$aggregate.agg_arg#37)
+        |                 |   |     |   +-field_idx=0
+        |                 |   |     +-field_idx=0
+        |                 |   +-input_scan=
+        |                 |     +-ProjectScan
+        |                 |       +-column_list=[$aggregate.agg_arg#37]
+        |                 |       +-expr_list=
+        |                 |       | +-agg_arg#37 :=
+        |                 |       |   +-GetStructField
+        |                 |       |     +-type=STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>
+        |                 |       |     +-expr=
+        |                 |       |     | +-GetStructField
+        |                 |       |     |   +-type=STRUCT<m STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>>
+        |                 |       |     |   +-expr=
+        |                 |       |     |   | +-ColumnRef(type=STRUCT<f STRUCT<m STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>>>, column=outer_t.s#30, is_correlated=TRUE)
+        |                 |       |     |   +-field_idx=0
+        |                 |       |     +-field_idx=0
+        |                 |       +-input_scan=
+        |                 |         +-ArrayScan
+        |                 |           +-array_expr_list=
+        |                 |           | +-Literal(type=ARRAY<INT64>, value=[1])
+        |                 |           +-element_column_list=[$array.$unnest1#31]
+        |                 +-aggregate_list=
+        |                   +-constituent_aggregate_1#40 :=
+        |                     +-AggregateFunctionCall(GoogleSQL:sum(INT64) -> INT64)
+        |                       +-ColumnRef(type=INT64, column=$aggregate.$any_value_grain_lock_0#41)
+        |                       +-where_expr=
+        |                       | +-FunctionCall(GoogleSQL:$not(BOOL) -> BOOL)
+        |                       |   +-FunctionCall(GoogleSQL:$is_null(STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>) -> BOOL)
+        |                       |     +-ColumnRef(type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, column=$aggregate.dep_closure#39)
+        |                       +-group_by_list=
+        |                       | +-grain_lock_key#42 :=
+        |                       |   +-GetStructField
+        |                       |     +-type=STRUCT<key INT64>
+        |                       |     +-expr=
+        |                       |     | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, column=$aggregate.dep_closure#39)
+        |                       |     +-field_idx=1
+        |                       +-group_by_aggregate_list=
+        |                         +-$any_value_grain_lock_0#41 :=
+        |                           +-AggregateFunctionCall(GoogleSQL:any_value(INT64) -> INT64)
+        |                             +-GetStructField
+        |                               +-type=INT64
+        |                               +-expr=
+        |                               | +-GetStructField
+        |                               |   +-type=STRUCT<price INT64>
+        |                               |   +-expr=
+        |                               |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<key INT64>>, column=$aggregate.dep_closure#39)
+        |                               |   +-field_idx=0
+        |                               +-field_idx=0
+        +-input_scan=
+          +-WithRefScan(column_list=outer_t.[key#29, s#30], with_query_name="outer_t")
+
+[SQLBUILDER_TARGET_SYNTAX_MODE standard]
+[SQLBUILDER_OUTPUT]
+WITH
+  outer_t AS (
+    SELECT
+      projectscan_7.a_1 AS a_1,
+      STRUCT< f STRUCT< m STRUCT< referenced_columns STRUCT< measure_sum_price STRUCT< referenced_columns STRUCT<
+      price INT64 >, key_columns STRUCT< key INT64 > > >, key_columns STRUCT< key INT64 > > > > (STRUCT< m STRUCT<
+        referenced_columns STRUCT< measure_sum_price STRUCT< referenced_columns STRUCT< price INT64 >, key_columns STRUCT<
+        key INT64 > > >, key_columns STRUCT< key INT64 > > > (projectscan_7.a_6)) AS a_8
+    FROM
+      (
+        SELECT
+          projectscan_5.a_1 AS a_1,
+          STRUCT< referenced_columns STRUCT< measure_sum_price STRUCT< referenced_columns STRUCT< price INT64 >
+          , key_columns STRUCT< key INT64 > > >, key_columns STRUCT< key INT64 > > (STRUCT< measure_sum_price STRUCT<
+            referenced_columns STRUCT< price INT64 >, key_columns STRUCT< key INT64 > > > (projectscan_5.a_4), STRUCT<
+            key INT64 > (projectscan_5.a_1)) AS a_6
+        FROM
+          (
+            SELECT
+              measuretable_derived_3.a_1 AS a_1,
+              STRUCT< referenced_columns STRUCT< price INT64 >, key_columns STRUCT< key INT64 > > (STRUCT< price INT64 >
+                (measuretable_derived_3.a_2), STRUCT< key INT64 > (measuretable_derived_3.a_1)) AS a_4
+            FROM
+              (
+                SELECT
+                  MeasureTable_Derived.key AS a_1,
+                  MeasureTable_Derived.price AS a_2
+                FROM
+                  MeasureTable_Derived
+              ) AS measuretable_derived_3
+          ) AS projectscan_5
+      ) AS projectscan_7
+  )
+SELECT
+  withrefscan_9.a_1 AS key,
+  (
+    SELECT
+      (aggregatescan_17.a_16) + 1 AS a_18
+    FROM
+      (
+        SELECT
+          SUM(ANY_VALUE(projectscan_15.a_14.referenced_columns.price)
+            WHERE
+              NOT((projectscan_15.a_14) IS NULL)
+            GROUP BY projectscan_15.a_14.key_columns) AS a_16
+        FROM
+          (
+            SELECT
+              projectscan_13.a_12 AS a_12,
+              projectscan_13.a_12.referenced_columns.measure_sum_price AS a_14
+            FROM
+              (
+                SELECT
+                  withrefscan_9.a_8.f.m AS a_12
+                FROM
+                  UNNEST(ARRAY< INT64 >[1] AS a_11)
+              ) AS projectscan_13
+          ) AS projectscan_15
+      ) AS aggregatescan_17
+  ) AS a_10
+FROM
+  outer_t AS withrefscan_9;
+
+[SQLBUILDER_TARGET_SYNTAX_MODE pipe]
+[SQLBUILDER_OUTPUT]
+WITH
+  outer_t AS (
+    FROM
+      MeasureTable_Derived
+    |> SELECT
+         MeasureTable_Derived.key AS a_1,
+         MeasureTable_Derived.price AS a_2
+    |> AS measuretable_derived_3
+    |> SELECT
+         measuretable_derived_3.a_1 AS a_1,
+         STRUCT< referenced_columns STRUCT< price INT64 >, key_columns STRUCT< key INT64 > > (STRUCT< price INT64 >
+           (measuretable_derived_3.a_2), STRUCT< key INT64 > (measuretable_derived_3.a_1)) AS a_4
+    |> AS projectscan_5
+    |> SELECT
+         projectscan_5.a_1 AS a_1,
+         STRUCT< referenced_columns STRUCT< measure_sum_price STRUCT< referenced_columns STRUCT< price INT64 >
+         , key_columns STRUCT< key INT64 > > >, key_columns STRUCT< key INT64 > > (STRUCT< measure_sum_price STRUCT<
+           referenced_columns STRUCT< price INT64 >, key_columns STRUCT< key INT64 > > > (projectscan_5.a_4), STRUCT<
+           key INT64 > (projectscan_5.a_1)) AS a_6
+    |> AS projectscan_7
+    |> SELECT
+         projectscan_7.a_1 AS a_1,
+         STRUCT< f STRUCT< m STRUCT< referenced_columns STRUCT< measure_sum_price STRUCT< referenced_columns STRUCT<
+         price INT64 >, key_columns STRUCT< key INT64 > > >, key_columns STRUCT< key INT64 > > > > (STRUCT< m STRUCT<
+           referenced_columns STRUCT< measure_sum_price STRUCT< referenced_columns STRUCT< price INT64 >, key_columns STRUCT<
+           key INT64 > > >, key_columns STRUCT< key INT64 > > > (projectscan_7.a_6)) AS a_8
+  )
+FROM
+  outer_t AS withrefscan_9
+|> SELECT
+     withrefscan_9.a_1 AS key,
+     (
+       FROM
+         UNNEST(ARRAY< INT64 >[1] AS a_11)
+       |> SELECT
+            withrefscan_9.a_8.f.m AS a_12
+       |> AS projectscan_13
+       |> SELECT
+            projectscan_13.a_12 AS a_12,
+            projectscan_13.a_12.referenced_columns.measure_sum_price AS a_14
+       |> AS projectscan_15
+       |> AGGREGATE
+            SUM(ANY_VALUE(projectscan_15.a_14.referenced_columns.price)
+              WHERE
+                NOT((projectscan_15.a_14) IS NULL)
+              GROUP BY projectscan_15.a_14.key_columns) AS a_16
+       |> AS aggregatescan_17
+       |> SELECT
+            (aggregatescan_17.a_16) + 1 AS a_18
+     ) AS a_10;
+==
+
+# 4. Multi-key and Partial Grain Tests
+
+## 4.1 Multi-key test (MeasureTable_TwoKeys_Derived)
+WITH t AS (
+  SELECT KEY1, key2, STRUCT(measure_derived_sum_price_plus_quantity AS m) AS s
+  FROM MeasureTable_TwoKeys_Derived
+)
+SELECT KEY1, key2, AGG(s.m) FROM t GROUP BY KEY1, key2;
+--
+QueryStmt
++-output_column_list=
+| +-$groupby.KEY1#13 AS KEY1 [INT64]
+| +-$groupby.key2#14 AS key2 [INT64]
+| +-$aggregate.$agg1#12 AS `$col3` [INT64]
++-query=
+  +-WithScan
+    +-column_list=[$groupby.KEY1#13, $groupby.key2#14, $aggregate.$agg1#12]
+    +-with_entry_list=
+    | +-WithEntry
+    |   +-with_query_name="t"
+    |   +-with_subquery=
+    |     +-ProjectScan
+    |       +-column_list=[MeasureTable_TwoKeys_Derived.KEY1#1, MeasureTable_TwoKeys_Derived.key2#2, t.s#8]
+    |       +-expr_list=
+    |       | +-s#8 :=
+    |       |   +-MakeStruct
+    |       |     +-type=STRUCT<m MEASURE<INT64>>
+    |       |     +-field_list=
+    |       |       +-ColumnRef(type=MEASURE<INT64>, column=MeasureTable_TwoKeys_Derived.measure_derived_sum_price_plus_quantity#7)
+    |       +-input_scan=
+    |         +-TableScan(column_list=MeasureTable_TwoKeys_Derived.[KEY1#1, key2#2, measure_derived_sum_price_plus_quantity#7], table=MeasureTable_TwoKeys_Derived, column_index_list=[0, 1, 6])
+    +-query=
+      +-ProjectScan
+        +-column_list=[$groupby.KEY1#13, $groupby.key2#14, $aggregate.$agg1#12]
+        +-input_scan=
+          +-AggregateScan
+            +-column_list=[$groupby.KEY1#13, $groupby.key2#14, $aggregate.$agg1#12]
+            +-input_scan=
+            | +-WithRefScan(column_list=t.[KEY1#9, key2#10, s#11], with_query_name="t")
+            +-group_by_list=
+            | +-KEY1#13 := ColumnRef(type=INT64, column=t.KEY1#9)
+            | +-key2#14 := ColumnRef(type=INT64, column=t.key2#10)
+            +-aggregate_list=
+              +-$agg1#12 :=
+                +-AggregateFunctionCall(GoogleSQL:AGG(MEASURE<INT64>) -> INT64)
+                  +-GetStructField
+                    +-type=MEASURE<INT64>
+                    +-expr=
+                    | +-ColumnRef(type=STRUCT<m MEASURE<INT64>>, column=t.s#11)
+                    +-field_idx=0
+
+[SQLBUILDER_TARGET_SYNTAX_MODE standard]
+[SQLBUILDER_OUTPUT]
+WITH
+  t AS (
+    SELECT
+      measuretable_twokeys_derived_4.a_1 AS a_1,
+      measuretable_twokeys_derived_4.a_2 AS a_2,
+      STRUCT(measuretable_twokeys_derived_4.a_3 AS m) AS a_5
+    FROM
+      (
+        SELECT
+          MeasureTable_TwoKeys_Derived.KEY1 AS a_1,
+          MeasureTable_TwoKeys_Derived.key2 AS a_2,
+          MeasureTable_TwoKeys_Derived.measure_derived_sum_price_plus_quantity AS a_3
+        FROM
+          MeasureTable_TwoKeys_Derived
+      ) AS measuretable_twokeys_derived_4
+  )
+SELECT
+  withrefscan_6.a_1 AS KEY1,
+  withrefscan_6.a_2 AS key2,
+  AGG(withrefscan_6.a_5.m) AS a_9
+FROM
+  t AS withrefscan_6
+GROUP BY 1, 2;
+
+[SQLBUILDER_TARGET_SYNTAX_MODE pipe]
+[SQLBUILDER_OUTPUT]
+WITH
+  t AS (
+    FROM
+      MeasureTable_TwoKeys_Derived
+    |> SELECT
+         MeasureTable_TwoKeys_Derived.KEY1 AS a_1,
+         MeasureTable_TwoKeys_Derived.key2 AS a_2,
+         MeasureTable_TwoKeys_Derived.measure_derived_sum_price_plus_quantity AS a_3
+    |> AS measuretable_twokeys_derived_4
+    |> SELECT
+         measuretable_twokeys_derived_4.a_1 AS a_1,
+         measuretable_twokeys_derived_4.a_2 AS a_2,
+         STRUCT(measuretable_twokeys_derived_4.a_3 AS m) AS a_5
+  )
+FROM
+  t AS withrefscan_6
+|> EXTEND
+     withrefscan_6.a_1 AS a_7,
+     withrefscan_6.a_2 AS a_8
+|> AGGREGATE
+     AGG(withrefscan_6.a_5.m) AS a_9
+   GROUP BY a_7, a_8
+|> AS aggregatescan_10
+|> SELECT
+     aggregatescan_10.a_7 AS KEY1,
+     aggregatescan_10.a_8 AS key2,
+     aggregatescan_10.a_9 AS a_9;
+
+[REWRITTEN AST]
+QueryStmt
++-output_column_list=
+| +-$groupby.KEY1#13 AS KEY1 [INT64]
+| +-$groupby.key2#14 AS key2 [INT64]
+| +-$aggregate.$agg1#12 AS `$col3` [INT64]
++-query=
+  +-WithScan
+    +-column_list=[$groupby.KEY1#13, $groupby.key2#14, $aggregate.$agg1#12]
+    +-with_entry_list=
+    | +-WithEntry
+    |   +-with_query_name="t"
+    |   +-with_subquery=
+    |     +-ProjectScan
+    |       +-column_list=[MeasureTable_TwoKeys_Derived.KEY1#1, MeasureTable_TwoKeys_Derived.key2#2, t.s#8]
+    |       +-expr_list=
+    |       | +-s#8 :=
+    |       |   +-MakeStruct
+    |       |     +-type=STRUCT<m STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<Price INT64>, key_columns STRUCT<KEY1 INT64, key2 INT64>>, Quantity INT64>, key_columns STRUCT<KEY1 INT64, key2 INT64>>>
+    |       |     +-field_list=
+    |       |       +-ColumnRef(type=STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<Price INT64>, key_columns STRUCT<KEY1 INT64, key2 INT64>>, Quantity INT64>, key_columns STRUCT<KEY1 INT64, key2 INT64>>, column=MeasureTable_TwoKeys_Derived.struct_for_measures_from_table_MeasureTable_TwoKeys_Derived#18)
+    |       +-input_scan=
+    |         +-ProjectScan
+    |           +-column_list=MeasureTable_TwoKeys_Derived.[KEY1#1, key2#2, struct_for_measures_from_table_MeasureTable_TwoKeys_Derived#18]
+    |           +-expr_list=
+    |           | +-struct_for_measures_from_table_MeasureTable_TwoKeys_Derived#18 :=
+    |           |   +-MakeStruct
+    |           |     +-type=STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<Price INT64>, key_columns STRUCT<KEY1 INT64, key2 INT64>>, Quantity INT64>, key_columns STRUCT<KEY1 INT64, key2 INT64>>
+    |           |     +-field_list=
+    |           |       +-MakeStruct
+    |           |       | +-type=STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<Price INT64>, key_columns STRUCT<KEY1 INT64, key2 INT64>>, Quantity INT64>
+    |           |       | +-field_list=
+    |           |       |   +-ColumnRef(type=STRUCT<referenced_columns STRUCT<Price INT64>, key_columns STRUCT<KEY1 INT64, key2 INT64>>, column=MeasureTable_TwoKeys_Derived.struct_for_measures_from_table_MeasureTable_TwoKeys_Derived#16)
+    |           |       |   +-ColumnRef(type=INT64, column=MeasureTable_TwoKeys_Derived.Quantity#17)
+    |           |       +-MakeStruct
+    |           |         +-type=STRUCT<KEY1 INT64, key2 INT64>
+    |           |         +-field_list=
+    |           |           +-ColumnRef(type=INT64, column=MeasureTable_TwoKeys_Derived.KEY1#1)
+    |           |           +-ColumnRef(type=INT64, column=MeasureTable_TwoKeys_Derived.key2#2)
+    |           +-input_scan=
+    |             +-ProjectScan
+    |               +-column_list=MeasureTable_TwoKeys_Derived.[KEY1#1, key2#2, Quantity#17, struct_for_measures_from_table_MeasureTable_TwoKeys_Derived#16]
+    |               +-expr_list=
+    |               | +-struct_for_measures_from_table_MeasureTable_TwoKeys_Derived#16 :=
+    |               |   +-MakeStruct
+    |               |     +-type=STRUCT<referenced_columns STRUCT<Price INT64>, key_columns STRUCT<KEY1 INT64, key2 INT64>>
+    |               |     +-field_list=
+    |               |       +-MakeStruct
+    |               |       | +-type=STRUCT<Price INT64>
+    |               |       | +-field_list=
+    |               |       |   +-ColumnRef(type=INT64, column=MeasureTable_TwoKeys_Derived.Price#15)
+    |               |       +-MakeStruct
+    |               |         +-type=STRUCT<KEY1 INT64, key2 INT64>
+    |               |         +-field_list=
+    |               |           +-ColumnRef(type=INT64, column=MeasureTable_TwoKeys_Derived.KEY1#1)
+    |               |           +-ColumnRef(type=INT64, column=MeasureTable_TwoKeys_Derived.key2#2)
+    |               +-input_scan=
+    |                 +-TableScan(column_list=MeasureTable_TwoKeys_Derived.[KEY1#1, key2#2, Quantity#17, Price#15], table=MeasureTable_TwoKeys_Derived, column_index_list=[0, 1, 3, 4])
+    +-query=
+      +-ProjectScan
+        +-column_list=[$groupby.KEY1#13, $groupby.key2#14, $aggregate.$agg1#12]
+        +-input_scan=
+          +-ProjectScan
+            +-column_list=[$groupby.KEY1#13, $groupby.key2#14, $aggregate.$agg1#12]
+            +-expr_list=
+            | +-$agg1#12 :=
+            |   +-FunctionCall(GoogleSQL:$add(INT64, INT64) -> INT64)
+            |     +-ColumnRef(type=INT64, column=$aggregate.constituent_aggregate_1#23)
+            |     +-ColumnRef(type=INT64, column=$aggregate.constituent_aggregate_2#21)
+            +-input_scan=
+              +-AggregateScan
+                +-column_list=[$groupby.KEY1#13, $groupby.key2#14, $aggregate.constituent_aggregate_1#23, $aggregate.constituent_aggregate_2#21]
+                +-input_scan=
+                | +-ProjectScan
+                |   +-column_list=[t.KEY1#9, t.key2#10, t.s#11, $aggregate.agg_arg#19, $aggregate.dep_closure#22]
+                |   +-expr_list=
+                |   | +-dep_closure#22 :=
+                |   |   +-GetStructField
+                |   |     +-type=STRUCT<referenced_columns STRUCT<Price INT64>, key_columns STRUCT<KEY1 INT64, key2 INT64>>
+                |   |     +-expr=
+                |   |     | +-GetStructField
+                |   |     |   +-type=STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<Price INT64>, key_columns STRUCT<KEY1 INT64, key2 INT64>>, Quantity INT64>
+                |   |     |   +-expr=
+                |   |     |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<Price INT64>, key_columns STRUCT<KEY1 INT64, key2 INT64>>, Quantity INT64>, key_columns STRUCT<KEY1 INT64, key2 INT64>>, column=$aggregate.agg_arg#19)
+                |   |     |   +-field_idx=0
+                |   |     +-field_idx=0
+                |   +-input_scan=
+                |     +-ProjectScan
+                |       +-column_list=[t.KEY1#9, t.key2#10, t.s#11, $aggregate.agg_arg#19]
+                |       +-expr_list=
+                |       | +-agg_arg#19 :=
+                |       |   +-GetStructField
+                |       |     +-type=STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<Price INT64>, key_columns STRUCT<KEY1 INT64, key2 INT64>>, Quantity INT64>, key_columns STRUCT<KEY1 INT64, key2 INT64>>
+                |       |     +-expr=
+                |       |     | +-ColumnRef(type=STRUCT<m STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<Price INT64>, key_columns STRUCT<KEY1 INT64, key2 INT64>>, Quantity INT64>, key_columns STRUCT<KEY1 INT64, key2 INT64>>>, column=t.s#11)
+                |       |     +-field_idx=0
+                |       +-input_scan=
+                |         +-WithRefScan(column_list=t.[KEY1#9, key2#10, s#11], with_query_name="t")
+                +-group_by_list=
+                | +-KEY1#13 := ColumnRef(type=INT64, column=t.KEY1#9)
+                | +-key2#14 := ColumnRef(type=INT64, column=t.key2#10)
+                +-aggregate_list=
+                  +-constituent_aggregate_1#23 :=
+                  | +-AggregateFunctionCall(GoogleSQL:sum(INT64) -> INT64)
+                  |   +-ColumnRef(type=INT64, column=$aggregate.$any_value_grain_lock_0#24)
+                  |   +-where_expr=
+                  |   | +-FunctionCall(GoogleSQL:$not(BOOL) -> BOOL)
+                  |   |   +-FunctionCall(GoogleSQL:$is_null(STRUCT<referenced_columns STRUCT<Price INT64>, key_columns STRUCT<KEY1 INT64, key2 INT64>>) -> BOOL)
+                  |   |     +-ColumnRef(type=STRUCT<referenced_columns STRUCT<Price INT64>, key_columns STRUCT<KEY1 INT64, key2 INT64>>, column=$aggregate.dep_closure#22)
+                  |   +-group_by_list=
+                  |   | +-grain_lock_key#25 :=
+                  |   |   +-GetStructField
+                  |   |     +-type=STRUCT<KEY1 INT64, key2 INT64>
+                  |   |     +-expr=
+                  |   |     | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<Price INT64>, key_columns STRUCT<KEY1 INT64, key2 INT64>>, column=$aggregate.dep_closure#22)
+                  |   |     +-field_idx=1
+                  |   +-group_by_aggregate_list=
+                  |     +-$any_value_grain_lock_0#24 :=
+                  |       +-AggregateFunctionCall(GoogleSQL:any_value(INT64) -> INT64)
+                  |         +-GetStructField
+                  |           +-type=INT64
+                  |           +-expr=
+                  |           | +-GetStructField
+                  |           |   +-type=STRUCT<Price INT64>
+                  |           |   +-expr=
+                  |           |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<Price INT64>, key_columns STRUCT<KEY1 INT64, key2 INT64>>, column=$aggregate.dep_closure#22)
+                  |           |   +-field_idx=0
+                  |           +-field_idx=0
+                  +-constituent_aggregate_2#21 :=
+                    +-AggregateFunctionCall(GoogleSQL:sum(INT64) -> INT64)
+                      +-ColumnRef(type=INT64, column=$aggregate.$any_value_grain_lock_0#26)
+                      +-where_expr=
+                      | +-FunctionCall(GoogleSQL:$not(BOOL) -> BOOL)
+                      |   +-FunctionCall(GoogleSQL:$is_null(STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<Price INT64>, key_columns STRUCT<KEY1 INT64, key2 INT64>>, Quantity INT64>, key_columns STRUCT<KEY1 INT64, key2 INT64>>) -> BOOL)
+                      |     +-ColumnRef(type=STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<Price INT64>, key_columns STRUCT<KEY1 INT64, key2 INT64>>, Quantity INT64>, key_columns STRUCT<KEY1 INT64, key2 INT64>>, column=$aggregate.agg_arg#19)
+                      +-group_by_list=
+                      | +-grain_lock_key#27 :=
+                      |   +-GetStructField
+                      |     +-type=STRUCT<KEY1 INT64, key2 INT64>
+                      |     +-expr=
+                      |     | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<Price INT64>, key_columns STRUCT<KEY1 INT64, key2 INT64>>, Quantity INT64>, key_columns STRUCT<KEY1 INT64, key2 INT64>>, column=$aggregate.agg_arg#19)
+                      |     +-field_idx=1
+                      +-group_by_aggregate_list=
+                        +-$any_value_grain_lock_0#26 :=
+                          +-AggregateFunctionCall(GoogleSQL:any_value(INT64) -> INT64)
+                            +-GetStructField
+                              +-type=INT64
+                              +-expr=
+                              | +-GetStructField
+                              |   +-type=STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<Price INT64>, key_columns STRUCT<KEY1 INT64, key2 INT64>>, Quantity INT64>
+                              |   +-expr=
+                              |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<measure_sum_price STRUCT<referenced_columns STRUCT<Price INT64>, key_columns STRUCT<KEY1 INT64, key2 INT64>>, Quantity INT64>, key_columns STRUCT<KEY1 INT64, key2 INT64>>, column=$aggregate.agg_arg#19)
+                              |   +-field_idx=0
+                              +-field_idx=1
+
+[SQLBUILDER_TARGET_SYNTAX_MODE standard]
+[SQLBUILDER_OUTPUT]
+WITH
+  t AS (
+    SELECT
+      projectscan_9.a_1 AS a_1,
+      projectscan_9.a_2 AS a_2,
+      STRUCT< m STRUCT< referenced_columns STRUCT< measure_sum_price STRUCT< referenced_columns STRUCT< Price INT64 >
+      , key_columns STRUCT< KEY1 INT64, key2 INT64 > >, Quantity INT64 >, key_columns STRUCT< KEY1 INT64, key2 INT64 >
+      > > (projectscan_9.a_8) AS a_10
+    FROM
+      (
+        SELECT
+          projectscan_7.a_1 AS a_1,
+          projectscan_7.a_2 AS a_2,
+          STRUCT< referenced_columns STRUCT< measure_sum_price STRUCT< referenced_columns STRUCT< Price INT64 >
+          , key_columns STRUCT< KEY1 INT64, key2 INT64 > >, Quantity INT64 >, key_columns STRUCT< KEY1 INT64, key2 INT64 >
+          > (STRUCT< measure_sum_price STRUCT< referenced_columns STRUCT< Price INT64 >, key_columns STRUCT< KEY1 INT64,
+            key2 INT64 > >, Quantity INT64 > (projectscan_7.a_6, projectscan_7.a_3), STRUCT< KEY1 INT64, key2 INT64 >
+            (projectscan_7.a_1, projectscan_7.a_2)) AS a_8
+        FROM
+          (
+            SELECT
+              measuretable_twokeys_derived_5.a_1 AS a_1,
+              measuretable_twokeys_derived_5.a_2 AS a_2,
+              measuretable_twokeys_derived_5.a_3 AS a_3,
+              STRUCT< referenced_columns STRUCT< Price INT64 >, key_columns STRUCT< KEY1 INT64, key2 INT64 > > (STRUCT<
+                Price INT64 > (measuretable_twokeys_derived_5.a_4), STRUCT< KEY1 INT64, key2 INT64 > (measuretable_twokeys_derived_5.a_1,
+                  measuretable_twokeys_derived_5.a_2)) AS a_6
+            FROM
+              (
+                SELECT
+                  MeasureTable_TwoKeys_Derived.KEY1 AS a_1,
+                  MeasureTable_TwoKeys_Derived.key2 AS a_2,
+                  MeasureTable_TwoKeys_Derived.Quantity AS a_3,
+                  MeasureTable_TwoKeys_Derived.Price AS a_4
+                FROM
+                  MeasureTable_TwoKeys_Derived
+              ) AS measuretable_twokeys_derived_5
+          ) AS projectscan_7
+      ) AS projectscan_9
+  )
+SELECT
+  aggregatescan_20.a_16 AS KEY1,
+  aggregatescan_20.a_17 AS key2,
+  (aggregatescan_20.a_18) + (aggregatescan_20.a_19) AS a_21
+FROM
+  (
+    SELECT
+      projectscan_15.a_1 AS a_16,
+      projectscan_15.a_2 AS a_17,
+      SUM(ANY_VALUE(projectscan_15.a_14.referenced_columns.Price)
+        WHERE
+          NOT((projectscan_15.a_14) IS NULL)
+        GROUP BY projectscan_15.a_14.key_columns) AS a_18,
+      SUM(ANY_VALUE(projectscan_15.a_12.referenced_columns.Quantity)
+        WHERE
+          NOT((projectscan_15.a_12) IS NULL)
+        GROUP BY projectscan_15.a_12.key_columns) AS a_19
+    FROM
+      (
+        SELECT
+          projectscan_13.a_1 AS a_1,
+          projectscan_13.a_2 AS a_2,
+          projectscan_13.a_10 AS a_10,
+          projectscan_13.a_12 AS a_12,
+          projectscan_13.a_12.referenced_columns.measure_sum_price AS a_14
+        FROM
+          (
+            SELECT
+              withrefscan_11.a_1 AS a_1,
+              withrefscan_11.a_2 AS a_2,
+              withrefscan_11.a_10 AS a_10,
+              withrefscan_11.a_10.m AS a_12
+            FROM
+              t AS withrefscan_11
+          ) AS projectscan_13
+      ) AS projectscan_15
+    GROUP BY 1, 2
+  ) AS aggregatescan_20;
+
+[SQLBUILDER_TARGET_SYNTAX_MODE pipe]
+[SQLBUILDER_OUTPUT]
+WITH
+  t AS (
+    FROM
+      MeasureTable_TwoKeys_Derived
+    |> SELECT
+         MeasureTable_TwoKeys_Derived.KEY1 AS a_1,
+         MeasureTable_TwoKeys_Derived.key2 AS a_2,
+         MeasureTable_TwoKeys_Derived.Quantity AS a_3,
+         MeasureTable_TwoKeys_Derived.Price AS a_4
+    |> AS measuretable_twokeys_derived_5
+    |> SELECT
+         measuretable_twokeys_derived_5.a_1 AS a_1,
+         measuretable_twokeys_derived_5.a_2 AS a_2,
+         measuretable_twokeys_derived_5.a_3 AS a_3,
+         STRUCT< referenced_columns STRUCT< Price INT64 >, key_columns STRUCT< KEY1 INT64, key2 INT64 > > (STRUCT<
+           Price INT64 > (measuretable_twokeys_derived_5.a_4), STRUCT< KEY1 INT64, key2 INT64 > (measuretable_twokeys_derived_5.a_1,
+             measuretable_twokeys_derived_5.a_2)) AS a_6
+    |> AS projectscan_7
+    |> SELECT
+         projectscan_7.a_1 AS a_1,
+         projectscan_7.a_2 AS a_2,
+         STRUCT< referenced_columns STRUCT< measure_sum_price STRUCT< referenced_columns STRUCT< Price INT64 >
+         , key_columns STRUCT< KEY1 INT64, key2 INT64 > >, Quantity INT64 >, key_columns STRUCT< KEY1 INT64, key2 INT64 >
+         > (STRUCT< measure_sum_price STRUCT< referenced_columns STRUCT< Price INT64 >, key_columns STRUCT< KEY1 INT64,
+           key2 INT64 > >, Quantity INT64 > (projectscan_7.a_6, projectscan_7.a_3), STRUCT< KEY1 INT64, key2 INT64 >
+           (projectscan_7.a_1, projectscan_7.a_2)) AS a_8
+    |> AS projectscan_9
+    |> SELECT
+         projectscan_9.a_1 AS a_1,
+         projectscan_9.a_2 AS a_2,
+         STRUCT< m STRUCT< referenced_columns STRUCT< measure_sum_price STRUCT< referenced_columns STRUCT< Price INT64 >
+         , key_columns STRUCT< KEY1 INT64, key2 INT64 > >, Quantity INT64 >, key_columns STRUCT< KEY1 INT64, key2 INT64 >
+         > > (projectscan_9.a_8) AS a_10
+  )
+FROM
+  t AS withrefscan_11
+|> SELECT
+     withrefscan_11.a_1 AS a_1,
+     withrefscan_11.a_2 AS a_2,
+     withrefscan_11.a_10 AS a_10,
+     withrefscan_11.a_10.m AS a_12
+|> AS projectscan_13
+|> SELECT
+     projectscan_13.a_1 AS a_1,
+     projectscan_13.a_2 AS a_2,
+     projectscan_13.a_10 AS a_10,
+     projectscan_13.a_12 AS a_12,
+     projectscan_13.a_12.referenced_columns.measure_sum_price AS a_14
+|> AS projectscan_15
+|> EXTEND
+     projectscan_15.a_1 AS a_16,
+     projectscan_15.a_2 AS a_17
+|> AGGREGATE
+     SUM(ANY_VALUE(projectscan_15.a_14.referenced_columns.Price)
+       WHERE
+         NOT((projectscan_15.a_14) IS NULL)
+       GROUP BY projectscan_15.a_14.key_columns) AS a_18,
+     SUM(ANY_VALUE(projectscan_15.a_12.referenced_columns.Quantity)
+       WHERE
+         NOT((projectscan_15.a_12) IS NULL)
+       GROUP BY projectscan_15.a_12.key_columns) AS a_19
+   GROUP BY a_16, a_17
+|> AS aggregatescan_20
+|> SELECT
+     aggregatescan_20.a_16 AS KEY1,
+     aggregatescan_20.a_17 AS key2,
+     (aggregatescan_20.a_18) + (aggregatescan_20.a_19) AS a_21;
+==
+
+## 4.2 Partial grain test (MeasureTable_SalesFacts_Derived)
+WITH t AS (
+  SELECT item_id, store_id, STRUCT(measure_derived_total_price_plus_one AS m) AS s
+  FROM MeasureTable_SalesFacts_Derived
+)
+SELECT item_id, AGG(s.m) FROM t GROUP BY item_id;
+--
+QueryStmt
++-output_column_list=
+| +-$groupby.item_id#13 AS item_id [INT64]
+| +-$aggregate.$agg1#12 AS `$col2` [INT64]
++-query=
+  +-WithScan
+    +-column_list=[$groupby.item_id#13, $aggregate.$agg1#12]
+    +-with_entry_list=
+    | +-WithEntry
+    |   +-with_query_name="t"
+    |   +-with_subquery=
+    |     +-ProjectScan
+    |       +-column_list=[MeasureTable_SalesFacts_Derived.item_id#1, MeasureTable_SalesFacts_Derived.store_id#2, t.s#8]
+    |       +-expr_list=
+    |       | +-s#8 :=
+    |       |   +-MakeStruct
+    |       |     +-type=STRUCT<m MEASURE<INT64>>
+    |       |     +-field_list=
+    |       |       +-ColumnRef(type=MEASURE<INT64>, column=MeasureTable_SalesFacts_Derived.measure_derived_total_price_plus_one#7)
+    |       +-input_scan=
+    |         +-TableScan(column_list=MeasureTable_SalesFacts_Derived.[item_id#1, store_id#2, measure_derived_total_price_plus_one#7], table=MeasureTable_SalesFacts_Derived, column_index_list=[0, 1, 6])
+    +-query=
+      +-ProjectScan
+        +-column_list=[$groupby.item_id#13, $aggregate.$agg1#12]
+        +-input_scan=
+          +-AggregateScan
+            +-column_list=[$groupby.item_id#13, $aggregate.$agg1#12]
+            +-input_scan=
+            | +-WithRefScan(column_list=t.[item_id#9, store_id#10, s#11], with_query_name="t")
+            +-group_by_list=
+            | +-item_id#13 := ColumnRef(type=INT64, column=t.item_id#9)
+            +-aggregate_list=
+              +-$agg1#12 :=
+                +-AggregateFunctionCall(GoogleSQL:AGG(MEASURE<INT64>) -> INT64)
+                  +-GetStructField
+                    +-type=MEASURE<INT64>
+                    +-expr=
+                    | +-ColumnRef(type=STRUCT<m MEASURE<INT64>>, column=t.s#11)
+                    +-field_idx=0
+
+[SQLBUILDER_TARGET_SYNTAX_MODE standard]
+[SQLBUILDER_OUTPUT]
+WITH
+  t AS (
+    SELECT
+      measuretable_salesfacts_derived_4.a_1 AS a_1,
+      measuretable_salesfacts_derived_4.a_2 AS a_2,
+      STRUCT(measuretable_salesfacts_derived_4.a_3 AS m) AS a_5
+    FROM
+      (
+        SELECT
+          MeasureTable_SalesFacts_Derived.item_id AS a_1,
+          MeasureTable_SalesFacts_Derived.store_id AS a_2,
+          MeasureTable_SalesFacts_Derived.measure_derived_total_price_plus_one AS a_3
+        FROM
+          MeasureTable_SalesFacts_Derived
+      ) AS measuretable_salesfacts_derived_4
+  )
+SELECT
+  withrefscan_6.a_1 AS item_id,
+  AGG(withrefscan_6.a_5.m) AS a_8
+FROM
+  t AS withrefscan_6
+GROUP BY 1;
+
+[SQLBUILDER_TARGET_SYNTAX_MODE pipe]
+[SQLBUILDER_OUTPUT]
+WITH
+  t AS (
+    FROM
+      MeasureTable_SalesFacts_Derived
+    |> SELECT
+         MeasureTable_SalesFacts_Derived.item_id AS a_1,
+         MeasureTable_SalesFacts_Derived.store_id AS a_2,
+         MeasureTable_SalesFacts_Derived.measure_derived_total_price_plus_one AS a_3
+    |> AS measuretable_salesfacts_derived_4
+    |> SELECT
+         measuretable_salesfacts_derived_4.a_1 AS a_1,
+         measuretable_salesfacts_derived_4.a_2 AS a_2,
+         STRUCT(measuretable_salesfacts_derived_4.a_3 AS m) AS a_5
+  )
+FROM
+  t AS withrefscan_6
+|> EXTEND
+     withrefscan_6.a_1 AS a_7
+|> AGGREGATE
+     AGG(withrefscan_6.a_5.m) AS a_8
+   GROUP BY a_7
+|> AS aggregatescan_9
+|> SELECT
+     aggregatescan_9.a_7 AS item_id,
+     aggregatescan_9.a_8 AS a_8;
+
+[REWRITTEN AST]
+QueryStmt
++-output_column_list=
+| +-$groupby.item_id#13 AS item_id [INT64]
+| +-$aggregate.$agg1#12 AS `$col2` [INT64]
++-query=
+  +-WithScan
+    +-column_list=[$groupby.item_id#13, $aggregate.$agg1#12]
+    +-with_entry_list=
+    | +-WithEntry
+    |   +-with_query_name="t"
+    |   +-with_subquery=
+    |     +-ProjectScan
+    |       +-column_list=[MeasureTable_SalesFacts_Derived.item_id#1, MeasureTable_SalesFacts_Derived.store_id#2, t.s#8]
+    |       +-expr_list=
+    |       | +-s#8 :=
+    |       |   +-MakeStruct
+    |       |     +-type=STRUCT<m STRUCT<referenced_columns STRUCT<measure_total_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<item_id INT64>>>, key_columns STRUCT<item_id INT64>>>
+    |       |     +-field_list=
+    |       |       +-ColumnRef(type=STRUCT<referenced_columns STRUCT<measure_total_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<item_id INT64>>>, key_columns STRUCT<item_id INT64>>, column=MeasureTable_SalesFacts_Derived.struct_for_measures_from_table_MeasureTable_SalesFacts_Derived#16)
+    |       +-input_scan=
+    |         +-ProjectScan
+    |           +-column_list=MeasureTable_SalesFacts_Derived.[item_id#1, store_id#2, struct_for_measures_from_table_MeasureTable_SalesFacts_Derived#16]
+    |           +-expr_list=
+    |           | +-struct_for_measures_from_table_MeasureTable_SalesFacts_Derived#16 :=
+    |           |   +-MakeStruct
+    |           |     +-type=STRUCT<referenced_columns STRUCT<measure_total_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<item_id INT64>>>, key_columns STRUCT<item_id INT64>>
+    |           |     +-field_list=
+    |           |       +-MakeStruct
+    |           |       | +-type=STRUCT<measure_total_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<item_id INT64>>>
+    |           |       | +-field_list=
+    |           |       |   +-ColumnRef(type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<item_id INT64>>, column=MeasureTable_SalesFacts_Derived.struct_for_measures_from_table_MeasureTable_SalesFacts_Derived#15)
+    |           |       +-MakeStruct
+    |           |         +-type=STRUCT<item_id INT64>
+    |           |         +-field_list=
+    |           |           +-ColumnRef(type=INT64, column=MeasureTable_SalesFacts_Derived.item_id#1)
+    |           +-input_scan=
+    |             +-ProjectScan
+    |               +-column_list=MeasureTable_SalesFacts_Derived.[item_id#1, store_id#2, struct_for_measures_from_table_MeasureTable_SalesFacts_Derived#15]
+    |               +-expr_list=
+    |               | +-struct_for_measures_from_table_MeasureTable_SalesFacts_Derived#15 :=
+    |               |   +-MakeStruct
+    |               |     +-type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<item_id INT64>>
+    |               |     +-field_list=
+    |               |       +-MakeStruct
+    |               |       | +-type=STRUCT<price INT64>
+    |               |       | +-field_list=
+    |               |       |   +-ColumnRef(type=INT64, column=MeasureTable_SalesFacts_Derived.price#14)
+    |               |       +-MakeStruct
+    |               |         +-type=STRUCT<item_id INT64>
+    |               |         +-field_list=
+    |               |           +-ColumnRef(type=INT64, column=MeasureTable_SalesFacts_Derived.item_id#1)
+    |               +-input_scan=
+    |                 +-TableScan(column_list=MeasureTable_SalesFacts_Derived.[item_id#1, store_id#2, price#14], table=MeasureTable_SalesFacts_Derived, column_index_list=[0, 1, 2])
+    +-query=
+      +-ProjectScan
+        +-column_list=[$groupby.item_id#13, $aggregate.$agg1#12]
+        +-input_scan=
+          +-ProjectScan
+            +-column_list=[$groupby.item_id#13, $aggregate.$agg1#12]
+            +-expr_list=
+            | +-$agg1#12 :=
+            |   +-FunctionCall(GoogleSQL:$add(INT64, INT64) -> INT64)
+            |     +-ColumnRef(type=INT64, column=$aggregate.constituent_aggregate_1#20)
+            |     +-Literal(type=INT64, value=1)
+            +-input_scan=
+              +-AggregateScan
+                +-column_list=[$groupby.item_id#13, $aggregate.constituent_aggregate_1#20]
+                +-input_scan=
+                | +-ProjectScan
+                |   +-column_list=[t.item_id#9, t.store_id#10, t.s#11, $aggregate.agg_arg#17, $aggregate.dep_closure#19]
+                |   +-expr_list=
+                |   | +-dep_closure#19 :=
+                |   |   +-GetStructField
+                |   |     +-type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<item_id INT64>>
+                |   |     +-expr=
+                |   |     | +-GetStructField
+                |   |     |   +-type=STRUCT<measure_total_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<item_id INT64>>>
+                |   |     |   +-expr=
+                |   |     |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<measure_total_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<item_id INT64>>>, key_columns STRUCT<item_id INT64>>, column=$aggregate.agg_arg#17)
+                |   |     |   +-field_idx=0
+                |   |     +-field_idx=0
+                |   +-input_scan=
+                |     +-ProjectScan
+                |       +-column_list=[t.item_id#9, t.store_id#10, t.s#11, $aggregate.agg_arg#17]
+                |       +-expr_list=
+                |       | +-agg_arg#17 :=
+                |       |   +-GetStructField
+                |       |     +-type=STRUCT<referenced_columns STRUCT<measure_total_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<item_id INT64>>>, key_columns STRUCT<item_id INT64>>
+                |       |     +-expr=
+                |       |     | +-ColumnRef(type=STRUCT<m STRUCT<referenced_columns STRUCT<measure_total_price STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<item_id INT64>>>, key_columns STRUCT<item_id INT64>>>, column=t.s#11)
+                |       |     +-field_idx=0
+                |       +-input_scan=
+                |         +-WithRefScan(column_list=t.[item_id#9, store_id#10, s#11], with_query_name="t")
+                +-group_by_list=
+                | +-item_id#13 := ColumnRef(type=INT64, column=t.item_id#9)
+                +-aggregate_list=
+                  +-constituent_aggregate_1#20 :=
+                    +-AggregateFunctionCall(GoogleSQL:sum(INT64) -> INT64)
+                      +-ColumnRef(type=INT64, column=$aggregate.$any_value_grain_lock_0#21)
+                      +-where_expr=
+                      | +-FunctionCall(GoogleSQL:$not(BOOL) -> BOOL)
+                      |   +-FunctionCall(GoogleSQL:$is_null(STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<item_id INT64>>) -> BOOL)
+                      |     +-ColumnRef(type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<item_id INT64>>, column=$aggregate.dep_closure#19)
+                      +-group_by_list=
+                      | +-grain_lock_key#22 :=
+                      |   +-GetStructField
+                      |     +-type=STRUCT<item_id INT64>
+                      |     +-expr=
+                      |     | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<item_id INT64>>, column=$aggregate.dep_closure#19)
+                      |     +-field_idx=1
+                      +-group_by_aggregate_list=
+                        +-$any_value_grain_lock_0#21 :=
+                          +-AggregateFunctionCall(GoogleSQL:any_value(INT64) -> INT64)
+                            +-GetStructField
+                              +-type=INT64
+                              +-expr=
+                              | +-GetStructField
+                              |   +-type=STRUCT<price INT64>
+                              |   +-expr=
+                              |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<price INT64>, key_columns STRUCT<item_id INT64>>, column=$aggregate.dep_closure#19)
+                              |   +-field_idx=0
+                              +-field_idx=0
+
+[SQLBUILDER_TARGET_SYNTAX_MODE standard]
+[SQLBUILDER_OUTPUT]
+WITH
+  t AS (
+    SELECT
+      projectscan_8.a_1 AS a_1,
+      projectscan_8.a_2 AS a_2,
+      STRUCT< m STRUCT< referenced_columns STRUCT< measure_total_price STRUCT< referenced_columns STRUCT< price INT64 >
+      , key_columns STRUCT< item_id INT64 > > >, key_columns STRUCT< item_id INT64 > > > (projectscan_8.a_7) AS a_9
+    FROM
+      (
+        SELECT
+          projectscan_6.a_1 AS a_1,
+          projectscan_6.a_2 AS a_2,
+          STRUCT< referenced_columns STRUCT< measure_total_price STRUCT< referenced_columns STRUCT< price INT64 >
+          , key_columns STRUCT< item_id INT64 > > >, key_columns STRUCT< item_id INT64 > > (STRUCT< measure_total_price STRUCT<
+            referenced_columns STRUCT< price INT64 >, key_columns STRUCT< item_id INT64 > > > (projectscan_6.a_5),
+            STRUCT< item_id INT64 > (projectscan_6.a_1)) AS a_7
+        FROM
+          (
+            SELECT
+              measuretable_salesfacts_derived_4.a_1 AS a_1,
+              measuretable_salesfacts_derived_4.a_2 AS a_2,
+              STRUCT< referenced_columns STRUCT< price INT64 >, key_columns STRUCT< item_id INT64 > > (STRUCT< price INT64 >
+                (measuretable_salesfacts_derived_4.a_3), STRUCT< item_id INT64 > (measuretable_salesfacts_derived_4.a_1)) AS a_5
+            FROM
+              (
+                SELECT
+                  MeasureTable_SalesFacts_Derived.item_id AS a_1,
+                  MeasureTable_SalesFacts_Derived.store_id AS a_2,
+                  MeasureTable_SalesFacts_Derived.price AS a_3
+                FROM
+                  MeasureTable_SalesFacts_Derived
+              ) AS measuretable_salesfacts_derived_4
+          ) AS projectscan_6
+      ) AS projectscan_8
+  )
+SELECT
+  aggregatescan_17.a_15 AS item_id,
+  (aggregatescan_17.a_16) + 1 AS a_18
+FROM
+  (
+    SELECT
+      projectscan_14.a_1 AS a_15,
+      SUM(ANY_VALUE(projectscan_14.a_13.referenced_columns.price)
+        WHERE
+          NOT((projectscan_14.a_13) IS NULL)
+        GROUP BY projectscan_14.a_13.key_columns) AS a_16
+    FROM
+      (
+        SELECT
+          projectscan_12.a_1 AS a_1,
+          projectscan_12.a_2 AS a_2,
+          projectscan_12.a_9 AS a_9,
+          projectscan_12.a_11 AS a_11,
+          projectscan_12.a_11.referenced_columns.measure_total_price AS a_13
+        FROM
+          (
+            SELECT
+              withrefscan_10.a_1 AS a_1,
+              withrefscan_10.a_2 AS a_2,
+              withrefscan_10.a_9 AS a_9,
+              withrefscan_10.a_9.m AS a_11
+            FROM
+              t AS withrefscan_10
+          ) AS projectscan_12
+      ) AS projectscan_14
+    GROUP BY 1
+  ) AS aggregatescan_17;
+
+[SQLBUILDER_TARGET_SYNTAX_MODE pipe]
+[SQLBUILDER_OUTPUT]
+WITH
+  t AS (
+    FROM
+      MeasureTable_SalesFacts_Derived
+    |> SELECT
+         MeasureTable_SalesFacts_Derived.item_id AS a_1,
+         MeasureTable_SalesFacts_Derived.store_id AS a_2,
+         MeasureTable_SalesFacts_Derived.price AS a_3
+    |> AS measuretable_salesfacts_derived_4
+    |> SELECT
+         measuretable_salesfacts_derived_4.a_1 AS a_1,
+         measuretable_salesfacts_derived_4.a_2 AS a_2,
+         STRUCT< referenced_columns STRUCT< price INT64 >, key_columns STRUCT< item_id INT64 > > (STRUCT< price INT64 >
+           (measuretable_salesfacts_derived_4.a_3), STRUCT< item_id INT64 > (measuretable_salesfacts_derived_4.a_1)) AS a_5
+    |> AS projectscan_6
+    |> SELECT
+         projectscan_6.a_1 AS a_1,
+         projectscan_6.a_2 AS a_2,
+         STRUCT< referenced_columns STRUCT< measure_total_price STRUCT< referenced_columns STRUCT< price INT64 >
+         , key_columns STRUCT< item_id INT64 > > >, key_columns STRUCT< item_id INT64 > > (STRUCT< measure_total_price STRUCT<
+           referenced_columns STRUCT< price INT64 >, key_columns STRUCT< item_id INT64 > > > (projectscan_6.a_5),
+           STRUCT< item_id INT64 > (projectscan_6.a_1)) AS a_7
+    |> AS projectscan_8
+    |> SELECT
+         projectscan_8.a_1 AS a_1,
+         projectscan_8.a_2 AS a_2,
+         STRUCT< m STRUCT< referenced_columns STRUCT< measure_total_price STRUCT< referenced_columns STRUCT< price INT64 >
+         , key_columns STRUCT< item_id INT64 > > >, key_columns STRUCT< item_id INT64 > > > (projectscan_8.a_7) AS a_9
+  )
+FROM
+  t AS withrefscan_10
+|> SELECT
+     withrefscan_10.a_1 AS a_1,
+     withrefscan_10.a_2 AS a_2,
+     withrefscan_10.a_9 AS a_9,
+     withrefscan_10.a_9.m AS a_11
+|> AS projectscan_12
+|> SELECT
+     projectscan_12.a_1 AS a_1,
+     projectscan_12.a_2 AS a_2,
+     projectscan_12.a_9 AS a_9,
+     projectscan_12.a_11 AS a_11,
+     projectscan_12.a_11.referenced_columns.measure_total_price AS a_13
+|> AS projectscan_14
+|> EXTEND
+     projectscan_14.a_1 AS a_15
+|> AGGREGATE
+     SUM(ANY_VALUE(projectscan_14.a_13.referenced_columns.price)
+       WHERE
+         NOT((projectscan_14.a_13) IS NULL)
+       GROUP BY projectscan_14.a_13.key_columns) AS a_16
+   GROUP BY a_15
+|> AS aggregatescan_17
+|> SELECT
+     aggregatescan_17.a_15 AS item_id,
+     (aggregatescan_17.a_16) + 1 AS a_18;
+==
+
+# 5. Derived measure definition expressions have measures in struct.
+# TODO: b/527119708 - Support measures in struct in derived measure definitions.
+[allow_internal_error_todo_bug=b/527119708]
+SELECT AGG(measure_derived_agg_struct)
+FROM MeasureTable_Derived;
+--
+[PRE-REWRITE AST]
+QueryStmt
++-output_column_list=
+| +-$aggregate.$agg1#28 AS `$col1` [INT64]
++-query=
+  +-ProjectScan
+    +-column_list=[$aggregate.$agg1#28]
+    +-input_scan=
+      +-AggregateScan
+        +-column_list=[$aggregate.$agg1#28]
+        +-input_scan=
+        | +-TableScan(column_list=[MeasureTable_Derived.measure_derived_agg_struct#27], table=MeasureTable_Derived, column_index_list=[26])
+        +-aggregate_list=
+          +-$agg1#28 :=
+            +-AggregateFunctionCall(GoogleSQL:AGG(MEASURE<INT64>) -> INT64)
+              +-ColumnRef(type=MEASURE<INT64>, column=MeasureTable_Derived.measure_derived_agg_struct#27)
+
+[SQLBUILDER_TARGET_SYNTAX_MODE standard]
+[SQLBUILDER_OUTPUT]
+SELECT
+  AGG(measuretable_derived_2.a_1) AS a_3
+FROM
+  (
+    SELECT
+      MeasureTable_Derived.measure_derived_agg_struct AS a_1
+    FROM
+      MeasureTable_Derived
+  ) AS measuretable_derived_2;
+
+[SQLBUILDER_TARGET_SYNTAX_MODE pipe]
+[SQLBUILDER_OUTPUT]
+FROM
+  MeasureTable_Derived
+|> SELECT
+     MeasureTable_Derived.measure_derived_agg_struct AS a_1
+|> AS measuretable_derived_2
+|> AGGREGATE
+     AGG(measuretable_derived_2.a_1) AS a_3;
+
+Rewrite ERROR: generic::internal: RET_CHECK failure (<location redacted>) struct_column_ref->type()->IsStruct() Expected struct type for closure column, but got: MEASURE<INT64>

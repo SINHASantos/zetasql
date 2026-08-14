@@ -27,18 +27,43 @@
 
 namespace googlesql {
 
-// Rewrites the given resolved_ast as follows:
+// Rewrites `resolved_ast` to replace the AGG'ed measure columns with their
+// corresponding closure struct columns and registers measure metadata in
+// `measure_collector`.
 //
-// For each scan `s` that defines an AGG'ed measure column `mi`, replace it with
-// a ProjectScan whose
-// - input_scan = s,
-// - expr_list: contains a struct ResolvedComputedColumn representing the
-//   closure information of all AGG'ed measure column definitions on this scan.
-// - column_list: contains every column from `s.column_list()` except the
-//   AGG'ed measure columns, plus the struct column. Note that the column list
-//   of `s` may be modified to include additional columns needed to compute the
-//   closure struct column.
-
+// Each measure source scan that defines an AGG'ed measure column is:
+//
+// 1. Rebuilt to include the required non-measure columns.
+// 2. Wrapped in a chain of `ResolvedProjectScan` layers that evaluate closure
+//    struct columns.
+//
+// Example scan transformation:
+//
+// Before:
+//   +-Scan(col_list=[c1, m1, m2])
+//
+// where m1 and m2 are measures, m1 := MEASURE(SUM(c1)),
+// and m2 := MEASURE(AGG(m1) + 1).
+//
+// After:
+//   +-ProjectScan(col_list=[c1, closure_m1, closure_m2])
+//   |   # Computes the closure struct for m2.
+//   |   expr_list=[
+//   |     closure_m2 := STRUCT(
+//   |       referenced_columns: STRUCT(m1: closure_m1),
+//   |       key_columns:        STRUCT(key: ...)
+//   |     )
+//   |   ]
+//   |   +-ProjectScan(col_list=[c1, key, closure_m1])
+//   |     # Computes the closure struct for m1.
+//   |     expr_list=[
+//   |       closure_m1 := STRUCT(
+//   |         referenced_columns: STRUCT(c1: c1),
+//   |         key_columns:        STRUCT(key: ...)
+//   |       )
+//   |     ]
+//   |     # Measures removed; keys and dependencies added.
+//   |     +-RebuiltScan(col_list=[c1, key])
 absl::StatusOr<std::unique_ptr<const ResolvedNode>> AddClosures(
     MeasureCollector& measure_collector,
     std::unique_ptr<const ResolvedNode> resolved_ast, TypeFactory& type_factory,

@@ -235,6 +235,10 @@ class {{node.name}} {{node.class_final}} : public {{node.parent}} {
   bool ColumnListIsCreatedColumns() const override { return true; }
 
 # endif
+# if node.pipe_input_scan_getter
+  const ResolvedScan* GetPipeInputScan() const override { return {{node.pipe_input_scan_getter}}(); }
+
+# endif
  private:
 # if node.is_abstract
   {# List all builders for concrete subclasses as friends, so that they can #}
@@ -680,6 +684,83 @@ std::unique_ptr<ResolvedAggregateScan> MakeResolvedAggregateScan(
       {std::make_move_iterator(rollup_column_list.begin()),
        std::make_move_iterator(rollup_column_list.end())},
       /*grouping_call_list=*/{});
+}
+
+// Overloaded factory method kept for backward compatibility with engines
+// that do not yet support version-aware DML fields (timestamp_version_column
+// and temporal_at).
+template <
+  typename query_parameter_list_t
+      = std::vector<std::unique_ptr<const ResolvedColumnRef>>,
+  typename row_list_t
+      = std::vector<std::unique_ptr<const ResolvedInsertRow>>,
+  typename generated_column_expr_list_t
+      = std::vector<std::unique_ptr<const ResolvedExpr>>>
+inline std::unique_ptr<ResolvedInsertStmt> MakeResolvedInsertStmt(
+    std::unique_ptr<const ResolvedTableScan> table_scan,
+    ResolvedInsertStmt::InsertMode insert_mode,
+    std::unique_ptr<const ResolvedAssertRowsModified> assert_rows_modified,
+    std::unique_ptr<const ResolvedReturningClause> returning,
+    const std::vector<ResolvedColumn>& insert_column_list,
+    query_parameter_list_t query_parameter_list,
+    std::unique_ptr<const ResolvedScan> query,
+    const std::vector<ResolvedColumn>& query_output_column_list,
+    row_list_t row_list,
+    std::unique_ptr<const ResolvedOnConflictClause> on_conflict_clause,
+    const std::vector<int>& topologically_sorted_generated_column_id_list,
+    generated_column_expr_list_t generated_column_expr_list) {
+  return MakeResolvedInsertStmt(
+      std::move(table_scan),
+      insert_mode,
+      std::move(assert_rows_modified),
+      std::move(returning),
+      insert_column_list,
+      {std::make_move_iterator(query_parameter_list.begin()),
+       std::make_move_iterator(query_parameter_list.end())},
+      std::move(query),
+      query_output_column_list,
+      {std::make_move_iterator(row_list.begin()),
+       std::make_move_iterator(row_list.end())},
+      std::move(on_conflict_clause),
+      topologically_sorted_generated_column_id_list,
+      {std::make_move_iterator(generated_column_expr_list.begin()),
+       std::make_move_iterator(generated_column_expr_list.end())},
+      /*timestamp_version_column=*/nullptr,
+      /*temporal_at=*/nullptr);
+}
+
+// Overloaded factory method kept for backward compatibility with engines
+// that do not yet support version-aware DML fields (timestamp_version_column
+// and temporal_at).
+template <
+  typename update_item_list_t
+      = std::vector<std::unique_ptr<const ResolvedUpdateItem>>,
+  typename generated_column_expr_list_t
+      = std::vector<std::unique_ptr<const ResolvedExpr>>>
+inline std::unique_ptr<ResolvedUpdateStmt> MakeResolvedUpdateStmt(
+    std::unique_ptr<const ResolvedTableScan> table_scan,
+    std::unique_ptr<const ResolvedAssertRowsModified> assert_rows_modified,
+    std::unique_ptr<const ResolvedReturningClause> returning,
+    std::unique_ptr<const ResolvedColumnHolder> array_offset_column,
+    std::unique_ptr<const ResolvedExpr> where_expr,
+    update_item_list_t update_item_list,
+    std::unique_ptr<const ResolvedScan> from_scan,
+    const std::vector<int>& topologically_sorted_generated_column_id_list,
+    generated_column_expr_list_t generated_column_expr_list) {
+  return MakeResolvedUpdateStmt(
+      std::move(table_scan),
+      std::move(assert_rows_modified),
+      std::move(returning),
+      std::move(array_offset_column),
+      std::move(where_expr),
+      {std::make_move_iterator(update_item_list.begin()),
+       std::make_move_iterator(update_item_list.end())},
+      std::move(from_scan),
+      topologically_sorted_generated_column_id_list,
+      {std::make_move_iterator(generated_column_expr_list.begin()),
+       std::make_move_iterator(generated_column_expr_list.end())},
+      /*timestamp_version_column=*/nullptr,
+      /*temporal_at=*/nullptr);
 }
 
 // Special overwrite for backward compatibility purpose.

@@ -1739,6 +1739,7 @@ QueryStmt
               +-ColumnRef(type=INT64, column=$subquery1.a#1)
 
 [[ REWRITER ARTIFACTS FOR RULE GROUPS 'ALL' ]]
+
 [REWRITTEN AST]
 QueryStmt
 +-output_column_list=
@@ -1785,6 +1786,7 @@ QueryStmt
               +-ColumnRef(type=INT64, column=$subquery1.a#1)
 
 [[ REWRITER ARTIFACTS FOR RULE GROUPS 'ALL,-WITH_EXPR' ]]
+
 [REWRITTEN AST]
 QueryStmt
 +-output_column_list=
@@ -1852,6 +1854,7 @@ QueryStmt
               +-ColumnRef(type=INT64, column=$subquery1.b#2)
 
 [[ REWRITER ARTIFACTS FOR RULE GROUPS 'ALL' ]]
+
 [REWRITTEN AST]
 QueryStmt
 +-output_column_list=
@@ -1905,6 +1908,7 @@ QueryStmt
               +-ColumnRef(type=INT64, column=$subquery1.b#2)
 
 [[ REWRITER ARTIFACTS FOR RULE GROUPS 'ALL,-WITH_EXPR' ]]
+
 [REWRITTEN AST]
 QueryStmt
 +-output_column_list=
@@ -1973,6 +1977,7 @@ QueryStmt
               +-ColumnRef(type=INT64, column=$subquery1.a#1)
 
 [[ REWRITER ARTIFACTS FOR RULE GROUPS 'ALL' ]]
+
 [REWRITTEN AST]
 QueryStmt
 +-output_column_list=
@@ -2019,6 +2024,7 @@ QueryStmt
               +-ColumnRef(type=INT64, column=$subquery1.a#1)
 
 [[ REWRITER ARTIFACTS FOR RULE GROUPS 'ALL,-WITH_EXPR' ]]
+
 [REWRITTEN AST]
 QueryStmt
 +-output_column_list=
@@ -2086,6 +2092,7 @@ QueryStmt
               +-ColumnRef(type=INT64, column=$subquery1.b#2)
 
 [[ REWRITER ARTIFACTS FOR RULE GROUPS 'ALL' ]]
+
 [REWRITTEN AST]
 QueryStmt
 +-output_column_list=
@@ -2139,6 +2146,7 @@ QueryStmt
               +-ColumnRef(type=INT64, column=$subquery1.b#2)
 
 [[ REWRITER ARTIFACTS FOR RULE GROUPS 'ALL,-WITH_EXPR' ]]
+
 [REWRITTEN AST]
 QueryStmt
 +-output_column_list=
@@ -2220,6 +2228,278 @@ QueryStmt
       +-SingleRowScan
 
 Rewrite ERROR: generic::unimplemented: SQL defined functions that contain argument references inside embedded WITH clauses are not implemented.
+
+==
+
+# Tests that argument references inside an outer CTE with an inner nested CTE
+# properly trigger the unimplemented error rather than clearing the WITH entry flag.
+SELECT ReferencesArgInsideNestedCte(1);
+--
+[PRE-REWRITE AST]
+QueryStmt
++-output_column_list=
+| +-$query.$col1#1 AS `$col1` [INT64]
++-query=
+  +-ProjectScan
+    +-column_list=[$query.$col1#1]
+    +-expr_list=
+    | +-$col1#1 :=
+    |   +-FunctionCall(Lazy_resolution_function:ReferencesArgInsideNestedCte(INT64 a) -> INT64)
+    |     +-Literal(type=INT64, value=1)
+    +-input_scan=
+      +-SingleRowScan
+
+Rewrite ERROR: generic::unimplemented: SQL defined functions that contain argument references inside embedded WITH clauses are not implemented.
+
+==
+
+# Tests that in_expr inside a nested subquery correctly preserves outer correlation
+# flags and updates the enclosing subquery's parameter list.
+SELECT SubqueryInExprNestedCorrelated(1);
+--
+QueryStmt
++-output_column_list=
+| +-$query.$col1#1 AS `$col1` [INT64]
++-query=
+  +-ProjectScan
+    +-column_list=[$query.$col1#1]
+    +-expr_list=
+    | +-$col1#1 :=
+    |   +-FunctionCall(Lazy_resolution_function:SubqueryInExprNestedCorrelated(INT64 x) -> INT64)
+    |     +-Literal(type=INT64, value=1)
+    +-input_scan=
+      +-SingleRowScan
+
+[REWRITTEN AST]
+QueryStmt
++-output_column_list=
+| +-$query.$col1#1 AS `$col1` [INT64]
++-query=
+  +-ProjectScan
+    +-column_list=[$query.$col1#1]
+    +-expr_list=
+    | +-$col1#1 :=
+    |   +-WithExpr
+    |     +-type=INT64
+    |     +-assignment_list=
+    |     | +-x#5 := Literal(type=INT64, value=1)
+    |     +-expr=
+    |       +-SubqueryExpr
+    |         +-type=INT64
+    |         +-subquery_type=SCALAR
+    |         +-parameter_list=
+    |         | +-ColumnRef(type=INT64, column=$inlined_SubqueryInExprNestedCorrelated.x#5)
+    |         +-subquery=
+    |           +-ProjectScan
+    |             +-column_list=[$expr_subquery.$col1#2]
+    |             +-expr_list=
+    |             | +-$col1#2 := Literal(type=INT64, value=1)
+    |             +-input_scan=
+    |               +-FilterScan
+    |                 +-column_list=[$subquery1.$col1#3]
+    |                 +-input_scan=
+    |                 | +-ProjectScan
+    |                 |   +-column_list=[$subquery1.$col1#3]
+    |                 |   +-expr_list=
+    |                 |   | +-$col1#3 := Literal(type=INT64, value=1)
+    |                 |   +-input_scan=
+    |                 |     +-SingleRowScan
+    |                 +-filter_expr=
+    |                   +-SubqueryExpr
+    |                     +-type=BOOL
+    |                     +-subquery_type=IN
+    |                     +-in_expr=
+    |                     | +-ColumnRef(type=INT64, column=$inlined_SubqueryInExprNestedCorrelated.x#5, is_correlated=TRUE)
+    |                     +-subquery=
+    |                       +-ProjectScan
+    |                         +-column_list=[$expr_subquery.$col1#4]
+    |                         +-expr_list=
+    |                         | +-$col1#4 := Literal(type=INT64, value=1)
+    |                         +-input_scan=
+    |                           +-SingleRowScan
+    +-input_scan=
+      +-SingleRowScan
+
+==
+
+# Tests that outer WITH columns referenced inside a lateral join's left_scan are
+# evaluated at the outer scope and do not leak into the join's parameter list.
+SELECT LateralJoinLeftScanCorrelated(1);
+--
+QueryStmt
++-output_column_list=
+| +-$query.$col1#1 AS `$col1` [INT64]
++-query=
+  +-ProjectScan
+    +-column_list=[$query.$col1#1]
+    +-expr_list=
+    | +-$col1#1 :=
+    |   +-FunctionCall(Lazy_resolution_function:LateralJoinLeftScanCorrelated(INT64 x) -> INT64)
+    |     +-Literal(type=INT64, value=1)
+    +-input_scan=
+      +-SingleRowScan
+
+[REWRITTEN AST]
+QueryStmt
++-output_column_list=
+| +-$query.$col1#1 AS `$col1` [INT64]
++-query=
+  +-ProjectScan
+    +-column_list=[$query.$col1#1]
+    +-expr_list=
+    | +-$col1#1 :=
+    |   +-WithExpr
+    |     +-type=INT64
+    |     +-assignment_list=
+    |     | +-x#4 := Literal(type=INT64, value=1)
+    |     +-expr=
+    |       +-SubqueryExpr
+    |         +-type=INT64
+    |         +-subquery_type=SCALAR
+    |         +-parameter_list=
+    |         | +-ColumnRef(type=INT64, column=$inlined_LateralJoinLeftScanCorrelated.x#4)
+    |         +-subquery=
+    |           +-ProjectScan
+    |             +-column_list=[$subquery2.val#3]
+    |             +-input_scan=
+    |               +-JoinScan
+    |                 +-column_list=[$subquery1.a#2, $subquery2.val#3]
+    |                 +-left_scan=
+    |                 | +-ProjectScan
+    |                 |   +-column_list=[$subquery1.a#2]
+    |                 |   +-expr_list=
+    |                 |   | +-a#2 := ColumnRef(type=INT64, column=$inlined_LateralJoinLeftScanCorrelated.x#4, is_correlated=TRUE)
+    |                 |   +-input_scan=
+    |                 |     +-SingleRowScan
+    |                 +-right_scan=
+    |                 | +-ProjectScan
+    |                 |   +-column_list=[$subquery2.val#3]
+    |                 |   +-expr_list=
+    |                 |   | +-val#3 := ColumnRef(type=INT64, column=$subquery1.a#2, is_correlated=TRUE)
+    |                 |   +-input_scan=
+    |                 |     +-SingleRowScan
+    |                 +-is_lateral=TRUE
+    |                 +-parameter_list=
+    |                   +-ColumnRef(type=INT64, column=$subquery1.a#2)
+    +-input_scan=
+      +-SingleRowScan
+
+==
+
+# Tests that outer WITH columns referenced inside a GraphCallScan subquery
+# are correctly captured and added to the GraphCallScan's parameter list.
+[enabled_ast_rewrites=NONE,+INLINE_SQL_FUNCTIONS]
+[language_features=NONE,+SAFE_FUNCTION_CALL,+INLINE_LAMBDA_ARGUMENT,+LATERAL_JOIN,+SQL_GRAPH,+SQL_GRAPH_CALL]
+[no_run_sqlbuilder]
+SELECT GraphCallScanCorrelated(1);
+--
+QueryStmt
++-output_column_list=
+| +-$query.$col1#1 AS `$col1` [INT64]
++-query=
+  +-ProjectScan
+    +-column_list=[$query.$col1#1]
+    +-expr_list=
+    | +-$col1#1 :=
+    |   +-FunctionCall(Lazy_resolution_function:GraphCallScanCorrelated(INT64 x) -> INT64)
+    |     +-Literal(type=INT64, value=1)
+    +-input_scan=
+      +-SingleRowScan
+
+[REWRITTEN AST]
+QueryStmt
++-output_column_list=
+| +-$query.$col1#1 AS `$col1` [INT64]
++-query=
+  +-ProjectScan
+    +-column_list=[$query.$col1#1]
+    +-expr_list=
+    | +-$col1#1 :=
+    |   +-WithExpr
+    |     +-type=INT64
+    |     +-assignment_list=
+    |     | +-x#5 := Literal(type=INT64, value=1)
+    |     +-expr=
+    |       +-SubqueryExpr
+    |         +-type=INT64
+    |         +-subquery_type=SCALAR
+    |         +-parameter_list=
+    |         | +-ColumnRef(type=INT64, column=$inlined_GraphCallScanCorrelated.x#5)
+    |         +-subquery=
+    |           +-LimitOffsetScan
+    |             +-column_list=[$graph_table.a#4]
+    |             +-input_scan=
+    |             | +-ProjectScan
+    |             |   +-column_list=[$graph_table.a#4]
+    |             |   +-input_scan=
+    |             |     +-GraphTableScan
+    |             |       +-column_list=[$graph_table.a#4]
+    |             |       +-property_graph=aml
+    |             |       +-input_scan=
+    |             |         +-GraphLinearScan
+    |             |           +-column_list=[$graph_table.a#4]
+    |             |           +-scan_list=
+    |             |             +-GraphLinearScan
+    |             |               +-column_list=[$graph_table.a#4]
+    |             |               +-scan_list=
+    |             |                 +-GraphScan
+    |             |                 | +-column_list=[$element_table.n#2]
+    |             |                 | +-input_scan_list=
+    |             |                 | | +-GraphPathScan
+    |             |                 | |   +-column_list=[$element_table.n#2]
+    |             |                 | |   +-input_scan_list=
+    |             |                 | |   | +-GraphNodeScan
+    |             |                 | |   |   +-column_list=[$element_table.n#2]
+    |             |                 | |   |   +-label_expr=
+    |             |                 | |   |   | +-GraphLabel(parse_location=148-154, label=aml.Person)
+    |             |                 | |   |   +-target_element_table_list=[aml.Person]
+    |             |                 | |   +-head=$element_table.n#2
+    |             |                 | |   +-tail=$element_table.n#2
+    |             |                 | +-input_scan=
+    |             |                 |   +-SingleRowScan
+    |             |                 +-GraphCallScan
+    |             |                 | +-column_list=[$element_table.n#2, $graph_table.a#3]
+    |             |                 | +-optional=FALSE
+    |             |                 | +-subquery=
+    |             |                 | | +-GraphTableScan
+    |             |                 | |   +-column_list=[$graph_table.a#3]
+    |             |                 | |   +-property_graph=aml
+    |             |                 | |   +-input_scan=
+    |             |                 | |     +-GraphLinearScan
+    |             |                 | |       +-column_list=[$graph_table.a#3]
+    |             |                 | |       +-scan_list=
+    |             |                 | |         +-GraphLinearScan
+    |             |                 | |           +-column_list=[$graph_table.a#3]
+    |             |                 | |           +-scan_list=
+    |             |                 | |             +-ProjectScan
+    |             |                 | |               +-column_list=[$graph_table.a#3]
+    |             |                 | |               +-expr_list=
+    |             |                 | |               | +-a#3 :=
+    |             |                 | |               |   +-FunctionCall(GoogleSQL:$add(INT64, INT64) -> INT64)
+    |             |                 | |               |     +-Cast(UINT32 -> INT64)
+    |             |                 | |               |     | +-GraphGetElementProperty
+    |             |                 | |               |     |   +-type=UINT32
+    |             |                 | |               |     |   +-expr=
+    |             |                 | |               |     |   | +-ColumnRef(type=GRAPH_NODE(aml)<age UINT32, birthday DATE, data BYTES, id INT64, name STRING>, column=$element_table.n#2, is_correlated=TRUE)
+    |             |                 | |               |     |   +-property=age(UINT32)
+    |             |                 | |               |     +-ColumnRef(type=INT64, column=$inlined_GraphCallScanCorrelated.x#5, is_correlated=TRUE)
+    |             |                 | |               +-input_scan=
+    |             |                 | |                 +-SingleRowScan
+    |             |                 | +-input_scan=
+    |             |                 | | +-GraphRefScan(column_list=[$element_table.n#2])
+    |             |                 | +-parameter_list=
+    |             |                 |   +-ColumnRef(type=GRAPH_NODE(aml)<age UINT32, birthday DATE, data BYTES, id INT64, name STRING>, column=$element_table.n#2)
+    |             |                 |   +-ColumnRef(type=INT64, column=$inlined_GraphCallScanCorrelated.x#5, is_correlated=TRUE)
+    |             |                 +-ProjectScan
+    |             |                   +-column_list=[$graph_table.a#4]
+    |             |                   +-expr_list=
+    |             |                   | +-a#4 := ColumnRef(type=INT64, column=$graph_table.a#3)
+    |             |                   +-input_scan=
+    |             |                     +-GraphRefScan(column_list=[$element_table.n#2, $graph_table.a#3])
+    |             +-limit=
+    |               +-Literal(type=INT64, value=1)
+    +-input_scan=
+      +-SingleRowScan
 
 ==
 
@@ -2659,3 +2939,6 @@ QueryStmt
     |                       +-$groupbymod#7 := ColumnRef(type=INT64, column=$array.x#6)
     +-input_scan=
       +-SingleRowScan
+
+==
+

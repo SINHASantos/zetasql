@@ -105,8 +105,8 @@ absl::Status WithExprRewriterVisitor::VisitResolvedWithExpr(
   }
 
   // Build result expression projection.
-  ResolvedColumn result_column =
-      column_factory_->MakeCol("$with_expr", "injected", with_expr->type());
+  ResolvedColumn result_column = column_factory_->MakeCol(
+      "$with_expr", "injected", with_expr->annotated_type());
   GOOGLESQL_ASSIGN_OR_RETURN(auto result_expr, ProcessNode(with_expr->expr()));
   std::vector<std::unique_ptr<const ResolvedComputedColumn>> result_exprs;
   result_exprs.emplace_back(
@@ -118,9 +118,11 @@ absl::Status WithExprRewriterVisitor::VisitResolvedWithExpr(
   // Build subquery.
   std::vector<std::unique_ptr<const ResolvedColumnRef>> column_refs;
   GOOGLESQL_RETURN_IF_ERROR(CollectSortUniqueColumnRefs(*node, column_refs));
-  PushNodeToStack(MakeResolvedSubqueryExpr(
+  auto subquery_expr = MakeResolvedSubqueryExpr(
       with_expr->type(), ResolvedSubqueryExpr::SCALAR, std::move(column_refs),
-      /*in_expr=*/nullptr, std::move(result_projection)));
+      /*in_expr=*/nullptr, std::move(result_projection));
+  subquery_expr->set_type_annotation_map(with_expr->type_annotation_map());
+  PushNodeToStack(std::move(subquery_expr));
   return absl::OkStatus();
 }
 

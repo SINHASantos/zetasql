@@ -336,7 +336,6 @@ CreateFunctionStmt
 +-function_expression=
   +-FunctionCall(sample_functions:deprecation_warning() -> INT64)
 
-
 DEPRECATION WARNING:
 Function SAMPLE_FUNCTIONS:DEPRECATION_WARNING triggers a deprecation warning with kind PROTO3_FIELD_PRESENCE [at 2:21]
   returns int64 as (deprecation_warning()) ;
@@ -364,7 +363,6 @@ CreateFunctionStmt
     +-FunctionCall(sample_functions:deprecation_warning() -> INT64)
     +-FunctionCall(sample_functions:deprecation_warning() -> INT64)
 
-
 DEPRECATION WARNING:
 Function SAMPLE_FUNCTIONS:DEPRECATION_WARNING triggers a deprecation warning with kind PROTO3_FIELD_PRESENCE [at 2:20]
   returns bool as (deprecation_warning() > deprecation_warning()) ;
@@ -391,7 +389,6 @@ CreateFunctionStmt
   +-FunctionCall(GoogleSQL:$greater(INT64, INT64) -> BOOL)
     +-FunctionCall(sample_functions:deprecation_warning() -> INT64)
     +-FunctionCall(sample_functions:deprecation_warning2() -> INT64)
-
 
 DEPRECATION WARNING:
 Function SAMPLE_FUNCTIONS:DEPRECATION_WARNING triggers a deprecation warning with kind PROTO3_FIELD_PRESENCE [at 2:20]
@@ -428,7 +425,6 @@ CreateFunctionStmt
 +-function_expression=
   +-FunctionCall(sample_functions:deprecation_warning() -> INT64)
 
-
 DEPRECATION WARNING:
 Function SAMPLE_FUNCTIONS:DEPRECATION_WARNING triggers a deprecation warning with kind PROTO3_FIELD_PRESENCE [at 2:21]
   returns int64 as (deprecation_warning()) ;
@@ -457,7 +453,6 @@ CreateFunctionStmt
     +-FunctionCall(sample_functions:deprecation_warning() -> INT64)
     +-FunctionCall(sample_functions:deprecation_warning() -> INT64)
 
-
 DEPRECATION WARNING:
 Function SAMPLE_FUNCTIONS:DEPRECATION_WARNING triggers a deprecation warning with kind PROTO3_FIELD_PRESENCE [at 2:21]
   returns int64 as (deprecation_warning() + deprecation_warning()) ;
@@ -484,7 +479,6 @@ CreateFunctionStmt
 +-function_expression=
   +-FunctionCall(sample_functions:two_deprecation_warnings_same_kind() -> INT64)
 
-
 DEPRECATION WARNING:
 Function SAMPLE_FUNCTIONS:TWO_DEPRECATION_WARNINGS_SAME_KIND triggers a deprecation warning with kind PROTO3_FIELD_PRESENCE [at 2:21]
   returns int64 as (two_deprecation_warnings_same_kind()) ;
@@ -510,7 +504,6 @@ CreateFunctionStmt
 +-code="two_deprecation_warnings()"
 +-function_expression=
   +-FunctionCall(sample_functions:two_deprecation_warnings() -> INT64)
-
 
 DEPRECATION WARNING:
 Function SAMPLE_FUNCTIONS:TWO_DEPRECATION_WARNINGS triggers a deprecation warning with kind PROTO3_FIELD_PRESENCE [at 2:21]
@@ -555,7 +548,6 @@ CreateFunctionStmt
     | +-FunctionCall(sample_functions:deprecation_warning() -> INT64)
     | +-FunctionCall(sample_functions:two_deprecation_warnings_same_kind() -> INT64)
     +-FunctionCall(sample_functions:two_deprecation_warnings() -> INT64)
-
 
 DEPRECATION WARNING:
 Function SAMPLE_FUNCTIONS:DEPRECATION_WARNING triggers a deprecation warning with kind PROTO3_FIELD_PRESENCE [at 3:6]
@@ -623,7 +615,6 @@ CreateFunctionStmt
     | | +-FunctionCall(sample_functions:two_deprecation_warnings_same_kind() -> INT64)
     | +-FunctionCall(sample_functions:two_deprecation_warnings() -> INT64)
     +-FunctionCall(sample_functions:two_deprecation_warnings() -> INT64)
-
 
 DEPRECATION WARNING:
 Function SAMPLE_FUNCTIONS:DEPRECATION_WARNING triggers a deprecation warning with kind PROTO3_FIELD_PRESENCE [at 3:6]

@@ -523,7 +523,6 @@ QueryStmt
         +-input_scan=
           +-SingleRowScan
 
-
 DEPRECATION WARNING:
 Lateral column alias will shadow original target: INT64 (t.x#1) [at 2:23]
   SELECT as struct t, t.x, SUM(y) FROM t.y
@@ -704,7 +703,6 @@ QueryStmt
         | +-y#2 := Literal(type=ARRAY<INT64>, value=[2])
         +-input_scan=
           +-SingleRowScan
-
 
 DEPRECATION WARNING:
 Lateral column alias will shadow original target: STRUCT<f1a INT32, f1b STRUCT<f2a BOOL, f2b STRUCT<f3a STRING>>> (t.x#1) [at 2:24]
@@ -1583,7 +1581,6 @@ QueryStmt
             +-input_scan=
               +-SingleRowScan
 
-
 DEPRECATION WARNING:
 Lateral column alias will shadow original target: RANGE_VARIABLE<$struct#3> (value table) [at 2:23]
   SELECT as struct t, t.x, SUM(y) FROM t.y
@@ -1765,7 +1762,6 @@ QueryStmt
         +-input_scan=
           +-SingleRowScan
 
-
 DEPRECATION WARNING:
 Lateral column alias will shadow original target: STRUCT<a INT64, b STRING> (t.x#4) [at 2:23]
   SELECT as struct x, x.a, SUM(y) FROM t.y GROUP BY x
@@ -1902,7 +1898,6 @@ QueryStmt
             | +-y#2 := Literal(type=ARRAY<INT64>, value=[2])
             +-input_scan=
               +-SingleRowScan
-
 
 DEPRECATION WARNING:
 Lateral column alias will shadow original target: FIELD_OF<$make_struct.$struct#3> (id: 0) [at 2:24]
@@ -2271,7 +2266,6 @@ QueryStmt
     |                       +-ColumnRef(type=INT64, column=$array.y#2)
     +-input_scan=
       +-TableScan(column_list=[KitchenSinkValueTable.value#1], table=KitchenSinkValueTable, column_index_list=[0], alias="t")
-
 
 DEPRECATION WARNING:
 Lateral column alias will shadow original target: RANGE_VARIABLE<value#1> (value table) [at 3:20]
@@ -2656,7 +2650,6 @@ QueryStmt
     +-input_scan=
       +-TableScan(column_list=ComplexTypes.[key#1, TestEnum#2, KitchenSink#3, Int32Array#4, TestStruct#5, TestProto#6], table=ComplexTypes, column_index_list=[0, 1, 2, 3, 4, 5], alias="ct")
 
-
 DEPRECATION WARNING:
 Lateral column alias will shadow original target: googlesql_test.KitchenSinkPB (ComplexTypes.KitchenSink#3) (implicit) [at 2:24]
   SELECT as struct ct, ct.KitchenSink, ct.KitchenSink.int32_val,
@@ -2738,7 +2731,6 @@ QueryStmt
     |                         +-default_value=0
     +-input_scan=
       +-TableScan(column_list=ComplexTypes.[key#1, TestEnum#2, KitchenSink#3, Int32Array#4, TestStruct#5, TestProto#6], table=ComplexTypes, column_index_list=[0, 1, 2, 3, 4, 5], alias="ct")
-
 
 DEPRECATION WARNING:
 Lateral column alias will shadow original target: googlesql_test.KitchenSinkPB (ComplexTypes.KitchenSink#3) (implicit) [at 2:24]
@@ -2838,7 +2830,6 @@ QueryStmt
     |                         +-ColumnRef(type=INT32, column=$array.y#7)
     +-input_scan=
       +-TableScan(column_list=ComplexTypes.[KitchenSink#3, Int32Array#4], table=ComplexTypes, column_index_list=[2, 3], alias="ct")
-
 
 DEPRECATION WARNING:
 Lateral column alias will shadow original target: googlesql_test.KitchenSinkPB (ComplexTypes.KitchenSink#3) (implicit) [at 3:20]

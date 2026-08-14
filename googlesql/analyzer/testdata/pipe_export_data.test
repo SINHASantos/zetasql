@@ -52,7 +52,6 @@ GeneralizedQueryStmt
         +-query=
           +-TableScan(column_list=KeyValue.[Key#1, Value#2], table=KeyValue, column_index_list=[0, 1])
 
-
 [REWRITTEN AST]
 ExportDataStmt
 +-output_column_list=
@@ -88,7 +87,6 @@ GeneralizedQueryStmt
         +-query=
           +-TableScan(column_list=KeyValue.[Key#1, Value#2], table=KeyValue, column_index_list=[0, 1])
 
-
 [REWRITTEN AST]
 ExportDataStmt
 +-option_list=
@@ -115,7 +113,6 @@ GeneralizedQueryStmt
         +-is_value_table=TRUE
         +-query=
           +-TableScan(column_list=[TestExtraValueTable.value#1], table=TestExtraValueTable, column_index_list=[0])
-
 
 [REWRITTEN AST]
 ExportDataStmt
@@ -160,7 +157,6 @@ GeneralizedQueryStmt
                   +-OrderByItem
                     +-column_ref=
                       +-ColumnRef(type=INT64, column=KeyValue.Key#1)
-
 
 [REWRITTEN AST]
 ExportDataStmt
@@ -214,7 +210,6 @@ GeneralizedQueryStmt
             +-input_scan=
               +-SingleRowScan
 
-
 [REWRITTEN AST]
 ExportDataStmt
 +-output_column_list=
@@ -248,7 +243,6 @@ GeneralizedQueryStmt
         +-query=
           +-TableScan(column_list=[KeyValue.Value#2], table=KeyValue, column_index_list=[1])
 
-
 [REWRITTEN AST]
 ExportDataStmt
 +-output_column_list=
@@ -272,7 +266,6 @@ GeneralizedQueryStmt
         | +-KeyValue.Value#2 AS Value [STRING]
         +-query=
           +-TableScan(column_list=KeyValue.[Key#1, Value#2], table=KeyValue, column_index_list=[0, 1])
-
 
 [REWRITTEN AST]
 ExportDataStmt
@@ -302,7 +295,6 @@ GeneralizedQueryStmt
         | +-KeyValue.Value#2 AS Value [STRING]
         +-query=
           +-TableScan(column_list=KeyValue.[Key#1, Value#2], table=KeyValue, column_index_list=[0, 1])
-
 
 [REWRITTEN AST]
 ExportDataStmt
@@ -370,7 +362,6 @@ GeneralizedQueryStmt
       |                   +-SubpipelineInputScan(column_list=KeyValue.[Key#1, Value#2])
       +-PipeIfCase(subpipeline_sql="(\n     |> DROP key\n     |> EXPORT DATA\n   )")
 
-
 [REWRITTEN AST]
 ExportDataStmt
 +-output_column_list=
@@ -413,7 +404,6 @@ GeneralizedQueryStmt
                     | +-KeyValue.Value#2 AS Value [STRING]
                     +-query=
                       +-SubpipelineInputScan(column_list=[KeyValue.Value#2])
-
 
 [REWRITTEN AST]
 ExportDataStmt
@@ -477,7 +467,6 @@ GeneralizedQueryStmt
                         +-column_list=[KeyValue.Value#2]
                         +-input_scan=
                           +-SubpipelineInputScan(column_list=KeyValue.[Key#1, Value#2])
-
 
 [REWRITTEN AST]
 MultiStmt
@@ -563,7 +552,6 @@ GeneralizedQueryStmt
                         +-column_list=[KeyValue.Value#2]
                         +-input_scan=
                           +-SubpipelineInputScan(column_list=KeyValue.[Key#1, Value#2])
-
 
 [REWRITTEN AST]
 MultiStmt
@@ -651,7 +639,6 @@ GeneralizedQueryStmt
             | +-cte.Value#4 AS Value [STRING]
             +-query=
               +-WithRefScan(column_list=cte.[Key#3, Value#4], with_query_name="cte")
-
 
 [REWRITTEN AST]
 ExportDataStmt
@@ -744,7 +731,6 @@ GeneralizedQueryStmt
     |         +-WithRefScan(column_list=[t.$col1#4], with_query_name="t")
     +-recursive=TRUE
 
-
 [REWRITTEN AST]
 ExportDataStmt
 +-output_column_list=
@@ -819,7 +805,6 @@ ExplainStmt
             +-query=
               +-TableScan(column_list=KeyValue.[Key#1, Value#2], table=KeyValue, column_index_list=[0, 1])
 
-
 [REWRITTEN AST]
 ExplainStmt
 +-statement=
@@ -859,7 +844,6 @@ GeneralizedQueryStmt
         | +-KeyValue.Value#2 AS Value [STRING]
         +-query=
           +-TableScan(column_list=KeyValue.[Key#1, Value#2], table=KeyValue, column_index_list=[0, 1])
-
 
 [REWRITTEN AST]
 ExportDataStmt

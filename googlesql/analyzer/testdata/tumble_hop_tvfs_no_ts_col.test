@@ -1,4 +1,5 @@
-[default language_features={{NONE|MAXIMUM}},+TABLE_VALUED_FUNCTIONS, +TUMBLE_HOP_TVFS, +INTERVAL_TYPE, +NAMED_ARGUMENTS, +TUMBLE_HOP_TVFS_NO_TIMESTAMP_COL]
+[default language_features={{NONE|MAXIMUM}},+TABLE_VALUED_FUNCTIONS, +TUMBLE_HOP_TVFS, +INTERVAL_TYPE, +NAMED_ARGUMENTS, +TUMBLE_HOP_TVFS_NO_TIMESTAMP_COL, +PIPES]
+[default sql_builder_target_syntax_mode=pipe]
 
 # TUMBLE_NO_TS_COL resolves correctly, adds the window start and end columns.
 
@@ -15,7 +16,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=tumble.[ts_col#3, WINDOW_START#4, WINDOW_END#5]
-        +-tvf=GoogleSQL:tumble((ANY TABLE table_expr, STRING timestamp_column, INTERVAL window_size, optional TIMESTAMP {default_value: 1970-01-01 00:00:00+00} origin) -> ANY TABLE; (ANY TABLE table_expr, INTERVAL window_size, optional TIMESTAMP {default_value: 1970-01-01 00:00:00+00} origin) -> ANY TABLE)
+        +-tvf=GoogleSQL:tumble
         +-signature=(TABLE<ts_col TIMESTAMP>, INTERVAL, literal TIMESTAMP) -> TABLE<ts_col TIMESTAMP, WINDOW_START TIMESTAMP, WINDOW_END TIMESTAMP>
         +-argument_list=
         | +-FunctionArgument
@@ -49,7 +50,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=hop.[ts_col#3, WINDOW_START#4, WINDOW_END#5]
-        +-tvf=GoogleSQL:hop((ANY TABLE table_expr, STRING timestamp_column, INTERVAL window_size, INTERVAL step_size, optional TIMESTAMP {default_value: 1970-01-01 00:00:00+00} origin) -> ANY TABLE; (ANY TABLE table_expr, INTERVAL window_size, INTERVAL step_size, optional TIMESTAMP {default_value: 1970-01-01 00:00:00+00} origin) -> ANY TABLE)
+        +-tvf=GoogleSQL:hop
         +-signature=(TABLE<ts_col TIMESTAMP>, INTERVAL, INTERVAL, literal TIMESTAMP) -> TABLE<ts_col TIMESTAMP, WINDOW_START TIMESTAMP, WINDOW_END TIMESTAMP>
         +-argument_list=
         | +-FunctionArgument
@@ -88,7 +89,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=tumble.[ts_col#3, WINDOW_START#4, WINDOW_END#5]
-        +-tvf=GoogleSQL:tumble((ANY TABLE table_expr, STRING timestamp_column, INTERVAL window_size, optional TIMESTAMP {default_value: 1970-01-01 00:00:00+00} origin) -> ANY TABLE; (ANY TABLE table_expr, INTERVAL window_size, optional TIMESTAMP {default_value: 1970-01-01 00:00:00+00} origin) -> ANY TABLE)
+        +-tvf=GoogleSQL:tumble
         +-signature=(TABLE<ts_col TIMESTAMP>, INTERVAL, TIMESTAMP) -> TABLE<ts_col TIMESTAMP, WINDOW_START TIMESTAMP, WINDOW_END TIMESTAMP>
         +-argument_list=
         | +-FunctionArgument
@@ -123,7 +124,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=hop.[ts_col#3, WINDOW_START#4, WINDOW_END#5]
-        +-tvf=GoogleSQL:hop((ANY TABLE table_expr, STRING timestamp_column, INTERVAL window_size, INTERVAL step_size, optional TIMESTAMP {default_value: 1970-01-01 00:00:00+00} origin) -> ANY TABLE; (ANY TABLE table_expr, INTERVAL window_size, INTERVAL step_size, optional TIMESTAMP {default_value: 1970-01-01 00:00:00+00} origin) -> ANY TABLE)
+        +-tvf=GoogleSQL:hop
         +-signature=(TABLE<ts_col TIMESTAMP>, INTERVAL, INTERVAL, TIMESTAMP) -> TABLE<ts_col TIMESTAMP, WINDOW_START TIMESTAMP, WINDOW_END TIMESTAMP>
         +-argument_list=
         | +-FunctionArgument

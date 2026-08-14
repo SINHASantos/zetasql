@@ -1796,7 +1796,7 @@ QueryStmt
         |   +-input_scan=
         |     +-TVFScan
         |       +-column_list=[templated_proto_braced_ctor_tvf.dice_roll#4]
-        |       +-tvf=templated_proto_braced_ctor_tvf((ANY TABLE) -> ANY TABLE)
+        |       +-tvf=templated_proto_braced_ctor_tvf
         |       +-signature=(TABLE<v INT32>) -> TABLE<dice_roll PROTO<googlesql_test.TestExtraPB>>
         |       +-argument_list=
         |       | +-FunctionArgument

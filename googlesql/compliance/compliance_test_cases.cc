@@ -1245,7 +1245,8 @@ SHARDED_TEST_F(ComplianceCodebasedTests, TestCastMapFunction, 5) {
 
 SHARDED_TEST_F(ComplianceCodebasedTests, TestBitCastFunctions, 1) {
   SetNamePrefix("BitCast");
-  RunFunctionCalls(Shard(GetFunctionTestsBitCast()));
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(auto bit_cast_tests, GetFunctionTestsBitCast());
+  RunFunctionCalls(Shard(bit_cast_tests));
 }
 
 SHARDED_TEST_F(ComplianceCodebasedTests, TestGenerateArray, 1) {

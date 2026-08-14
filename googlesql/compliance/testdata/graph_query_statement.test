@@ -309,3 +309,51 @@ ARRAY<STRUCT<aid INT64,
   {1010, 200, 1020, 200, 1010, 600, 1010, 200},
   {1010, 600, 1010, 600, 1010, 600, 1010, 600}
 ]
+==
+[name=element_definition_name_is_predicate_for_nodes]
+GRAPH aml
+MATCH (n:Human|Account)
+RETURN DISTINCT element_definition_name(n) AS definition_name,
+                element_definition_name_is(n, Person) AS is_person,
+                element_definition_name_is(n, ACCOUNT) AS is_account
+ORDER BY definition_name, is_person, is_account
+--
+ARRAY<STRUCT<
+        definition_name STRING,
+        is_person BOOL,
+        is_account BOOL
+      >>
+[unknown order:
+  {"Account", false, true},
+  {"Person", true, false}
+]
+==
+[name=element_definition_name_is_predicate_for_edges]
+GRAPH aml
+MATCH -[e:Knows|Transfer]->
+RETURN DISTINCT element_definition_name(e) AS definition_name,
+       element_definition_name_is(e, Knows) AS is_knows,
+       element_definition_name_is(e, Transfer) AS is_transfer
+ORDER BY definition_name, is_knows, is_transfer
+--
+ARRAY<STRUCT<
+        definition_name STRING,
+        is_knows BOOL,
+        is_transfer BOOL
+      >>
+[unknown order:
+  {"Knows", true, false},
+  {"Transfer", false, true}
+]
+==
+[name=element_definition_name_is_predicate_with_null]
+GRAPH aml
+OPTIONAL MATCH (n)-[e]->(m)
+         WHERE false
+RETURN DISTINCT element_definition_name_is(n, Person) AS is_person,
+       element_definition_name_is(e, Transfer) AS is_transfer,
+       element_definition_name_is(m, Account) AS is_account
+--
+ARRAY<STRUCT<is_person BOOL, is_transfer BOOL, is_account BOOL>>[
+  {NULL, NULL, NULL}
+]

@@ -1222,4 +1222,42 @@ INSTANTIATE_TEST_SUITE_P(CastUuid, CastTemplateTest,
 INSTANTIATE_TEST_SUITE_P(CastJson, CastTemplateTest,
                          testing::ValuesIn(GetFunctionTestsCastJson()));
 
+TEST(IsTypeCastableToJsonTest, TypeCastableToJson) {
+  LanguageOptions options_enabled;
+  options_enabled.EnableLanguageFeature(FEATURE_CAST_TO_JSON_TYPE);
+
+  LanguageOptions options_disabled;
+
+  TypeFactory factory;
+  const Type* int64_type = types::Int64Type();
+  const Type* json_type = types::JsonType();
+  const Type* geography_type = types::GeographyType();
+
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(const ArrayType* array_int64_type,
+                       factory.MakeArrayType(int64_type));
+
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(const ArrayType* array_geography_type,
+                       factory.MakeArrayType(geography_type));
+
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(const Type* map_type,
+                       factory.MakeMapType(types::StringType(), int64_type));
+
+  // Feature disabled
+  EXPECT_FALSE(IsTypeCastableToJson(int64_type, options_disabled));
+  EXPECT_TRUE(IsTypeCastableToJson(json_type, options_disabled));
+
+  // Feature enabled
+  EXPECT_TRUE(IsTypeCastableToJson(int64_type, options_enabled));
+  EXPECT_TRUE(IsTypeCastableToJson(json_type, options_enabled));
+
+  // Cast MAP
+  EXPECT_FALSE(IsTypeCastableToJson(map_type, options_enabled));
+
+  // Cast array of supported type
+  EXPECT_TRUE(IsTypeCastableToJson(array_int64_type, options_enabled));
+
+  // Cast array of unsupported type
+  EXPECT_FALSE(IsTypeCastableToJson(array_geography_type, options_enabled));
+}
+
 }  // namespace googlesql

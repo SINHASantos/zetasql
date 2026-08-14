@@ -33,8 +33,11 @@ class QueryWebTemplates {
   virtual const std::string& GetWebPageCSS() const;
   virtual const std::string& GetWebPageBody() const;
   virtual const std::string& GetTable() const;
+  // Returns the embedded JavaScript partial used for interactive UI elements
+  // such as rewrite-steps.
+  virtual const std::string& GetInlineJS() const;
 
-  std::string page_template_, style_css_, page_body_, table_;
+  std::string page_template_, style_css_, page_body_, table_, inline_js_;
 };
 
 }  // namespace googlesql

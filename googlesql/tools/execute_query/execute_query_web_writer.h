@@ -37,8 +37,10 @@ namespace googlesql {
 // HTML output.
 class ExecuteQueryWebWriter : public ExecuteQueryWriter {
  public:
-  explicit ExecuteQueryWebWriter(mstch::map &template_params)
-      : template_params_(template_params) {
+  explicit ExecuteQueryWebWriter(mstch::map& template_params,
+                                 bool linear_resolved_ast = false)
+      : template_params_(template_params),
+        linear_resolved_ast_(linear_resolved_ast) {
     // The `statements` param is an array of maps, containing the `error`
     // and `result_*` keys for each statmement.
     template_params_["statements"] = mstch::array();
@@ -123,6 +125,7 @@ class ExecuteQueryWebWriter : public ExecuteQueryWriter {
   std::vector<mstch::map> current_rewrites_;
   std::string log_messages_;
   bool got_results_{false};
+  bool linear_resolved_ast_{false};
 };
 
 }  // namespace googlesql

@@ -2298,12 +2298,15 @@ void SQLTestBase::StepPrepareDatabase() {
     lang_options.set_product_mode(googlesql::ProductMode::PRODUCT_INTERNAL);
     lang_options.EnableMaximumLanguageFeaturesForDevelopment();
     // Enabling MaximumLanguageFeaturesForDevelopment enables all features,
-    // including FEATURE_VECTOR_SEARCH_TVF. We remove it explicitly here
+    // including FEATURE_VECTOR_SEARCH_TVF and
+    // FEATURE_SINGLE_HYBRID_VECTOR_SEARCH_TVF. We remove them explicitly here
     // because VECTOR_SEARCH_TVF is explicitly added to include_function_ids
     // along with other needed functions in test_database_catalog.cc. If we
     // don't disable it here, it will be added again leading to unrelated
     // test failures for CreatePropertyGraph tests.
     lang_options.DisableLanguageFeature(FEATURE_VECTOR_SEARCH_TVF);
+    lang_options.DisableLanguageFeature(
+        FEATURE_SINGLE_HYBRID_VECTOR_SEARCH_TVF);
     lang_options.AddSupportedStatementKind(RESOLVED_CREATE_PROPERTY_GRAPH_STMT);
     CheckCancellation(
         test_catalog.SetLanguageOptions(lang_options),

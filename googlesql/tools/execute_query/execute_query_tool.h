@@ -143,6 +143,11 @@ class ExecuteQueryConfig {
   void set_use_box_glyphs(bool value) { use_box_glyphs_ = value; }
   bool use_box_glyphs() const { return use_box_glyphs_; }
 
+  // If true, the resolved AST is printed in linear (pipe-style) mode instead
+  // of as a nested tree.
+  void set_linear_resolved_ast(bool value) { linear_resolved_ast_ = value; }
+  bool linear_resolved_ast() const { return linear_resolved_ast_; }
+
   // Defaults matches AnalyzerOptions default.
   const AnalyzerOptions& analyzer_options() const { return analyzer_options_; }
   AnalyzerOptions& mutable_analyzer_options() { return analyzer_options_; }
@@ -277,6 +282,8 @@ class ExecuteQueryConfig {
 
   bool use_box_glyphs_ = true;
 
+  bool linear_resolved_ast_ = false;
+
   AnalyzerOptions analyzer_options_;
 
   // The effective Catalog is a MultiCatalog with
@@ -385,5 +392,6 @@ ABSL_DECLARE_FLAG(int64_t, max_statements_to_execute);
 ABSL_DECLARE_FLAG(std::string, parse_location_record_type);
 ABSL_DECLARE_FLAG(std::optional<googlesql::internal::EnabledLanguageFeatures>,
                   enabled_language_features);
+ABSL_DECLARE_FLAG(bool, linear_resolved_ast);
 
 #endif  // GOOGLESQL_TOOLS_EXECUTE_QUERY_EXECUTE_QUERY_TOOL_H_

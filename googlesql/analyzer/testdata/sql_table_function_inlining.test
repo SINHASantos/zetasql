@@ -1,5 +1,5 @@
 [default enabled_ast_rewrites=ALL]
-[default language_features=NONE,+TABLE_VALUED_FUNCTIONS,+WITH_EXPRESSION,+ORDER_BY_IN_AGGREGATE]
+[default language_features=NONE,+TABLE_VALUED_FUNCTIONS,+WITH_EXPRESSION,+ORDER_BY_IN_AGGREGATE,+CREATE_TABLE_FUNCTION,+WITH_ON_SUBQUERY,+CORRELATED_WITH_ON_SUBQUERY]
 [default no_java]
 
 SELECT {{*|a|b}} FROM NullarySelect();
@@ -14,7 +14,7 @@ QueryStmt
   +-ProjectScan
     +-column_list=NullarySelect.[a#1, b#2]
     +-input_scan=
-      +-TVFScan(column_list=NullarySelect.[a#1, b#2], tvf=NullarySelect(() -> TABLE<a INT64, b INT64>), signature=() -> TABLE<a INT64, b INT64>, column_index_list=[0, 1], function_call_signature=() -> TABLE<a INT64, b INT64>)
+      +-TVFScan(column_list=NullarySelect.[a#1, b#2], tvf=NullarySelect, signature=() -> TABLE<a INT64, b INT64>, column_index_list=[0, 1], function_call_signature=() -> TABLE<a INT64, b INT64>)
 
 [REWRITTEN AST]
 QueryStmt
@@ -42,7 +42,7 @@ QueryStmt
   +-ProjectScan
     +-column_list=[NullarySelect.a#1]
     +-input_scan=
-      +-TVFScan(column_list=[NullarySelect.a#1], tvf=NullarySelect(() -> TABLE<a INT64, b INT64>), signature=() -> TABLE<a INT64, b INT64>, column_index_list=[0], function_call_signature=() -> TABLE<a INT64, b INT64>)
+      +-TVFScan(column_list=[NullarySelect.a#1], tvf=NullarySelect, signature=() -> TABLE<a INT64, b INT64>, column_index_list=[0], function_call_signature=() -> TABLE<a INT64, b INT64>)
 
 [REWRITTEN AST]
 QueryStmt
@@ -69,7 +69,7 @@ QueryStmt
   +-ProjectScan
     +-column_list=[NullarySelect.b#2]
     +-input_scan=
-      +-TVFScan(column_list=[NullarySelect.b#2], tvf=NullarySelect(() -> TABLE<a INT64, b INT64>), signature=() -> TABLE<a INT64, b INT64>, column_index_list=[1], function_call_signature=() -> TABLE<a INT64, b INT64>)
+      +-TVFScan(column_list=[NullarySelect.b#2], tvf=NullarySelect, signature=() -> TABLE<a INT64, b INT64>, column_index_list=[1], function_call_signature=() -> TABLE<a INT64, b INT64>)
 
 [REWRITTEN AST]
 QueryStmt
@@ -98,7 +98,7 @@ QueryStmt
   +-ProjectScan
     +-column_list=NullarySelectUnion.[a#1, b#2]
     +-input_scan=
-      +-TVFScan(column_list=NullarySelectUnion.[a#1, b#2], tvf=NullarySelectUnion(() -> TABLE<a INT64, b INT64>), signature=() -> TABLE<a INT64, b INT64>, column_index_list=[0, 1], function_call_signature=() -> TABLE<a INT64, b INT64>)
+      +-TVFScan(column_list=NullarySelectUnion.[a#1, b#2], tvf=NullarySelectUnion, signature=() -> TABLE<a INT64, b INT64>, column_index_list=[0, 1], function_call_signature=() -> TABLE<a INT64, b INT64>)
 
 [REWRITTEN AST]
 QueryStmt
@@ -145,7 +145,7 @@ QueryStmt
   +-ProjectScan
     +-column_list=NullarySelectCTE.[a#1, b#2]
     +-input_scan=
-      +-TVFScan(column_list=NullarySelectCTE.[a#1, b#2], tvf=NullarySelectCTE(() -> TABLE<a INT64, b INT64>), signature=() -> TABLE<a INT64, b INT64>, column_index_list=[0, 1], function_call_signature=() -> TABLE<a INT64, b INT64>)
+      +-TVFScan(column_list=NullarySelectCTE.[a#1, b#2], tvf=NullarySelectCTE, signature=() -> TABLE<a INT64, b INT64>, column_index_list=[0, 1], function_call_signature=() -> TABLE<a INT64, b INT64>)
 
 [REWRITTEN AST]
 QueryStmt
@@ -186,7 +186,7 @@ QueryStmt
   +-ProjectScan
     +-column_list=NullarySelectFromTvf.[a#1, b#2]
     +-input_scan=
-      +-TVFScan(column_list=NullarySelectFromTvf.[a#1, b#2], tvf=NullarySelectFromTvf(() -> TABLE<a INT64, b INT64>), signature=() -> TABLE<a INT64, b INT64>, column_index_list=[0, 1], function_call_signature=() -> TABLE<a INT64, b INT64>)
+      +-TVFScan(column_list=NullarySelectFromTvf.[a#1, b#2], tvf=NullarySelectFromTvf, signature=() -> TABLE<a INT64, b INT64>, column_index_list=[0, 1], function_call_signature=() -> TABLE<a INT64, b INT64>)
 
 [REWRITTEN AST]
 QueryStmt
@@ -218,7 +218,7 @@ QueryStmt
   +-ProjectScan
     +-column_list=[NullarySelectCallingScalarUDF.pi#1]
     +-input_scan=
-      +-TVFScan(column_list=[NullarySelectCallingScalarUDF.pi#1], tvf=NullarySelectCallingScalarUDF(() -> TABLE<pi DOUBLE>), signature=() -> TABLE<pi DOUBLE>, column_index_list=[0], function_call_signature=() -> TABLE<pi DOUBLE>)
+      +-TVFScan(column_list=[NullarySelectCallingScalarUDF.pi#1], tvf=NullarySelectCallingScalarUDF, signature=() -> TABLE<pi DOUBLE>, column_index_list=[0], function_call_signature=() -> TABLE<pi DOUBLE>)
 
 [REWRITTEN AST]
 QueryStmt
@@ -245,7 +245,7 @@ QueryStmt
   +-ProjectScan
     +-column_list=[NullarySelectCallingLambdaArgFunction.arr#1]
     +-input_scan=
-      +-TVFScan(column_list=[NullarySelectCallingLambdaArgFunction.arr#1], tvf=NullarySelectCallingLambdaArgFunction(() -> TABLE<arr ARRAY<INT64>>), signature=() -> TABLE<arr ARRAY<INT64>>, column_index_list=[0], function_call_signature=() -> TABLE<arr ARRAY<INT64>>)
+      +-TVFScan(column_list=[NullarySelectCallingLambdaArgFunction.arr#1], tvf=NullarySelectCallingLambdaArgFunction, signature=() -> TABLE<arr ARRAY<INT64>>, column_index_list=[0], function_call_signature=() -> TABLE<arr ARRAY<INT64>>)
 
 [REWRITTEN AST]
 QueryStmt
@@ -321,7 +321,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=[UnaryScalarArg.arg0#1]
-        +-tvf=UnaryScalarArg((INT64 arg0) -> TABLE<arg0 INT64>)
+        +-tvf=UnaryScalarArg
         +-signature=(literal INT64) -> TABLE<arg0 INT64>
         +-argument_list=
         | +-FunctionArgument
@@ -382,7 +382,7 @@ QueryStmt
         +-left_scan=
         | +-TVFScan
         |   +-column_list=[UnaryScalarArg.arg0#1]
-        |   +-tvf=UnaryScalarArg((INT64 arg0) -> TABLE<arg0 INT64>)
+        |   +-tvf=UnaryScalarArg
         |   +-signature=(literal INT64) -> TABLE<arg0 INT64>
         |   +-argument_list=
         |   | +-FunctionArgument
@@ -393,7 +393,7 @@ QueryStmt
         +-right_scan=
           +-TVFScan
             +-column_list=[UnaryScalarArg.arg0#2]
-            +-tvf=UnaryScalarArg((INT64 arg0) -> TABLE<arg0 INT64>)
+            +-tvf=UnaryScalarArg
             +-signature=(literal INT64) -> TABLE<arg0 INT64>
             +-argument_list=
             | +-FunctionArgument
@@ -483,7 +483,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=UnaryScalarArgMultipleReferences.[ret0#1, ret1#2]
-        +-tvf=UnaryScalarArgMultipleReferences((INT64 arg0) -> TABLE<ret0 INT64, ret1 INT64>)
+        +-tvf=UnaryScalarArgMultipleReferences
         +-signature=(INT64) -> TABLE<ret0 INT64, ret1 INT64>
         +-argument_list=
         | +-FunctionArgument
@@ -548,9 +548,9 @@ QueryStmt
             |     +-subquery_type=SCALAR
             |     +-subquery=
             |       +-ProjectScan
-            |         +-column_list=[$inlined_UnaryScalarArgMultipleReferences.arg0#6]
+            |         +-column_list=[$inlined_UnaryScalarArgMultipleReferences.arg0#7]
             |         +-input_scan=
-            |           +-WithRefScan(column_list=[$inlined_UnaryScalarArgMultipleReferences.arg0#6], with_query_name="$inlined_UnaryScalarArgMultipleReferences_scalar_args")
+            |           +-WithRefScan(column_list=[$inlined_UnaryScalarArgMultipleReferences.arg0#7], with_query_name="$inlined_UnaryScalarArgMultipleReferences_scalar_args")
             +-input_scan=
               +-SingleRowScan
 ==
@@ -568,7 +568,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=BinaryScalarArg.[arg0#1, arg1#2, ret2#3]
-        +-tvf=BinaryScalarArg((INT64 arg0, INT64 arg1) -> TABLE<arg0 INT64, arg1 INT64, ret2 INT64>)
+        +-tvf=BinaryScalarArg
         +-signature=(literal INT64, literal INT64) -> TABLE<arg0 INT64, arg1 INT64, ret2 INT64>
         +-argument_list=
         | +-FunctionArgument
@@ -640,9 +640,9 @@ QueryStmt
             |       +-subquery_type=SCALAR
             |       +-subquery=
             |         +-ProjectScan
-            |           +-column_list=[$inlined_BinaryScalarArg.arg1#13]
+            |           +-column_list=[$inlined_BinaryScalarArg.arg1#14]
             |           +-input_scan=
-            |             +-WithRefScan(column_list=$inlined_BinaryScalarArg.[arg0#12, arg1#13], with_query_name="$inlined_BinaryScalarArg_scalar_args")
+            |             +-WithRefScan(column_list=$inlined_BinaryScalarArg.[arg0#13, arg1#14], with_query_name="$inlined_BinaryScalarArg_scalar_args")
             +-input_scan=
               +-SingleRowScan
 ==
@@ -666,7 +666,7 @@ QueryStmt
         +-left_scan=
         | +-TVFScan
         |   +-column_list=BinaryScalarArg.[arg0#1, arg1#2, ret2#3]
-        |   +-tvf=BinaryScalarArg((INT64 arg0, INT64 arg1) -> TABLE<arg0 INT64, arg1 INT64, ret2 INT64>)
+        |   +-tvf=BinaryScalarArg
         |   +-signature=(literal INT64, literal INT64) -> TABLE<arg0 INT64, arg1 INT64, ret2 INT64>
         |   +-argument_list=
         |   | +-FunctionArgument
@@ -680,7 +680,7 @@ QueryStmt
         +-right_scan=
           +-TVFScan
             +-column_list=BinaryScalarArg.[arg0#4, arg1#5, ret2#6]
-            +-tvf=BinaryScalarArg((INT64 arg0, INT64 arg1) -> TABLE<arg0 INT64, arg1 INT64, ret2 INT64>)
+            +-tvf=BinaryScalarArg
             +-signature=(literal INT64, literal INT64) -> TABLE<arg0 INT64, arg1 INT64, ret2 INT64>
             +-argument_list=
             | +-FunctionArgument
@@ -758,9 +758,9 @@ QueryStmt
         |       |       +-subquery_type=SCALAR
         |       |       +-subquery=
         |       |         +-ProjectScan
-        |       |           +-column_list=[$inlined_BinaryScalarArg.arg1#16]
+        |       |           +-column_list=[$inlined_BinaryScalarArg.arg1#17]
         |       |           +-input_scan=
-        |       |             +-WithRefScan(column_list=$inlined_BinaryScalarArg.[arg0#15, arg1#16], with_query_name="$inlined_BinaryScalarArg_scalar_args")
+        |       |             +-WithRefScan(column_list=$inlined_BinaryScalarArg.[arg0#16, arg1#17], with_query_name="$inlined_BinaryScalarArg_scalar_args")
         |       +-input_scan=
         |         +-SingleRowScan
         +-right_scan=
@@ -771,10 +771,10 @@ QueryStmt
             |   +-with_query_name="$inlined_BinaryScalarArg_scalar_args"
             |   +-with_subquery=
             |     +-ProjectScan
-            |       +-column_list=$inlined_BinaryScalarArg.[arg0#17, arg1#18]
+            |       +-column_list=$inlined_BinaryScalarArg.[arg0#19, arg1#20]
             |       +-expr_list=
-            |       | +-arg0#17 := Literal(type=INT64, value=3)
-            |       | +-arg1#18 := Literal(type=INT64, value=4)
+            |       | +-arg0#19 := Literal(type=INT64, value=3)
+            |       | +-arg1#20 := Literal(type=INT64, value=4)
             |       +-input_scan=
             |         +-SingleRowScan
             +-query=
@@ -787,18 +787,18 @@ QueryStmt
                 | |   +-subquery_type=SCALAR
                 | |   +-subquery=
                 | |     +-ProjectScan
-                | |       +-column_list=[$inlined_BinaryScalarArg.arg0#19]
+                | |       +-column_list=[$inlined_BinaryScalarArg.arg0#21]
                 | |       +-input_scan=
-                | |         +-WithRefScan(column_list=$inlined_BinaryScalarArg.[arg0#19, arg1#20], with_query_name="$inlined_BinaryScalarArg_scalar_args")
+                | |         +-WithRefScan(column_list=$inlined_BinaryScalarArg.[arg0#21, arg1#22], with_query_name="$inlined_BinaryScalarArg_scalar_args")
                 | +-arg1#5 :=
                 | | +-SubqueryExpr
                 | |   +-type=INT64
                 | |   +-subquery_type=SCALAR
                 | |   +-subquery=
                 | |     +-ProjectScan
-                | |       +-column_list=[$inlined_BinaryScalarArg.arg1#22]
+                | |       +-column_list=[$inlined_BinaryScalarArg.arg1#24]
                 | |       +-input_scan=
-                | |         +-WithRefScan(column_list=$inlined_BinaryScalarArg.[arg0#21, arg1#22], with_query_name="$inlined_BinaryScalarArg_scalar_args")
+                | |         +-WithRefScan(column_list=$inlined_BinaryScalarArg.[arg0#23, arg1#24], with_query_name="$inlined_BinaryScalarArg_scalar_args")
                 | +-ret2#6 :=
                 |   +-FunctionCall(GoogleSQL:$add(INT64, INT64) -> INT64)
                 |     +-SubqueryExpr
@@ -806,17 +806,17 @@ QueryStmt
                 |     | +-subquery_type=SCALAR
                 |     | +-subquery=
                 |     |   +-ProjectScan
-                |     |     +-column_list=[$inlined_BinaryScalarArg.arg0#23]
+                |     |     +-column_list=[$inlined_BinaryScalarArg.arg0#25]
                 |     |     +-input_scan=
-                |     |       +-WithRefScan(column_list=$inlined_BinaryScalarArg.[arg0#23, arg1#24], with_query_name="$inlined_BinaryScalarArg_scalar_args")
+                |     |       +-WithRefScan(column_list=$inlined_BinaryScalarArg.[arg0#25, arg1#26], with_query_name="$inlined_BinaryScalarArg_scalar_args")
                 |     +-SubqueryExpr
                 |       +-type=INT64
                 |       +-subquery_type=SCALAR
                 |       +-subquery=
                 |         +-ProjectScan
-                |           +-column_list=[$inlined_BinaryScalarArg.arg1#26]
+                |           +-column_list=[$inlined_BinaryScalarArg.arg1#29]
                 |           +-input_scan=
-                |             +-WithRefScan(column_list=$inlined_BinaryScalarArg.[arg0#25, arg1#26], with_query_name="$inlined_BinaryScalarArg_scalar_args")
+                |             +-WithRefScan(column_list=$inlined_BinaryScalarArg.[arg0#28, arg1#29], with_query_name="$inlined_BinaryScalarArg_scalar_args")
                 +-input_scan=
                   +-SingleRowScan
 ==
@@ -832,7 +832,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=[UnaryScalarArgSubqueryReference.ret0#1]
-        +-tvf=UnaryScalarArgSubqueryReference((INT64 arg0) -> TABLE<ret0 INT64>)
+        +-tvf=UnaryScalarArgSubqueryReference
         +-signature=(literal INT64) -> TABLE<ret0 INT64>
         +-argument_list=
         | +-FunctionArgument
@@ -900,7 +900,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=[UnaryScalarArgSubqueryWithReference.ret0#1]
-        +-tvf=UnaryScalarArgSubqueryWithReference((INT64 arg0) -> TABLE<ret0 INT64>)
+        +-tvf=UnaryScalarArgSubqueryWithReference
         +-signature=(literal INT64) -> TABLE<ret0 INT64>
         +-argument_list=
         | +-FunctionArgument
@@ -934,7 +934,7 @@ QueryStmt
     |         +-input_scan=
     |           +-TVFScan
     |             +-column_list=[UnaryScalarArg.arg0#2]
-    |             +-tvf=UnaryScalarArg((INT64 arg0) -> TABLE<arg0 INT64>)
+    |             +-tvf=UnaryScalarArg
     |             +-signature=(INT64) -> TABLE<arg0 INT64>
     |             +-argument_list=
     |             | +-FunctionArgument
@@ -1001,7 +1001,7 @@ QueryStmt
         |           +-input_scan=
         |             +-TVFScan
         |               +-column_list=[UnaryScalarArg.arg0#2]
-        |               +-tvf=UnaryScalarArg((INT64 arg0) -> TABLE<arg0 INT64>)
+        |               +-tvf=UnaryScalarArg
         |               +-signature=(INT64) -> TABLE<arg0 INT64>
         |               +-argument_list=
         |               | +-FunctionArgument
@@ -1025,7 +1025,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=[UnaryTableArg.a#2]
-        +-tvf=UnaryTableArg((TABLE<a INT64> arg0) -> TABLE<a INT64>)
+        +-tvf=UnaryTableArg
         +-signature=(TABLE<a INT64>) -> TABLE<a INT64>
         +-argument_list=
         | +-FunctionArgument
@@ -1079,7 +1079,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=[ScalarParamUsedAsTVFArgument.arg0#1]
-        +-tvf=ScalarParamUsedAsTVFArgument((INT64 arg0) -> TABLE<arg0 INT64>)
+        +-tvf=ScalarParamUsedAsTVFArgument
         +-signature=(literal INT64) -> TABLE<arg0 INT64>
         +-argument_list=
         | +-FunctionArgument
@@ -1177,7 +1177,7 @@ QueryStmt
     |             +-input_scan=
     |               +-TVFScan
     |                 +-column_list=[ScalarParamUsedAsTVFArgument.arg0#2]
-    |                 +-tvf=ScalarParamUsedAsTVFArgument((INT64 arg0) -> TABLE<arg0 INT64>)
+    |                 +-tvf=ScalarParamUsedAsTVFArgument
     |                 +-signature=(INT64) -> TABLE<arg0 INT64>
     |                 +-argument_list=
     |                 | +-FunctionArgument
@@ -1211,7 +1211,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=UnaryAbTableArg.[a#3, b#4]
-        +-tvf=UnaryAbTableArg((TABLE<a INT64, b STRING> arg0) -> TABLE<a INT64, b STRING>)
+        +-tvf=UnaryAbTableArg
         +-signature=(TABLE<a INT64, b STRING>) -> TABLE<a INT64, b STRING>
         +-argument_list=
         | +-FunctionArgument
@@ -1220,7 +1220,6 @@ QueryStmt
         |   +-argument_column_list=abTable.[a#1, b#2]
         +-column_index_list=[0, 1]
         +-function_call_signature=(TABLE<a INT64, b STRING> arg0) -> TABLE<a INT64, b STRING>
-
 
 [REWRITTEN AST]
 QueryStmt
@@ -1256,7 +1255,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=UnaryAbTableArg.[a#3, b#4]
-        +-tvf=UnaryAbTableArg((TABLE<a INT64, b STRING> arg0) -> TABLE<a INT64, b STRING>)
+        +-tvf=UnaryAbTableArg
         +-signature=(TABLE<a INT64, b STRING>) -> TABLE<a INT64, b STRING>
         +-argument_list=
         | +-FunctionArgument
@@ -1271,7 +1270,6 @@ QueryStmt
         |   +-argument_column_list=$subquery1.[a#1, b#2]
         +-column_index_list=[0, 1]
         +-function_call_signature=(TABLE<a INT64, b STRING> arg0) -> TABLE<a INT64, b STRING>
-
 
 [REWRITTEN AST]
 QueryStmt
@@ -1315,7 +1313,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=UnaryAbTableArgSelfJoin.[a#3, b#4, a#5, b#6]
-        +-tvf=UnaryAbTableArgSelfJoin((TABLE<a INT64, b STRING> arg0) -> TABLE<a INT64, b STRING, a INT64, b STRING>)
+        +-tvf=UnaryAbTableArgSelfJoin
         +-signature=(TABLE<a INT64, b STRING>) -> TABLE<a INT64, b STRING, a INT64, b STRING>
         +-argument_list=
         | +-FunctionArgument
@@ -1324,7 +1322,6 @@ QueryStmt
         |   +-argument_column_list=abTable.[a#1, b#2]
         +-column_index_list=[0, 1, 2, 3]
         +-function_call_signature=(TABLE<a INT64, b STRING> arg0) -> TABLE<a INT64, b STRING, a INT64, b STRING>
-
 
 [REWRITTEN AST]
 QueryStmt
@@ -1369,7 +1366,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=UnaryAbTableArgSelfJoin.[a#3, b#4, a#5, b#6]
-        +-tvf=UnaryAbTableArgSelfJoin((TABLE<a INT64, b STRING> arg0) -> TABLE<a INT64, b STRING, a INT64, b STRING>)
+        +-tvf=UnaryAbTableArgSelfJoin
         +-signature=(TABLE<a INT64, b STRING>) -> TABLE<a INT64, b STRING, a INT64, b STRING>
         +-argument_list=
         | +-FunctionArgument
@@ -1384,7 +1381,6 @@ QueryStmt
         |   +-argument_column_list=$subquery1.[a#1, b#2]
         +-column_index_list=[0, 1, 2, 3]
         +-function_call_signature=(TABLE<a INT64, b STRING> arg0) -> TABLE<a INT64, b STRING, a INT64, b STRING>
-
 
 [REWRITTEN AST]
 QueryStmt
@@ -1433,7 +1429,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=UnaryAbTableArgScannedInCTE.[a#3, b#4]
-        +-tvf=UnaryAbTableArgScannedInCTE((TABLE<a INT64, b STRING> arg0) -> TABLE<a INT64, b STRING>)
+        +-tvf=UnaryAbTableArgScannedInCTE
         +-signature=(TABLE<a INT64, b STRING>) -> TABLE<a INT64, b STRING>
         +-argument_list=
         | +-FunctionArgument
@@ -1442,7 +1438,6 @@ QueryStmt
         |   +-argument_column_list=abTable.[a#1, b#2]
         +-column_index_list=[0, 1]
         +-function_call_signature=(TABLE<a INT64, b STRING> arg0) -> TABLE<a INT64, b STRING>
-
 
 [REWRITTEN AST]
 QueryStmt
@@ -1489,7 +1484,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=UnaryAbTableArgScannedInCTE.[a#3, b#4]
-        +-tvf=UnaryAbTableArgScannedInCTE((TABLE<a INT64, b STRING> arg0) -> TABLE<a INT64, b STRING>)
+        +-tvf=UnaryAbTableArgScannedInCTE
         +-signature=(TABLE<a INT64, b STRING>) -> TABLE<a INT64, b STRING>
         +-argument_list=
         | +-FunctionArgument
@@ -1504,7 +1499,6 @@ QueryStmt
         |   +-argument_column_list=$subquery1.[a#1, b#2]
         +-column_index_list=[0, 1]
         +-function_call_signature=(TABLE<a INT64, b STRING> arg0) -> TABLE<a INT64, b STRING>
-
 
 [REWRITTEN AST]
 QueryStmt
@@ -1556,7 +1550,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=[UnaryAbTableArg.a#3]
-        +-tvf=UnaryAbTableArg((TABLE<a INT64, b STRING> arg0) -> TABLE<a INT64, b STRING>)
+        +-tvf=UnaryAbTableArg
         +-signature=(TABLE<a INT64, b STRING>) -> TABLE<a INT64, b STRING>
         +-argument_list=
         | +-FunctionArgument
@@ -1565,7 +1559,6 @@ QueryStmt
         |   +-argument_column_list=abTable.[a#1, b#2]
         +-column_index_list=[0]
         +-function_call_signature=(TABLE<a INT64, b STRING> arg0) -> TABLE<a INT64, b STRING>
-
 
 [REWRITTEN AST]
 QueryStmt
@@ -1599,7 +1592,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=[UnaryAbTableArg.a#3]
-        +-tvf=UnaryAbTableArg((TABLE<a INT64, b STRING> arg0) -> TABLE<a INT64, b STRING>)
+        +-tvf=UnaryAbTableArg
         +-signature=(TABLE<a INT64, b STRING>) -> TABLE<a INT64, b STRING>
         +-argument_list=
         | +-FunctionArgument
@@ -1614,7 +1607,6 @@ QueryStmt
         |   +-argument_column_list=$subquery1.[a#1, b#2]
         +-column_index_list=[0]
         +-function_call_signature=(TABLE<a INT64, b STRING> arg0) -> TABLE<a INT64, b STRING>
-
 
 [REWRITTEN AST]
 QueryStmt
@@ -1662,7 +1654,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=[UnaryAbTableArgScannedInCTE.a#3]
-        +-tvf=UnaryAbTableArgScannedInCTE((TABLE<a INT64, b STRING> arg0) -> TABLE<a INT64, b STRING>)
+        +-tvf=UnaryAbTableArgScannedInCTE
         +-signature=(TABLE<a INT64, b STRING>) -> TABLE<a INT64, b STRING>
         +-argument_list=
         | +-FunctionArgument
@@ -1671,7 +1663,6 @@ QueryStmt
         |   +-argument_column_list=abTable.[a#1, b#2]
         +-column_index_list=[0]
         +-function_call_signature=(TABLE<a INT64, b STRING> arg0) -> TABLE<a INT64, b STRING>
-
 
 [REWRITTEN AST]
 QueryStmt
@@ -1716,7 +1707,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=[UnaryAbTableArgScannedInCTE.a#3]
-        +-tvf=UnaryAbTableArgScannedInCTE((TABLE<a INT64, b STRING> arg0) -> TABLE<a INT64, b STRING>)
+        +-tvf=UnaryAbTableArgScannedInCTE
         +-signature=(TABLE<a INT64, b STRING>) -> TABLE<a INT64, b STRING>
         +-argument_list=
         | +-FunctionArgument
@@ -1731,7 +1722,6 @@ QueryStmt
         |   +-argument_column_list=$subquery1.[a#1, b#2]
         +-column_index_list=[0]
         +-function_call_signature=(TABLE<a INT64, b STRING> arg0) -> TABLE<a INT64, b STRING>
-
 
 [REWRITTEN AST]
 QueryStmt
@@ -1782,7 +1772,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=[UnaryAbTableArg.b#4]
-        +-tvf=UnaryAbTableArg((TABLE<a INT64, b STRING> arg0) -> TABLE<a INT64, b STRING>)
+        +-tvf=UnaryAbTableArg
         +-signature=(TABLE<a INT64, b STRING>) -> TABLE<a INT64, b STRING>
         +-argument_list=
         | +-FunctionArgument
@@ -1791,7 +1781,6 @@ QueryStmt
         |   +-argument_column_list=abTable.[a#1, b#2]
         +-column_index_list=[1]
         +-function_call_signature=(TABLE<a INT64, b STRING> arg0) -> TABLE<a INT64, b STRING>
-
 
 [REWRITTEN AST]
 QueryStmt
@@ -1825,7 +1814,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=[UnaryAbTableArg.b#4]
-        +-tvf=UnaryAbTableArg((TABLE<a INT64, b STRING> arg0) -> TABLE<a INT64, b STRING>)
+        +-tvf=UnaryAbTableArg
         +-signature=(TABLE<a INT64, b STRING>) -> TABLE<a INT64, b STRING>
         +-argument_list=
         | +-FunctionArgument
@@ -1840,7 +1829,6 @@ QueryStmt
         |   +-argument_column_list=$subquery1.[a#1, b#2]
         +-column_index_list=[1]
         +-function_call_signature=(TABLE<a INT64, b STRING> arg0) -> TABLE<a INT64, b STRING>
-
 
 [REWRITTEN AST]
 QueryStmt
@@ -1888,7 +1876,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=[UnaryAbTableArgScannedInCTE.b#4]
-        +-tvf=UnaryAbTableArgScannedInCTE((TABLE<a INT64, b STRING> arg0) -> TABLE<a INT64, b STRING>)
+        +-tvf=UnaryAbTableArgScannedInCTE
         +-signature=(TABLE<a INT64, b STRING>) -> TABLE<a INT64, b STRING>
         +-argument_list=
         | +-FunctionArgument
@@ -1897,7 +1885,6 @@ QueryStmt
         |   +-argument_column_list=abTable.[a#1, b#2]
         +-column_index_list=[1]
         +-function_call_signature=(TABLE<a INT64, b STRING> arg0) -> TABLE<a INT64, b STRING>
-
 
 [REWRITTEN AST]
 QueryStmt
@@ -1942,7 +1929,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=[UnaryAbTableArgScannedInCTE.b#4]
-        +-tvf=UnaryAbTableArgScannedInCTE((TABLE<a INT64, b STRING> arg0) -> TABLE<a INT64, b STRING>)
+        +-tvf=UnaryAbTableArgScannedInCTE
         +-signature=(TABLE<a INT64, b STRING>) -> TABLE<a INT64, b STRING>
         +-argument_list=
         | +-FunctionArgument
@@ -1957,7 +1944,6 @@ QueryStmt
         |   +-argument_column_list=$subquery1.[a#1, b#2]
         +-column_index_list=[1]
         +-function_call_signature=(TABLE<a INT64, b STRING> arg0) -> TABLE<a INT64, b STRING>
-
 
 [REWRITTEN AST]
 QueryStmt
@@ -2016,7 +2002,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=BinaryTableArg.[a#5, b#6, c#7, d#8]
-        +-tvf=BinaryTableArg((TABLE<a INT64, b STRING> arg0, TABLE<c INT64, d STRING> arg1) -> TABLE<a INT64, b STRING, c INT64, d STRING>)
+        +-tvf=BinaryTableArg
         +-signature=(TABLE<a INT64, b STRING>, TABLE<c INT64, d STRING>) -> TABLE<a INT64, b STRING, c INT64, d STRING>
         +-argument_list=
         | +-FunctionArgument
@@ -2089,7 +2075,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=BinaryTableArg.[a#5, b#6, c#7, d#8]
-        +-tvf=BinaryTableArg((TABLE<a INT64, b STRING> arg0, TABLE<c INT64, d STRING> arg1) -> TABLE<a INT64, b STRING, c INT64, d STRING>)
+        +-tvf=BinaryTableArg
         +-signature=(TABLE<a INT64, b STRING>, TABLE<c INT64, d STRING>) -> TABLE<a INT64, b STRING, c INT64, d STRING>
         +-argument_list=
         | +-FunctionArgument
@@ -2181,7 +2167,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=BinaryAbTableArg.[a#5, b#6, a#7, b#8]
-        +-tvf=BinaryAbTableArg((TABLE<a INT64, b STRING> arg0, TABLE<a INT64, b STRING> arg1) -> TABLE<a INT64, b STRING, a INT64, b STRING>)
+        +-tvf=BinaryAbTableArg
         +-signature=(TABLE<a INT64, b STRING>, TABLE<a INT64, b STRING>) -> TABLE<a INT64, b STRING, a INT64, b STRING>
         +-argument_list=
         | +-FunctionArgument
@@ -2194,7 +2180,6 @@ QueryStmt
         |   +-argument_column_list=abTable.[a#3, b#4]
         +-column_index_list=[0, 1, 2, 3]
         +-function_call_signature=(TABLE<a INT64, b STRING> arg0, TABLE<a INT64, b STRING> arg1) -> TABLE<a INT64, b STRING, a INT64, b STRING>
-
 
 [REWRITTEN AST]
 QueryStmt
@@ -2243,7 +2228,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=BinaryAbTableArg.[a#5, b#6, a#7, b#8]
-        +-tvf=BinaryAbTableArg((TABLE<a INT64, b STRING> arg0, TABLE<a INT64, b STRING> arg1) -> TABLE<a INT64, b STRING, a INT64, b STRING>)
+        +-tvf=BinaryAbTableArg
         +-signature=(TABLE<a INT64, b STRING>, TABLE<a INT64, b STRING>) -> TABLE<a INT64, b STRING, a INT64, b STRING>
         +-argument_list=
         | +-FunctionArgument
@@ -2262,7 +2247,6 @@ QueryStmt
         |   +-argument_column_list=$subquery1.[a#3, b#4]
         +-column_index_list=[0, 1, 2, 3]
         +-function_call_signature=(TABLE<a INT64, b STRING> arg0, TABLE<a INT64, b STRING> arg1) -> TABLE<a INT64, b STRING, a INT64, b STRING>
-
 
 [REWRITTEN AST]
 QueryStmt
@@ -2317,7 +2301,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=BinaryAbTableArg.[a#5, b#6, a#7, b#8]
-        +-tvf=BinaryAbTableArg((TABLE<a INT64, b STRING> arg0, TABLE<a INT64, b STRING> arg1) -> TABLE<a INT64, b STRING, a INT64, b STRING>)
+        +-tvf=BinaryAbTableArg
         +-signature=(TABLE<a INT64, b STRING>, TABLE<a INT64, b STRING>) -> TABLE<a INT64, b STRING, a INT64, b STRING>
         +-argument_list=
         | +-FunctionArgument
@@ -2336,7 +2320,6 @@ QueryStmt
         |   +-argument_column_list=abTable.[a#3, b#4]
         +-column_index_list=[0, 1, 2, 3]
         +-function_call_signature=(TABLE<a INT64, b STRING> arg0, TABLE<a INT64, b STRING> arg1) -> TABLE<a INT64, b STRING, a INT64, b STRING>
-
 
 [REWRITTEN AST]
 QueryStmt
@@ -2391,7 +2374,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=BinaryAbTableArg.[a#5, b#6, a#7, b#8]
-        +-tvf=BinaryAbTableArg((TABLE<a INT64, b STRING> arg0, TABLE<a INT64, b STRING> arg1) -> TABLE<a INT64, b STRING, a INT64, b STRING>)
+        +-tvf=BinaryAbTableArg
         +-signature=(TABLE<a INT64, b STRING>, TABLE<a INT64, b STRING>) -> TABLE<a INT64, b STRING, a INT64, b STRING>
         +-argument_list=
         | +-FunctionArgument
@@ -2416,7 +2399,6 @@ QueryStmt
         |   +-argument_column_list=$subquery2.[a#3, b#4]
         +-column_index_list=[0, 1, 2, 3]
         +-function_call_signature=(TABLE<a INT64, b STRING> arg0, TABLE<a INT64, b STRING> arg1) -> TABLE<a INT64, b STRING, a INT64, b STRING>
-
 
 [REWRITTEN AST]
 QueryStmt
@@ -2481,7 +2463,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=UnaryAbTableArgWithScalarArgs.[a#3, b#4]
-        +-tvf=UnaryAbTableArgWithScalarArgs((INT64 x, TABLE<a INT64, b STRING> arg0, STRING y) -> TABLE<a INT64, b STRING>)
+        +-tvf=UnaryAbTableArgWithScalarArgs
         +-signature=(literal INT64, TABLE<a INT64, b STRING>, literal STRING) -> TABLE<a INT64, b STRING>
         +-argument_list=
         | +-FunctionArgument
@@ -2566,7 +2548,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=UnaryAbTableArgWithScalarArgs.[a#3, b#4]
-        +-tvf=UnaryAbTableArgWithScalarArgs((INT64 x, TABLE<a INT64, b STRING> arg0, STRING y) -> TABLE<a INT64, b STRING>)
+        +-tvf=UnaryAbTableArgWithScalarArgs
         +-signature=(literal INT64, TABLE<a INT64, b STRING>, literal STRING) -> TABLE<a INT64, b STRING>
         +-argument_list=
         | +-FunctionArgument
@@ -2692,7 +2674,7 @@ QueryStmt
     |             +-input_scan=
     |               +-TVFScan
     |                 +-column_list=UnaryAbTableArgWithScalarArgs.[a#7, b#8]
-    |                 +-tvf=UnaryAbTableArgWithScalarArgs((INT64 x, TABLE<a INT64, b STRING> arg0, STRING y) -> TABLE<a INT64, b STRING>)
+    |                 +-tvf=UnaryAbTableArgWithScalarArgs
     |                 +-signature=(literal INT64, TABLE<a INT64, b STRING>, literal STRING) -> TABLE<a INT64, b STRING>
     |                 +-argument_list=
     |                 | +-FunctionArgument
@@ -2709,7 +2691,7 @@ QueryStmt
     |                 +-function_call_signature=(INT64 x, TABLE<a INT64, b STRING> arg0, STRING y) -> TABLE<a INT64, b STRING>
     +-input_scan=
       +-TVFScan
-        +-tvf=UnaryAbTableArg((TABLE<a INT64, b STRING> arg0) -> TABLE<a INT64, b STRING>)
+        +-tvf=UnaryAbTableArg
         +-signature=(TABLE<a INT64, b STRING>) -> TABLE<a INT64, b STRING>
         +-argument_list=
         | +-FunctionArgument
@@ -2838,7 +2820,7 @@ QueryStmt
     |             +-input_scan=
     |               +-TVFScan
     |                 +-column_list=UnaryAbTableArgWithScalarArgs.[a#7, b#8]
-    |                 +-tvf=UnaryAbTableArgWithScalarArgs((INT64 x, TABLE<a INT64, b STRING> arg0, STRING y) -> TABLE<a INT64, b STRING>)
+    |                 +-tvf=UnaryAbTableArgWithScalarArgs
     |                 +-signature=(literal INT64, TABLE<a INT64, b STRING>, STRING) -> TABLE<a INT64, b STRING>
     |                 +-argument_list=
     |                 | +-FunctionArgument
@@ -2856,7 +2838,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=[UnaryAbTableArg.b#4]
-        +-tvf=UnaryAbTableArg((TABLE<a INT64, b STRING> arg0) -> TABLE<a INT64, b STRING>)
+        +-tvf=UnaryAbTableArg
         +-signature=(TABLE<a INT64, b STRING>) -> TABLE<a INT64, b STRING>
         +-argument_list=
         | +-FunctionArgument
@@ -2898,7 +2880,7 @@ QueryStmt
     |             +-input_scan=
     |               +-TVFScan
     |                 +-column_list=UnaryAbTableArgWithScalarArgs.[a#7, b#8]
-    |                 +-tvf=UnaryAbTableArgWithScalarArgs((INT64 x, TABLE<a INT64, b STRING> arg0, STRING y) -> TABLE<a INT64, b STRING>)
+    |                 +-tvf=UnaryAbTableArgWithScalarArgs
     |                 +-signature=(literal INT64, TABLE<a INT64, b STRING>, literal STRING) -> TABLE<a INT64, b STRING>
     |                 +-argument_list=
     |                 | +-FunctionArgument
@@ -2921,7 +2903,7 @@ QueryStmt
     |                 +-function_call_signature=(INT64 x, TABLE<a INT64, b STRING> arg0, STRING y) -> TABLE<a INT64, b STRING>
     +-input_scan=
       +-TVFScan
-        +-tvf=UnaryAbTableArg((TABLE<a INT64, b STRING> arg0) -> TABLE<a INT64, b STRING>)
+        +-tvf=UnaryAbTableArg
         +-signature=(TABLE<a INT64, b STRING>) -> TABLE<a INT64, b STRING>
         +-argument_list=
         | +-FunctionArgument
@@ -3056,7 +3038,7 @@ QueryStmt
     |             +-input_scan=
     |               +-TVFScan
     |                 +-column_list=UnaryAbTableArgWithScalarArgs.[a#7, b#8]
-    |                 +-tvf=UnaryAbTableArgWithScalarArgs((INT64 x, TABLE<a INT64, b STRING> arg0, STRING y) -> TABLE<a INT64, b STRING>)
+    |                 +-tvf=UnaryAbTableArgWithScalarArgs
     |                 +-signature=(literal INT64, TABLE<a INT64, b STRING>, STRING) -> TABLE<a INT64, b STRING>
     |                 +-argument_list=
     |                 | +-FunctionArgument
@@ -3080,7 +3062,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=[UnaryAbTableArg.b#4]
-        +-tvf=UnaryAbTableArg((TABLE<a INT64, b STRING> arg0) -> TABLE<a INT64, b STRING>)
+        +-tvf=UnaryAbTableArg
         +-signature=(TABLE<a INT64, b STRING>) -> TABLE<a INT64, b STRING>
         +-argument_list=
         | +-FunctionArgument
@@ -3125,7 +3107,7 @@ QueryStmt
     |             +-input_scan=
     |               +-TVFScan
     |                 +-column_list=UnaryAbTableArgWithScalarArgs.[a#7, b#8]
-    |                 +-tvf=UnaryAbTableArgWithScalarArgs((INT64 x, TABLE<a INT64, b STRING> arg0, STRING y) -> TABLE<a INT64, b STRING>)
+    |                 +-tvf=UnaryAbTableArgWithScalarArgs
     |                 +-signature=(literal INT64, TABLE<a INT64, b STRING>, literal STRING) -> TABLE<a INT64, b STRING>
     |                 +-argument_list=
     |                 | +-FunctionArgument
@@ -3149,7 +3131,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=[UnaryAbTableArg.a#3]
-        +-tvf=UnaryAbTableArg((TABLE<a INT64, b STRING> arg0) -> TABLE<a INT64, b STRING>)
+        +-tvf=UnaryAbTableArg
         +-signature=(TABLE<a INT64, b STRING>) -> TABLE<a INT64, b STRING>
         +-argument_list=
         | +-FunctionArgument
@@ -3195,7 +3177,7 @@ QueryStmt
     |             +-input_scan=
     |               +-TVFScan
     |                 +-column_list=UnaryAbTableArgWithScalarArgs.[a#7, b#8]
-    |                 +-tvf=UnaryAbTableArgWithScalarArgs((INT64 x, TABLE<a INT64, b STRING> arg0, STRING y) -> TABLE<a INT64, b STRING>)
+    |                 +-tvf=UnaryAbTableArgWithScalarArgs
     |                 +-signature=(literal INT64, TABLE<a INT64, b STRING>, STRING) -> TABLE<a INT64, b STRING>
     |                 +-argument_list=
     |                 | +-FunctionArgument
@@ -3219,7 +3201,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=UnaryAbTableArg.[a#3, b#4]
-        +-tvf=UnaryAbTableArg((TABLE<a INT64, b STRING> arg0) -> TABLE<a INT64, b STRING>)
+        +-tvf=UnaryAbTableArg
         +-signature=(TABLE<a INT64, b STRING>) -> TABLE<a INT64, b STRING>
         +-argument_list=
         | +-FunctionArgument
@@ -3264,7 +3246,7 @@ QueryStmt
     |             +-input_scan=
     |               +-TVFScan
     |                 +-column_list=UnaryAbTableArgWithScalarArgs.[a#7, b#8]
-    |                 +-tvf=UnaryAbTableArgWithScalarArgs((INT64 x, TABLE<a INT64, b STRING> arg0, STRING y) -> TABLE<a INT64, b STRING>)
+    |                 +-tvf=UnaryAbTableArgWithScalarArgs
     |                 +-signature=(INT64, TABLE<a INT64, b STRING>, literal STRING) -> TABLE<a INT64, b STRING>
     |                 +-argument_list=
     |                 | +-FunctionArgument
@@ -3282,7 +3264,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=[UnaryAbTableArg.a#3]
-        +-tvf=UnaryAbTableArg((TABLE<a INT64, b STRING> arg0) -> TABLE<a INT64, b STRING>)
+        +-tvf=UnaryAbTableArg
         +-signature=(TABLE<a INT64, b STRING>) -> TABLE<a INT64, b STRING>
         +-argument_list=
         | +-FunctionArgument
@@ -3328,7 +3310,7 @@ QueryStmt
     |             +-input_scan=
     |               +-TVFScan
     |                 +-column_list=UnaryAbTableArgWithScalarArgs.[a#7, b#8]
-    |                 +-tvf=UnaryAbTableArgWithScalarArgs((INT64 x, TABLE<a INT64, b STRING> arg0, STRING y) -> TABLE<a INT64, b STRING>)
+    |                 +-tvf=UnaryAbTableArgWithScalarArgs
     |                 +-signature=(INT64, TABLE<a INT64, b STRING>, STRING) -> TABLE<a INT64, b STRING>
     |                 +-argument_list=
     |                 | +-FunctionArgument
@@ -3346,7 +3328,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=UnaryAbTableArg.[a#3, b#4]
-        +-tvf=UnaryAbTableArg((TABLE<a INT64, b STRING> arg0) -> TABLE<a INT64, b STRING>)
+        +-tvf=UnaryAbTableArg
         +-signature=(TABLE<a INT64, b STRING>) -> TABLE<a INT64, b STRING>
         +-argument_list=
         | +-FunctionArgument
@@ -3391,7 +3373,7 @@ QueryStmt
     |             +-input_scan=
     |               +-TVFScan
     |                 +-column_list=UnaryAbTableArgWithScalarArgs.[a#7, b#8]
-    |                 +-tvf=UnaryAbTableArgWithScalarArgs((INT64 x, TABLE<a INT64, b STRING> arg0, STRING y) -> TABLE<a INT64, b STRING>)
+    |                 +-tvf=UnaryAbTableArgWithScalarArgs
     |                 +-signature=(INT64, TABLE<a INT64, b STRING>, literal STRING) -> TABLE<a INT64, b STRING>
     |                 +-argument_list=
     |                 | +-FunctionArgument
@@ -3415,7 +3397,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=[UnaryAbTableArg.a#3]
-        +-tvf=UnaryAbTableArg((TABLE<a INT64, b STRING> arg0) -> TABLE<a INT64, b STRING>)
+        +-tvf=UnaryAbTableArg
         +-signature=(TABLE<a INT64, b STRING>) -> TABLE<a INT64, b STRING>
         +-argument_list=
         | +-FunctionArgument
@@ -3461,7 +3443,7 @@ QueryStmt
     |             +-input_scan=
     |               +-TVFScan
     |                 +-column_list=UnaryAbTableArgWithScalarArgs.[a#7, b#8]
-    |                 +-tvf=UnaryAbTableArgWithScalarArgs((INT64 x, TABLE<a INT64, b STRING> arg0, STRING y) -> TABLE<a INT64, b STRING>)
+    |                 +-tvf=UnaryAbTableArgWithScalarArgs
     |                 +-signature=(INT64, TABLE<a INT64, b STRING>, STRING) -> TABLE<a INT64, b STRING>
     |                 +-argument_list=
     |                 | +-FunctionArgument
@@ -3485,7 +3467,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=UnaryAbTableArg.[a#3, b#4]
-        +-tvf=UnaryAbTableArg((TABLE<a INT64, b STRING> arg0) -> TABLE<a INT64, b STRING>)
+        +-tvf=UnaryAbTableArg
         +-signature=(TABLE<a INT64, b STRING>) -> TABLE<a INT64, b STRING>
         +-argument_list=
         | +-FunctionArgument
@@ -3530,7 +3512,7 @@ QueryStmt
     |             +-input_scan=
     |               +-TVFScan
     |                 +-column_list=UnaryAbTableArgWithScalarArgs.[a#7, b#8]
-    |                 +-tvf=UnaryAbTableArgWithScalarArgs((INT64 x, TABLE<a INT64, b STRING> arg0, STRING y) -> TABLE<a INT64, b STRING>)
+    |                 +-tvf=UnaryAbTableArgWithScalarArgs
     |                 +-signature=(INT64, TABLE<a INT64, b STRING>, literal STRING) -> TABLE<a INT64, b STRING>
     |                 +-argument_list=
     |                 | +-FunctionArgument
@@ -3554,7 +3536,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=[UnaryAbTableArg.a#3]
-        +-tvf=UnaryAbTableArg((TABLE<a INT64, b STRING> arg0) -> TABLE<a INT64, b STRING>)
+        +-tvf=UnaryAbTableArg
         +-signature=(TABLE<a INT64, b STRING>) -> TABLE<a INT64, b STRING>
         +-argument_list=
         | +-FunctionArgument
@@ -3600,7 +3582,7 @@ QueryStmt
     |             +-input_scan=
     |               +-TVFScan
     |                 +-column_list=UnaryAbTableArgWithScalarArgs.[a#7, b#8]
-    |                 +-tvf=UnaryAbTableArgWithScalarArgs((INT64 x, TABLE<a INT64, b STRING> arg0, STRING y) -> TABLE<a INT64, b STRING>)
+    |                 +-tvf=UnaryAbTableArgWithScalarArgs
     |                 +-signature=(INT64, TABLE<a INT64, b STRING>, STRING) -> TABLE<a INT64, b STRING>
     |                 +-argument_list=
     |                 | +-FunctionArgument
@@ -3624,7 +3606,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=UnaryAbTableArg.[a#3, b#4]
-        +-tvf=UnaryAbTableArg((TABLE<a INT64, b STRING> arg0) -> TABLE<a INT64, b STRING>)
+        +-tvf=UnaryAbTableArg
         +-signature=(TABLE<a INT64, b STRING>) -> TABLE<a INT64, b STRING>
         +-argument_list=
         | +-FunctionArgument
@@ -3663,7 +3645,7 @@ QueryStmt
     |         +-input_scan=
     |           +-TVFScan
     |             +-column_list=[UnaryAbTableArg.b#6]
-    |             +-tvf=UnaryAbTableArg((TABLE<a INT64, b STRING> arg0) -> TABLE<a INT64, b STRING>)
+    |             +-tvf=UnaryAbTableArg
     |             +-signature=(TABLE<a INT64, b STRING>) -> TABLE<a INT64, b STRING>
     |             +-argument_list=
     |             | +-FunctionArgument
@@ -3714,7 +3696,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=DefinerRightsTvf.[Key#4, Value#5]
-        +-tvf=DefinerRightsTvf((INT64 a) -> TABLE<Key INT64, Value STRING>)
+        +-tvf=DefinerRightsTvf
         +-signature=(INT64) -> TABLE<Key INT64, Value STRING>
         +-argument_list=
         | +-FunctionArgument
@@ -3734,7 +3716,6 @@ QueryStmt
         |                 +-$agg1#3 := AggregateFunctionCall(GoogleSQL:$count_star() -> INT64)
         +-column_index_list=[0, 1]
         +-function_call_signature=(INT64 a) -> TABLE<Key INT64, Value STRING>
-
 
 [REWRITTEN AST]
 QueryStmt
@@ -3793,7 +3774,7 @@ QueryStmt
             |                 +-input_scan=
             |                   +-WithRefScan(column_list=[$inlined_DefinerRightsTvf.a#9], with_query_name="$inlined_DefinerRightsTvf_scalar_args")
             +-original_inlined_view=<null>
-            +-original_inlined_tvf=DefinerRightsTvf((INT64 a) -> TABLE<Key INT64, Value STRING>)
+            +-original_inlined_tvf=DefinerRightsTvf
 ==
 
 SELECT *
@@ -3811,7 +3792,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=JoinsTableArgToScannedTable.[c#3, key#4, value#5]
-        +-tvf=JoinsTableArgToScannedTable((TABLE<key INT64, value INT64> arg_table, STRING arg_scalar) -> TABLE<c STRING, key INT64, value INT64>)
+        +-tvf=JoinsTableArgToScannedTable
         +-signature=(TABLE<key INT64, value INT64>, literal STRING) -> TABLE<c STRING, key INT64, value INT64>
         +-argument_list=
         | +-FunctionArgument
@@ -3900,7 +3881,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=[UnaryTableArgAggregatedWithOrderBy.arr#3]
-        +-tvf=UnaryTableArgAggregatedWithOrderBy((TABLE<a INT64> arg0) -> TABLE<arr ARRAY<INT64>>)
+        +-tvf=UnaryTableArgAggregatedWithOrderBy
         +-signature=(TABLE<a INT64>) -> TABLE<arr ARRAY<INT64>>
         +-argument_list=
         | +-FunctionArgument
@@ -4030,7 +4011,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=[tvf_templated_multi_agg_valid_grouping_constants.result#1]
-        +-tvf=tvf_templated_multi_agg_valid_grouping_constants((ANY TYPE) -> ANY TABLE)
+        +-tvf=tvf_templated_multi_agg_valid_grouping_constants
         +-signature=(literal INT64) -> TABLE<result INT64>
         +-argument_list=
         | +-FunctionArgument
@@ -4135,7 +4116,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=[UnaryTableArgColumnsUnused.result#3]
-        +-tvf=UnaryTableArgColumnsUnused((TABLE<key INT64, value INT64> arg0) -> TABLE<result INT64>)
+        +-tvf=UnaryTableArgColumnsUnused
         +-signature=(TABLE<key INT64, value INT64>) -> TABLE<result INT64>
         +-argument_list=
         | +-FunctionArgument
@@ -4180,7 +4161,7 @@ QueryStmt
   +-ProjectScan
     +-column_list=[TvfMultiAggNullary.result#1]
     +-input_scan=
-      +-TVFScan(column_list=[TvfMultiAggNullary.result#1], tvf=TvfMultiAggNullary(() -> TABLE<result INT64>), signature=() -> TABLE<result INT64>, column_index_list=[0], function_call_signature=() -> TABLE<result INT64>)
+      +-TVFScan(column_list=[TvfMultiAggNullary.result#1], tvf=TvfMultiAggNullary, signature=() -> TABLE<result INT64>, column_index_list=[0], function_call_signature=() -> TABLE<result INT64>)
 
 [REWRITTEN AST]
 QueryStmt
@@ -4248,7 +4229,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=[TvfMultiAggGroupingConstantsWithStruct.result#2]
-        +-tvf=TvfMultiAggGroupingConstantsWithStruct((TABLE<STRUCT<a STRUCT<b INT64>>> arg_table, INT64 int64_arg) -> TABLE<result INT64>)
+        +-tvf=TvfMultiAggGroupingConstantsWithStruct
         +-signature=(TABLE<$col1 STRUCT<a STRUCT<b INT64>>>, literal INT64) -> TABLE<result INT64>
         +-argument_list=
         | +-FunctionArgument
@@ -4342,7 +4323,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=[tvf_templated_multi_agg_valid_grouping_constants_with_struct.result#2]
-        +-tvf=tvf_templated_multi_agg_valid_grouping_constants_with_struct((ANY TABLE) -> ANY TABLE)
+        +-tvf=tvf_templated_multi_agg_valid_grouping_constants_with_struct
         +-signature=(TABLE<a STRUCT<b INT64>>) -> TABLE<result INT64>
         +-argument_list=
         | +-FunctionArgument
@@ -4435,7 +4416,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=[tvf_templated_call_udf_with_multi_agg.result#3]
-        +-tvf=tvf_templated_call_udf_with_multi_agg((ANY TABLE) -> ANY TABLE)
+        +-tvf=tvf_templated_call_udf_with_multi_agg
         +-signature=(TABLE<key INT64, value INT64>) -> TABLE<result INT64>
         +-argument_list=
         | +-FunctionArgument
@@ -4517,7 +4498,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=[tvf_templated_call_uda_with_multi_agg.result#3]
-        +-tvf=tvf_templated_call_uda_with_multi_agg((ANY TABLE) -> ANY TABLE)
+        +-tvf=tvf_templated_call_uda_with_multi_agg
         +-signature=(TABLE<key INT64, value INT64>) -> TABLE<result INT64>
         +-argument_list=
         | +-FunctionArgument
@@ -4605,7 +4586,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=[TvfMultiAggReferencesScannedTable.result#5]
-        +-tvf=TvfMultiAggReferencesScannedTable((TABLE<key INT64, value INT64> arg_table, INT64 arg_scalar) -> TABLE<result DOUBLE>)
+        +-tvf=TvfMultiAggReferencesScannedTable
         +-signature=(TABLE<key INT64, value INT64>, INT64) -> TABLE<result DOUBLE>
         +-argument_list=
         | +-FunctionArgument
@@ -4729,7 +4710,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=[TvfMultiAggScalarArgGroupingConst.result#3]
-        +-tvf=TvfMultiAggScalarArgGroupingConst((TABLE<key INT64, value INT64> arg_table, INT64 arg_scalar) -> TABLE<result INT64>)
+        +-tvf=TvfMultiAggScalarArgGroupingConst
         +-signature=(TABLE<key INT64, value INT64>, literal INT64) -> TABLE<result INT64>
         +-argument_list=
         | +-FunctionArgument
@@ -4793,3 +4774,436 @@ QueryStmt
                         +-$agg1#7 :=
                           +-AggregateFunctionCall(GoogleSQL:count(INT64) -> INT64)
                             +-ColumnRef(type=INT64, column=arg_table.key#4)
+
+==
+
+[prepare_database=db]
+CREATE TABLE FUNCTION DupColsTvf() AS SELECT key as k1, key as k2, value as v1, value as v2 FROM KeyValue;
+--
+CreateTableFunctionStmt
++-name_path=DupColsTvf
++-signature=() -> TABLE<k1 INT64, k2 INT64, v1 STRING, v2 STRING>
++-language="SQL"
++-code="SELECT key as k1, key as k2, value as v1, value as v2 FROM KeyValue"
++-query=
+| +-ProjectScan
+|   +-column_list=KeyValue.[Key#1, Key#1, Value#2, Value#2]
+|   +-input_scan=
+|     +-TableScan(column_list=KeyValue.[Key#1, Value#2], table=KeyValue, column_index_list=[0, 1])
++-output_column_list=
+  +-KeyValue.Key#1 AS k1 [INT64]
+  +-KeyValue.Key#1 AS k2 [INT64]
+  +-KeyValue.Value#2 AS v1 [STRING]
+  +-KeyValue.Value#2 AS v2 [STRING]
+==
+
+[default use_database=db]
+SELECT * FROM DupColsTvf();
+--
+QueryStmt
++-output_column_list=
+| +-DupColsTvf.k1#1 AS k1 [INT64]
+| +-DupColsTvf.k2#2 AS k2 [INT64]
+| +-DupColsTvf.v1#3 AS v1 [STRING]
+| +-DupColsTvf.v2#4 AS v2 [STRING]
++-query=
+  +-ProjectScan
+    +-column_list=DupColsTvf.[k1#1, k2#2, v1#3, v2#4]
+    +-input_scan=
+      +-TVFScan(column_list=DupColsTvf.[k1#1, k2#2, v1#3, v2#4], tvf=DupColsTvf, signature=() -> TABLE<k1 INT64, k2 INT64, v1 STRING, v2 STRING>, column_index_list=[0, 1, 2, 3], function_call_signature=() -> TABLE<k1 INT64, k2 INT64, v1 STRING, v2 STRING>)
+
+[REWRITTEN AST]
+QueryStmt
++-output_column_list=
+| +-DupColsTvf.k1#1 AS k1 [INT64]
+| +-DupColsTvf.k2#2 AS k2 [INT64]
+| +-DupColsTvf.v1#3 AS v1 [STRING]
+| +-DupColsTvf.v2#4 AS v2 [STRING]
++-query=
+  +-ProjectScan
+    +-column_list=DupColsTvf.[k1#1, k2#2, v1#3, v2#4]
+    +-input_scan=
+      +-ProjectScan
+        +-column_list=DupColsTvf.[k1#1, k2#2, v1#3, v2#4]
+        +-expr_list=
+        | +-k2#2 := ColumnRef(type=INT64, column=DupColsTvf.k1#1)
+        | +-v2#4 := ColumnRef(type=STRING, column=DupColsTvf.v1#3)
+        +-input_scan=
+          +-ProjectScan
+            +-column_list=DupColsTvf.[k1#1, k1#1, v1#3, v1#3]
+            +-input_scan=
+              +-TableScan(column_list=DupColsTvf.[k1#1, v1#3], table=KeyValue, column_index_list=[0, 1])
+==
+
+[default use_database=db]
+SELECT k1, v1 FROM DupColsTvf();
+--
+QueryStmt
++-output_column_list=
+| +-DupColsTvf.k1#1 AS k1 [INT64]
+| +-DupColsTvf.v1#3 AS v1 [STRING]
++-query=
+  +-ProjectScan
+    +-column_list=DupColsTvf.[k1#1, v1#3]
+    +-input_scan=
+      +-TVFScan(column_list=DupColsTvf.[k1#1, v1#3], tvf=DupColsTvf, signature=() -> TABLE<k1 INT64, k2 INT64, v1 STRING, v2 STRING>, column_index_list=[0, 2], function_call_signature=() -> TABLE<k1 INT64, k2 INT64, v1 STRING, v2 STRING>)
+
+[REWRITTEN AST]
+QueryStmt
++-output_column_list=
+| +-DupColsTvf.k1#1 AS k1 [INT64]
+| +-DupColsTvf.v1#3 AS v1 [STRING]
++-query=
+  +-ProjectScan
+    +-column_list=DupColsTvf.[k1#1, v1#3]
+    +-input_scan=
+      +-ProjectScan
+        +-column_list=DupColsTvf.[k1#1, k1#1, v1#3, v1#3]
+        +-input_scan=
+          +-TableScan(column_list=DupColsTvf.[k1#1, v1#3], table=KeyValue, column_index_list=[0, 1])
+==
+
+[default use_database=db]
+SELECT k1, k2 FROM DupColsTvf();
+--
+QueryStmt
++-output_column_list=
+| +-DupColsTvf.k1#1 AS k1 [INT64]
+| +-DupColsTvf.k2#2 AS k2 [INT64]
++-query=
+  +-ProjectScan
+    +-column_list=DupColsTvf.[k1#1, k2#2]
+    +-input_scan=
+      +-TVFScan(column_list=DupColsTvf.[k1#1, k2#2], tvf=DupColsTvf, signature=() -> TABLE<k1 INT64, k2 INT64, v1 STRING, v2 STRING>, column_index_list=[0, 1], function_call_signature=() -> TABLE<k1 INT64, k2 INT64, v1 STRING, v2 STRING>)
+
+[REWRITTEN AST]
+QueryStmt
++-output_column_list=
+| +-DupColsTvf.k1#1 AS k1 [INT64]
+| +-DupColsTvf.k2#2 AS k2 [INT64]
++-query=
+  +-ProjectScan
+    +-column_list=DupColsTvf.[k1#1, k2#2]
+    +-input_scan=
+      +-ProjectScan
+        +-column_list=[DupColsTvf.k1#1, DupColsTvf.k2#2, KeyValue.Value#5, KeyValue.Value#5]
+        +-expr_list=
+        | +-k2#2 := ColumnRef(type=INT64, column=DupColsTvf.k1#1)
+        +-input_scan=
+          +-ProjectScan
+            +-column_list=[DupColsTvf.k1#1, DupColsTvf.k1#1, KeyValue.Value#5, KeyValue.Value#5]
+            +-input_scan=
+              +-TableScan(column_list=[DupColsTvf.k1#1, KeyValue.Value#5], table=KeyValue, column_index_list=[0, 1])
+==
+
+[default use_database=db]
+SELECT v1, v2 FROM DupColsTvf();
+--
+QueryStmt
++-output_column_list=
+| +-DupColsTvf.v1#3 AS v1 [STRING]
+| +-DupColsTvf.v2#4 AS v2 [STRING]
++-query=
+  +-ProjectScan
+    +-column_list=DupColsTvf.[v1#3, v2#4]
+    +-input_scan=
+      +-TVFScan(column_list=DupColsTvf.[v1#3, v2#4], tvf=DupColsTvf, signature=() -> TABLE<k1 INT64, k2 INT64, v1 STRING, v2 STRING>, column_index_list=[2, 3], function_call_signature=() -> TABLE<k1 INT64, k2 INT64, v1 STRING, v2 STRING>)
+
+[REWRITTEN AST]
+QueryStmt
++-output_column_list=
+| +-DupColsTvf.v1#3 AS v1 [STRING]
+| +-DupColsTvf.v2#4 AS v2 [STRING]
++-query=
+  +-ProjectScan
+    +-column_list=DupColsTvf.[v1#3, v2#4]
+    +-input_scan=
+      +-ProjectScan
+        +-column_list=[KeyValue.Key#5, KeyValue.Key#5, DupColsTvf.v1#3, DupColsTvf.v2#4]
+        +-expr_list=
+        | +-v2#4 := ColumnRef(type=STRING, column=DupColsTvf.v1#3)
+        +-input_scan=
+          +-ProjectScan
+            +-column_list=[KeyValue.Key#5, KeyValue.Key#5, DupColsTvf.v1#3, DupColsTvf.v1#3]
+            +-input_scan=
+              +-TableScan(column_list=[KeyValue.Key#5, DupColsTvf.v1#3], table=KeyValue, column_index_list=[0, 1])
+==
+
+[default use_database=db]
+SELECT * FROM (DupColsTvf() AS T1 JOIN DupColsTvf() AS T2 ON T1.k1 = T2.k1);
+--
+QueryStmt
++-output_column_list=
+| +-DupColsTvf.k1#1 AS k1 [INT64]
+| +-DupColsTvf.k2#2 AS k2 [INT64]
+| +-DupColsTvf.v1#3 AS v1 [STRING]
+| +-DupColsTvf.v2#4 AS v2 [STRING]
+| +-DupColsTvf.k1#5 AS k1 [INT64]
+| +-DupColsTvf.k2#6 AS k2 [INT64]
+| +-DupColsTvf.v1#7 AS v1 [STRING]
+| +-DupColsTvf.v2#8 AS v2 [STRING]
++-query=
+  +-ProjectScan
+    +-column_list=DupColsTvf.[k1#1, k2#2, v1#3, v2#4, k1#5, k2#6, v1#7, v2#8]
+    +-input_scan=
+      +-JoinScan
+        +-column_list=DupColsTvf.[k1#1, k2#2, v1#3, v2#4, k1#5, k2#6, v1#7, v2#8]
+        +-left_scan=
+        | +-TVFScan(column_list=DupColsTvf.[k1#1, k2#2, v1#3, v2#4], tvf=DupColsTvf, signature=() -> TABLE<k1 INT64, k2 INT64, v1 STRING, v2 STRING>, column_index_list=[0, 1, 2, 3], alias="T1", function_call_signature=() -> TABLE<k1 INT64, k2 INT64, v1 STRING, v2 STRING>)
+        +-right_scan=
+        | +-TVFScan(column_list=DupColsTvf.[k1#5, k2#6, v1#7, v2#8], tvf=DupColsTvf, signature=() -> TABLE<k1 INT64, k2 INT64, v1 STRING, v2 STRING>, column_index_list=[0, 1, 2, 3], alias="T2", function_call_signature=() -> TABLE<k1 INT64, k2 INT64, v1 STRING, v2 STRING>)
+        +-join_expr=
+          +-FunctionCall(GoogleSQL:$equal(INT64, INT64) -> BOOL)
+            +-ColumnRef(type=INT64, column=DupColsTvf.k1#1)
+            +-ColumnRef(type=INT64, column=DupColsTvf.k1#5)
+
+[REWRITTEN AST]
+QueryStmt
++-output_column_list=
+| +-DupColsTvf.k1#1 AS k1 [INT64]
+| +-DupColsTvf.k2#2 AS k2 [INT64]
+| +-DupColsTvf.v1#3 AS v1 [STRING]
+| +-DupColsTvf.v2#4 AS v2 [STRING]
+| +-DupColsTvf.k1#5 AS k1 [INT64]
+| +-DupColsTvf.k2#6 AS k2 [INT64]
+| +-DupColsTvf.v1#7 AS v1 [STRING]
+| +-DupColsTvf.v2#8 AS v2 [STRING]
++-query=
+  +-ProjectScan
+    +-column_list=DupColsTvf.[k1#1, k2#2, v1#3, v2#4, k1#5, k2#6, v1#7, v2#8]
+    +-input_scan=
+      +-JoinScan
+        +-column_list=DupColsTvf.[k1#1, k2#2, v1#3, v2#4, k1#5, k2#6, v1#7, v2#8]
+        +-left_scan=
+        | +-ProjectScan
+        |   +-column_list=DupColsTvf.[k1#1, k2#2, v1#3, v2#4]
+        |   +-expr_list=
+        |   | +-k2#2 := ColumnRef(type=INT64, column=DupColsTvf.k1#1)
+        |   | +-v2#4 := ColumnRef(type=STRING, column=DupColsTvf.v1#3)
+        |   +-input_scan=
+        |     +-ProjectScan
+        |       +-column_list=DupColsTvf.[k1#1, k1#1, v1#3, v1#3]
+        |       +-input_scan=
+        |         +-TableScan(column_list=DupColsTvf.[k1#1, v1#3], table=KeyValue, column_index_list=[0, 1])
+        +-right_scan=
+        | +-ProjectScan
+        |   +-column_list=DupColsTvf.[k1#5, k2#6, v1#7, v2#8]
+        |   +-expr_list=
+        |   | +-k2#6 := ColumnRef(type=INT64, column=DupColsTvf.k1#5)
+        |   | +-v2#8 := ColumnRef(type=STRING, column=DupColsTvf.v1#7)
+        |   +-input_scan=
+        |     +-ProjectScan
+        |       +-column_list=DupColsTvf.[k1#5, k1#5, v1#7, v1#7]
+        |       +-input_scan=
+        |         +-TableScan(column_list=DupColsTvf.[k1#5, v1#7], table=KeyValue, column_index_list=[0, 1])
+        +-join_expr=
+          +-FunctionCall(GoogleSQL:$equal(INT64, INT64) -> BOOL)
+            +-ColumnRef(type=INT64, column=DupColsTvf.k1#1)
+            +-ColumnRef(type=INT64, column=DupColsTvf.k1#5)
+
+==
+
+[prepare_database=db]
+CREATE TABLE FUNCTION DupColsDefinerTvf() SQL SECURITY DEFINER AS SELECT key as k1, key as k2 FROM KeyValue;
+--
+CreateTableFunctionStmt
++-name_path=DupColsDefinerTvf
++-signature=() -> TABLE<k1 INT64, k2 INT64>
++-language="SQL"
++-code="SELECT key as k1, key as k2 FROM KeyValue"
++-query=
+| +-ProjectScan
+|   +-column_list=KeyValue.[Key#1, Key#1]
+|   +-input_scan=
+|     +-TableScan(column_list=[KeyValue.Key#1], table=KeyValue, column_index_list=[0])
++-output_column_list=
+| +-KeyValue.Key#1 AS k1 [INT64]
+| +-KeyValue.Key#1 AS k2 [INT64]
++-sql_security=SQL_SECURITY_DEFINER
+==
+
+# ExecuteAsRoleScan is not supported by SQLBuilder
+[no_run_sqlbuilder]
+[default use_database=db]
+SELECT * FROM DupColsDefinerTvf();
+--
+QueryStmt
++-output_column_list=
+| +-DupColsDefinerTvf.k1#1 AS k1 [INT64]
+| +-DupColsDefinerTvf.k2#2 AS k2 [INT64]
++-query=
+  +-ProjectScan
+    +-column_list=DupColsDefinerTvf.[k1#1, k2#2]
+    +-input_scan=
+      +-TVFScan(column_list=DupColsDefinerTvf.[k1#1, k2#2], tvf=DupColsDefinerTvf, signature=() -> TABLE<k1 INT64, k2 INT64>, column_index_list=[0, 1], function_call_signature=() -> TABLE<k1 INT64, k2 INT64>)
+
+[REWRITTEN AST]
+QueryStmt
++-output_column_list=
+| +-DupColsDefinerTvf.k1#1 AS k1 [INT64]
+| +-DupColsDefinerTvf.k2#2 AS k2 [INT64]
++-query=
+  +-ProjectScan
+    +-column_list=DupColsDefinerTvf.[k1#1, k2#2]
+    +-input_scan=
+      +-ExecuteAsRoleScan
+        +-column_list=DupColsDefinerTvf.[k1#1, k2#2]
+        +-input_scan=
+        | +-ProjectScan
+        |   +-column_list=DupColsDefinerTvf.[k1#3, k2#4]
+        |   +-expr_list=
+        |   | +-k2#4 := ColumnRef(type=INT64, column=DupColsDefinerTvf.k1#3)
+        |   +-input_scan=
+        |     +-ProjectScan
+        |       +-column_list=DupColsDefinerTvf.[k1#3, k1#3]
+        |       +-input_scan=
+        |         +-TableScan(column_list=[DupColsDefinerTvf.k1#3], table=KeyValue, column_index_list=[0])
+        +-original_inlined_view=<null>
+        +-original_inlined_tvf=DupColsDefinerTvf
+==
+
+[prepare_database=db]
+CREATE TABLE FUNCTION NestedDupColsTvf()  AS SELECT k1 AS k3, k1 AS k4 FROM DupColsTvf();
+--
+CreateTableFunctionStmt
++-name_path=NestedDupColsTvf
++-signature=() -> TABLE<k3 INT64, k4 INT64>
++-language="SQL"
++-code="SELECT k1 AS k3, k1 AS k4 FROM DupColsTvf()"
++-query=
+| +-ProjectScan
+|   +-column_list=DupColsTvf.[k1#1, k1#1]
+|   +-input_scan=
+|     +-TVFScan(column_list=[DupColsTvf.k1#1], tvf=DupColsTvf, signature=() -> TABLE<k1 INT64, k2 INT64, v1 STRING, v2 STRING>, column_index_list=[0], function_call_signature=() -> TABLE<k1 INT64, k2 INT64, v1 STRING, v2 STRING>)
++-output_column_list=
+  +-DupColsTvf.k1#1 AS k3 [INT64]
+  +-DupColsTvf.k1#1 AS k4 [INT64]
+
+[REWRITTEN AST]
+CreateTableFunctionStmt
++-name_path=NestedDupColsTvf
++-signature=() -> TABLE<k3 INT64, k4 INT64>
++-language="SQL"
++-code="SELECT k1 AS k3, k1 AS k4 FROM DupColsTvf()"
++-query=
+| +-ProjectScan
+|   +-column_list=DupColsTvf.[k1#1, k1#1]
+|   +-input_scan=
+|     +-ProjectScan
+|       +-column_list=[DupColsTvf.k1#1, DupColsTvf.k1#1, KeyValue.Value#5, KeyValue.Value#5]
+|       +-input_scan=
+|         +-TableScan(column_list=[DupColsTvf.k1#1, KeyValue.Value#5], table=KeyValue, column_index_list=[0, 1])
++-output_column_list=
+  +-DupColsTvf.k1#1 AS k3 [INT64]
+  +-DupColsTvf.k1#1 AS k4 [INT64]
+==
+
+[default use_database=db]
+SELECT * FROM NestedDupColsTvf();
+--
+QueryStmt
++-output_column_list=
+| +-NestedDupColsTvf.k3#1 AS k3 [INT64]
+| +-NestedDupColsTvf.k4#2 AS k4 [INT64]
++-query=
+  +-ProjectScan
+    +-column_list=NestedDupColsTvf.[k3#1, k4#2]
+    +-input_scan=
+      +-TVFScan(column_list=NestedDupColsTvf.[k3#1, k4#2], tvf=NestedDupColsTvf, signature=() -> TABLE<k3 INT64, k4 INT64>, column_index_list=[0, 1], function_call_signature=() -> TABLE<k3 INT64, k4 INT64>)
+
+[REWRITTEN AST]
+QueryStmt
++-output_column_list=
+| +-NestedDupColsTvf.k3#1 AS k3 [INT64]
+| +-NestedDupColsTvf.k4#2 AS k4 [INT64]
++-query=
+  +-ProjectScan
+    +-column_list=NestedDupColsTvf.[k3#1, k4#2]
+    +-input_scan=
+      +-ProjectScan
+        +-column_list=NestedDupColsTvf.[k3#1, k4#2]
+        +-expr_list=
+        | +-k4#2 := ColumnRef(type=INT64, column=NestedDupColsTvf.k3#1)
+        +-input_scan=
+          +-ProjectScan
+            +-column_list=NestedDupColsTvf.[k3#1, k3#1]
+            +-input_scan=
+              +-ProjectScan
+                +-column_list=[NestedDupColsTvf.k3#1, NestedDupColsTvf.k3#1, KeyValue.Value#3, KeyValue.Value#3]
+                +-input_scan=
+                  +-TableScan(column_list=[NestedDupColsTvf.k3#1, KeyValue.Value#3], table=KeyValue, column_index_list=[0, 1])
+==
+
+[prepare_database=db]
+CREATE TABLE FUNCTION CteDupColsTvf() AS
+  WITH t AS (SELECT key AS k1, key AS k2 FROM KeyValue)
+  SELECT * FROM t;
+--
+CreateTableFunctionStmt
++-name_path=CteDupColsTvf
++-signature=() -> TABLE<k1 INT64, k2 INT64>
++-language="SQL"
++-code="WITH t AS (SELECT key AS k1, key AS k2 FROM KeyValue)\n  SELECT * FROM t"
++-query=
+| +-WithScan
+|   +-column_list=t.[k1#4, k1#4]
+|   +-with_entry_list=
+|   | +-WithEntry
+|   |   +-with_query_name="t"
+|   |   +-with_subquery=
+|   |     +-ProjectScan
+|   |       +-column_list=KeyValue.[Key#1, Key#1]
+|   |       +-input_scan=
+|   |         +-TableScan(column_list=[KeyValue.Key#1], table=KeyValue, column_index_list=[0])
+|   +-query=
+|     +-ProjectScan
+|       +-column_list=t.[k1#4, k1#4]
+|       +-input_scan=
+|         +-WithRefScan(column_list=t.[k1#3, k1#4], with_query_name="t")
++-output_column_list=
+  +-t.k1#4 AS k1 [INT64]
+  +-t.k1#4 AS k2 [INT64]
+==
+
+[default use_database=db]
+SELECT * FROM CteDupColsTvf();
+--
+QueryStmt
++-output_column_list=
+| +-CteDupColsTvf.k1#1 AS k1 [INT64]
+| +-CteDupColsTvf.k2#2 AS k2 [INT64]
++-query=
+  +-ProjectScan
+    +-column_list=CteDupColsTvf.[k1#1, k2#2]
+    +-input_scan=
+      +-TVFScan(column_list=CteDupColsTvf.[k1#1, k2#2], tvf=CteDupColsTvf, signature=() -> TABLE<k1 INT64, k2 INT64>, column_index_list=[0, 1], function_call_signature=() -> TABLE<k1 INT64, k2 INT64>)
+
+[REWRITTEN AST]
+QueryStmt
++-output_column_list=
+| +-CteDupColsTvf.k1#1 AS k1 [INT64]
+| +-CteDupColsTvf.k2#2 AS k2 [INT64]
++-query=
+  +-ProjectScan
+    +-column_list=CteDupColsTvf.[k1#1, k2#2]
+    +-input_scan=
+      +-ProjectScan
+        +-column_list=CteDupColsTvf.[k1#1, k2#2]
+        +-expr_list=
+        | +-k2#2 := ColumnRef(type=INT64, column=CteDupColsTvf.k1#1)
+        +-input_scan=
+          +-WithScan
+            +-column_list=CteDupColsTvf.[k1#1, k1#1]
+            +-with_entry_list=
+            | +-WithEntry
+            |   +-with_query_name="t"
+            |   +-with_subquery=
+            |     +-ProjectScan
+            |       +-column_list=KeyValue.[Key#3, Key#3]
+            |       +-input_scan=
+            |         +-TableScan(column_list=[KeyValue.Key#3], table=KeyValue, column_index_list=[0])
+            +-query=
+              +-ProjectScan
+                +-column_list=CteDupColsTvf.[k1#1, k1#1]
+                +-input_scan=
+                  +-WithRefScan(column_list=[t.k1#4, CteDupColsTvf.k1#1], with_query_name="t")

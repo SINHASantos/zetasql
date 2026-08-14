@@ -1518,11 +1518,25 @@ VECTOR(128)
 VECTOR(128)
 ==
 
+# VECTOR with length and encoding parameters is supported.
+[language_features=MAXIMUM,+DECLARATIVE_TYPE_FRAMEWORK,+VECTOR_TYPE]
+VECTOR(128, 'FLOAT32')
+--
+VECTOR(128, 'FLOAT32')
+==
+
+# VECTOR encoding parameter is case-insensitive and normalized to uppercase.
+[language_features=MAXIMUM,+DECLARATIVE_TYPE_FRAMEWORK,+VECTOR_TYPE]
+VECTOR(128, 'float32')
+--
+VECTOR(128, 'FLOAT32')
+==
+
 # TODO: Support analysis time constants as VECTOR type parameters (TestConstantInt64).
 # TODO: Support VECTOR(NULL) and VECTOR(length => 3) once named parameters and NULL as a type parameter are supported.
 # Parameterized VECTOR error cases.
 [language_features=MAXIMUM,+DECLARATIVE_TYPE_FRAMEWORK,+VECTOR_TYPE]
-VECTOR({{?|(1)|0|1.5|'abc'|MAX|3, 4|[]|@p|rand()|CAST(2 AS UINT32)|length => 3|TestConstantInt64|true|b'abc'|NULL|1+2|"a"|[1,2]}})
+VECTOR({{?|(1)|0|1.5|'abc'|MAX|[]|@p|rand()|CAST(2 AS UINT32)|length => 3|TestConstantInt64|true|b'abc'|NULL|1+2|"a"|[1,2]|}})
 --
 ALTERNATION GROUP: ?
 --
@@ -1558,12 +1572,6 @@ ALTERNATION GROUP: MAX
 --
 ERROR: VECTOR length parameter must be an integer literal [at 1:7]
 VECTOR(MAX)
-      ^
---
-ALTERNATION GROUP: 3, 4
---
-ERROR: VECTOR type can only have one parameter. Found 2 parameters [at 1:7]
-VECTOR(3, 4)
       ^
 --
 ALTERNATION GROUP: []
@@ -1637,6 +1645,80 @@ ALTERNATION GROUP: [1,2]
 ERROR: Syntax error: Unexpected "[" [at 1:8]
 VECTOR([1,2])
        ^
+--
+ALTERNATION GROUP: <empty>
+--
+ERROR: Syntax error: Unexpected ")" [at 1:8]
+VECTOR()
+       ^
+==
+
+# Parameterized VECTOR encoding and multi-parameter error cases.
+[language_features=MAXIMUM,+DECLARATIVE_TYPE_FRAMEWORK,+VECTOR_TYPE]
+VECTOR({{3, 4, 5|128, 4|128, 'UNKNOWN_VECTOR_ENCODING'|128, 'BAD_ENCODING'|128, ''|128, @p}})
+--
+ALTERNATION GROUP: 3, 4, 5
+--
+ERROR: VECTOR type has too many type parameters. Found 3 parameters [at 1:7]
+VECTOR(3, 4, 5)
+      ^
+--
+ALTERNATION GROUP: 128, 4
+--
+ERROR: VECTOR encoding parameter must be a string literal [at 1:7]
+VECTOR(128, 4)
+      ^
+--
+ALTERNATION GROUP: 128, 'UNKNOWN_VECTOR_ENCODING'
+--
+ERROR: Unrecognized VECTOR encoding: "UNKNOWN_VECTOR_ENCODING" [at 1:7]
+VECTOR(128, 'UNKNOWN_VECTOR_ENCODING')
+      ^
+--
+ALTERNATION GROUP: 128, 'BAD_ENCODING'
+--
+ERROR: Unrecognized VECTOR encoding: "BAD_ENCODING" [at 1:7]
+VECTOR(128, 'BAD_ENCODING')
+      ^
+--
+ALTERNATION GROUP: 128, ''
+--
+ERROR: Unrecognized VECTOR encoding: "" [at 1:7]
+VECTOR(128, '')
+      ^
+--
+ALTERNATION GROUP: 128, @p
+--
+ERROR: Syntax error: Unexpected "@" [at 1:13]
+VECTOR(128, @p)
+            ^
+==
+
+# Parameterized VECTOR error with identifier
+[language_features=MAXIMUM,+DECLARATIVE_TYPE_FRAMEWORK,+VECTOR_TYPE]
+VECTOR(123, FLOAT32)
+--
+ERROR: Syntax error: Unexpected identifier "FLOAT32" [at 1:13]
+VECTOR(123, FLOAT32)
+            ^
+==
+
+# Parameterized VECTOR error with constant identifier
+[language_features=MAXIMUM,+DECLARATIVE_TYPE_FRAMEWORK,+VECTOR_TYPE]
+VECTOR(128, TestConstantString)
+--
+ERROR: Syntax error: Unexpected identifier "TestConstantString" [at 1:13]
+VECTOR(128, TestConstantString)
+            ^
+==
+
+# Parameterized VECTOR error with concat expression
+[language_features=MAXIMUM,+DECLARATIVE_TYPE_FRAMEWORK,+VECTOR_TYPE]
+VECTOR(128, 'FLOAT' || '32')
+--
+ERROR: Syntax error: Expected ")" or "," but got "||" [at 1:21]
+VECTOR(128, 'FLOAT' || '32')
+                    ^
 ==
 
 # Parameterized VECTOR requires VECTOR_TYPE feature.
@@ -1704,5 +1786,12 @@ STRUCT<v VECTOR(0)>
 ARRAY<VECTOR(128)>
 --
 ARRAY<VECTOR(128)>
+==
+
+# STRUCT containing parameterized VECTOR and ARRAY<VECTOR> is valid.
+[language_features=MAXIMUM,+DECLARATIVE_TYPE_FRAMEWORK,+VECTOR_TYPE]
+STRUCT<v VECTOR(128), STRUCT<w ARRAY<VECTOR(256)>>>
+--
+STRUCT<v VECTOR(128), STRUCT<w ARRAY<VECTOR(256)>>>
 ==
 

@@ -960,6 +960,90 @@ class NonAggregateAnalyticArg final : public AnalyticArg {
   std::unique_ptr<const TupleSchema> partition_schema_;
 };
 
+// Argument class for a WITHIN Bound in ALIGN operator. Represents a single
+// boundary expression (lower or upper), e.g. INTERVAL 5 SECOND PRECEDING, or
+// UNBOUNDED FOLLOWING.
+class WithinBoundExprArg final : public AlgebraArg {
+ public:
+  static absl::StatusOr<std::unique_ptr<WithinBoundExprArg>> Create(
+      ResolvedWithinBoundExpr::BoundKind bound_kind,
+      std::unique_ptr<ValueExpr> expr);
+
+  WithinBoundExprArg(const WithinBoundExprArg&) = delete;
+  WithinBoundExprArg& operator=(const WithinBoundExprArg&) = delete;
+  ~WithinBoundExprArg() override = default;
+
+  ResolvedWithinBoundExpr::BoundKind bound_kind() const { return bound_kind_; }
+
+  std::string DebugInternal(const std::string& indent,
+                            bool verbose) const override;
+
+  absl::Status SetSchemasForEvaluation(
+      absl::Span<const TupleSchema* const> params_schemas);
+
+ private:
+  WithinBoundExprArg(ResolvedWithinBoundExpr::BoundKind bound_kind,
+                     std::unique_ptr<ValueExpr> expr);
+
+  const ResolvedWithinBoundExpr::BoundKind bound_kind_;
+};
+
+// Represents lower and upper boundaries defining a WITHIN range.
+class WithinBoundsArg final : public AlgebraArg {
+ public:
+  static absl::StatusOr<std::unique_ptr<WithinBoundsArg>> Create(
+      std::unique_ptr<WithinBoundExprArg> lower_bound,
+      std::unique_ptr<WithinBoundExprArg> upper_bound);
+
+  WithinBoundsArg(const WithinBoundsArg&) = delete;
+  WithinBoundsArg& operator=(const WithinBoundsArg&) = delete;
+  ~WithinBoundsArg() override = default;
+
+  const WithinBoundExprArg* lower_bound() const { return lower_bound_.get(); }
+  const WithinBoundExprArg* upper_bound() const { return upper_bound_.get(); }
+
+  absl::Status SetSchemasForEvaluation(
+      absl::Span<const TupleSchema* const> params_schemas);
+
+  std::string DebugInternal(const std::string& indent,
+                            bool verbose) const override;
+
+ private:
+  WithinBoundsArg(std::unique_ptr<WithinBoundExprArg> lower_bound,
+                  std::unique_ptr<WithinBoundExprArg> upper_bound);
+
+  std::unique_ptr<WithinBoundExprArg> lower_bound_;
+  std::unique_ptr<WithinBoundExprArg> upper_bound_;
+};
+
+// TODO: Use AggregateEstimatorArg here with EstimatorArg as the
+// base class.
+// Argument class representing an estimator function call in ALIGN operator,
+// e.g. `AVG(col) WITHIN (1 PERIOD PRECEDING)` . It wraps the aggregate argument
+// and the bounds (WITHIN clause) that define the evaluation window.
+class EstimatorArg final : public ExprArg {
+ public:
+  EstimatorArg(std::unique_ptr<AggregateArg> aggregate_arg,
+               std::unique_ptr<WithinBoundsArg> within_bounds);
+
+  EstimatorArg(const EstimatorArg&) = delete;
+  EstimatorArg& operator=(const EstimatorArg&) = delete;
+
+  const AggregateArg* aggregate_arg() const { return aggregate_arg_.get(); }
+  const WithinBoundsArg* within_bounds() const { return within_bounds_.get(); }
+
+  absl::Status SetSchemasForEvaluation(
+      const TupleSchema& input_schema,
+      absl::Span<const TupleSchema* const> params_schemas);
+
+  std::string DebugInternal(const std::string& indent,
+                            bool verbose) const override;
+
+ private:
+  std::unique_ptr<AggregateArg> aggregate_arg_;
+  std::unique_ptr<WithinBoundsArg> within_bounds_;
+};
+
 // An argument in the tree that generates column filters for an
 // EvaluatorTableScanOp.
 class ColumnFilterArg : public AlgebraArg {
@@ -2102,6 +2186,75 @@ class AnalyticOp final : public RelationalOp {
 
   const RelationalOp* input() const;
   RelationalOp* mutable_input();
+};
+
+// Evaluates the ALIGN operator scan. Given a time-series input table, ALIGN
+// produces aligned timestamps at regular intervals (defined by period and
+// origin) and computes estimator functions for each partition.
+class AlignOp final : public RelationalOp {
+ public:
+  AlignOp(const AlignOp&) = delete;
+  AlignOp& operator=(const AlignOp&) = delete;
+
+  static absl::StatusOr<std::unique_ptr<AlignOp>> Create(
+      std::unique_ptr<RelationalOp> input, const VariableId& timestamp_var,
+      std::unique_ptr<ValueExpr> period, std::unique_ptr<ValueExpr> origin,
+      std::unique_ptr<WithinBoundsArg> output_within,
+      std::vector<std::unique_ptr<KeyArg>> partition_keys,
+      const VariableId& aligned_timestamp_var,
+      std::vector<std::unique_ptr<EstimatorArg>> estimators);
+
+  absl::Status SetSchemasForEvaluation(
+      absl::Span<const TupleSchema* const> params_schemas) override;
+
+  absl::StatusOr<std::unique_ptr<TupleIterator>> CreateIterator(
+      absl::Span<const TupleData* const> params, int num_extra_slots,
+      EvaluationContext* context) const override;
+
+  std::unique_ptr<TupleSchema> CreateOutputSchema() const override;
+
+  std::string IteratorDebugString() const override;
+
+  std::string DebugInternal(const std::string& indent,
+                            bool verbose) const override;
+
+ private:
+  enum ArgKind {
+    kInput,
+    kPeriod,
+    kOrigin,
+    kOutputWithin,
+    kPartitionKey,
+    kEstimator
+  };
+
+  AlignOp(std::unique_ptr<RelationalOp> input, const VariableId& timestamp_var,
+          std::unique_ptr<ValueExpr> period, std::unique_ptr<ValueExpr> origin,
+          std::unique_ptr<WithinBoundsArg> output_within,
+          std::vector<std::unique_ptr<KeyArg>> partition_keys,
+          const VariableId& aligned_timestamp_var,
+          std::vector<std::unique_ptr<EstimatorArg>> estimators);
+
+  const RelationalOp* input() const;
+  RelationalOp* mutable_input();
+
+  const ValueExpr* period() const;
+  ValueExpr* mutable_period();
+
+  const ValueExpr* origin() const;
+  ValueExpr* mutable_origin();
+
+  const WithinBoundsArg* output_within() const;
+  WithinBoundsArg* mutable_output_within();
+
+  absl::Span<const KeyArg* const> partition_keys() const;
+  absl::Span<KeyArg* const> mutable_partition_keys();
+
+  absl::Span<const EstimatorArg* const> estimators() const;
+  absl::Span<EstimatorArg* const> mutable_estimators();
+
+  const VariableId timestamp_var_;
+  const VariableId aligned_timestamp_var_;
 };
 
 // Sorts 'values' in 'input' using 'keys'.
@@ -3468,6 +3621,39 @@ class NewArrayExpr final : public ValueExpr {
 
   absl::Span<const ExprArg* const> elements() const;
   absl::Span<ExprArg* const> mutable_elements();
+};
+
+// Constructs a map of the given 'type' and key/value entries. Key and value
+// types must match the type definition.
+class NewMapExpr final : public ValueExpr {
+ public:
+  NewMapExpr(const NewMapExpr&) = delete;
+  NewMapExpr& operator=(const NewMapExpr&) = delete;
+
+  static absl::StatusOr<std::unique_ptr<NewMapExpr>> Create(
+      const MapType* type, std::vector<std::unique_ptr<ValueExpr>> keys,
+      std::vector<std::unique_ptr<ValueExpr>> values);
+
+  absl::Status SetSchemasForEvaluation(
+      absl::Span<const TupleSchema* const> params_schemas) override;
+
+  bool Eval(absl::Span<const TupleData* const> params,
+            EvaluationContext* context, VirtualTupleSlot* result,
+            absl::Status* status) const override;
+
+  std::string DebugInternal(const std::string& indent,
+                            bool verbose) const override;
+
+ private:
+  enum ArgKind { kKey, kValue };
+
+  NewMapExpr(const MapType* type, std::vector<std::unique_ptr<ExprArg>> keys,
+             std::vector<std::unique_ptr<ExprArg>> values);
+
+  absl::Span<const ExprArg* const> keys() const;
+  absl::Span<ExprArg* const> mutable_keys();
+  absl::Span<const ExprArg* const> values() const;
+  absl::Span<ExprArg* const> mutable_values();
 };
 
 // Produces a constant 'value'.

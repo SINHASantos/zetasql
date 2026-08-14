@@ -16,11 +16,9 @@
 
 # Java API for GoogleSQL.
 
-load("@google_bazel_common//tools/jarjar:jarjar.bzl", "jarjar_library")
-load("@google_bazel_common//tools/javadoc:javadoc.bzl", "javadoc_library")
 load("@rules_cc//cc:cc_binary.bzl", "cc_binary")
 load("@rules_java//java:defs.bzl", "java_library")
-load("//tools:maven.bzl", "pom_file")
+load("@rules_jvm_external//:defs.bzl", "java_export")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -68,6 +66,7 @@ BUILTIN_PROTO_DEPS = [
     "//googlesql/public/functions:bitwise_agg_mode_java_proto",
     "//googlesql/public/functions:datetime_java_proto",
     "//googlesql/public/functions:differential_privacy_java_proto",
+    "//googlesql/public/functions:endianness_java_proto",
     "//googlesql/public/functions:normalize_mode_java_proto",
     "//googlesql/public/functions:range_sessionize_mode_java_proto",
     "//googlesql/public/functions:rounding_mode_java_proto",
@@ -111,13 +110,13 @@ java_library(
         ":auto_one_of_processor_plugin",
         ":auto_annotation_processor_plugin",
     ],
-    tags = ["maven_coordinates=com.google.googlesql:googlesql-types:${project.version}"],
     deps = BUILTIN_PROTO_DEPS + [
         "//googlesql/public:annotation_java_proto",
         "//googlesql/public:options_java_proto",
         "//googlesql/public:simple_value_java_proto",
         "//googlesql/public:type_parameters_java_proto",
         "//googlesql/public/proto:type_annotation_java_proto",
+        "//googlesql/public/proto:vector_encoding_id_java_proto",
         "@com_google_protobuf//:protobuf_java",
         "@com_google_protobuf//:protobuf_java_util",
         "@maven//:com_google_api_grpc_proto_google_common_protos",
@@ -137,48 +136,6 @@ java_library(
     ],
 )
 
-jarjar_library(
-    name = "types_jar",
-    jars = BUILTIN_PROTO_DEPS + [
-        ":types",
-        ":types_proto_resources",
-        "//googlesql/public:deprecation_warning_java_proto",
-        "//googlesql/public:error_location_java_proto",
-        "//googlesql/public:options_java_proto",
-        "//googlesql/public/proto:type_annotation_java_proto",
-    ],
-    rules = [
-        "zap com.google.protobuf.**",
-    ],
-)
-
-jarjar_library(
-    name = "types_src",
-    jars = [
-        ":libtypes-src.jar",
-    ],
-)
-
-pom_file(
-    name = "types_pom",
-    artifact_id = "googlesql-types",
-    artifact_name = "Types",
-    targets = BUILTIN_PROTO_DEPS + [
-        ":types",
-        "//googlesql/public:deprecation_warning_java_proto",
-        "//googlesql/public:error_location_java_proto",
-        "//googlesql/public:options_java_proto",
-        "//googlesql/public/proto:type_annotation_java_proto",
-    ],
-)
-
-javadoc_library(
-    name = "types_javadoc",
-    srcs = TYPES_SRCS,
-    root_packages = ["com.google.googlesql"],
-    deps = [":types"],
-)
-
 CHANNEL_PROVIDER_SRCS = [
     "ClientChannelProvider.java",
 ]
@@ -186,7 +143,6 @@ CHANNEL_PROVIDER_SRCS = [
 java_library(
     name = "channel_provider",
     srcs = CHANNEL_PROVIDER_SRCS,
-    tags = ["maven_coordinates=com.google.googlesql:googlesql-client:${project.version}"],
     deps = [
         "@io_grpc_grpc_java//api",
         "@io_grpc_grpc_java//core",
@@ -203,37 +159,6 @@ java_library(
         "@bazel_tools//src/conditions:darwin": ["//googlesql/local_service:liblocal_service_jni.dylib"],
         "//conditions:default": [],
     }),
-    tags = ["maven_coordinates=com.google.googlesql:googlesql-jni-channel-darwin:${project.version}"],
-)
-
-jarjar_library(
-    name = "jni_channel_darwin_jar",
-    jars = [
-        ":jni_channel_darwin",
-    ],
-)
-
-jarjar_library(
-    name = "jni_channel_darwin_src",
-    jars = [
-        ":libjni_channel_darwin-src.jar",
-    ],
-)
-
-pom_file(
-    name = "jni_channel_darwin_pom",
-    artifact_id = "googlesql-jni-channel-darwin",
-    artifact_name = "JNI Channel for Darwin",
-    targets = [
-        ":jni_channel_darwin",
-    ],
-)
-
-javadoc_library(
-    name = "jni_channel_darwin_javadoc",
-    srcs = JNI_CHANNEL_SRCS,
-    root_packages = ["com.google.googlesql"],
-    deps = [":jni_channel"],
 )
 
 java_library(
@@ -242,44 +167,12 @@ java_library(
         "@bazel_tools//src/conditions:linux_x86_64": ["//googlesql/local_service:liblocal_service_jni.so"],
         "//conditions:default": [],
     }),
-    tags = ["maven_coordinates=com.google.googlesql:googlesql-jni-channel-linux:${project.version}"],
-)
-
-jarjar_library(
-    name = "jni_channel_linux_jar",
-    jars = [
-        ":jni_channel_linux",
-    ],
-)
-
-jarjar_library(
-    name = "jni_channel_linux_src",
-    jars = [
-        ":libjni_channel_linux-src.jar",
-    ],
-)
-
-pom_file(
-    name = "jni_channel_linux_pom",
-    artifact_id = "googlesql-jni-channel-linux",
-    artifact_name = "JNI Channel for Linux",
-    targets = [
-        ":jni_channel_linux",
-    ],
-)
-
-javadoc_library(
-    name = "jni_channel_linux_javadoc",
-    srcs = JNI_CHANNEL_SRCS,
-    root_packages = ["com.google.googlesql"],
-    deps = [":jni_channel"],
 )
 
 java_library(
     name = "jni_channel",
     srcs = JNI_CHANNEL_SRCS,
     plugins = [":auto_service_processor_plugin"],
-    tags = ["maven_coordinates=com.google.googlesql:googlesql-jni-channel:${project.version}"],
     runtime_deps = [
         ":jni_channel_darwin",
         ":jni_channel_linux",
@@ -295,42 +188,6 @@ java_library(
         "@maven//:io_netty_netty_transport",
         "@native_utils",
     ],
-)
-
-jarjar_library(
-    name = "jni_channel_jar",
-    jars = [
-        ":jni_channel",
-        "@native_utils",
-    ],
-    rules = [
-        "rule cz.adamh.utils.** com.google.googlesql.@0",
-        "rule io.grpc.** com.google.googlesql.@0",
-        "rule io.opencensus.** com.google.googlesql.@0",
-    ],
-)
-
-jarjar_library(
-    name = "jni_channel_src",
-    jars = [
-        ":libjni_channel-src.jar",
-    ],
-)
-
-pom_file(
-    name = "jni_channel_pom",
-    artifact_id = "googlesql-jni-channel",
-    artifact_name = "JNI Channel",
-    targets = [
-        ":jni_channel",
-    ],
-)
-
-javadoc_library(
-    name = "jni_channel_javadoc",
-    srcs = JNI_CHANNEL_SRCS,
-    root_packages = ["com.google.googlesql"],
-    deps = [":jni_channel"],
 )
 
 PROPERTY_GRAPH_SRCS = [
@@ -597,118 +454,6 @@ java_library(
     ],
 )
 
-jarjar_library(
-    name = "client_jar",
-    jars = BUILTIN_PROTO_DEPS + [
-        ":analyzer",
-        ":parser",
-        ":channel_provider",
-        ":client",
-        ":debug_printable_node",
-        "//java/com/google/googlesql/parser",
-        "//java/com/google/googlesql/resolvedast",
-        "//java/com/google/googlesql/testing:sql_compliance_service_java_grpc",
-        "//java/com/google/googlesql/testing:sql_compliance_service_java_proto",
-        "//googlesql/compliance:test_driver_java_proto",
-        "//googlesql/local_service:local_service_java_grpc",
-        "//googlesql/local_service:local_service_java_proto",
-        "//googlesql/proto:options_java_proto",
-        "//googlesql/proto:simple_catalog_java_proto",
-        "//googlesql/public:builtin_function_java_proto",
-        "//googlesql/public:parse_location_range_java_proto",
-        "//googlesql/public:parse_resume_location_java_proto",
-        "//googlesql/public:simple_connection_java_proto",
-        "//googlesql/public:simple_constant_java_proto",
-        "//googlesql/public:simple_model_java_proto",
-        "//googlesql/public:simple_sequence_java_proto",
-        "//googlesql/public:simple_table_java_proto",
-        "//googlesql/resolved_ast:resolved_ast_enums_java_proto",
-        "//googlesql/resolved_ast:resolved_ast_java_proto",
-        "//googlesql/resolved_ast:resolved_node_kind_java_proto",
-        "//googlesql/resolved_ast:serialization_java_proto",
-        "@io_grpc_grpc_java//context",
-        "@io_grpc_grpc_java//core",
-        "@io_grpc_grpc_java//netty",
-        "@io_grpc_grpc_java//protobuf",
-        "@io_grpc_grpc_java//protobuf-lite",
-        "@io_grpc_grpc_java//stub",
-        "@io_grpc_grpc_java//api",
-        "@maven//:com_google_code_gson_gson",
-        "@maven//:io_opencensus_opencensus_api",
-        "@maven//:io_opencensus_opencensus_contrib_grpc_metrics",
-    ],
-    rules = [
-        "rule com.google.gson.** com.google.googlesql.@0",
-        "rule io.grpc.** com.google.googlesql.@0",
-        "rule io.opencensus.** com.google.googlesql.@0",
-        "zap com.google.protobuf.**",
-    ],
-)
-
-jarjar_library(
-    name = "client_src",
-    jars = [
-        ":libanalyzer-src.jar",
-        ":libchannel_provider-src.jar",
-        ":libclient-src.jar",
-        ":libdebug_printable_node-src.jar",
-        "//java/com/google/googlesql/resolvedast:libresolvedast-src.jar",
-    ],
-)
-
-pom_file(
-    name = "client_pom",
-    artifact_id = "googlesql-client",
-    artifact_name = "Core Client",
-    targets = BUILTIN_PROTO_DEPS + [
-        ":analyzer",
-        ":channel_provider",
-        ":client",
-        ":debug_printable_node",
-        "//java/com/google/googlesql/resolvedast",
-        "//java/com/google/googlesql/testing:sql_compliance_service_java_grpc",
-        "//java/com/google/googlesql/testing:sql_compliance_service_java_proto",
-        "//googlesql/compliance:test_driver_java_proto",
-        "//googlesql/local_service:local_service_java_grpc",
-        "//googlesql/local_service:local_service_java_proto",
-        "//googlesql/proto:options_java_proto",
-        "//googlesql/proto:simple_catalog_java_proto",
-        "//googlesql/public:builtin_function_java_proto",
-        "//googlesql/public:parse_location_range_java_proto",
-        "//googlesql/public:parse_resume_location_java_proto",
-        "//googlesql/public:simple_connection_java_proto",
-        "//googlesql/public:simple_constant_java_proto",
-        "//googlesql/public:simple_model_java_proto",
-        "//googlesql/public:simple_sequence_java_proto",
-        "//googlesql/public:simple_table_java_proto",
-        "//googlesql/resolved_ast:resolved_ast_enums_java_proto",
-        "//googlesql/resolved_ast:resolved_ast_java_proto",
-        "//googlesql/resolved_ast:resolved_node_kind_java_proto",
-        "//googlesql/resolved_ast:serialization_java_proto",
-        "@io_grpc_grpc_java//context",
-        "@io_grpc_grpc_java//core",
-        "@io_grpc_grpc_java//netty",
-        "@io_grpc_grpc_java//protobuf",
-        "@io_grpc_grpc_java//protobuf-lite",
-        "@io_grpc_grpc_java//api",
-        "@maven//:io_opencensus_opencensus_api",
-        "@maven//:io_opencensus_opencensus_contrib_grpc_metrics",
-    ],
-)
-
-javadoc_library(
-    name = "client_javadoc",
-    srcs = ANALYZER_SRCS + CHANNEL_PROVIDER_SRCS + CATALOG_SRCS +
-           SIMPLE_CATALOG_SRCS + COMMON_SRCS + ["DebugPrintableNode.java"],
-    root_packages = ["com.google.googlesql"],
-    deps = [
-        ":analyzer",
-        ":channel_provider",
-        ":client",
-        ":debug_printable_node",
-    ],
-)
-
 java_library(
     name = "testaccess",
     testonly = 1,
@@ -717,4 +462,47 @@ java_library(
         ":types",
         "@maven//:com_google_guava_guava",
     ],
+)
+
+java_export(
+    name = "client_export",
+    maven_coordinates = "com.google.googlesql:googlesql-client:$(pom_version)",
+    pom_template = "//tools:pom-template.xml",
+    exports = [
+        ":analyzer",
+        ":channel_provider",
+        ":client",
+        ":debug_printable_node",
+    ] + BUILTIN_PROTO_DEPS,
+)
+
+java_export(
+    name = "types_export",
+    maven_coordinates = "com.google.googlesql:googlesql-types:$(pom_version)",
+    pom_template = "//tools:pom-template.xml",
+    exports = [
+        ":types",
+        ":types_proto_resources",
+    ] + BUILTIN_PROTO_DEPS,
+)
+
+java_export(
+    name = "jni_channel_export",
+    maven_coordinates = "com.google.googlesql:googlesql-jni-channel:$(pom_version)",
+    pom_template = "//tools:pom-template.xml",
+    exports = [":jni_channel"],
+)
+
+java_export(
+    name = "jni_channel_linux_export",
+    maven_coordinates = "com.google.googlesql:googlesql-jni-channel-linux:$(pom_version)",
+    pom_template = "//tools:pom-template.xml",
+    exports = [":jni_channel_linux"],
+)
+
+java_export(
+    name = "jni_channel_darwin_export",
+    maven_coordinates = "com.google.googlesql:googlesql-jni-channel-darwin:$(pom_version)",
+    pom_template = "//tools:pom-template.xml",
+    exports = [":jni_channel_darwin"],
 )

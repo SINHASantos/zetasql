@@ -506,6 +506,134 @@ absl::Span<ExprArg* const> NewArrayExpr::mutable_elements() {
 }
 
 // -------------------------------------------------------
+// NewMapExpr
+// -------------------------------------------------------
+
+absl::StatusOr<std::unique_ptr<NewMapExpr>> NewMapExpr::Create(
+    const MapType* type, std::vector<std::unique_ptr<ValueExpr>> keys,
+    std::vector<std::unique_ptr<ValueExpr>> values) {
+  GOOGLESQL_RET_CHECK_EQ(keys.size(), values.size());
+  for (const auto& k : keys) {
+    GOOGLESQL_RET_CHECK(type->key_type()->Equals(k->output_type()));
+  }
+  for (const auto& v : values) {
+    GOOGLESQL_RET_CHECK(type->value_type()->Equals(v->output_type()));
+  }
+  std::vector<std::unique_ptr<ExprArg>> key_args =
+      MakeExprArgList(std::move(keys));
+  std::vector<std::unique_ptr<ExprArg>> value_args =
+      MakeExprArgList(std::move(values));
+  return absl::WrapUnique(
+      new NewMapExpr(type, std::move(key_args), std::move(value_args)));
+}
+
+absl::Status NewMapExpr::SetSchemasForEvaluation(
+    absl::Span<const TupleSchema* const> params_schemas) {
+  for (ExprArg* arg : mutable_keys()) {
+    GOOGLESQL_RETURN_IF_ERROR(
+        arg->mutable_value_expr()->SetSchemasForEvaluation(params_schemas));
+  }
+  for (ExprArg* arg : mutable_values()) {
+    GOOGLESQL_RETURN_IF_ERROR(
+        arg->mutable_value_expr()->SetSchemasForEvaluation(params_schemas));
+  }
+  return absl::OkStatus();
+}
+
+bool NewMapExpr::Eval(absl::Span<const TupleData* const> params,
+                      EvaluationContext* context, VirtualTupleSlot* result,
+                      absl::Status* status) const {
+  if (keys().size() != values().size()) {
+    *status = googlesql_base::InternalErrorBuilder()
+              << "NewMapExpr keys and values size mismatch: " << keys().size()
+              << " vs " << values().size();
+    return false;
+  }
+  int64_t total_bytes = 0;
+  std::vector<std::pair<Value, Value>> evaled_entries;
+  evaled_entries.reserve(keys().size());
+
+  for (size_t i = 0; i < keys().size(); ++i) {
+    Value key_val;
+    std::shared_ptr<TupleSlot::SharedProtoState> key_shared_state;
+    VirtualTupleSlot key_slot(&key_val, &key_shared_state);
+    if (!keys()[i]->value_expr()->Eval(params, context, &key_slot, status)) {
+      return false;
+    }
+
+    Value value_val;
+    std::shared_ptr<TupleSlot::SharedProtoState> value_shared_state;
+    VirtualTupleSlot value_slot(&value_val, &value_shared_state);
+    if (!values()[i]->value_expr()->Eval(params, context, &value_slot,
+                                         status)) {
+      return false;
+    }
+
+    total_bytes +=
+        key_val.physical_byte_size() + value_val.physical_byte_size();
+    if (total_bytes >= context->options().max_value_byte_size) {
+      *status = googlesql_base::OutOfRangeErrorBuilder()
+                << "Cannot construct MAP Value larger than "
+                << context->options().max_value_byte_size << " bytes";
+      return false;
+    }
+
+    evaled_entries.emplace_back(std::move(key_val), std::move(value_val));
+  }
+
+  auto map_val_or_status =
+      Value::MakeMap(output_type()->AsMap(), std::move(evaled_entries));
+  if (!map_val_or_status.ok()) {
+    *status = std::move(map_val_or_status).status();
+    return false;
+  }
+
+  result->SetValue(std::move(map_val_or_status).value());
+  return true;
+}
+
+std::string NewMapExpr::DebugInternal(const std::string& indent,
+                                      bool verbose) const {
+  std::string indent_child = indent + kIndentFork;
+  std::string result = absl::StrCat("NewMapExpr(", indent_child,
+                                    "type: ", output_type()->DebugString());
+  const size_t count = std::min(keys().size(), values().size());
+  for (size_t i = 0; i < count; ++i) {
+    absl::StrAppend(
+        &result, ",", indent_child, i,
+        " key: ", keys()[i]->DebugInternal(indent + kIndentSpace, verbose), ",",
+        indent_child, i,
+        " value: ", values()[i]->DebugInternal(indent + kIndentSpace, verbose));
+  }
+  absl::StrAppend(&result, ")");
+  return result;
+}
+
+NewMapExpr::NewMapExpr(const MapType* type,
+                       std::vector<std::unique_ptr<ExprArg>> keys,
+                       std::vector<std::unique_ptr<ExprArg>> values)
+    : ValueExpr(type) {
+  SetArgs<ExprArg>(kKey, std::move(keys));
+  SetArgs<ExprArg>(kValue, std::move(values));
+}
+
+absl::Span<const ExprArg* const> NewMapExpr::keys() const {
+  return GetArgs<ExprArg>(kKey);
+}
+
+absl::Span<ExprArg* const> NewMapExpr::mutable_keys() {
+  return GetMutableArgs<ExprArg>(kKey);
+}
+
+absl::Span<const ExprArg* const> NewMapExpr::values() const {
+  return GetArgs<ExprArg>(kValue);
+}
+
+absl::Span<ExprArg* const> NewMapExpr::mutable_values() {
+  return GetMutableArgs<ExprArg>(kValue);
+}
+
+// -------------------------------------------------------
 // ArrayNestExpr
 // -------------------------------------------------------
 
@@ -821,12 +949,17 @@ bool MeasureFieldValueExpr::Eval(absl::Span<const TupleData* const> params,
               << "Captured value for measure is not a struct";
     return false;
   }
-  Value field_value =
-      captured_values_as_struct_value.FindFieldByName(field_name());
+  auto field_value_or =
+      captured_values_as_struct_value.FindStructFieldByNameCaseInsensitive(
+          field_name());
+  if (!field_value_or.ok()) {
+    *status = field_value_or.status();
+    return false;
+  }
+  Value field_value = *std::move(field_value_or);
   if (!field_value.is_valid()) {
     *status = googlesql_base::InternalErrorBuilder()
-              << "Captured value for measure does not have field "
-              << field_name();
+              << "Field value is invalid for " << field_name();
     return false;
   }
   result->SetValueAndMaybeSharedProtoState(

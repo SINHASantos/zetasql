@@ -31,6 +31,7 @@
 #include "googlesql/parser/ast_node_kind.h"
 #include "googlesql/parser/parse_tree.h"
 #include "googlesql/parser/parse_tree_errors.h"
+#include "googlesql/parser/unparser.h"
 #include "googlesql/public/catalog.h"
 #include "googlesql/public/coercer.h"
 #include "googlesql/public/id_string.h"
@@ -241,6 +242,11 @@ absl::Status Resolver::ResolveAlterActions(
              << "ALTER " << alter_statement_kind << " does not support "
              << action->GetSQLForAlterAction();
     }
+    if (action->node_kind() == AST_SET_CONDITION_ACTION &&
+        ast_statement->node_kind() != AST_ALTER_DATA_POLICY_STATEMENT) {
+      return MakeSqlErrorAt(action) << "ALTER " << alter_statement_kind
+                                    << " does not support SET CONDITION";
+    }
     switch (action->node_kind()) {
       case AST_SET_OPTIONS_ACTION: {
         std::vector<std::unique_ptr<const ResolvedOption>> resolved_options;
@@ -249,6 +255,32 @@ absl::Status Resolver::ResolveAlterActions(
             /*allow_alter_array_operators=*/true, &resolved_options));
         alter_actions->push_back(
             MakeResolvedSetOptionsAction(std::move(resolved_options)));
+      } break;
+      case AST_SET_CONDITION_ACTION: {
+        std::unique_ptr<const ResolvedExpr> resolved_expression;
+        ExprResolutionInfo expr_resolution_info(empty_name_scope_.get(),
+                                                "SET CONDITION");
+        googlesql_base::VarSetter<absl::string_view> disallow_params(
+            &disallowing_query_parameters_with_error_,
+            "Query parameters cannot be used inside SET CONDITION expression "
+            "of ALTER DATA_POLICY statement");
+        GOOGLESQL_RETURN_IF_ERROR(ResolveExpr(
+            action->GetAsOrDie<ASTSetConditionAction>()->condition(),
+            &expr_resolution_info, &resolved_expression));
+        if (resolved_expression->type() == nullptr ||
+            !resolved_expression->type()->IsBool()) {
+          return MakeSqlErrorAt(
+                     action->GetAsOrDie<ASTSetConditionAction>()->condition())
+                 << "SET CONDITION expression must be a boolean expression";
+        }
+        std::string expression_string;
+        parser::Unparser expression_unparser(&expression_string);
+        action->GetAsOrDie<ASTSetConditionAction>()->condition()->Accept(
+            &expression_unparser, /*data=*/nullptr);
+        expression_unparser.FlushLine();
+        absl::StripAsciiWhitespace(&expression_string);
+        alter_actions->push_back(MakeResolvedSetConditionAction(
+            std::move(resolved_expression), std::move(expression_string)));
       } break;
       case AST_ADD_CONSTRAINT_ACTION: {
         if (!is_if_exists) {
@@ -1671,6 +1703,28 @@ absl::Status Resolver::ResolveAlterSequenceStatement(
       output, &has_only_set_options_action, &resolved_alter_actions));
 
   *output = MakeResolvedAlterSequenceStmt(
+      ast_statement->path()->ToIdentifierVector(),
+      std::move(resolved_alter_actions), ast_statement->is_if_exists());
+  return absl::OkStatus();
+}
+
+absl::Status Resolver::ResolveAlterDataPolicyStatement(
+    const ASTAlterDataPolicyStatement* ast_statement,
+    std::unique_ptr<ResolvedStatement>* output) {
+  if (!language().LanguageFeatureEnabled(FEATURE_TAG_DATA_POLICY_DDL)) {
+    return MakeSqlErrorAt(ast_statement)
+           << "ALTER DATA_POLICY is not supported";
+  }
+  bool has_only_set_options_action = true;
+  std::vector<std::unique_ptr<const ResolvedAlterAction>>
+      resolved_alter_actions;
+  GOOGLESQL_RET_CHECK(ast_statement->path() != nullptr);
+  GOOGLESQL_RETURN_IF_ERROR(ResolveAlterActions(
+      ast_statement,
+      /*alter_statement_kind=*/"DATA_POLICY", /*column_name_list=*/nullptr,
+      output, &has_only_set_options_action, &resolved_alter_actions));
+
+  *output = MakeResolvedAlterDataPolicyStmt(
       ast_statement->path()->ToIdentifierVector(),
       std::move(resolved_alter_actions), ast_statement->is_if_exists());
   return absl::OkStatus();

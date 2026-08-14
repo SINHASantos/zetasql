@@ -151,6 +151,9 @@ std::string EnumType::ShortTypeName() const {
   } else if (enum_descriptor()->full_name() ==
              "googlesql.functions.NormalizeMode") {
     return "NORMALIZE_MODE";
+  } else if (enum_descriptor()->full_name() ==
+             "googlesql.functions.Endianness") {
+    return "ENDIANNESS";
   }
 
   std::string catalog_name_path;
@@ -273,6 +276,13 @@ absl::StatusOr<bool> EnumType::IsSupported(
                      Equivalent(types::BitwiseAggModeEnumType()) ||
                      Equivalent(rank_type_enum_type))) {
     return true;
+  }
+
+  GOOGLESQL_ASSIGN_OR_RETURN(const EnumType* endianness_enum_type,
+                   types::EndiannessEnumType());
+  if (is_opaque_ && Equivalent(endianness_enum_type)) {
+    return language_options.LanguageFeatureEnabled(
+        FEATURE_BIT_CAST_BYTES_FUNCTIONS);
   }
 
   if (Equivalent(types::RangeSessionizeModeEnumType())) {

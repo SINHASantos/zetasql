@@ -72,6 +72,7 @@ cc_test(
         "//googlesql/base/testing:googlesql_gtest_main",
         "//googlesql/base/testing:status_matchers",
         "//googlesql/parser",
+        "//googlesql/parser:ast_enums_cc_proto",
         "//googlesql/parser:parser_mode",
         "//googlesql/public:language_options",
         "@com_google_absl//absl/status",

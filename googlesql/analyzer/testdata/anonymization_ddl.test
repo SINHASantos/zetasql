@@ -199,6 +199,7 @@ CreateTableFunctionStmt
 |         +-anon_count#2 := AggregateFunctionCall(GoogleSQL:$anon_count_star(optional(0) INT64, optional(0) INT64) -> INT64)(parse_location=66-76)
 +-output_column_list=
   +-$aggregate.anon_count#2 AS anon_count [INT64]
+
 [REPLACED_LITERALS]
 CREATE TABLE FUNCTION foo_tvf(table_arg table<a int64>) AS
 SELECT anon_count(*) AS anon_count
@@ -211,6 +212,7 @@ FROM table_arg;
 ALTERNATION GROUP: ANY TABLE
 --
 CreateTableFunctionStmt(parse_location=22-29, name_path=foo_tvf, argument_name_list=[table_arg], signature=(ANY TABLE table_arg) -> ANY TABLE, language="SQL", code="SELECT anon_count(*) AS anon_count\nFROM table_arg")
+
 [REPLACED_LITERALS]
 CREATE TABLE FUNCTION foo_tvf(table_arg ANY TABLE) AS
 SELECT anon_count(*) AS anon_count
@@ -327,6 +329,7 @@ CreateTableFunctionStmt
 |           +-ArgumentRef(parse_location=168-169, type=INT64, name="k")
 +-output_column_list=
   +-$aggregate.anon_count#2 AS anon_count [INT64]
+
 [REPLACED_LITERALS]
 CREATE TABLE FUNCTION foo_tvf(table_arg table<a int64>,
                               e DOUBLE, k INT64) AS
@@ -341,6 +344,7 @@ FROM table_arg
 ALTERNATION GROUP: ANY TABLE
 --
 CreateTableFunctionStmt(parse_location=22-29, name_path=foo_tvf, argument_name_list=[table_arg, e, k], signature=(ANY TABLE table_arg, DOUBLE e, INT64 k) -> ANY TABLE, language="SQL", code="SELECT WITH ANONYMIZATION OPTIONS(epsilon=(e), k_threshold=(k))\n    anon_count(*) AS anon_count\nFROM table_arg")
+
 [REPLACED_LITERALS]
 CREATE TABLE FUNCTION foo_tvf(table_arg ANY TABLE,
                               e DOUBLE, k INT64) AS
@@ -413,6 +417,7 @@ CreateTableFunctionStmt
 |           +-ArgumentRef(parse_location=168-169, type=INT64, name="k")
 +-output_column_list=
   +-$aggregate.anon_count#14 AS anon_count [INT64]
+
 [REPLACED_LITERALS]
 CREATE TABLE FUNCTION foo_tvf(table_arg table<a int64>,
                               e DOUBLE, k INT64) AS
@@ -427,6 +432,7 @@ FROM table_arg JOIN SimpleTypesWithAnonymizationUid t ON (table_arg.a = t.uid)
 ALTERNATION GROUP: ANY TABLE
 --
 CreateTableFunctionStmt(parse_location=22-29, name_path=foo_tvf, argument_name_list=[table_arg, e, k], signature=(ANY TABLE table_arg, DOUBLE e, INT64 k) -> ANY TABLE, language="SQL", code="SELECT WITH ANONYMIZATION OPTIONS(epsilon=(e), k_threshold=(k))\n    anon_count(*) AS anon_count\nFROM table_arg JOIN SimpleTypesWithAnonymizationUid t ON (table_arg.a = t.uid)")
+
 [REPLACED_LITERALS]
 CREATE TABLE FUNCTION foo_tvf(table_arg ANY TABLE,
                               e DOUBLE, k INT64) AS

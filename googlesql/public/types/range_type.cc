@@ -162,7 +162,7 @@ absl::HashState RangeType::HashValueContent(const ValueContent& value,
   const internal::ValueContentOrderedList* container =
       value.GetAs<internal::ValueContentOrderedListRef*>()->value();
   ABSL_DCHECK_EQ(container->num_elements(), 2);
-  NullableValueContentHasher hasher(element_type());
+  NullableValueContentHasher</*ignore_floats=*/false> hasher(element_type());
   const internal::NullableValueContent& start = container->element(0);
   result = absl::HashState::combine(std::move(result), hasher(start));
   const internal::NullableValueContent& end = container->element(1);

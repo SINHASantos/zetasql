@@ -36,6 +36,7 @@
 #include "googlesql/public/types/collation.h"
 #include "googlesql/public/types/container_type.h"
 #include "googlesql/public/types/list_backed_type.h"
+#include "googlesql/public/types/map_type.h"
 #include "googlesql/public/types/struct_type.h"
 #include "googlesql/public/types/type.h"
 #include "googlesql/public/types/type_modifiers.h"
@@ -44,6 +45,7 @@
 #include "googlesql/public/value.pb.h"
 #include "googlesql/public/value_content.h"
 #include "absl/base/attributes.h"
+#include "absl/container/inlined_vector.h"
 #include "absl/hash/hash.h"
 #include "absl/status/status.h"
 #include "googlesql/base/status_macros.h"
@@ -54,89 +56,6 @@
 
 namespace googlesql {
 
-struct HashableValueContentContainerElementIgnoringFloat {
-  explicit HashableValueContentContainerElementIgnoringFloat(
-      const internal::NullableValueContent element, const Type* type)
-      : element(element), type(type) {}
-  const internal::NullableValueContent element;
-  const Type* type;
-
-  template <typename H>
-  H Hash(H h) const {
-    type->HashValueContent(element.value_content(),
-                           absl::HashState::Create(&h));
-    return h;
-  }
-
-  template <typename H>
-  friend H AbslHashValue(
-      H h, const HashableValueContentContainerElementIgnoringFloat& v) {
-    const bool is_null = v.element.is_null();
-    if (is_null) {
-      return H::combine(std::move(h), is_null);
-    }
-    switch (v.type->kind()) {
-      case TYPE_FLOAT:
-        h = H::combine(std::move(h), TYPE_FLOAT);
-        break;
-      case TYPE_DOUBLE:
-        h = H::combine(std::move(h), TYPE_DOUBLE);
-        break;
-      case TYPE_ARRAY: {
-        // TODO: we should use H::combine_unordered instead of summing the
-        // hashes of elements.
-        absl::Hash<HashableValueContentContainerElementIgnoringFloat>
-            element_hasher;
-        size_t combined_hash = 1;
-        const internal::ValueContentOrderedList* container =
-            v.element.value_content()
-                .GetAs<internal::ValueContentOrderedListRef*>()
-                ->value();
-        for (int i = 0; i < container->num_elements(); i++) {
-          const Type* element_type = v.type->AsArray()->element_type();
-          combined_hash +=
-              element_hasher(HashableValueContentContainerElementIgnoringFloat(
-                  container->element(i), element_type));
-        }
-        h = H::combine(std::move(h), combined_hash, container->num_elements(),
-                       TYPE_ARRAY);
-        break;
-      }
-      case TYPE_STRUCT: {
-        const internal::ValueContentOrderedList* container =
-            v.element.value_content()
-                .GetAs<internal::ValueContentOrderedListRef*>()
-                ->value();
-        absl::Hash<HashableValueContentContainerElementIgnoringFloat>
-            field_hasher;
-        for (int i = 0; i < container->num_elements(); i++) {
-          const StructType* struct_type = v.type->AsStruct();
-          const Type* field_type = struct_type->field(i).type;
-          h = H::combine(
-              std::move(h),
-              field_hasher(HashableValueContentContainerElementIgnoringFloat(
-                  container->element(i), field_type)));
-        }
-        h = H::combine(std::move(h), container->num_elements(), TYPE_STRUCT);
-        break;
-      }
-      case TYPE_PROTO: {
-        bool has_floating_point_fields = v.type->HasFloatingPointFields();
-        if (has_floating_point_fields) {
-          h = H::combine(std::move(h), TYPE_PROTO, has_floating_point_fields);
-          break;
-        }
-        h = H::combine(std::move(h), has_floating_point_fields);
-        ABSL_FALLTHROUGH_INTENDED;
-      }
-      default:
-        h = v.Hash(std::move(h));
-        break;
-    }
-    return H::combine(std::move(h), is_null);
-  }
-};
-
 // Hasher used by EqualElementMultiSet in tests only.
 struct MultisetValueContentContainerElementHasher {
   explicit MultisetValueContentContainerElementHasher(
@@ -145,11 +64,13 @@ struct MultisetValueContentContainerElementHasher {
 
   size_t operator()(const internal::NullableValueContent& x) const {
     if (!float_margin.IsExactEquality()) {
-      return absl::Hash<HashableValueContentContainerElementIgnoringFloat>()(
-          HashableValueContentContainerElementIgnoringFloat(x, type));
+      return absl::HashOf(
+          ListBackedType::HashableNullableValueContent</*ignore_floats=*/true>{
+              x, type});
     }
-    return absl::Hash<ListBackedType::HashableNullableValueContent>()(
-        ListBackedType::HashableNullableValueContent{x, type});
+    return absl::HashOf(
+        ListBackedType::HashableNullableValueContent</*ignore_floats=*/false>{
+            x, type});
   }
 
  private:
@@ -358,21 +279,32 @@ absl::HashState ArrayType::HashTypeParameter(absl::HashState state) const {
   return element_type()->Hash(std::move(state));
 }
 
-absl::HashState ArrayType::HashValueContent(const ValueContent& value,
-                                            absl::HashState state) const {
+template <typename H>
+static absl::HashState HashValueContentForArray(const ValueContent& value,
+                                                absl::HashState state,
+                                                const Type* element_type) {
   const internal::ValueContentOrderedList* container =
       value.GetAs<internal::ValueContentOrderedListRef*>()->value();
-  // We must hash arrays as if unordered to support hash_map and hash_set of
-  // values containing arrays with order_kind()=kIgnoresOrder.
-  // absl::Hash lacks support for unordered containers, so we create a
-  // cheapo solution of just adding the hashcodes.
-  size_t combined_hash = 1;
+  absl::InlinedVector<size_t, 16> hashes;
+  hashes.reserve(container->num_elements());
   for (int i = 0; i < container->num_elements(); i++) {
-    NullableValueContentHasher hasher(element_type());
-    combined_hash += hasher(container->element(i));
+    hashes.push_back(absl::HashOf(H{container->element(i), element_type}));
   }
-  return absl::HashState::combine(std::move(state), combined_hash,
-                                  container->num_elements());
+  return absl::HashState::combine_unordered(std::move(state), hashes.begin(),
+                                            hashes.end());
+}
+
+absl::HashState ArrayType::HashValueContent(const ValueContent& value,
+                                            absl::HashState state) const {
+  return HashValueContentForArray<
+      HashableNullableValueContent</*ignore_floats=*/false>>(
+      value, std::move(state), element_type());
+}
+
+absl::HashState ArrayType::HashValueContentIgnoringFloat(
+    const ValueContent& value, absl::HashState state) const {
+  return HashValueContentForArray<HashableNullableValueContent<
+      /*ignore_floats=*/true>>(value, std::move(state), element_type());
 }
 
 // Compares arrays as multisets. Used in tests only. The current algorithm,

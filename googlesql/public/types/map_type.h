@@ -133,6 +133,8 @@ class MapType : public ContainerType {
   absl::HashState HashTypeParameter(absl::HashState state) const override;
   absl::HashState HashValueContent(const ValueContent& value,
                                    absl::HashState state) const override;
+  absl::HashState HashValueContentIgnoringFloat(
+      const ValueContent& value, absl::HashState state) const override;
   std::string FormatValueContent(
       const ValueContent& value,
       const FormatValueContentOptions& options) const override;
@@ -170,7 +172,6 @@ class MapType : public ContainerType {
       const internal::ValueContentMap* value_content_map,
       const FormatValueContentOptions& options, std::string* result) const;
 
-  struct ValueContentMapElementHasher;
   const Type* const key_type_;
   const Type* const value_type_;
 

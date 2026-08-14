@@ -1336,7 +1336,7 @@ QueryStmt
     |       +-ProjectScan
     |         +-column_list=[NullarySelect.a#13]
     |         +-input_scan=
-    |           +-TVFScan(column_list=[NullarySelect.a#13], tvf=NullarySelect(() -> TABLE<a INT64, b INT64>), signature=() -> TABLE<a INT64, b INT64>, column_index_list=[0], function_call_signature=() -> TABLE<a INT64, b INT64>)
+    |           +-TVFScan(column_list=[NullarySelect.a#13], tvf=NullarySelect, signature=() -> TABLE<a INT64, b INT64>, column_index_list=[0], function_call_signature=() -> TABLE<a INT64, b INT64>)
     +-input_scan=
       +-AggregateScan
         +-column_list=[$expr_subquery.$group_rows_subquery#12]
@@ -1357,7 +1357,6 @@ QueryStmt
                         +-key#9 := ColumnRef(type=INT32, column=TestTable.key#1)
                         +-TestEnum#10 := ColumnRef(type=ENUM<googlesql_test.TestEnum>, column=TestTable.TestEnum#2)
                         +-KitchenSink#11 := ColumnRef(type=PROTO<googlesql_test.KitchenSinkPB>, column=TestTable.KitchenSink#3)
-
 
 [REWRITTEN AST]
 QueryStmt
@@ -1883,7 +1882,6 @@ QueryStmt
                           +-input_column_list=
                             +-key#13 := ColumnRef(type=INT32, column=$groupby.key#8)
                             +-_0#14 := ColumnRef(type=INT64, column=$pivot._0#9)
-
 
 [REWRITTEN AST]
 QueryStmt

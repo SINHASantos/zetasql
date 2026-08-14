@@ -313,7 +313,7 @@ QueryStmt
     |   +-FunctionCall(Templated_SQL_Function:udf_templated_typeof_function(BYTES) -> STRING)
     |     +-ColumnRef(type=BYTES, column=tvf_no_args.column_bytes#2)
     +-input_scan=
-      +-TVFScan(column_list=[tvf_no_args.column_bytes#2], tvf=tvf_no_args(() -> TABLE<column_bool BOOL, column_bytes BYTES>), signature=() -> TABLE<column_bool BOOL, column_bytes BYTES>, column_index_list=[1], function_call_signature=() -> TABLE<column_bool BOOL, column_bytes BYTES>)
+      +-TVFScan(column_list=[tvf_no_args.column_bytes#2], tvf=tvf_no_args, signature=() -> TABLE<column_bool BOOL, column_bytes BYTES>, column_index_list=[1], function_call_signature=() -> TABLE<column_bool BOOL, column_bytes BYTES>)
 
 With Templated SQL function call:
   Templated_SQL_Function:udf_templated_typeof_function(BYTES) -> STRING
@@ -333,7 +333,7 @@ QueryStmt
     |   +-FunctionCall(Templated_SQL_Function:udf_templated_typeof_function(BYTES) -> STRING)
     |     +-ColumnRef(type=BYTES, column=tvf_no_args.column_bytes#2)
     +-input_scan=
-      +-TVFScan(column_list=[tvf_no_args.column_bytes#2], tvf=tvf_no_args(() -> TABLE<column_bool BOOL, column_bytes BYTES>), signature=() -> TABLE<column_bool BOOL, column_bytes BYTES>, column_index_list=[1], function_call_signature=() -> TABLE<column_bool BOOL, column_bytes BYTES>)
+      +-TVFScan(column_list=[tvf_no_args.column_bytes#2], tvf=tvf_no_args, signature=() -> TABLE<column_bool BOOL, column_bytes BYTES>, column_index_list=[1], function_call_signature=() -> TABLE<column_bool BOOL, column_bytes BYTES>)
 
 With Templated SQL function call:
   Templated_SQL_Function:udf_templated_typeof_function(BYTES) -> STRING
@@ -362,7 +362,7 @@ QueryStmt
     |   +-FunctionCall(Templated_SQL_Function:udf_templated_typeof_function(INT64) -> STRING)
     |     +-ColumnRef(type=INT64, column=tvf_templated_select_one.x#1)
     +-input_scan=
-      +-TVFScan(column_list=[tvf_templated_select_one.x#1], tvf=tvf_templated_select_one(() -> ANY TABLE), signature=() -> TABLE<x INT64>, column_index_list=[0], function_call_signature=() -> ANY TABLE)
+      +-TVFScan(column_list=[tvf_templated_select_one.x#1], tvf=tvf_templated_select_one, signature=() -> TABLE<x INT64>, column_index_list=[0], function_call_signature=() -> ANY TABLE)
 
 With Templated SQL function call:
   Templated_SQL_Function:udf_templated_typeof_function(INT64) -> STRING
@@ -396,7 +396,7 @@ QueryStmt
     |   +-FunctionCall(Templated_SQL_Function:udf_templated_typeof_function(INT64) -> STRING)
     |     +-ColumnRef(type=INT64, column=tvf_templated_select_one.x#1)
     +-input_scan=
-      +-TVFScan(column_list=[tvf_templated_select_one.x#1], tvf=tvf_templated_select_one(() -> ANY TABLE), signature=() -> TABLE<x INT64>, column_index_list=[0], function_call_signature=() -> ANY TABLE)
+      +-TVFScan(column_list=[tvf_templated_select_one.x#1], tvf=tvf_templated_select_one, signature=() -> TABLE<x INT64>, column_index_list=[0], function_call_signature=() -> ANY TABLE)
 
 With Templated SQL function call:
   Templated_SQL_Function:udf_templated_typeof_function(INT64) -> STRING
@@ -435,7 +435,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=[tvf_templated_select_typeof_function.col#1]
-        +-tvf=tvf_templated_select_typeof_function((ANY TYPE) -> ANY TABLE)
+        +-tvf=tvf_templated_select_typeof_function
         +-signature=(literal INT64) -> TABLE<col STRING>
         +-argument_list=
         | +-FunctionArgument
@@ -470,7 +470,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=[tvf_templated_select_typeof_function.col#1]
-        +-tvf=tvf_templated_select_typeof_function((ANY TYPE) -> ANY TABLE)
+        +-tvf=tvf_templated_select_typeof_function
         +-signature=(literal INT64) -> TABLE<col STRING>
         +-argument_list=
         | +-FunctionArgument
@@ -524,7 +524,7 @@ QueryStmt
         +-input_scan=
         | +-TVFScan
         |   +-column_list=[tvf_templated_select_typeof_function_with_anonymization_info.value#2]
-        |   +-tvf=tvf_templated_select_typeof_function_with_anonymization_info((ANY TYPE) -> ANY TABLE)
+        |   +-tvf=tvf_templated_select_typeof_function_with_anonymization_info
         |   +-signature=(literal STRING) -> TABLE<user_id INT64, value STRING>
         |   +-argument_list=
         |   | +-FunctionArgument
@@ -577,7 +577,7 @@ QueryStmt
         |   +-input_scan=
         |   | +-TVFScan
         |   |   +-column_list=tvf_templated_select_typeof_function_with_anonymization_info.[user_id#5, value#2]
-        |   |   +-tvf=tvf_templated_select_typeof_function_with_anonymization_info((ANY TYPE) -> ANY TABLE)
+        |   |   +-tvf=tvf_templated_select_typeof_function_with_anonymization_info
         |   |   +-signature=(literal STRING) -> TABLE<user_id INT64, value STRING>
         |   |   +-argument_list=
         |   |   | +-FunctionArgument
@@ -643,7 +643,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=[tvf_templated_select_nested_typeof_function.col#1]
-        +-tvf=tvf_templated_select_nested_typeof_function((ANY TYPE) -> ANY TABLE)
+        +-tvf=tvf_templated_select_nested_typeof_function
         +-signature=(literal STRING) -> TABLE<col STRING>
         +-argument_list=
         | +-FunctionArgument
@@ -664,7 +664,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=[tvf_templated_select_typeof_function.col#1]
-        +-tvf=tvf_templated_select_typeof_function((ANY TYPE) -> ANY TABLE)
+        +-tvf=tvf_templated_select_typeof_function
         +-signature=(STRING) -> TABLE<col STRING>
         +-argument_list=
         | +-FunctionArgument
@@ -699,7 +699,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=[tvf_templated_select_nested_typeof_function.col#1]
-        +-tvf=tvf_templated_select_nested_typeof_function((ANY TYPE) -> ANY TABLE)
+        +-tvf=tvf_templated_select_nested_typeof_function
         +-signature=(literal STRING) -> TABLE<col STRING>
         +-argument_list=
         | +-FunctionArgument
@@ -720,7 +720,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=[tvf_templated_select_typeof_function.col#1]
-        +-tvf=tvf_templated_select_typeof_function((ANY TYPE) -> ANY TABLE)
+        +-tvf=tvf_templated_select_typeof_function
         +-signature=(STRING) -> TABLE<col STRING>
         +-argument_list=
         | +-FunctionArgument
@@ -838,7 +838,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=tvf_templated_select_array_max_function.[first_two_elements#2, next_two_elements#3]
-        +-tvf=tvf_templated_select_array_max_function((ANY TABLE, ANY TYPE) -> ANY TABLE)
+        +-tvf=tvf_templated_select_array_max_function
         +-signature=(TABLE<array_col ARRAY<INT64>>, literal INT64) -> TABLE<first_two_elements ARRAY<INT64>, next_two_elements ARRAY<INT64>>
         +-argument_list=
         | +-FunctionArgument
@@ -916,7 +916,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=tvf_templated_select_array_max_function.[first_two_elements#2, next_two_elements#3]
-        +-tvf=tvf_templated_select_array_max_function((ANY TABLE, ANY TYPE) -> ANY TABLE)
+        +-tvf=tvf_templated_select_array_max_function
         +-signature=(TABLE<array_col ARRAY<INT64>>, literal INT64) -> TABLE<first_two_elements ARRAY<INT64>, next_two_elements ARRAY<INT64>>
         +-argument_list=
         | +-FunctionArgument

@@ -21,6 +21,7 @@ import static com.google.common.collect.ImmutableList.toImmutableList;
 
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
+import com.google.protos.googlesql.VectorEncodingId;
 import com.google.googlesql.GoogleSQLTypeParameters.ExtendedTypeParametersProto;
 import com.google.googlesql.GoogleSQLTypeParameters.NumericTypeParametersProto;
 import com.google.googlesql.GoogleSQLTypeParameters.StringTypeParametersProto;
@@ -272,7 +273,12 @@ public final class TypeParameters implements Serializable {
   }
 
   private static String vectorTypeParametersDebugString(VectorTypeParametersProto parameters) {
-    return "(length=" + parameters.getLength() + ")";
+    String encodingStr =
+        parameters.hasEncoding()
+                && parameters.getEncoding() != VectorEncodingId.Id.UNKNOWN_VECTOR_ENCODING
+            ? ", encoding=" + parameters.getEncoding().name()
+            : "";
+    return "(length=" + parameters.getLength() + encodingStr + ")";
   }
 
   private static String extendedTypeParametersDebugString() {
@@ -327,6 +333,16 @@ public final class TypeParameters implements Serializable {
       long length = proto.getLength();
       Preconditions.checkArgument(
           length > 0, "length must be larger than 0, actual length: %s", String.valueOf(length));
+    }
+    if (proto.hasEncoding()) {
+      Preconditions.checkArgument(
+          proto.getEncoding() != VectorEncodingId.Id.UNKNOWN_VECTOR_ENCODING,
+          "Unrecognized VECTOR encoding: \"%s\"",
+          proto.getEncoding());
+      Preconditions.checkArgument(
+          proto.getEncoding() != VectorEncodingId.Id.UNRECOGNIZED,
+          "Unrecognized VECTOR encoding: \"%s\"",
+          proto.getEncoding());
     }
   }
 

@@ -17,13 +17,16 @@
 #include "googlesql/analyzer/rewriters/measure_source_scan_rewrite_util.h"
 
 #include <algorithm>
+#include <cstddef>
+#include <iterator>
 #include <memory>
-#include <optional>
 #include <string>
 #include <utility>
 #include <vector>
 
+#include "googlesql/analyzer/rewriters/measure_closure_builder.h"
 #include "googlesql/analyzer/rewriters/measure_collector.h"
+#include "googlesql/analyzer/rewriters/measure_dependency_graph.h"
 #include "googlesql/public/catalog.h"
 #include "googlesql/public/types/measure_type.h"
 #include "googlesql/public/types/struct_type.h"
@@ -45,110 +48,15 @@
 #include "googlesql/base/status_macros.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
-#include "absl/strings/string_view.h"
-#include "absl/types/span.h"
 #include "googlesql/base/ret_check.h"
 
 namespace googlesql {
 
-using NameToResolvedColumn =
-    absl::flat_hash_map<std::string, ResolvedColumn,
-                        googlesql_base::StringViewCaseHash,
-                        googlesql_base::StringViewCaseEqual>;
-using CaseInsensitiveStringSet =
-    absl::flat_hash_set<std::string, googlesql_base::StringViewCaseHash,
-                        googlesql_base::StringViewCaseEqual>;
+namespace {
 
-static constexpr char kReferencedColumnsFieldName[] = "referenced_columns";
-static constexpr char kKeyColumnsFieldName[] = "key_columns";
+/* Measure source column helper structures */
 
-class ExpressionColumnNameCollector : public ResolvedASTVisitor {
- public:
-  static absl::StatusOr<CaseInsensitiveStringSet> GetExpressionColumnNames(
-      const ResolvedExpr* expr) {
-    ExpressionColumnNameCollector collector;
-    GOOGLESQL_RETURN_IF_ERROR(expr->Accept(&collector));
-    return collector.column_names_;
-  }
-
-  absl::Status VisitResolvedExpressionColumn(
-      const ResolvedExpressionColumn* node) override {
-    column_names_.insert(node->name());
-    return absl::OkStatus();
-  }
-
- private:
-  CaseInsensitiveStringSet column_names_;
-};
-
-absl::StatusOr<CaseInsensitiveStringSet> GetExpressionColumnNames(
-    const ResolvedExpr* expr) {
-  return ExpressionColumnNameCollector::GetExpressionColumnNames(expr);
-}
-
-absl::StatusOr<std::vector<int>> GetRowIdentityColumnIndices(
-    const Column* column, const Table* table) {
-  GOOGLESQL_RET_CHECK(column->GetExpression().has_value());
-  if (std::optional<std::vector<int>> column_level_row_identity_columns =
-          column->GetExpression()->RowIdentityColumns();
-      column_level_row_identity_columns.has_value()) {
-    return *column_level_row_identity_columns;
-  }
-  return table->RowIdentityColumns().value_or(std::vector<int>{});
-}
-
-absl::StatusOr<const StructType*> BuildClosureType(const Column* measure_column,
-                                                   const Table* table,
-                                                   TypeFactory& type_factory) {
-  GOOGLESQL_RET_CHECK(measure_column->HasMeasureExpression() &&
-            measure_column->GetExpression()->HasResolvedExpression());
-  const ResolvedExpr* measure_expr =
-      measure_column->GetExpression()->GetResolvedExpression();
-
-  GOOGLESQL_ASSIGN_OR_RETURN(CaseInsensitiveStringSet referenced_column_names,
-                   GetExpressionColumnNames(measure_expr));
-
-  GOOGLESQL_ASSIGN_OR_RETURN(std::vector<int> row_identity_column_indices,
-                   GetRowIdentityColumnIndices(measure_column, table));
-  GOOGLESQL_RET_CHECK(!row_identity_column_indices.empty());
-  absl::c_sort(row_identity_column_indices);
-
-  // Build referenced_columns struct type
-  std::vector<StructType::StructField> ref_fields;
-  for (int table_col_idx = 0; table_col_idx < table->NumColumns();
-       ++table_col_idx) {
-    const Column* column = table->GetColumn(table_col_idx);
-    if (referenced_column_names.contains(column->Name())) {
-      ref_fields.push_back(
-          StructType::StructField(column->Name(), column->GetType()));
-    }
-  }
-  const StructType* ref_struct_type = nullptr;
-  GOOGLESQL_RETURN_IF_ERROR(type_factory.MakeStructType(ref_fields, &ref_struct_type));
-
-  // Build key_columns struct type
-  std::vector<StructType::StructField> key_fields;
-  key_fields.reserve(row_identity_column_indices.size());
-  for (int row_id_col_idx : row_identity_column_indices) {
-    const Column* column = table->GetColumn(row_id_col_idx);
-    key_fields.push_back(
-        StructType::StructField(column->Name(), column->GetType()));
-  }
-  const StructType* key_struct_type = nullptr;
-  GOOGLESQL_RETURN_IF_ERROR(type_factory.MakeStructType(key_fields, &key_struct_type));
-
-  // Build wrapping struct type
-  std::vector<StructType::StructField> wrapping_fields = {
-      {kReferencedColumnsFieldName, ref_struct_type},
-      {kKeyColumnsFieldName, key_struct_type}};
-  const StructType* wrapping_struct_type = nullptr;
-  GOOGLESQL_RETURN_IF_ERROR(
-      type_factory.MakeStructType(wrapping_fields, &wrapping_struct_type));
-
-  return wrapping_struct_type;
-}
-
-// Provides scan-type-specific information for measure source scans.
+// Traits to extract the catalog Table from different scan types.
 template <typename ScanType>
 struct MeasureSourceTraits {};
 
@@ -166,105 +74,267 @@ struct MeasureSourceTraits<ResolvedTVFScan> {
   }
 };
 
-
-
-// Holds information about a measure source column.
-struct MeasureSourceInfo {
-  // The measure column from table scan's column_list.
-  ResolvedColumn measure_col;
-
-  // The measure expression of `measure_col` from catalog.
-  const ResolvedExpr* measure_expr;
-
-  // The set of column names referenced in `measure_expr`.
-  CaseInsensitiveStringSet referenced_column_names;
-
-  // The row identity column indices for this measure source column.
-  std::vector<int> row_identity_column_indices;
-};
-
-static absl::StatusOr<int> FindColumnIndex(const Table* table,
-                                           absl::string_view name) {
-  const Column* target_col = table->FindColumnByName(std::string(name));
-  GOOGLESQL_RET_CHECK(target_col != nullptr) << "Cannot find column: " << name;
-  for (int i = 0; i < table->NumColumns(); ++i) {
-    if (table->GetColumn(i) == target_col) {
-      return i;
+// Registers the catalog metadata of all measures in `graph` with
+// `measure_collector`.
+//
+// Input:
+// - `graph`: The measure dependency graph.
+// - `table`: The catalog table.
+// - `closure_types`: Map of measure name to its closure struct type.
+// - `measure_collector`: The collector to register the metadata with.
+//   The collector is mutated to register the `MeasureInfo`s.
+absl::Status RegisterCatalogMeasureInfos(
+    const MeasureGraph& graph, const Table& table,
+    const CaseInsensitiveMap<const StructType*>& closure_types,
+    MeasureCollector& measure_collector) {
+  for (const MeasureGraph::Node* node : graph.nodes()) {
+    absl::btree_set<std::string, googlesql_base::CaseLess>
+        row_identity_column_names;
+    for (int idx : node->row_identity_column_indices) {
+      row_identity_column_names.insert(table.GetColumn(idx)->Name());
     }
+
+    auto closure_type_it = closure_types.find(node->name);
+    GOOGLESQL_RET_CHECK(closure_type_it != closure_types.end());
+    const StructType* closure_struct_type = closure_type_it->second;
+    GOOGLESQL_RET_CHECK(closure_struct_type != nullptr);
+    MeasureInfo measure_info = {
+        .measure_expr = node->def_expr,
+        .row_identity_column_names = std::move(row_identity_column_names),
+        .closure_struct_type = closure_struct_type,
+    };
+    GOOGLESQL_RETURN_IF_ERROR(
+        measure_collector.AddMeasureInfo(node->measure_type, measure_info));
+    measure_collector.MarkAgged(node->measure_type);
   }
-  GOOGLESQL_RET_CHECK_FAIL() << "Column " << name << " not found in table columns";
+  return absl::OkStatus();
 }
 
-// Builds the closure struct type for all measure columns on the scan.
-// The closure struct type has two fields:
-// 1. `referenced_columns`: A STRUCT containing all columns referenced by
-//    measure expressions on the scan.
-// 2. `key_columns`: A STRUCT containing row identity columns of the table.
-static absl::StatusOr<const StructType*> BuildSharedClosureType(
-    absl::Span<const MeasureSourceInfo> measure_infos, const Table* table,
-    TypeFactory& type_factory) {
-  absl::btree_set<std::string, googlesql_base::CaseLess>
-      all_referenced_column_names;
-  absl::btree_set<int> all_row_identity_column_indices;
+// Represents a measure column projected by a source scan.
+struct ProjectedMeasure {
+  // The projected ResolvedColumn for the measure.
+  ResolvedColumn resolved_column;
+  // The catalog column for the measure.
+  const Column* catalog_column;
+  // The node in the measure dependency graph.
+  const MeasureGraph::Node* node;
+};
 
-  for (const auto& info : measure_infos) {
-    all_referenced_column_names.insert(info.referenced_column_names.begin(),
-                                       info.referenced_column_names.end());
-    all_row_identity_column_indices.insert(
-        info.row_identity_column_indices.begin(),
-        info.row_identity_column_indices.end());
+// Registers the resolved metadata of the projected measures with
+// `measure_collector`.
+//
+// Input:
+// - `projected_measures`: The list of projected measures.
+// - `measure_to_closure_col`: Map of measure name to its closure column.
+// - `measure_collector`: The collector to register the metadata with.
+//   The collector is mutated to add projected measure infos.
+absl::Status RegisterProjectedMeasureInfos(
+    absl::Span<const ProjectedMeasure> projected_measures,
+    const CaseInsensitiveMap<ResolvedColumn>& measure_to_closure_col,
+    MeasureCollector& measure_collector) {
+  for (const auto& pm : projected_measures) {
+    GOOGLESQL_ASSIGN_OR_RETURN(MeasureInfo catalog_info,
+                     measure_collector.GetMeasureInfo(pm.node->measure_type));
+
+    auto it = measure_to_closure_col.find(pm.node->name);
+    GOOGLESQL_RET_CHECK(it != measure_to_closure_col.end());
+    ResolvedColumn closure_col = it->second;
+
+    MeasureInfo projected_info = catalog_info;
+    projected_info.closure_column = MeasureInfo::ClosureColumn{
+        .closure_struct = closure_col,
+        .measure_source_column = pm.resolved_column,
+    };
+    projected_info.closure_struct_type = closure_col.type();
+
+    GOOGLESQL_RETURN_IF_ERROR(measure_collector.AddMeasureInfo(
+        pm.resolved_column.type()->AsMeasure(), projected_info));
+    measure_collector.MarkAgged(pm.resolved_column.type()->AsMeasure());
   }
+  return absl::OkStatus();
+}
 
-  // Build referenced_columns struct type
-  std::vector<StructType::StructField> ref_fields;
-  for (int table_col_idx = 0; table_col_idx < table->NumColumns();
-       ++table_col_idx) {
-    const Column* column = table->GetColumn(table_col_idx);
-    if (all_referenced_column_names.contains(column->Name())) {
-      ref_fields.push_back(
-          StructType::StructField(column->Name(), column->GetType()));
+bool HasAggedMeasure(const ResolvedScan& scan,
+                     const MeasureCollector& measure_collector) {
+  for (const ResolvedColumn& col : scan.column_list()) {
+    if (col.type()->IsMeasureType() &&
+        measure_collector.IsAgged(col.type()->AsMeasure())) {
+      return true;
     }
   }
-  const StructType* ref_struct_type = nullptr;
-  GOOGLESQL_RETURN_IF_ERROR(type_factory.MakeStructType(ref_fields, &ref_struct_type));
+  return false;
+}
 
-  // Build key_columns struct type
-  std::vector<StructType::StructField> key_fields;
-  key_fields.reserve(all_row_identity_column_indices.size());
-  for (int row_id_col_idx : all_row_identity_column_indices) {
-    const Column* column = table->GetColumn(row_id_col_idx);
-    key_fields.push_back(
-        StructType::StructField(column->Name(), column->GetType()));
+// Rebuilds the measure source `scan` by
+// - removing AGG'ed measure columns, and
+// - adding any missing non-measure columns that are transitively required by
+//   the measure expressions.
+//
+// Input:
+// - `scan`: The measure source scan to rebuild.
+// - `table`: The catalog table.
+// - `measure_collector`: Used to identify which measure columns are AGG'ed.
+// - `missing_non_measure_columns`: Contains the non-measure columns to be
+//   added.
+template <typename ScanType>
+absl::StatusOr<std::unique_ptr<const ScanType>> RebuildScan(
+    std::unique_ptr<const ScanType> scan, const Table& table,
+    const MeasureCollector& measure_collector,
+    const CaseInsensitiveMap<ResolvedColumn>& missing_non_measure_columns) {
+  GOOGLESQL_RET_CHECK(scan != nullptr);
+  struct IndexedColumn {
+    int index;
+    ResolvedColumn column;
+  };
+  std::vector<IndexedColumn> indexed_columns;
+  for (int i = 0; i < scan->column_list_size(); ++i) {
+    const ResolvedColumn& col = scan->column_list(i);
+    if (col.type()->IsMeasureType() &&
+        measure_collector.IsAgged(col.type()->AsMeasure())) {
+      continue;
+    }
+    indexed_columns.push_back(
+        IndexedColumn{.index = scan->column_index_list(i), .column = col});
   }
-  const StructType* key_struct_type = nullptr;
-  GOOGLESQL_RETURN_IF_ERROR(type_factory.MakeStructType(key_fields, &key_struct_type));
 
-  // Build wrapping struct type
-  std::vector<StructType::StructField> wrapping_fields = {
-      {kReferencedColumnsFieldName, ref_struct_type},
-      {kKeyColumnsFieldName, key_struct_type}};
-  const StructType* wrapping_struct_type = nullptr;
-  GOOGLESQL_RETURN_IF_ERROR(
-      type_factory.MakeStructType(wrapping_fields, &wrapping_struct_type));
+  for (int i = 0; i < table.NumColumns(); ++i) {
+    const Column* column = table.GetColumn(i);
+    if (missing_non_measure_columns.contains(column->Name())) {
+      indexed_columns.push_back(IndexedColumn{
+          .index = i,
+          .column = missing_non_measure_columns.at(column->Name())});
+    }
+  }
 
-  return wrapping_struct_type;
+  std::sort(indexed_columns.begin(), indexed_columns.end(),
+            [](const auto& a, const auto& b) { return a.index < b.index; });
+
+  ResolvedColumnList project_column_list;
+  project_column_list.reserve(indexed_columns.size());
+  std::vector<int> project_column_index_list;
+  project_column_index_list.reserve(indexed_columns.size());
+  for (const auto& item : indexed_columns) {
+    project_column_list.push_back(item.column);
+    project_column_index_list.push_back(item.index);
+  }
+
+  GOOGLESQL_ASSIGN_OR_RETURN(std::unique_ptr<const ScanType> rebuilt_scan,
+                   ToBuilder(std::move(scan))
+                       .set_column_list(project_column_list)
+                       .set_column_index_list(project_column_index_list)
+                       .Build());
+  return rebuilt_scan;
+}
+
+// Returns the set of columns that must be projected at each level of
+// ProjectScan.
+//
+// Input:
+// - `scan`: The measure source scan.
+// - `final_output_columns`: The set of columns that the final output scan
+//   should project.
+// - `closure_structs`: Lists the computed closure columns for each ProjectScan
+//   layer. This argument is consumed by the function.
+absl::StatusOr<std::vector<absl::flat_hash_set<ResolvedColumn>>>
+ComputeProjectScanOutputColumns(
+    const ResolvedScan& scan,
+    const absl::flat_hash_set<ResolvedColumn>& final_output_columns,
+    absl::Span<const ClosureLayer> closure_structs) {
+  std::vector<absl::flat_hash_set<ResolvedColumn>> alive_sets(
+      closure_structs.size());
+  absl::flat_hash_set<ResolvedColumn> current_alive_columns =
+      final_output_columns;
+
+  // Standard liveness analysis
+  // (https://en.wikipedia.org/wiki/Live-variable_analysis).
+  for (int i = static_cast<int>(closure_structs.size()) - 1; i >= 0; --i) {
+    const auto& level = closure_structs[i];
+    alive_sets[i] = current_alive_columns;
+    // Columns computed at this level are produced here, so they weren't alive
+    // before this level.
+    for (const auto& closure : level.computed_columns) {
+      current_alive_columns.erase(closure->column());
+    }
+    // Columns required as input for this level must be alive before this level.
+    for (const ResolvedColumn& dep : level.required_input_columns) {
+      current_alive_columns.insert(dep);
+    }
+  }
+
+  // The columns remaining after backpropagation must match the columns
+  // produced by the input scan.
+  absl::flat_hash_set<ResolvedColumn> rebuilt_scan_columns(
+      scan.column_list().begin(), scan.column_list().end());
+  GOOGLESQL_RET_CHECK(rebuilt_scan_columns == current_alive_columns)
+      << "Columns in rebuilt source scan do not match alive columns. "
+      << "Alive columns: " << current_alive_columns.size()
+      << ", Rebuilt scan columns: " << rebuilt_scan_columns.size();
+
+  return alive_sets;
+}
+
+// Projects closure struct columns on top of `scan` by wrapping it with layers
+// of `ResolvedProjectScan`s.
+//
+// The final ProjectScan will output columns in `final_output_columns`.
+//
+// Input:
+// - `scan`: The input scan to wrap. Must not be null.
+// - `final_output_columns`: The set of columns that the final output scan
+//   should project.
+// - `closure_structs`: Lists the computed closure columns for each topological
+//   level. This parameter is consumed by the function.
+absl::StatusOr<std::unique_ptr<const ResolvedScan>> ProjectClosureExpressions(
+    std::unique_ptr<const ResolvedScan> scan,
+    const absl::flat_hash_set<ResolvedColumn>& final_output_columns,
+    std::vector<ClosureLayer> closure_structs) {
+  GOOGLESQL_RET_CHECK(scan != nullptr);
+
+  GOOGLESQL_ASSIGN_OR_RETURN(
+      std::vector<absl::flat_hash_set<ResolvedColumn>> leveled_output_columns,
+      ComputeProjectScanOutputColumns(*scan, final_output_columns,
+                                      closure_structs));
+
+  // Construct the ProjectScans from bottom to top. Each ProjectScan only
+  // outputs the columns in `leveled_output_columns` at that level.
+  std::unique_ptr<const ResolvedScan> prev = std::move(scan);
+  for (size_t i = 0; i < closure_structs.size(); ++i) {
+    auto& level = closure_structs[i];
+    const auto& output_columns = leveled_output_columns[i];
+
+    ResolvedColumnList new_column_list;
+    absl::c_copy_if(prev->column_list(), std::back_inserter(new_column_list),
+                    [&output_columns](const ResolvedColumn& prev_col) {
+                      return output_columns.contains(prev_col);
+                    });
+    for (const auto& closure : level.computed_columns) {
+      // All computed closure columns are transitively needed, so they must be
+      // present in `output_columns`.
+      GOOGLESQL_RET_CHECK(output_columns.contains(closure->column()));
+      new_column_list.push_back(closure->column());
+    }
+
+    prev = MakeResolvedProjectScan(
+        new_column_list, std::move(level.computed_columns), std::move(prev));
+  }
+  return prev;
 }
 
 // Rewrites a ResolvedTableScan or ResolvedTVFScan if it contains AGG'ed
 // measure source columns.
 //
 // If measure columns are present on the scan, this class:
-// 1. Builds a closure column, which is a STRUCT containing:
-//    - referenced_columns: a STRUCT of columns referenced by any measure
-//      expression on the scan.
+// 1. Builds closure columns. Each closure column is a STRUCT containing:
+//    - referenced_columns: a STRUCT of columns referenced by the measure
+//      expression and its dependencies on the scan.
 //    - key_columns: a STRUCT of row identity columns of the table.
-// 2. Creates a ProjectScan on top of the input scan to project this closure
-//    column.
-// 3. Removes measure columns that have measure expressions from scan's column
-//    list, and adds any columns referenced by measure expressions but not
-//    present in scan's column list to the scan.
-// 4. Registers measure definitions with `measure_collector_` for later rewrite
-//    of ResolvedMeasureReference.
+// 2. Creates a chain of `ProjectScan`s on top of the input scan to evaluate
+//    and project these closure columns.
+// 3. Replaces the AGG'ed measure columns with their corresponding closure
+//    columns, and adds any columns referenced by their definition expressions
+//    but not present in scan's column list to the scan.
+// 4. Registers measure metadata with `measure_collector_` for later rewrite
+//    of the measure references.
 template <typename ScanType>
 class MeasureSourceColumnReplacer {
  public:
@@ -277,57 +347,133 @@ class MeasureSourceColumnReplacer {
         type_factory_(type_factory),
         column_factory_(column_factory) {}
 
+  // Rewrites the input scan to replace AGG'ed measure columns with closure
+  // struct columns.
   absl::StatusOr<std::unique_ptr<const ResolvedNode>> Replace() {
-    // Step 1: Collect measure column information.
-    GOOGLESQL_ASSIGN_OR_RETURN(std::vector<MeasureSourceInfo> measure_infos,
-                     CollectMeasureInfos());
-    if (measure_infos.empty()) {
-      // No measure definitions are found, nothing to rewrite.
+    GOOGLESQL_RET_CHECK(scan_ != nullptr);
+    if (!HasAggedMeasure(*scan_, measure_collector_)) {
       return std::move(scan_);
     }
-    // Step 2: Build the closure struct.
-    NameToResolvedColumn missing_columns_from_scan;
-    absl::flat_hash_set<ResolvedColumn> measure_cols_with_expr_set;
-    GOOGLESQL_ASSIGN_OR_RETURN(
-        std::unique_ptr<ResolvedComputedColumn> closure,
-        BuildClosureColumn(measure_infos, missing_columns_from_scan,
-                           measure_cols_with_expr_set));
-    // Step 3: Store the relevant information for each measure definition.
-    const Table* table = GetTable();
-    for (const auto& info : measure_infos) {
-      GOOGLESQL_RET_CHECK(info.measure_col.type()->IsMeasureType());
-      absl::btree_set<std::string, googlesql_base::CaseLess>
-          row_identity_column_names;
-      for (const int index : info.row_identity_column_indices) {
-        const std::string column_name = table->GetColumn(index)->Name();
-        GOOGLESQL_RET_CHECK(row_identity_column_names.insert(column_name).second)
-            << "Duplicate row identity column name: " << column_name;
-      }
-      GOOGLESQL_RETURN_IF_ERROR(measure_collector_.AddMeasureInfo(
-          info.measure_col.type()->AsMeasure(),
-          {.measure_expr = info.measure_expr,
-           .row_identity_column_names = std::move(row_identity_column_names),
-           .closure_struct_type = closure->column().type(),
-           .closure_column = MeasureInfo::ClosureColumn{
-               .closure_struct = closure->column(),
-               .measure_source_column = info.measure_col}}));
-    }
 
-    // Step 4: Add a ProjectScan to project the closure column.
-    return RebuildScanAndCreateProjectScan(measure_cols_with_expr_set,
-                                           missing_columns_from_scan,
-                                           std::move(closure));
+    GOOGLESQL_ASSIGN_OR_RETURN(const Table* table, GetTable());
+
+    // Step 1: Build the measure dependency graph to collect all the
+    // transitively AGG'ed measures.
+    GOOGLESQL_ASSIGN_OR_RETURN(MeasureGraph graph, BuildMeasureGraphFromScan());
+
+    GOOGLESQL_ASSIGN_OR_RETURN(
+        CaseInsensitiveMap<const StructType*> closure_types,
+        ComputeClosureTypesForMeasuresFromScan(graph, *table, type_factory_));
+
+    // Step 2: Register these measures with `measure_collector` under their
+    // catalog Column::GetType().
+    //
+    // These MeasureInfo's will be used to rewrite the AGG calls over dependency
+    // measures, e.g., the `AGG(b)` for `m := AGG(b) + 1`.
+    GOOGLESQL_RETURN_IF_ERROR(RegisterCatalogMeasureInfos(graph, *table, closure_types,
+                                                measure_collector_));
+
+    // Step 3: Build the closure columns for all the measures in the graph.
+    ReplacerColumnProvider column_provider(*this, *table);
+    GOOGLESQL_ASSIGN_OR_RETURN(ComputeClosureColumnsResult closure_result,
+                     ComputeClosureColumnsForMeasuresFromScan(
+                         graph, *table, closure_types, type_factory_,
+                         column_factory_, column_provider));
+
+    // Step 4: Register the MeasureInfo for the projected measures. They are
+    // different from the catalog measure info because ResolvedColumn::type()
+    // is different from Column::type().
+    //
+    // These MeasureInfo's will be used to rewrite the explicit AGG calls users
+    // write in the query.
+    GOOGLESQL_ASSIGN_OR_RETURN(std::vector<ProjectedMeasure> projected_measures,
+                     GetProjectedMeasures(graph));
+    GOOGLESQL_RETURN_IF_ERROR(RegisterProjectedMeasureInfos(
+        projected_measures, closure_result.measure_to_closure_col,
+        measure_collector_));
+
+    // Step 5: Rebuild the scan to project the closure struct columns and the
+    // required non-measure columns, and remove the AGG'ed measure columns.
+    GOOGLESQL_ASSIGN_OR_RETURN(
+        absl::flat_hash_set<ResolvedColumn> final_output_columns,
+        ComputeFinalOutputColumn(projected_measures,
+                                 closure_result.measure_to_closure_col));
+
+    GOOGLESQL_ASSIGN_OR_RETURN(
+        std::unique_ptr<const ScanType> rebuilt_scan,
+        RebuildScan(std::move(scan_), *table, measure_collector_,
+                    column_provider.missing_non_measure_columns()));
+
+    GOOGLESQL_ASSIGN_OR_RETURN(
+        std::unique_ptr<const ResolvedScan> final_scan,
+        ProjectClosureExpressions(std::move(rebuilt_scan), final_output_columns,
+                                  std::move(closure_result.closure_structs)));
+
+    return final_scan;
   }
 
  private:
-  const Table* GetTable() const {
+  // Helper class that implements ColumnProvider to collect missing non-measure
+  // columns while building closure columns.
+  class ReplacerColumnProvider : public ColumnProvider {
+   public:
+    ReplacerColumnProvider(MeasureSourceColumnReplacer& replacer,
+                           const Table& table)
+        : replacer_(replacer), table_(table) {}
+
+    absl::StatusOr<ResolvedColumn> GetOrProjectColumn(
+        const Column* column) override {
+      GOOGLESQL_RET_CHECK(column != nullptr);
+
+      int table_col_idx = -1;
+      for (int i = 0; i < table_.NumColumns(); ++i) {
+        if (table_.GetColumn(i) == column) {
+          table_col_idx = i;
+          break;
+        }
+      }
+      GOOGLESQL_RET_CHECK_GE(table_col_idx, 0);
+
+      for (int i = 0; i < replacer_.scan_->column_index_list_size(); ++i) {
+        if (replacer_.scan_->column_index_list(i) == table_col_idx) {
+          return replacer_.scan_->column_list(i);
+        }
+      }
+      auto it = missing_non_measure_columns_.find(column->Name());
+      if (it != missing_non_measure_columns_.end()) {
+        return it->second;
+      }
+      ResolvedColumn new_col = replacer_.column_factory_.MakeCol(
+          table_.Name(), column->Name(), column->GetType());
+      missing_non_measure_columns_[column->Name()] = new_col;
+      return new_col;
+    }
+
+    const CaseInsensitiveMap<ResolvedColumn>& missing_non_measure_columns()
+        const {
+      return missing_non_measure_columns_;
+    }
+
+   private:
+    // Reference to the parent replacer.
+    MeasureSourceColumnReplacer& replacer_;
+    // The catalog table.
+    const Table& table_;
+    // Map to accumulate non-measure columns that were missing from the scan.
+    CaseInsensitiveMap<ResolvedColumn> missing_non_measure_columns_;
+  };
+
+  // Returns the catalog table associated with the scan.
+  absl::StatusOr<const Table*> GetTable() const {
     const Table* table = MeasureSourceTraits<ScanType>::GetTable(scan_.get());
-    ABSL_DCHECK(table != nullptr);
+    GOOGLESQL_RET_CHECK(table != nullptr);
     return table;
   }
 
-  absl::StatusOr<std::vector<MeasureSourceInfo>> CollectMeasureInfos() {
-    std::vector<MeasureSourceInfo> measure_infos;
+  // Builds the measure dependency graph from `scan_`.
+  absl::StatusOr<MeasureGraph> BuildMeasureGraphFromScan() {
+    GOOGLESQL_ASSIGN_OR_RETURN(const Table* table, GetTable());
+    MeasureGraph graph;
     for (int i = 0; i < scan_->column_list_size(); ++i) {
       const ResolvedColumn& col = scan_->column_list(i);
       if (!col.type()->IsMeasureType()) {
@@ -336,221 +482,79 @@ class MeasureSourceColumnReplacer {
       if (!measure_collector_.IsAgged(col.type()->AsMeasure())) {
         continue;
       }
-      const int col_idx_in_table = scan_->column_index_list(i);
-      const Table* table = GetTable();
+      int col_idx_in_table = scan_->column_index_list(i);
       const Column* catalog_column = table->GetColumn(col_idx_in_table);
-      GOOGLESQL_RET_CHECK(catalog_column->HasMeasureExpression() &&
-                catalog_column->GetExpression()->HasResolvedExpression());
 
-      const ResolvedExpr* measure_expr =
-          catalog_column->GetExpression()->GetResolvedExpression();
+      GOOGLESQL_RETURN_IF_ERROR(graph.AddIfNotPresent(*catalog_column, *table).status());
+    }
+    return graph;
+  }
 
-      GOOGLESQL_ASSIGN_OR_RETURN(CaseInsensitiveStringSet referenced_column_names,
-                       GetExpressionColumnNames(measure_expr));
+  // Returns the projected measures in `graph` that are projected by `scan_`.
+  absl::StatusOr<std::vector<ProjectedMeasure>> GetProjectedMeasures(
+      const MeasureGraph& graph) const {
+    GOOGLESQL_ASSIGN_OR_RETURN(const Table* table, GetTable());
+    std::vector<ProjectedMeasure> projected_measures;
+    for (int i = 0; i < scan_->column_list_size(); ++i) {
+      const ResolvedColumn& c = scan_->column_list(i);
+      if (!c.type()->IsMeasureType() ||
+          !measure_collector_.IsAgged(c.type()->AsMeasure())) {
+        continue;
+      }
+      int col_idx = scan_->column_index_list(i);
+      const Column* catalog_col = table->GetColumn(col_idx);
 
-      GOOGLESQL_ASSIGN_OR_RETURN(std::vector<int> row_identity_column_indices,
-                       GetRowIdentityColumnIndices(catalog_column, table));
-      GOOGLESQL_RET_CHECK(!row_identity_column_indices.empty());
-      absl::c_sort(row_identity_column_indices);
-
-      measure_infos.push_back({
-          .measure_col = col,
-          .measure_expr = measure_expr,
-          .referenced_column_names = referenced_column_names,
-          .row_identity_column_indices = row_identity_column_indices,
+      const MeasureGraph::Node* node = graph.FindNode(catalog_col->Name());
+      GOOGLESQL_RET_CHECK(node != nullptr);
+      projected_measures.push_back(ProjectedMeasure{
+          .resolved_column = c,
+          .catalog_column = catalog_col,
+          .node = node,
       });
     }
-    return measure_infos;
+    return projected_measures;
   }
 
-  // Builds and returns a ResolvedComputedColumn representing the closure
-  // for all measure columns on the scan. The expression is a struct that
-  // contains all columns referenced by measures defined in `measure_infos`, as
-  // well as row identity columns, i.e.,
+  // Computes the set of columns that the final rewritten scan (the outermost
+  // ProjectScan) must output.
   //
-  // STRUCT(
-  //   referenced_columns: STRUCT(
-  //     <column_name>: ResolvedColumn,
-  //     ...
-  //   ),
-  //   key_columns: STRUCT(
-  //     <column index>: ResolvedColumn,
-  //     ...
-  //   )
-  // )
+  // Input:
+  // - `projected_measures`: The list of projected measures.
+  // - `measure_to_closure_col`: Map of measure name to its closure column.
   //
-  // Populates `missing_columns_from_scan` with columns that are needed for
-  // building the closure but are not present in `scan_`. Populates
-  // `measure_cols_with_expr_set` with measure columns that have measure
-  // expressions.
-  absl::StatusOr<std::unique_ptr<ResolvedComputedColumn>> BuildClosureColumn(
-      absl::Span<const MeasureSourceInfo> measure_infos,
-      NameToResolvedColumn& missing_columns_from_scan,
-      absl::flat_hash_set<ResolvedColumn>& measure_cols_with_expr_set) {
-    const Table* table = GetTable();
-
-    for (const auto& info : measure_infos) {
-      measure_cols_with_expr_set.insert(info.measure_col);
-    }
-
-    GOOGLESQL_ASSIGN_OR_RETURN(
-        const StructType* closure_struct_type,
-        BuildSharedClosureType(measure_infos, table, type_factory_));
-
-    // Validation on the computed closure struct type.
-    GOOGLESQL_RET_CHECK(closure_struct_type->num_fields() == 2);
-    GOOGLESQL_RET_CHECK(closure_struct_type->field(0).name ==
-              kReferencedColumnsFieldName);
-    GOOGLESQL_RET_CHECK(closure_struct_type->field(0).type->IsStruct());
-    GOOGLESQL_RET_CHECK(closure_struct_type->field(1).name == kKeyColumnsFieldName);
-    GOOGLESQL_RET_CHECK(closure_struct_type->field(1).type->IsStruct());
-
-    // 1. Build referenced_columns struct expression
-    GOOGLESQL_ASSIGN_OR_RETURN(std::unique_ptr<ResolvedMakeStruct> ref_struct_expr,
-                     BuildStructExprFromFields(
-                         closure_struct_type->field(0).type->AsStruct(),
-                         missing_columns_from_scan));
-
-    // 2. Build key_columns struct expression
-    GOOGLESQL_ASSIGN_OR_RETURN(std::unique_ptr<ResolvedMakeStruct> key_struct_expr,
-                     BuildStructExprFromFields(
-                         closure_struct_type->field(1).type->AsStruct(),
-                         missing_columns_from_scan));
-
-    // 3. Build wrapping struct expression
-    std::vector<std::unique_ptr<const ResolvedExpr>> wrapping_exprs;
-    wrapping_exprs.reserve(2);
-    wrapping_exprs.push_back(std::move(ref_struct_expr));
-    wrapping_exprs.push_back(std::move(key_struct_expr));
-    auto closure_expr =
-        MakeResolvedMakeStruct(closure_struct_type, std::move(wrapping_exprs));
-
-    const std::string closure_column_name =
-        absl::StrCat("struct_for_measures_from_table_", table->Name());
-    ResolvedColumn closure_column = column_factory_.MakeCol(
-        table->Name(), closure_column_name, closure_expr->type());
-    return MakeResolvedComputedColumn(closure_column, std::move(closure_expr));
-  }
-
-  // Builds a struct expression that projects the columns specified by the
-  // fields of `target_struct_type`.
-  absl::StatusOr<std::unique_ptr<ResolvedMakeStruct>> BuildStructExprFromFields(
-      const StructType* target_struct_type,
-      NameToResolvedColumn& missing_columns_from_scan) {
-    const Table* table = GetTable();
-    std::vector<std::unique_ptr<const ResolvedExpr>> exprs;
-    exprs.reserve(target_struct_type->num_fields());
-    for (int i = 0; i < target_struct_type->num_fields(); ++i) {
-      const StructType::StructField& field = target_struct_type->field(i);
-      GOOGLESQL_ASSIGN_OR_RETURN(const int table_col_idx,
-                       FindColumnIndex(table, field.name));
-      ResolvedColumn col =
-          GetOrProjectColumn(table_col_idx, missing_columns_from_scan);
-      exprs.push_back(MakeResolvedColumnRef(field.type, col,
-                                            /*is_correlated=*/false));
-    }
-    return MakeResolvedMakeStruct(target_struct_type, std::move(exprs));
-  }
-
-  // Rebuilds `scan_` to remove measure columns and add columns in
-  // `missing_columns_from_scan`. Then, creates a ProjectScan on top of
-  // `scan_` which adds `closure` to the column list.
-  absl::StatusOr<std::unique_ptr<const ResolvedNode>>
-  RebuildScanAndCreateProjectScan(
-      const absl::flat_hash_set<ResolvedColumn>& measure_cols_with_expr_set,
-      const NameToResolvedColumn& missing_columns_from_scan,
-      std::unique_ptr<ResolvedComputedColumn> closure) {
-    // Step 1: Remove the AGG'ed measure columns from the source_scan - they
-    // are replaced by the struct closure column on this scan.
-    std::vector<std::pair<int, ResolvedColumn>> indexed_columns;
-    ResolvedColumnList project_column_list;
-
-    for (int i = 0; i < scan_->column_list_size(); ++i) {
-      if (!measure_cols_with_expr_set.contains(scan_->column_list(i))) {
-        indexed_columns.push_back(
-            {scan_->column_index_list(i), scan_->column_list(i)});
-        project_column_list.push_back(scan_->column_list(i));
+  // Returns:
+  // - The set of columns containing:
+  //   - Columns from the original `scan_`, excluding AGG'ed measure columns.
+  //   - The new closure columns that replace the AGG'ed measure columns.
+  absl::StatusOr<absl::flat_hash_set<ResolvedColumn>> ComputeFinalOutputColumn(
+      absl::Span<const ProjectedMeasure> projected_measures,
+      const CaseInsensitiveMap<ResolvedColumn>& measure_to_closure_col) const {
+    absl::flat_hash_set<ResolvedColumn> alive_columns;
+    for (const ResolvedColumn& col : scan_->column_list()) {
+      if (col.type()->IsMeasureType() &&
+          measure_collector_.IsAgged(col.type()->AsMeasure())) {
+        continue;
       }
+      alive_columns.insert(col);
     }
-
-    // Step 2: Add columns in `missing_columns_from_scan` to the
-    // source_scan. These columns are referenced in measure expressions but
-    // not in scan_'s column list.
-    const Table* table = GetTable();
-    for (int i = 0; i < table->NumColumns(); ++i) {
-      const Column* column = table->GetColumn(i);
-      if (missing_columns_from_scan.contains(column->Name())) {
-        indexed_columns.push_back(
-            {i, missing_columns_from_scan.at(column->Name())});
-      }
+    for (const auto& pm : projected_measures) {
+      auto it = measure_to_closure_col.find(pm.node->name);
+      GOOGLESQL_RET_CHECK(it != measure_to_closure_col.end());
+      alive_columns.insert(it->second);
     }
-
-    GOOGLESQL_RETURN_IF_ERROR(RebuildScanColumns(indexed_columns));
-
-    // Step 3: Build ProjectScan to add `closure`.
-    project_column_list.push_back(closure->column());
-    std::vector<std::unique_ptr<const ResolvedComputedColumn>> project_exprs;
-    project_exprs.push_back(std::move(closure));
-
-    return MakeResolvedProjectScan(project_column_list,
-                                   std::move(project_exprs), std::move(scan_));
+    return alive_columns;
   }
 
-  // Gets the ResolvedColumn corresponding to `table_col_idx`. If it is not
-  // present in `scan_->column_list()`, creates a new ResolvedColumn for it
-  // and adds it to scan_->column_list() first.
-  ResolvedColumn GetOrProjectColumn(
-      int table_col_idx, NameToResolvedColumn& missing_columns_from_scan) {
-    for (int i = 0; i < scan_->column_index_list_size(); ++i) {
-      if (scan_->column_index_list(i) == table_col_idx) {
-        return scan_->column_list(i);
-      }
-    }
-    const Table* table = GetTable();
-    const Column* column = table->GetColumn(table_col_idx);
-    if (missing_columns_from_scan.contains(column->Name())) {
-      return missing_columns_from_scan.at(column->Name());
-    }
-    ResolvedColumn new_col = column_factory_.MakeCol(
-        table->Name(), column->Name(), column->GetType());
-    missing_columns_from_scan[column->Name()] = new_col;
-    return new_col;
-  }
-
-  // Rebuilds `column_list` and `column_index_list` of `scan_` with columns and
-  // indices in `indexed_columns`.
-  absl::Status RebuildScanColumns(
-      std::vector<std::pair<int, ResolvedColumn>>& indexed_columns) {
-    std::sort(indexed_columns.begin(), indexed_columns.end(),
-              [](const auto& a, const auto& b) { return a.first < b.first; });
-
-    ResolvedColumnList new_column_list;
-    std::vector<int> new_column_index_list;
-    new_column_list.reserve(indexed_columns.size());
-    new_column_index_list.reserve(indexed_columns.size());
-    for (const auto& [index, column] : indexed_columns) {
-      new_column_index_list.push_back(index);
-      new_column_list.push_back(column);
-    }
-
-    GOOGLESQL_ASSIGN_OR_RETURN(scan_, ToBuilder(std::move(scan_))
-                                .set_column_list(new_column_list)
-                                .set_column_index_list(new_column_index_list)
-                                .Build());
-    return absl::OkStatus();
-  }
-
+  // The scan to be rewritten.
   std::unique_ptr<const ScanType> scan_;
+  // Used to collect and query measure metadata.
   MeasureCollector& measure_collector_;
+  // Used to create closure struct types.
   TypeFactory& type_factory_;
+  // Used to generate new resolved columns.
   ColumnFactory& column_factory_;
 };
 
-// Collects measure sources and computes the corresponding closure struct
-// types.
-//
-// If the measure source is a TableScan or TVFScan, it also creates a closure
-// column and adds it to the source scan by adding a ProjectScan on top of it.
 class MeasureSourceCollector : public ResolvedASTRewriteVisitor {
  public:
   MeasureSourceCollector(MeasureCollector& measure_collector,
@@ -599,27 +603,17 @@ class MeasureSourceCollector : public ResolvedASTRewriteVisitor {
     // We currently only support measure columns on tables with DEFAULT column
     // list mode, i.e., tables that have a column list.
     GOOGLESQL_RET_CHECK(table->HasColumnList());
-    GOOGLESQL_ASSIGN_OR_RETURN(const StructType* closure_struct_type,
-                     BuildClosureType(measure_column, table, type_factory_));
 
-    const ResolvedExpr* measure_expr =
-        measure_column->GetExpression()->GetResolvedExpression();
+    // Register all the measures transitively depending on this measure from
+    // row type.
+    MeasureGraph graph;
+    GOOGLESQL_RETURN_IF_ERROR(graph.AddIfNotPresent(*measure_column, *table).status());
+    GOOGLESQL_ASSIGN_OR_RETURN(
+        CaseInsensitiveMap<const StructType*> closure_types,
+        BuildClosureTypesForTableRow(graph, *table, type_factory_));
+    GOOGLESQL_RETURN_IF_ERROR(RegisterCatalogMeasureInfos(graph, *table, closure_types,
+                                                measure_collector_));
 
-    GOOGLESQL_ASSIGN_OR_RETURN(std::vector<int> row_identity_column_indices,
-                     GetRowIdentityColumnIndices(measure_column, table));
-    absl::btree_set<std::string, googlesql_base::CaseLess>
-        row_identity_column_names;
-    for (const int index : row_identity_column_indices) {
-      row_identity_column_names.insert(table->GetColumn(index)->Name());
-    }
-
-    GOOGLESQL_RETURN_IF_ERROR(measure_collector_.AddMeasureInfo(
-        measure_type,
-        {
-            .measure_expr = measure_expr,
-            .row_identity_column_names = std::move(row_identity_column_names),
-            .closure_struct_type = closure_struct_type,
-        }));
     return node;
   }
 
@@ -645,6 +639,10 @@ class MeasureSourceCollector : public ResolvedASTRewriteVisitor {
   TypeFactory& type_factory_;
   ColumnFactory& column_factory_;
 };
+
+}  // namespace
+
+/* Public API Entry Point */
 
 absl::StatusOr<std::unique_ptr<const ResolvedNode>> AddClosures(
     MeasureCollector& measure_collector,

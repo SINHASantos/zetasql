@@ -206,4 +206,32 @@ TEST(TypeModifiersTest, GetChild) {
   }
 }
 
+TEST(TypeModifiersTest, ReleaseTypeParametersAndCollation) {
+  StringTypeParametersProto string_proto;
+  string_proto.set_max_length(10);
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(TypeParameters type_params,
+                       TypeParameters::MakeStringTypeParameters(string_proto));
+  Collation collation = Collation::MakeScalar("und:ci");
+
+  TypeModifiers modifiers =
+      TypeModifiers::MakeTypeModifiers(type_params, collation);
+
+  EXPECT_FALSE(modifiers.type_parameters().IsEmpty());
+  EXPECT_FALSE(modifiers.collation().Empty());
+
+  // Release type parameters.
+  TypeParameters released_params = modifiers.release_type_parameters();
+  EXPECT_TRUE(released_params.Equals(type_params));
+  // The internal pointer should be reset to nullptr, returning
+  // EmptyTypeParameters.
+  EXPECT_EQ(&modifiers.type_parameters(),
+            &TypeParameters::EmptyTypeParameters());
+
+  // Release collation.
+  Collation released_collation = modifiers.release_collation();
+  EXPECT_TRUE(released_collation.Equals(collation));
+  // The internal pointer should be reset to nullptr, returning EmptyCollation.
+  EXPECT_EQ(&modifiers.collation(), &Collation::EmptyCollation());
+}
+
 }  // namespace googlesql

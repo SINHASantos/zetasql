@@ -59,7 +59,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=tvf_one_relation_arg_one_descriptor.[column_bool#2, column_bytes#3]
-        +-tvf=tvf_one_relation_arg_one_descriptor((TABLE<int64a INT64>, ANY DESCRIPTOR) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+        +-tvf=tvf_one_relation_arg_one_descriptor
         +-signature=(TABLE<int64a INT64>, ANY DESCRIPTOR) -> TABLE<column_bool BOOL, column_bytes BYTES>
         +-argument_list=
         | +-FunctionArgument

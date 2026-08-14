@@ -33,6 +33,7 @@
 #include "googlesql/public/function.h"
 #include "googlesql/public/language_options.h"
 #include "googlesql/public/options.pb.h"
+#include "googlesql/public/prepared_expression_constant_evaluator.h"
 #include "googlesql/public/simple_catalog.h"
 #include "googlesql/public/type.h"
 #include "googlesql/public/value.h"
@@ -344,6 +345,7 @@ class ReferenceDriver : public TestDriver {
 
   // The name of dumping catalog for fuzz testing.
   std::string fuzzing_catalog_name_;
+  std::unique_ptr<PreparedExpressionConstantEvaluator> constant_evaluator_;
 };
 
 }  // namespace googlesql

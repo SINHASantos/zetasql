@@ -90,7 +90,31 @@ ResolvedASTRewriteVisitor::DefaultVisit(
     builder.set_{{field.name}}(std::move(tmp));
   }
   # elif field.is_visitable_scalar and not field.is_vector
-  builder.set_{{field.name}}(DefaultVisit(builder.{{field.name}}()));
+    # if field.is_type
+      # if node | is_subclass_of('ResolvedExpr')
+      {# Visit the type and annotations together. #}
+      {
+        GOOGLESQL_ASSIGN_OR_RETURN(
+            AnnotatedType new_annotated_type,
+            DefaultVisit(builder.type(), builder.type_annotation_map()));
+        builder.set_type(new_annotated_type.type);
+        builder.set_type_annotation_map(new_annotated_type.annotation_map);
+      }
+      # else
+      {# No annotation map for this node, so just visit the type. The returned
+         AnnotatedType is not allowed to have an annotation map because there is
+         nowhere to put it. #}
+      {
+        GOOGLESQL_ASSIGN_OR_RETURN(
+            AnnotatedType new_annotated_type,
+            DefaultVisit(builder.{{field.name}}(), std::nullopt));
+        GOOGLESQL_RET_CHECK(new_annotated_type.annotation_map == nullptr);
+        builder.set_{{field.name}}(new_annotated_type.type);
+      }
+      # endif
+    # else
+    builder.set_{{field.name}}(DefaultVisit(builder.{{field.name}}()));
+    # endif
   # endif
  # endfor
  # if default_visit_ns.found == true
@@ -110,10 +134,11 @@ ResolvedASTRewriteVisitor::DefaultVisit(ResolvedColumn column) {
   return PostVisitResolvedColumn(std::move(column));
 }
 
-absl::StatusOr<const Type*>
-ResolvedASTRewriteVisitor::DefaultVisit(const Type* type) {
-  GOOGLESQL_RETURN_IF_ERROR(PreVisitType(type));
-  return PostVisitType(type);
+absl::StatusOr<AnnotatedType>
+ResolvedASTRewriteVisitor::DefaultVisit(
+    const Type* type, std::optional<const AnnotationMap*> annotation_map) {
+  GOOGLESQL_RETURN_IF_ERROR(PreVisitAnnotatedType(type, annotation_map));
+  return PostVisitAnnotatedType(type, annotation_map);
 }
 # endif
 

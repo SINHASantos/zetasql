@@ -27,7 +27,6 @@
 #include <utility>
 #include <vector>
 
-#include "googlesql/base/logging.h"
 #include "googlesql/proto/function.pb.h"
 #include "googlesql/public/constness_level.pb.h"
 #include "googlesql/public/deprecation_warning.pb.h"
@@ -38,6 +37,7 @@
 #include "googlesql/public/types/type_deserializer.h"
 #include "googlesql/public/types/type_modifiers.h"
 #include "googlesql/public/value.h"
+#include "gtest/gtest_prod.h"
 #include "absl/algorithm/container.h"
 #include "absl/base/attributes.h"
 #include "absl/base/macros.h"
@@ -46,11 +46,9 @@
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
-#include "absl/types/optional.h"
 #include "absl/types/span.h"
 #include "googlesql/base/case.h"
 #include "googlesql/base/map_util.h"
-#include "googlesql/base/status.h"
 
 namespace googlesql {
 

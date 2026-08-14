@@ -1845,6 +1845,166 @@ TEST_F(ValueTest, AlmostEqualsArrayOfProto) {
       Not(AlmostEqualsValue(Array({x_far}, InternalValue::kIgnoresOrder))));
 }
 
+TEST_F(ValueTest, AlmostEqualsMapArray) {
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(
+      const Type* map_type,
+      MakeMapType(Int64Type(), DoubleType(), &type_factory_));
+  auto x = Value::Double(3.0);
+  auto x_near = Value::Double(NextAlmostEqual(3.0));
+  auto x_far = Value::Double(7.0);
+
+  auto k1 = Value::Int64(1);
+  auto k2 = Value::Int64(2);
+
+  std::vector<std::pair<const Value, const Value>> kv_base = {{k1, x}, {k2, x}};
+  std::vector<std::pair<const Value, const Value>> kv_near = {{k1, x_near},
+                                                              {k2, x_near}};
+  std::vector<std::pair<const Value, const Value>> kv_far = {{k1, x_far},
+                                                             {k2, x_far}};
+
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(Value map_base, Value::MakeMap(map_type, kv_base));
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(Value map_near, Value::MakeMap(map_type, kv_near));
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(Value map_far, Value::MakeMap(map_type, kv_far));
+
+  // Test map equality unwrapped directly.
+  EXPECT_THAT(map_base, AlmostEqualsValue(map_near));
+  EXPECT_THAT(map_base, Not(AlmostEqualsValue(map_far)));
+
+  // Test with default AlmostEqualsValue matcher inside an unordered ARRAY.
+  // map element comparison uses Value::AlmostEquals, multiset comparison of map
+  // arrays will do exact matching of maps (using the serialized key-value
+  // representation).
+  // E.g.
+  // Array1: [MAP{ 1: 3.0, 2: 3.0 }]
+  // Array2: [MAP{ 1: 3.0000000000000004, 2: 3.0000000000000004 }]
+  // AlmostEqualsMapArray(Array1, Array2) -> true
+  EXPECT_THAT(Array({map_base}, InternalValue::kPreservesOrder, &type_factory_),
+              AlmostEqualsValue(Array({map_near}, InternalValue::kIgnoresOrder,
+                                      &type_factory_)));
+  EXPECT_THAT(Array({map_base}, InternalValue::kPreservesOrder, &type_factory_),
+              Not(AlmostEqualsValue(Array(
+                  {map_far}, InternalValue::kIgnoresOrder, &type_factory_))));
+
+  // Also test when MAP is inside a STRUCT inside an unordered ARRAY.
+  auto struct_base = Struct({"m"}, {map_base}, &type_factory_);
+  auto struct_near = Struct({"m"}, {map_near}, &type_factory_);
+  auto struct_far = Struct({"m"}, {map_far}, &type_factory_);
+
+  EXPECT_THAT(
+      Array({struct_base}, InternalValue::kPreservesOrder, &type_factory_),
+      AlmostEqualsValue(
+          Array({struct_near}, InternalValue::kIgnoresOrder, &type_factory_)));
+  EXPECT_THAT(
+      Array({struct_base}, InternalValue::kPreservesOrder, &type_factory_),
+      Not(AlmostEqualsValue(
+          Array({struct_far}, InternalValue::kIgnoresOrder, &type_factory_))));
+
+  // Test with DeclarativeType wrapping MAP inside an unordered ARRAY.
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(
+      const Type* decl_map_type,
+      type_factory_.MakeDeclarativeType(
+          DeclarativeTypeDescriptor()
+              .set_type_id({"NS", "AlmostEqualsDeclMap"})
+              .set_display_name("almost_equals_decl_map")
+              .set_backing_type(map_type)
+              .set_equality_strategy(
+                  DeclarativeTypeDescriptor::EqualityDelegated{})));
+
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(
+      Value decl_map,
+      Value::Declarative(decl_map_type->AsDeclarativeType(), map_base));
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(
+      Value decl_map_near,
+      Value::Declarative(decl_map_type->AsDeclarativeType(), map_near));
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(
+      Value decl_map_far,
+      Value::Declarative(decl_map_type->AsDeclarativeType(), map_far));
+
+  EXPECT_THAT(
+      Array({decl_map}, InternalValue::kPreservesOrder, &type_factory_),
+      AlmostEqualsValue(Array({decl_map_near}, InternalValue::kIgnoresOrder,
+                              &type_factory_)));
+  EXPECT_THAT(
+      Array({decl_map}, InternalValue::kPreservesOrder, &type_factory_),
+      Not(AlmostEqualsValue(Array({decl_map_far}, InternalValue::kIgnoresOrder,
+                                  &type_factory_))));
+
+  // Test explicit ULP margins using InternalValue::Equals on multisets.
+  // x_5ulps is 5 ULPs away from x=3.0.
+  auto x_5ulps = Value::Double(3.0 + 5 * FloatMargin::Ulp(3.0));
+  std::vector<std::pair<const Value, const Value>> kv_5ulps = {{k1, x_5ulps},
+                                                               {k2, x_5ulps}};
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(Value map_5ulps,
+                            Value::MakeMap(map_type, kv_5ulps));
+  auto struct_5ulps = Struct({"m"}, {map_5ulps}, &type_factory_);
+
+  std::string why;
+  EXPECT_TRUE(InternalValue::Equals(
+      Array({map_base}, InternalValue::kPreservesOrder, &type_factory_),
+      Array({map_5ulps}, InternalValue::kIgnoresOrder, &type_factory_),
+      ValueEqualityCheckOptions{.float_margin = FloatMargin::UlpMargin(10),
+                                .reason = &why}))
+      << why;
+  EXPECT_FALSE(InternalValue::Equals(
+      Array({map_base}, InternalValue::kPreservesOrder, &type_factory_),
+      Array({map_5ulps}, InternalValue::kIgnoresOrder, &type_factory_),
+      ValueEqualityCheckOptions{.float_margin = FloatMargin::UlpMargin(2),
+                                .reason = &why}));
+
+  why.clear();
+  EXPECT_TRUE(InternalValue::Equals(
+      Array({struct_base}, InternalValue::kPreservesOrder, &type_factory_),
+      Array({struct_5ulps}, InternalValue::kIgnoresOrder, &type_factory_),
+      ValueEqualityCheckOptions{.float_margin = FloatMargin::UlpMargin(10),
+                                .reason = &why}))
+      << why;
+  EXPECT_FALSE(InternalValue::Equals(
+      Array({struct_base}, InternalValue::kPreservesOrder, &type_factory_),
+      Array({struct_5ulps}, InternalValue::kIgnoresOrder, &type_factory_),
+      ValueEqualityCheckOptions{.float_margin = FloatMargin::UlpMargin(2),
+                                .reason = &why}));
+}
+
+TEST_F(ValueTest, AlmostEqualsArrayOfProtoWithFloatsAndInts) {
+  TypeFactory factory;
+  const ProtoType* proto_type;
+  GOOGLESQL_ASSERT_OK(factory.MakeProtoType(googlesql_test::KitchenSinkPB::descriptor(),
+                                  &proto_type));
+  // Create proto 1: float_val = 3.0, int32_val = 1
+  googlesql_test::KitchenSinkPB p1;
+  p1.set_int64_key_1(1);
+  p1.set_int64_key_2(2);
+  p1.set_int32_val(1);
+  p1.set_float_val(3.0);
+  auto v1 = Value::Proto(proto_type, p1.SerializeAsCord());
+
+  // Create proto 2: float_val = 3.0000000000000004 (near), int32_val = 1
+  googlesql_test::KitchenSinkPB p2;
+  p2.set_int64_key_1(1);
+  p2.set_int64_key_2(2);
+  p2.set_int32_val(1);
+  p2.set_float_val(NextAlmostEqual(3.0));
+  auto v2 = Value::Proto(proto_type, p2.SerializeAsCord());
+
+  // Create proto 3: float_val = 3.0, int32_val = 2 (different int)
+  googlesql_test::KitchenSinkPB p3;
+  p3.set_int64_key_1(1);
+  p3.set_int64_key_2(2);
+  p3.set_int32_val(2);
+  p3.set_float_val(3.0);
+  auto v3 = Value::Proto(proto_type, p3.SerializeAsCord());
+
+  // v1 and v2 should be almost equal (floats are near, ints are same)
+  EXPECT_THAT(Array({v1}, InternalValue::kPreservesOrder, &type_factory_),
+              AlmostEqualsValue(
+                  Array({v2}, InternalValue::kIgnoresOrder, &type_factory_)));
+
+  // v1 and v3 should NOT be almost equal (ints are different)
+  EXPECT_THAT(Array({v1}, InternalValue::kPreservesOrder, &type_factory_),
+              Not(AlmostEqualsValue(
+                  Array({v3}, InternalValue::kIgnoresOrder, &type_factory_))));
+}
+
 TEST_F(ValueTest, StructNotNull) {
   Value value = Struct({{"a", Value::Int64(1)}, {"b", Value::Int64(2)}});
   TestGetSQL(value);
@@ -1886,6 +2046,61 @@ TEST_F(ValueTest, StructNull) {
   EXPECT_DEATH(value.int64_value(), "Not an int64 value");
   EXPECT_DEATH(value.num_fields(), "Null value");
   EXPECT_DEATH(value.FindFieldByName("junk"), "Null value");
+}
+
+TEST_F(ValueTest, FindStructFieldByNameCaseInsensitive) {
+  // Test on non-struct
+  EXPECT_THAT(Value::Int64(1).FindStructFieldByNameCaseInsensitive("a"),
+              StatusIs(absl::StatusCode::kInvalidArgument,
+                       HasSubstr("Not a struct type: INT64")));
+
+  // Test on null struct
+  Value null_struct = Value::Null(MakeStructType({{"a", Int64Type()}}));
+  EXPECT_THAT(null_struct.FindStructFieldByNameCaseInsensitive("a"),
+              StatusIs(absl::StatusCode::kInvalidArgument,
+                       HasSubstr("Null struct value")));
+
+  // Test on valid struct
+  Value struct_val =
+      Struct({{"FooBar", Value::Int64(1)}, {"aBbC", Value::Int64(2)}});
+
+  // Exact match
+  EXPECT_THAT(struct_val.FindStructFieldByNameCaseInsensitive("FooBar"),
+              IsOkAndHolds(Value::Int64(1)));
+  EXPECT_THAT(struct_val.FindStructFieldByNameCaseInsensitive("aBbC"),
+              IsOkAndHolds(Value::Int64(2)));
+
+  // Case-insensitive match
+  EXPECT_THAT(struct_val.FindStructFieldByNameCaseInsensitive("foobar"),
+              IsOkAndHolds(Value::Int64(1)));
+  EXPECT_THAT(struct_val.FindStructFieldByNameCaseInsensitive("FOOBAR"),
+              IsOkAndHolds(Value::Int64(1)));
+  EXPECT_THAT(struct_val.FindStructFieldByNameCaseInsensitive("abbc"),
+              IsOkAndHolds(Value::Int64(2)));
+  EXPECT_THAT(struct_val.FindStructFieldByNameCaseInsensitive("ABBC"),
+              IsOkAndHolds(Value::Int64(2)));
+
+  // Not found
+  EXPECT_THAT(struct_val.FindStructFieldByNameCaseInsensitive("junk"),
+              StatusIs(absl::StatusCode::kNotFound,
+                       HasSubstr("Field not found: junk")));
+
+  // Empty field name (anonymous field) returns NotFoundError
+  Value anon_struct =
+      Struct({{"", Value::Int64(1)}, {"FooBar", Value::Int64(2)}});
+  EXPECT_THAT(
+      anon_struct.FindStructFieldByNameCaseInsensitive(""),
+      StatusIs(absl::StatusCode::kNotFound, HasSubstr("Field not found: ")));
+
+  // Ambiguous match
+  Value ambiguous_struct =
+      Struct({{"FooBar", Value::Int64(1)}, {"FOOBAR", Value::Int64(2)}});
+  EXPECT_THAT(ambiguous_struct.FindStructFieldByNameCaseInsensitive("foobar"),
+              StatusIs(absl::StatusCode::kInvalidArgument,
+                       HasSubstr("Ambiguous field lookup: foobar")));
+  EXPECT_THAT(ambiguous_struct.FindStructFieldByNameCaseInsensitive("FOOBAR"),
+              StatusIs(absl::StatusCode::kInvalidArgument,
+                       HasSubstr("Ambiguous field lookup: FOOBAR")));
 }
 
 TEST_F(ValueTest, StructInvalidConstruction) {

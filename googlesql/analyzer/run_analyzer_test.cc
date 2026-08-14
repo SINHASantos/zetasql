@@ -1305,7 +1305,7 @@ class AnalyzerTestRunner {
     std::string templated_expr_debug_str =
         sql_function_call->expr()->DebugString();
     std::string debug_string = absl::StrCat(
-        "\nWith Templated SQL function call:\n  ", signature_string,
+        "\n\nWith Templated SQL function call:\n  ", signature_string,
         "\ncontaining resolved templated expression:\n",
         templated_expr_debug_str);
     for (const auto& agg_expr :
@@ -1318,6 +1318,7 @@ class AnalyzerTestRunner {
     }
     if (debug_strings.insert(debug_string).second) {
       absl::StrAppend(&test_result_string, debug_string);
+      absl::StripTrailingAsciiWhitespace(&test_result_string);
     }
     return absl::OkStatus();
   }
@@ -1335,11 +1336,12 @@ class AnalyzerTestRunner {
     std::string templated_query_debug_str =
         tvf_signature->resolved_templated_query()->DebugString();
     const std::string debug_string = absl::StrCat(
-        "\nWith Templated SQL TVF signature:\n  ", node->tvf()->FullName(),
+        "\n\nWith Templated SQL TVF signature:\n  ", node->tvf()->FullName(),
         node->signature()->DebugString(/*verbose=*/true),
         "\ncontaining resolved templated query:\n", templated_query_debug_str);
     if (debug_strings.insert(debug_string).second) {
       absl::StrAppend(&test_result_string, debug_string);
+      absl::StripTrailingAsciiWhitespace(&test_result_string);
     }
     return absl::OkStatus();
   }
@@ -1353,6 +1355,9 @@ class AnalyzerTestRunner {
         TemplatedFunctionCallVisitor::FindTemplatedFunctionCalls(node));
 
     absl::flat_hash_set<std::string> debug_strings;
+    if (!templated_function_calls.empty()) {
+      absl::StripTrailingAsciiWhitespace(&test_result_string);
+    }
     for (const ResolvedNode* node : templated_function_calls) {
       if (node->Is<ResolvedTVFScan>()) {
         GOOGLESQL_RETURN_IF_ERROR(AddResultStringForTemplatedSqlTvf(
@@ -1374,7 +1379,7 @@ class AnalyzerTestRunner {
                                    &describe_scans);
 
     for (const ResolvedNode* node : describe_scans) {
-      absl::StrAppend(&test_result_string, "\n[DESCRIBE output]\n");
+      absl::StrAppend(&test_result_string, "\n\n[DESCRIBE output]\n");
 
       const ResolvedDescribeScan* describe_scan =
           node->GetAs<ResolvedDescribeScan>();
@@ -1383,9 +1388,9 @@ class AnalyzerTestRunner {
       const Value& value = value_expr->GetAs<ResolvedLiteral>()->value();
       GOOGLESQL_RET_CHECK(!value.is_null());
       if (value.type()->IsString()) {
-        absl::StrAppend(&test_result_string, value.ToString(), "\n");
+        absl::StrAppend(&test_result_string, value.ToString());
       } else {
-        absl::StrAppend(&test_result_string, value.DebugString(), "\n");
+        absl::StrAppend(&test_result_string, value.DebugString());
       }
     }
     return absl::OkStatus();
@@ -1540,6 +1545,14 @@ class AnalyzerTestRunner {
       const absl::Status& status, const AnalyzerOutput* output,
       const StatementProperties& extracted_statement_properties,
       file_based_test_driver::RunTestCaseResult* test_result) {
+    ResolvedNode::DebugStringConfig debug_string_config;
+    debug_string_config.use_box_glyphs =
+        test_case_options_.GetBool(kDebugStringUseBoxGlyphs);
+    debug_string_config.linear_mode =
+        test_case_options_.GetBool(kDebugStringLinearMode);
+    debug_string_config.omit_pipe_input_scan_field =
+        test_case_options_.GetBool(kDebugStringOmitPipeInputScanField);
+
     std::string test_result_string;
     if (status.ok()) {
       const ResolvedStatement* resolved_statement =
@@ -1554,8 +1567,9 @@ class AnalyzerTestRunner {
         ASSERT_TRUE(resolved_expr != nullptr);
         node = resolved_expr;
       }
+
       node->ClearFieldsAccessed();
-      test_result_string = node->DebugString();
+      test_result_string = node->DebugString(debug_string_config);
       GOOGLESQL_ASSERT_OK(node->CheckNoFieldsAccessed());
       if (!test_case_options_.GetBool(kShowResolvedAST)) {
         // Hide debug string from test result if not requested in test case
@@ -1566,6 +1580,7 @@ class AnalyzerTestRunner {
         // accidentally mark fields as accessed.
         test_result_string.clear();
       }
+      absl::StripTrailingAsciiWhitespace(&test_result_string);
 
       // Append strings for any resolved templated objects in 'output'.
       GOOGLESQL_ASSERT_OK(
@@ -1664,7 +1679,7 @@ class AnalyzerTestRunner {
       std::string result_string;
       TestSqlBuilder(test_case, options, catalog, mode == "statement", output,
                      &result_string);
-      absl::StrAppend(&test_result_string, "\n", result_string);
+      absl::StrAppend(&test_result_string, "\n\n", result_string);
       absl::StripAsciiWhitespace(&test_result_string);
     }
 
@@ -1680,7 +1695,7 @@ class AnalyzerTestRunner {
       std::string result_string;
       TestLiteralReplacementInGoldens(test_case, options, output,
                                       &result_string);
-      absl::StrAppend(&test_result_string, "\n", result_string);
+      absl::StrAppend(&test_result_string, "\n\n", result_string);
       absl::StripAsciiWhitespace(&test_result_string);
     }
 
@@ -1690,7 +1705,7 @@ class AnalyzerTestRunner {
         output != nullptr) {
       std::string result_string;
       TestUndeclaredParameters(output, &result_string);
-      absl::StrAppend(&test_result_string, "\n", result_string);
+      absl::StrAppend(&test_result_string, "\n\n", result_string);
       absl::StripAsciiWhitespace(&test_result_string);
     }
 
@@ -1698,7 +1713,7 @@ class AnalyzerTestRunner {
         output != nullptr) {
       std::string result_string;
       TestReferencedPropertyGraph(output, &result_string);
-      absl::StrAppend(&test_result_string, "\n", result_string);
+      absl::StrAppend(&test_result_string, "\n\n", result_string);
       absl::StripAsciiWhitespace(&test_result_string);
     }
 
@@ -1725,7 +1740,8 @@ class AnalyzerTestRunner {
       // the templated SQL objects will have different ASTs.
       std::string pre_rewrite_result_string;
       if (output->resolved_statement() != nullptr) {
-        pre_rewrite_result_string = output->resolved_statement()->DebugString();
+        pre_rewrite_result_string =
+            output->resolved_statement()->DebugString(debug_string_config);
         GOOGLESQL_ASSERT_OK(AddResultStringsForTemplatedSqlObjects(
             output->resolved_statement(), pre_rewrite_result_string));
       }
@@ -1749,8 +1765,8 @@ class AnalyzerTestRunner {
 
         if (outcome.status.ok() &&
             rewrite_output->resolved_statement() != nullptr) {
-          outcome.ast_debug =
-              rewrite_output->resolved_statement()->DebugString();
+          outcome.ast_debug = rewrite_output->resolved_statement()->DebugString(
+              debug_string_config);
           // Append strings for any resolved templated objects in 'output'.
           GOOGLESQL_ASSERT_OK(AddResultStringsForTemplatedSqlObjects(
               rewrite_output->resolved_statement(), outcome.ast_debug));
@@ -1763,8 +1779,10 @@ class AnalyzerTestRunner {
           }
         } else if (outcome.status.ok()) {
           ASSERT_NE(rewrite_output->resolved_expr(), nullptr);
-          outcome.ast_debug = rewrite_output->resolved_expr()->DebugString();
-          if (outcome.ast_debug == output->resolved_expr()->DebugString()) {
+          outcome.ast_debug =
+              rewrite_output->resolved_expr()->DebugString(debug_string_config);
+          if (outcome.ast_debug ==
+              output->resolved_expr()->DebugString(debug_string_config)) {
             continue;
           }
           if (test_case_options_.GetBool(kRunSqlBuilder)) {
@@ -1791,24 +1809,24 @@ class AnalyzerTestRunner {
         }
         for (auto& outcome : rewrite_group_results) {
           std::string groups = absl::StrJoin(outcome.rewrite_group_keys, "|");
-          std::string groups_header = absl::StrCat(
-              "\n\n[[ REWRITER ARTIFACTS FOR RULE GROUPS '", groups, "' ]]\n");
-          if (rewrite_group_results.size() == 1) {
-            // TODO: Remove this exception and update relevant goldens.
-            groups_header = "\n\n";
+          if (rewrite_group_results.size() > 1) {
+            absl::StrAppend(&test_result_string,
+                            "\n\n[[ REWRITER ARTIFACTS FOR RULE GROUPS '",
+                            groups, "' ]]");
           }
           if (!outcome.status.ok()) {
-            absl::StrAppend(&test_result_string, groups_header,
-                            "Rewrite ERROR: ", FormatError(outcome.status));
+            absl::StrAppend(&test_result_string,
+                            "\n\nRewrite ERROR: ", FormatError(outcome.status));
           } else {
-            absl::StrAppend(&test_result_string, groups_header);
             if (test_case_options_.GetBool(kShowResolvedAST) &&
                 !outcome.ast_debug.empty()) {
-              absl::StrAppend(&test_result_string, "[REWRITTEN AST]\n",
+              absl::StrAppend(&test_result_string, "\n\n[REWRITTEN AST]\n",
                               outcome.ast_debug);
+              absl::StripTrailingAsciiWhitespace(&test_result_string);
             }
-            absl::StrAppend(&test_result_string, outcome.sqlbuilder_output);
-            absl::StripAsciiWhitespace(&test_result_string);
+            absl::StrAppend(&test_result_string, "\n\n",
+                            outcome.sqlbuilder_output);
+            absl::StripTrailingAsciiWhitespace(&test_result_string);
           }
         }
       }
@@ -2446,6 +2464,17 @@ class AnalyzerTestRunner {
             output_stmt->GetAs<ResolvedCreateLiveTableStmt>();
         const ResolvedCreateLiveTableStmt* sqlbuilder_create_stmt =
             sqlbuilder_stmt->GetAs<ResolvedCreateLiveTableStmt>();
+        return CompareColumnDefinitionList(
+                   output_create_stmt->column_definition_list(),
+                   sqlbuilder_create_stmt->column_definition_list()) &&
+               CompareOptionList(output_create_stmt->option_list(),
+                                 sqlbuilder_create_stmt->option_list());
+      }
+      case RESOLVED_CREATE_LIVE_TABLE_AS_SELECT_STMT: {
+        const ResolvedCreateLiveTableAsSelectStmt* output_create_stmt =
+            output_stmt->GetAs<ResolvedCreateLiveTableAsSelectStmt>();
+        const ResolvedCreateLiveTableAsSelectStmt* sqlbuilder_create_stmt =
+            sqlbuilder_stmt->GetAs<ResolvedCreateLiveTableAsSelectStmt>();
         return CompareNode(output_create_stmt->query(),
                            sqlbuilder_create_stmt->query()) &&
                CompareOutputColumnList(
@@ -2511,6 +2540,68 @@ class AnalyzerTestRunner {
                    sqlbuilder_create_stmt->entity_type() &&
                CompareOptionList(output_create_stmt->option_list(),
                                  sqlbuilder_create_stmt->option_list());
+      }
+      case RESOLVED_CREATE_DATA_POLICY_STMT: {
+        const auto* output_create_stmt =
+            output_stmt->GetAs<ResolvedCreateDataPolicyStmt>();
+        const auto* sqlbuilder_create_stmt =
+            sqlbuilder_stmt->GetAs<ResolvedCreateDataPolicyStmt>();
+        return ComparePath(output_create_stmt->name_path(),
+                           sqlbuilder_create_stmt->name_path()) &&
+               CompareOptionList(output_create_stmt->option_list(),
+                                 sqlbuilder_create_stmt->option_list()) &&
+               CompareNode(output_create_stmt->condition(),
+                           sqlbuilder_create_stmt->condition());
+      }
+      case RESOLVED_ALTER_DATA_POLICY_STMT: {
+        const auto* output_alter_stmt =
+            output_stmt->GetAs<ResolvedAlterDataPolicyStmt>();
+        const auto* sqlbuilder_alter_stmt =
+            sqlbuilder_stmt->GetAs<ResolvedAlterDataPolicyStmt>();
+        if (!ComparePath(output_alter_stmt->name_path(),
+                         sqlbuilder_alter_stmt->name_path())) {
+          return false;
+        }
+        if (output_alter_stmt->alter_action_list_size() !=
+            sqlbuilder_alter_stmt->alter_action_list_size()) {
+          return false;
+        }
+        for (int i = 0; i < output_alter_stmt->alter_action_list_size(); ++i) {
+          const ResolvedAlterAction* output_action =
+              output_alter_stmt->alter_action_list(i);
+          const ResolvedAlterAction* sqlbuilder_action =
+              sqlbuilder_alter_stmt->alter_action_list(i);
+          if (output_action->node_kind() != sqlbuilder_action->node_kind()) {
+            return false;
+          }
+          switch (output_action->node_kind()) {
+            case RESOLVED_SET_CONDITION_ACTION: {
+              const ResolvedSetConditionAction* output_set_cond =
+                  output_action->GetAs<ResolvedSetConditionAction>();
+              const ResolvedSetConditionAction* sqlbuilder_set_cond =
+                  sqlbuilder_action->GetAs<ResolvedSetConditionAction>();
+              if (!CompareNode(output_set_cond->expression(),
+                               sqlbuilder_set_cond->expression())) {
+                return false;
+              }
+              break;
+            }
+            case RESOLVED_SET_OPTIONS_ACTION: {
+              const ResolvedSetOptionsAction* output_set_opt =
+                  output_action->GetAs<ResolvedSetOptionsAction>();
+              const ResolvedSetOptionsAction* sqlbuilder_set_opt =
+                  sqlbuilder_action->GetAs<ResolvedSetOptionsAction>();
+              if (!CompareOptionList(output_set_opt->option_list(),
+                                     sqlbuilder_set_opt->option_list())) {
+                return false;
+              }
+              break;
+            }
+            default:
+              return false;
+          }
+        }
+        return true;
       }
       case RESOLVED_AUX_LOAD_DATA_STMT: {
         const ResolvedAuxLoadDataStmt* output_create_stmt =
@@ -2632,6 +2723,19 @@ class AnalyzerTestRunner {
                output_create_stmt->is_value_table() ==
                    sqlbuilder_create_stmt->is_value_table();
       }
+      case RESOLVED_CREATE_LIVE_TABLE_AS_SELECT_STMT: {
+        const ResolvedCreateLiveTableAsSelectStmt* output_create_stmt =
+            output_stmt->GetAs<ResolvedCreateLiveTableAsSelectStmt>();
+        const ResolvedCreateLiveTableAsSelectStmt* sqlbuilder_create_stmt =
+            sqlbuilder_stmt->GetAs<ResolvedCreateLiveTableAsSelectStmt>();
+        return CompareOutputColumnList(
+                   output_create_stmt->output_column_list(),
+                   sqlbuilder_create_stmt->output_column_list()) &&
+               CompareOptionList(output_create_stmt->option_list(),
+                                 sqlbuilder_create_stmt->option_list()) &&
+               output_create_stmt->is_value_table() ==
+                   sqlbuilder_create_stmt->is_value_table();
+      }
       case RESOLVED_EXPORT_DATA_STMT: {
         const ResolvedExportDataStmt* output_export_stmt =
             output_stmt->GetAs<ResolvedExportDataStmt>();
@@ -2739,6 +2843,61 @@ class AnalyzerTestRunner {
         GOOGLESQL_EXPECT_OK(sqlbuilder_create_stmt->CheckFieldsAccessed());
         return true;
       }
+      case RESOLVED_CREATE_PROPERTY_GRAPH_TYPE_STMT: {
+        const ResolvedCreatePropertyGraphTypeStmt* output_create_stmt =
+            output_stmt->GetAs<ResolvedCreatePropertyGraphTypeStmt>();
+        const ResolvedCreatePropertyGraphTypeStmt* sqlbuilder_create_stmt =
+            sqlbuilder_stmt->GetAs<ResolvedCreatePropertyGraphTypeStmt>();
+
+        if (!ComparePath(output_create_stmt->name_path(),
+                         sqlbuilder_create_stmt->name_path())) {
+          return false;
+        }
+        if (output_create_stmt->create_mode() !=
+            sqlbuilder_create_stmt->create_mode()) {
+          return false;
+        }
+        if (output_create_stmt->create_scope() !=
+            sqlbuilder_create_stmt->create_scope()) {
+          return false;
+        }
+        if (!CompareOptionList(output_create_stmt->option_list(),
+                               sqlbuilder_create_stmt->option_list())) {
+          return false;
+        }
+        if (!absl::c_equal(
+                output_create_stmt->node_type_list(),
+                sqlbuilder_create_stmt->node_type_list(),
+                absl::bind_front(&AnalyzerTestRunner::GraphElementTypeEqual,
+                                 this))) {
+          return false;
+        }
+        if (!absl::c_equal(
+                output_create_stmt->edge_type_list(),
+                sqlbuilder_create_stmt->edge_type_list(),
+                absl::bind_front(&AnalyzerTestRunner::GraphElementTypeEqual,
+                                 this))) {
+          return false;
+        }
+        if (!absl::c_equal(
+                output_create_stmt->label_list(),
+                sqlbuilder_create_stmt->label_list(),
+                absl::bind_front(&AnalyzerTestRunner::GraphElementLabelEqual,
+                                 this))) {
+          return false;
+        }
+        if (!absl::c_equal(
+                output_create_stmt->property_declaration_list(),
+                sqlbuilder_create_stmt->property_declaration_list(),
+                absl::bind_front(
+                    &AnalyzerTestRunner::GraphPropertyDeclarationEqual,
+                    this))) {
+          return false;
+        }
+        GOOGLESQL_EXPECT_OK(output_create_stmt->CheckFieldsAccessed());
+        GOOGLESQL_EXPECT_OK(sqlbuilder_create_stmt->CheckFieldsAccessed());
+        return true;
+      }
 
       // There is nothing to test for these statement kinds, or we just
       // haven't implemented any comparison yet.  Some of these could do
@@ -2752,6 +2911,7 @@ class AnalyzerTestRunner {
       case RESOLVED_ALTER_PRIVILEGE_RESTRICTION_STMT:
       case RESOLVED_ALTER_MODEL_STMT:
       case RESOLVED_ALTER_ROW_ACCESS_POLICY_STMT:
+      case RESOLVED_ALTER_DATA_POLICY_STMT:
       case RESOLVED_ALTER_SCHEMA_STMT:
       case RESOLVED_ALTER_EXTERNAL_SCHEMA_STMT:
       case RESOLVED_ALTER_SEQUENCE_STMT:
@@ -2775,6 +2935,7 @@ class AnalyzerTestRunner {
       case RESOLVED_CREATE_PROCEDURE_STMT:
       case RESOLVED_CREATE_PRIVILEGE_RESTRICTION_STMT:
       case RESOLVED_CREATE_ROW_ACCESS_POLICY_STMT:
+      case RESOLVED_CREATE_DATA_POLICY_STMT:
       case RESOLVED_CREATE_SCHEMA_STMT:
       case RESOLVED_CREATE_EXTERNAL_SCHEMA_STMT:
       case RESOLVED_CREATE_SNAPSHOT_TABLE_STMT:
@@ -3025,6 +3186,12 @@ class AnalyzerTestRunner {
     return true;
   }
 
+  bool GraphElementTypeEqual(
+      const std::unique_ptr<const ResolvedGraphElementType>& output,
+      const std::unique_ptr<const ResolvedGraphElementType>& sqlbuilder) {
+    return CompareNode(output.get(), sqlbuilder.get());
+  }
+
   bool GraphElementLabelEqual(
       const std::unique_ptr<const ResolvedGraphElementLabel>& output,
       const std::unique_ptr<const ResolvedGraphElementLabel>& sqlbuilder) {
@@ -3156,8 +3323,8 @@ class AnalyzerTestRunner {
   // show_referenced_property_graph option is specified.
   void TestReferencedPropertyGraph(const AnalyzerOutput* analyzer_output,
                                    std::string* result_string) {
-    absl::StrAppend(result_string, "\n[has_graph_references=",
-                    analyzer_output->has_graph_references(), "]\n\n");
+    absl::StrAppend(result_string, "[has_graph_references=",
+                    analyzer_output->has_graph_references(), "]");
   }
 
   // This method is executed to populate the output of parse_locations.test.
@@ -3265,6 +3432,10 @@ class AnalyzerTestRunner {
             RESOLVED_CREATE_MATERIALIZED_VIEW_STMT ||
         original_analyzer_output->resolved_statement()->node_kind() ==
             RESOLVED_CREATE_APPROX_VIEW_STMT ||
+        original_analyzer_output->resolved_statement()->node_kind() ==
+            RESOLVED_CREATE_DATA_POLICY_STMT ||
+        original_analyzer_output->resolved_statement()->node_kind() ==
+            RESOLVED_ALTER_DATA_POLICY_STMT ||
         original_options.statement_context() ==
             StatementContext::CONTEXT_MODULE) {
       return absl::OkStatus();

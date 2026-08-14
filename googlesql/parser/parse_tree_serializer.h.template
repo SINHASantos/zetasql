@@ -102,7 +102,7 @@ class ParseTreeSerializer {
       {{node.name}}* node, const {{node.proto_type}}& proto,
       IdStringPool* id_string_pool, googlesql_base::UnsafeArena* arena,
       std::vector<std::unique_ptr<ASTNode>>* allocated_ast_nodes);
- # if node.is_abstract
+ # if node.is_abstract or node.allow_non_final_concrete_class_for_legacy_migration
   # if not node.name in ['ASTStatement', 'ASTExpression', 'ASTType']
   static absl::Status Serialize(const {{node.name}}* node,
                                 {{node.proto_field_type}}* proto);
@@ -119,7 +119,8 @@ class ParseTreeSerializer {
       IdStringPool* id_string_pool,
       googlesql_base::UnsafeArena* arena,
       std::vector<std::unique_ptr<ASTNode>>* allocated_ast_nodes);
- # else
+ # endif
+ # if not node.is_abstract
   static absl::StatusOr<{{node.name}}*> Deserialize(
       const {{node.proto_type}}& proto,
       IdStringPool* id_string_pool,

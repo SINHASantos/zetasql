@@ -55,6 +55,14 @@ class GraphDdlResolver {
       const ASTCreatePropertyGraphStatement* ast_stmt,
       std::unique_ptr<ResolvedStatement>* output) const;
 
+  // Resolves a CREATE PROPERTY GRAPH TYPE statement, the logical-only property
+  // graph type DDL. Unlike ResolveCreatePropertyGraphStmt it resolves no
+  // physical table bindings: only the element types, their default labels and
+  // the property declarations exposed by those labels.
+  absl::Status ResolveCreatePropertyGraphTypeStmt(
+      const ASTCreatePropertyGraphTypeStatement* ast_stmt,
+      std::unique_ptr<ResolvedStatement>* output) const;
+
   // This class represents a ResolvedGraphPropertyDeclaration with is_measure
   // property. It is used to validate that when there is a
   // ResolvedGraphPropertyDeclaration that is a measure, then there should not
@@ -140,6 +148,21 @@ class GraphDdlResolver {
       GraphElementTable::Kind element_kind,
       const StringViewHashMapCase<const ResolvedGraphElementTable*>&
           node_table_map) const;
+
+  // Resolves a single node or edge type definition `ast_element_type` in a
+  // CREATE PROPERTY GRAPH TYPE statement. Returns the resolved element type
+  // together with its default label and the property declarations exposed by
+  // that label. `element_kind` selects node-type vs edge-type handling (only
+  // edge types may carry FROM/TO references).
+  struct ElementTypeWithLabelAndProperties {
+    std::unique_ptr<const ResolvedGraphElementType> element_type;
+    std::unique_ptr<const ResolvedGraphElementLabel> label;
+    std::vector<std::unique_ptr<PropertyDeclarationWithIsMeasure>>
+        property_decls;
+  };
+  absl::StatusOr<ElementTypeWithLabelAndProperties> ResolveGraphElementType(
+      const ASTGraphElementType* ast_element_type,
+      PropertyGraphElementType::Kind element_kind) const;
 
   // Resolves the `ast_node_table_ref` into a ResolvedGraphNodeTableReference.
   //

@@ -40,7 +40,6 @@
 #include "googlesql/public/function_signature.h"
 #include "googlesql/public/functions/arithmetics.h"
 #include "googlesql/public/functions/array_zip_mode.pb.h"
-#include "googlesql/public/functions/range.h"
 #include "googlesql/public/numeric_value.h"
 #include "googlesql/public/options.pb.h"
 #include "googlesql/public/sql_tvf.h"
@@ -51,6 +50,7 @@
 #include "googlesql/public/value.h"
 #include "googlesql/reference_impl/evaluation.h"
 #include "googlesql/reference_impl/function.h"
+#include "googlesql/reference_impl/memory_accountant.h"
 #include "googlesql/reference_impl/operator.h"
 #include "googlesql/reference_impl/tuple.h"
 #include "googlesql/reference_impl/tuple_comparator.h"
@@ -5800,6 +5800,18 @@ struct PathFactorsWithCost {
   }
 };
 
+int64_t GetPathFactorsWithCostSize(const PathFactorsWithCost& path) {
+  int64_t size = sizeof(PathFactorsWithCost);
+  for (const auto& val : path.path_factors) {
+    size += val.physical_byte_size();
+  }
+  if (path.total_cost.has_value()) {
+    size += path.total_cost->physical_byte_size();
+  }
+  size += path.path_length.physical_byte_size();
+  return size;
+}
+
 static std::unique_ptr<TupleData> BuildHeadAndTailAsGroupKey(
     const Value& head, const Value& tail) {
   auto group_key = std::make_unique<TupleData>(2);
@@ -5817,13 +5829,17 @@ static bool LessThanOrEquals(const Value& lhs, const Value& rhs) {
 // selection criteria are defined by `GraphPathPrefixEvalContext` and sorting
 // criteria are defined by `PathPriorityQueue`.
 class PathPriorityQueue {
+  using MemoryTrackedTopKPathsPQ =
+      MemoryTrackedQueue<std::priority_queue<PathFactorsWithCost>>;
+
  public:
   static absl::StatusOr<std::unique_ptr<PathPriorityQueue>> Create(
-      const GraphPathPrefixEvalContext& context) {
+      const GraphPathPrefixEvalContext& context,
+      RelationalOpMemoryTracker* memory_tracker = nullptr) {
     GOOGLESQL_RET_CHECK_GE(context.path_count, 0);
     GOOGLESQL_RET_CHECK_NE(context.path_mode,
                  ResolvedGraphPathMode::PATH_MODE_UNSPECIFIED);
-    return absl::WrapUnique(new PathPriorityQueue(context));
+    return absl::WrapUnique(new PathPriorityQueue(context, memory_tracker));
   }
 
   absl::Status Push(PathFactorsWithCost& path) {
@@ -5838,10 +5854,10 @@ class PathPriorityQueue {
                                                     path.path_factors.back());
     pq_ties_cnt_per_head_tail_[TupleDataPtr(head_and_tail.get())]
                               [path.GetSortingValue()]++;
-    top_k_paths_per_head_tail_[TupleDataPtr(head_and_tail.get())].push(
-        std::move(path));
-    DiscardToMaxSize(
-        top_k_paths_per_head_tail_[TupleDataPtr(head_and_tail.get())]);
+    MemoryTrackedTopKPathsPQ& pq =
+        GetOrCreateTopKPathsPriorityQueue(head_and_tail.get());
+    GOOGLESQL_RETURN_IF_ERROR(pq.Push(std::move(path)));
+    DiscardToMaxSize(pq);
 
     group_keys_memory_.push_back(std::move(head_and_tail));
     return absl::OkStatus();
@@ -5860,8 +5876,7 @@ class PathPriorityQueue {
     std::vector<PathFactorsWithCost> paths;
     for (auto& [unused, pq] : top_k_paths_per_head_tail_) {
       while (!pq.empty()) {
-        paths.push_back(std::move(pq.top()));
-        pq.pop();
+        paths.push_back(pq.Pop());
       }
     }
     top_k_paths_per_head_tail_.clear();
@@ -5871,8 +5886,7 @@ class PathPriorityQueue {
     return paths;
   }
 
-  const absl::flat_hash_map<TupleDataPtr,
-                            std::priority_queue<PathFactorsWithCost>>&
+  const absl::flat_hash_map<TupleDataPtr, MemoryTrackedTopKPathsPQ>&
   top_k_paths_per_head_tail() const {
     return top_k_paths_per_head_tail_;
   }
@@ -5901,17 +5915,28 @@ class PathPriorityQueue {
   }
 
  private:
-  explicit PathPriorityQueue(const GraphPathPrefixEvalContext& context)
-      : context_(context) {}
+  explicit PathPriorityQueue(const GraphPathPrefixEvalContext& context,
+                             RelationalOpMemoryTracker* memory_tracker)
+      : context_(context), memory_tracker_(memory_tracker) {}
 
-  void DiscardToMaxSize(std::priority_queue<PathFactorsWithCost>& pq) {
+  MemoryTrackedTopKPathsPQ& GetOrCreateTopKPathsPriorityQueue(
+      TupleData* head_and_tail) {
+    auto [it, inserted] = top_k_paths_per_head_tail_.try_emplace(
+        TupleDataPtr(head_and_tail), memory_tracker_,
+        [](const PathFactorsWithCost& path) {
+          return GetPathFactorsWithCostSize(path);
+        });
+    return it->second;
+  }
+
+  void DiscardToMaxSize(MemoryTrackedTopKPathsPQ& pq) {
     while (pq.size() > path_count()) {
       const auto& top = pq.top();
       auto head_and_tail = BuildHeadAndTailAsGroupKey(top.path_factors.front(),
                                                       top.path_factors.back());
       pq_ties_cnt_per_head_tail_[TupleDataPtr(head_and_tail.get())]
                                 [top.GetSortingValue()]--;
-      pq.pop();
+      pq.Pop();
     }
   }
 
@@ -5924,9 +5949,10 @@ class PathPriorityQueue {
 
   // The path prefix evaluation context of the paths in this priority queue.
   const GraphPathPrefixEvalContext context_;
+  RelationalOpMemoryTracker* const memory_tracker_ = nullptr;
   // The top k materialized paths with costs grouped by the values of the head
   // and tail node pairs.
-  absl::flat_hash_map<TupleDataPtr, std::priority_queue<PathFactorsWithCost>>
+  absl::flat_hash_map<TupleDataPtr, MemoryTrackedTopKPathsPQ>
       top_k_paths_per_head_tail_;
   // Per head and tail node pairs, the ties count across top k materialized
   // paths.
@@ -6670,6 +6696,8 @@ class QuantifiedGraphPathTupleIterator : public TupleIterator {
     std::optional<Value> total_cost = std::nullopt;
   };
 
+  friend int64_t GetPathStateSize(const PathState& path_state);
+
   const TupleSchema& Schema() const override { return *output_schema_; }
 
   absl::Status Status() const override { return status_; }
@@ -6766,11 +6794,14 @@ class QuantifiedGraphPathTupleIterator : public TupleIterator {
   absl::Status MaterializeAllQuantifiedPaths() {
     // A collection of priority queues that retain the materialized paths
     // according to path prefix constraints.
-    GOOGLESQL_ASSIGN_OR_RETURN(auto path_priority_queue,
-                     PathPriorityQueue::Create(prefix_context_));
+    GOOGLESQL_ASSIGN_OR_RETURN(
+        auto path_priority_queue,
+        PathPriorityQueue::Create(prefix_context_, &memory_tracker_));
 
     // Queue that holds paths from start until current iteration.
-    std::queue<PathState> queue;
+    MemoryTrackedQueue<std::queue<PathState>> queue(
+        &memory_tracker_,
+        [](const PathState& state) { return GetPathStateSize(state); });
     for (const Value& node : starting_nodes_) {
       PathState path_state;
       path_state.iteration = 0;
@@ -6782,7 +6813,7 @@ class QuantifiedGraphPathTupleIterator : public TupleIterator {
         GOOGLESQL_ASSIGN_OR_RETURN(path_state.total_cost,
                          CreateTypedZeroForCost(cost_type_));
       }
-      queue.push(std::move(path_state));
+      GOOGLESQL_RETURN_IF_ERROR(queue.Push(std::move(path_state)));
     }
 
     // Perform BFS to materialize paths that:
@@ -6791,8 +6822,7 @@ class QuantifiedGraphPathTupleIterator : public TupleIterator {
     while (!queue.empty()) {
       GOOGLESQL_RETURN_IF_ERROR(
           PeriodicallyVerifyNotAborted(context_, ++num_steps_computed_));
-      PathState current_path = std::move(queue.front());
-      queue.pop();
+      PathState current_path = queue.Pop();
 
       if (current_path.iteration <= upper_bound_ &&
           current_path.iteration >= lower_bound_) {
@@ -6856,7 +6886,7 @@ class QuantifiedGraphPathTupleIterator : public TupleIterator {
         if (cost_type_) {
           next_path.total_cost = new_total_cost.value();
         }
-        queue.push(std::move(next_path));
+        GOOGLESQL_RETURN_IF_ERROR(queue.Push(std::move(next_path)));
       }
     }
 
@@ -6958,7 +6988,8 @@ class QuantifiedGraphPathTupleIterator : public TupleIterator {
         path_type_(path_type),
         cost_type_(cost_type),
         prefix_context_(prefix_context),
-        context_(context) {
+        context_(context),
+        memory_tracker_(context->memory_accountant()) {
     output_tuple_.AddSlots(output_schema_->num_variables() + num_extra_slots);
   }
 
@@ -6995,6 +7026,8 @@ class QuantifiedGraphPathTupleIterator : public TupleIterator {
   // The EvaluationContext.
   EvaluationContext* context_;
 
+  RelationalOpAccountantMemoryTracker memory_tracker_;
+
   // A map of reachable nodes from every starting node's identifier for this
   // quantified path. Quantifying this path repeats the path primary up to N
   // times and concatenates the tail of the previous iteration with the head of
@@ -7020,6 +7053,23 @@ class QuantifiedGraphPathTupleIterator : public TupleIterator {
   // Temporarily stores the materialized paths before they're outputted.
   std::optional<std::vector<PathFactorsWithCost>> materialized_paths_;
 };
+
+int64_t GetPathStateSize(
+    const QuantifiedGraphPathTupleIterator::PathState& path_state) {
+  int64_t size = sizeof(QuantifiedGraphPathTupleIterator::PathState);
+  size += path_state.head.physical_byte_size();
+  size += path_state.tail.physical_byte_size();
+  for (const auto& vec : path_state.group_variables) {
+    size += sizeof(std::vector<Value>);
+    for (const auto& val : vec) {
+      size += val.physical_byte_size();
+    }
+  }
+  if (path_state.total_cost.has_value()) {
+    size += path_state.total_cost->physical_byte_size();
+  }
+  return size;
+}
 
 }  // namespace
 

@@ -24,10 +24,10 @@
 #include "googlesql/public/function.h"
 #include "googlesql/public/function_signature.h"
 #include "googlesql/public/options.pb.h"
-#include "googlesql/public/types/declarative_type.h"
 #include "googlesql/public/types/type.h"
 #include "googlesql/public/types/type_factory.h"
 #include "googlesql/public/types/value_representations.h"
+#include "googlesql/public/types/vector_type_util.h"
 #include "absl/status/status.h"
 #include "absl/strings/string_view.h"
 #include "googlesql/base/ret_check.h"
@@ -44,18 +44,7 @@ absl::Status GetVectorFunctions(TypeFactory* type_factory,
     return absl::OkStatus();
   }
 
-  GOOGLESQL_ASSIGN_OR_RETURN(
-      const Type* vector_type,
-      type_factory->MakeDeclarativeType(
-          DeclarativeTypeDescriptor()
-              .set_type_id({std::string(TypeId::kGoogleSqlNamespace),
-                            std::string(kVectorTypeName)})
-              .set_display_name(kVectorTypeName)
-              .set_backing_type(type_factory->get_bytes())
-              .set_returning_strategy(
-                  DeclarativeTypeDescriptor::ReturningDelegated{})
-              .set_additional_required_language_features(
-                  {FEATURE_VECTOR_TYPE})));
+  GOOGLESQL_ASSIGN_OR_RETURN(const Type* vector_type, MakeVectorType(type_factory));
   const auto& [it, inserted] =
       types->insert({std::string(kVectorTypeName), vector_type});
   GOOGLESQL_RET_CHECK(inserted);

@@ -296,6 +296,31 @@ absl::Status ValidateCreationAgainstCatalog(
   return MakeSqlErrorAt(ast_location) << err_message;
 }
 
+// Validates that no object of `CatalogObjectType` shares `create_stmt`'s name.
+// Unlike ValidateCreationAgainstCatalog, an existing object is ALWAYS an error
+// here, even under CREATE OR REPLACE / CREATE IF NOT EXISTS. Those modifiers
+// only apply to a same-kind object being (re)created; a cross-kind name clash
+// (e.g. a property graph type whose name is already used by a table) can never
+// be satisfied by replacing or skipping, and must be rejected regardless of
+// create mode.
+template <typename CatalogObjectType>
+absl::Status ValidateNoCrossKindCollision(
+    const ASTNode* ast_location, const ResolvedCreateStatement& create_stmt,
+    Catalog& catalog, const Catalog::FindOptions& options,
+    absl::string_view err_message) {
+  const CatalogObjectType* object;
+  absl::Status find_object_status =
+      catalog.FindObject(create_stmt.name_path(), &object, options);
+  // Report ok if no object with given name exists in catalog.
+  if (absl::IsNotFound(find_object_status)) {
+    return absl::OkStatus();
+  }
+  // Report other catalog error as it is.
+  GOOGLESQL_RETURN_IF_ERROR(find_object_status);
+  // A cross-kind name clash is always an error, irrespective of create mode.
+  return MakeSqlErrorAt(ast_location) << err_message;
+}
+
 // Validates element tables all have distinct names and outputs the names to
 // `existing_identifiers`.
 absl::Status ValidateNoDuplicateElementTable(
@@ -1612,6 +1637,325 @@ absl::Status GraphDdlResolver::ResolveCreatePropertyGraphStmt(
       "Please use a different name")));
   *output = absl::WrapUnique(const_cast<ResolvedCreatePropertyGraphStmt*>(
       create_property_graph_stmt.release()));
+  return absl::OkStatus();
+}
+
+absl::StatusOr<GraphDdlResolver::ElementTypeWithLabelAndProperties>
+GraphDdlResolver::ResolveGraphElementType(
+    const ASTGraphElementType* ast_element_type,
+    PropertyGraphElementType::Kind element_kind) const {
+  GOOGLESQL_RET_CHECK_NE(ast_element_type, nullptr);
+  GOOGLESQL_RET_CHECK_NE(ast_element_type->name(), nullptr);
+  const std::string element_type_name = ast_element_type->name()->GetAsString();
+
+  // Resolve the property declarations exposed by this element type's default
+  // label (whose name is the element type name).
+  std::vector<std::unique_ptr<PropertyDeclarationWithIsMeasure>> property_decls;
+  std::vector<std::string> property_declaration_names;
+  StringViewHashSetCase local_property_names;
+  if (ast_element_type->property_list() != nullptr) {
+    const auto& ast_property_declarations =
+        ast_element_type->property_list()->property_declarations();
+    property_decls.reserve(ast_property_declarations.size());
+    property_declaration_names.reserve(ast_property_declarations.size());
+    for (const ASTGraphPropertyDeclaration* ast_property :
+         ast_property_declarations) {
+      GOOGLESQL_RET_CHECK_NE(ast_property->name(), nullptr);
+      const std::string property_name = ast_property->name()->GetAsString();
+      if (!local_property_names.insert(ast_property->name()->GetAsStringView())
+               .second) {
+        return MakeSqlErrorAt(ast_property->name())
+               << "Duplicate property name "
+               << ToSingleQuotedStringLiteral(property_name)
+               << " in element type "
+               << ToSingleQuotedStringLiteral(element_type_name);
+      }
+      // Property-level OPTIONS clause is not supported in
+      // ResolvedGraphPropertyDeclaration yet.
+      if (ast_property->options_list() != nullptr) {
+        return MakeSqlErrorAt(ast_property->options_list())
+               << "OPTIONS clause is not supported for the graph type property "
+                  "declaration";
+      }
+      const Type* property_type = nullptr;
+      TypeModifiers property_type_modifiers;
+      GOOGLESQL_RETURN_IF_ERROR(
+          resolver_.ResolveType(ast_property->type(),
+                                {.allow_type_parameters = false,
+                                 .allow_collation = false,
+                                 .context = "graph type property declarations"},
+                                &property_type, &property_type_modifiers));
+      // Measure-typed properties are not allowed in a graph type property
+      // declaration. `ResolveType` above already rejects them today, but that
+      // rejection is incidental to measure support being unimplemented; guard
+      // explicitly so a future `ResolveType` that resolves measure types cannot
+      // silently flow one through here as a plain (is_measure=false) property.
+      if (property_type->IsMeasureType()) {
+        return MakeSqlErrorAt(ast_property->type())
+               << "Measure-typed properties are not supported in a graph type "
+                  "property declaration";
+      }
+      GOOGLESQL_ASSIGN_OR_RETURN(
+          std::unique_ptr<const ResolvedGraphPropertyDeclaration> property_decl,
+          ResolvedGraphPropertyDeclarationBuilder()
+              .set_name(property_name)
+              .set_type(property_type)
+              .Build());
+      property_decls.push_back(
+          std::make_unique<PropertyDeclarationWithIsMeasure>(
+              GetResolvedElementWithLocation(std::move(property_decl),
+                                             ast_property->location()),
+              /*is_measure=*/false));
+      property_declaration_names.push_back(property_name);
+    }
+  }
+
+  // Default-label OPTIONS have no place in this statement yet: the resolved
+  // shape carries them on the label, but neither the validator (without the
+  // feature) nor the SQLBuilder round-trip can handle a label option list, so
+  // resolving them would produce an AST that fails downstream. Reject them
+  // here, mirroring the property-level OPTIONS rejection above.
+  if (ast_element_type->default_label_options_list() != nullptr) {
+    return MakeSqlErrorAt(ast_element_type->default_label_options_list())
+           << "OPTIONS clause is not supported for the graph type default "
+              "label";
+  }
+
+  // Build the default label: its name is the element type name and it exposes
+  // exactly the property declarations resolved above. A property graph element
+  // type is not allowed to have explicit labels, so this default label (named
+  // after the element type) is the only label the element type ever carries.
+  GOOGLESQL_ASSIGN_OR_RETURN(std::unique_ptr<const ResolvedGraphElementLabel> label,
+                   ResolvedGraphElementLabelBuilder()
+                       .set_name(element_type_name)
+                       .set_property_declaration_name_list(
+                           std::move(property_declaration_names))
+                       .Build());
+  label = GetResolvedElementWithLocation(std::move(label),
+                                         ast_element_type->name()->location());
+
+  // Resolve FROM/TO node type references. These are only valid on edge types,
+  // where an edge type may carry zero, one, or two of them: an omitted endpoint
+  // means any node type is allowed there (see the builder below). The grammar
+  // shares the element type production between node and edge types, so a
+  // FROM/TO clause can syntactically appear on a node type; reject that here
+  // with a user-facing error rather than treating it as an internal bug.
+  std::string source_node_type;
+  std::string dest_node_type;
+  if (element_kind == PropertyGraphElementType::Kind::kEdge) {
+    for (const ASTGraphNodeTypeReference* ref :
+         ast_element_type->node_type_references()) {
+      GOOGLESQL_RET_CHECK_NE(ref->node_type_name(), nullptr);
+      const std::string node_type_name = ref->node_type_name()->GetAsString();
+      switch (ref->node_reference_type()) {
+        case ASTGraphNodeTypeReference::SOURCE:
+          source_node_type = node_type_name;
+          break;
+        case ASTGraphNodeTypeReference::DESTINATION:
+          dest_node_type = node_type_name;
+          break;
+        default:
+          return MakeSqlErrorAt(ref)
+                 << "Unexpected FROM/TO node type reference kind on edge type "
+                 << ToSingleQuotedStringLiteral(element_type_name);
+      }
+    }
+  } else if (!ast_element_type->node_type_references().empty()) {
+    return MakeSqlErrorAt(ast_element_type->node_type_references().front())
+           << "FROM/TO node type references are not allowed on node type "
+           << ToSingleQuotedStringLiteral(element_type_name);
+  }
+
+  // An edge type may declare FROM, TO, both, or neither. An omitted endpoint is
+  // left unset on the resolved element type, which means any node type is
+  // allowed for that endpoint; FROM-only, TO-only, and neither are all valid.
+  ResolvedGraphElementTypeBuilder builder;
+  builder.set_name(element_type_name).set_label_name_list({element_type_name});
+  if (!source_node_type.empty()) {
+    builder.set_source_node_type(source_node_type);
+  }
+  if (!dest_node_type.empty()) {
+    builder.set_dest_node_type(dest_node_type);
+  }
+  GOOGLESQL_ASSIGN_OR_RETURN(std::unique_ptr<const ResolvedGraphElementType> element_type,
+                   std::move(builder).Build());
+
+  return ElementTypeWithLabelAndProperties{
+      .element_type = std::move(element_type),
+      .label = std::move(label),
+      .property_decls = std::move(property_decls)};
+}
+
+namespace {
+
+// Moves a resolved element type, its default label, and its property
+// declarations into the statement-level accumulators `element_types`, `labels`,
+// and `property_decls`.
+void CollectElementType(
+    std::unique_ptr<const ResolvedGraphElementType> element_type,
+    std::unique_ptr<const ResolvedGraphElementLabel> label,
+    std::vector<
+        std::unique_ptr<GraphDdlResolver::PropertyDeclarationWithIsMeasure>>
+        resolved_property_decls,
+    std::vector<std::unique_ptr<const ResolvedGraphElementType>>& element_types,
+    std::vector<std::unique_ptr<const ResolvedGraphElementLabel>>& labels,
+    std::vector<
+        std::unique_ptr<GraphDdlResolver::PropertyDeclarationWithIsMeasure>>&
+        property_decls) {
+  element_types.push_back(std::move(element_type));
+  labels.push_back(std::move(label));
+  property_decls.insert(
+      property_decls.end(),
+      std::make_move_iterator(resolved_property_decls.begin()),
+      std::make_move_iterator(resolved_property_decls.end()));
+}
+
+}  // namespace
+
+absl::Status GraphDdlResolver::ResolveCreatePropertyGraphTypeStmt(
+    const ASTCreatePropertyGraphTypeStatement* ast_stmt,
+    std::unique_ptr<ResolvedStatement>* output) const {
+  GOOGLESQL_RET_CHECK_NE(ast_stmt, nullptr);
+
+  ResolvedCreateStatement::CreateScope create_scope;
+  ResolvedCreateStatement::CreateMode create_mode;
+  GOOGLESQL_RETURN_IF_ERROR(resolver_.ResolveCreateStatementOptions(
+      ast_stmt, "CREATE PROPERTY GRAPH TYPE", &create_scope, &create_mode));
+
+  std::vector<std::unique_ptr<const ResolvedOption>> option_list;
+  if (ast_stmt->options_list() != nullptr) {
+    GOOGLESQL_RETURN_IF_ERROR(resolver_.ResolveOptionsList(
+        ast_stmt->options_list(), /*allow_alter_array_operators=*/false,
+        &option_list));
+  }
+
+  std::vector<std::unique_ptr<const ResolvedGraphElementType>> node_types;
+  std::vector<std::unique_ptr<const ResolvedGraphElementType>> edge_types;
+  std::vector<std::unique_ptr<const ResolvedGraphElementLabel>> labels;
+  std::vector<std::unique_ptr<PropertyDeclarationWithIsMeasure>> property_decls;
+
+  // Element type names are unique across both node and edge types. Node type
+  // names are tracked separately so edge FROM/TO references can be validated
+  // against the full set of declared node types.
+  StringViewHashSetCase element_type_names;
+  StringViewHashSetCase node_type_names;
+
+  // Resolve node types first so that edge FROM/TO references can be resolved
+  // against the complete set of node type names.
+  GOOGLESQL_RET_CHECK_NE(ast_stmt->node_type_list(), nullptr);
+  for (const ASTGraphElementType* ast_node_type :
+       ast_stmt->node_type_list()->element_types()) {
+    if (!element_type_names.insert(ast_node_type->name()->GetAsStringView())
+             .second) {
+      return MakeSqlErrorAt(ast_node_type->name())
+             << "Duplicate element type name "
+             << ToSingleQuotedStringLiteral(
+                    ast_node_type->name()->GetAsString());
+    }
+    node_type_names.insert(ast_node_type->name()->GetAsStringView());
+    GOOGLESQL_ASSIGN_OR_RETURN(ElementTypeWithLabelAndProperties resolved_node,
+                     ResolveGraphElementType(
+                         ast_node_type, PropertyGraphElementType::Kind::kNode));
+    CollectElementType(std::move(resolved_node.element_type),
+                       std::move(resolved_node.label),
+                       std::move(resolved_node.property_decls), node_types,
+                       labels, property_decls);
+  }
+
+  // Resolve edge types, if any.
+  if (ast_stmt->edge_type_list() != nullptr) {
+    for (const ASTGraphElementType* ast_edge_type :
+         ast_stmt->edge_type_list()->element_types()) {
+      if (!element_type_names.insert(ast_edge_type->name()->GetAsStringView())
+               .second) {
+        return MakeSqlErrorAt(ast_edge_type->name())
+               << "Duplicate element type name "
+               << ToSingleQuotedStringLiteral(
+                      ast_edge_type->name()->GetAsString());
+      }
+      // Validate FROM/TO references against the declared node types before
+      // building, so the user-facing error points at the offending reference.
+      for (const ASTGraphNodeTypeReference* ref :
+           ast_edge_type->node_type_references()) {
+        if (!node_type_names.contains(
+                ref->node_type_name()->GetAsStringView())) {
+          return MakeSqlErrorAt(ref->node_type_name())
+                 << "Edge type "
+                 << ToSingleQuotedStringLiteral(
+                        ast_edge_type->name()->GetAsString())
+                 << " references undefined node type "
+                 << ToSingleQuotedStringLiteral(
+                        ref->node_type_name()->GetAsString());
+        }
+      }
+      GOOGLESQL_ASSIGN_OR_RETURN(
+          ElementTypeWithLabelAndProperties resolved_edge,
+          ResolveGraphElementType(ast_edge_type,
+                                  PropertyGraphElementType::Kind::kEdge));
+      CollectElementType(std::move(resolved_edge.element_type),
+                         std::move(resolved_edge.label),
+                         std::move(resolved_edge.property_decls), edge_types,
+                         labels, property_decls);
+    }
+  }
+
+  // De-duplicate property declarations at graph-type scope: a property name
+  // reused across element types must resolve to a consistent type.
+  GOOGLESQL_RETURN_IF_ERROR(
+      Dedupe(property_decls, &PropertyDeclarationWithIsMeasure::name));
+  // Labels are keyed by their (element type) name, which is already unique
+  // across the statement; Dedupe keeps the collection canonical.
+  GOOGLESQL_RETURN_IF_ERROR(Dedupe(labels, &ResolvedGraphElementLabel::name));
+
+  std::vector<std::unique_ptr<const ResolvedGraphPropertyDeclaration>>
+      property_declarations;
+  property_declarations.reserve(property_decls.size());
+  absl::c_transform(
+      property_decls, std::back_inserter(property_declarations),
+      [](auto& property_decl) { return property_decl->release_declaration(); });
+
+  GOOGLESQL_ASSIGN_OR_RETURN(
+      std::unique_ptr<const ResolvedCreatePropertyGraphTypeStmt>
+          create_property_graph_type_stmt,
+      ResolvedCreatePropertyGraphTypeStmtBuilder()
+          .set_name_path(ast_stmt->name()->ToIdentifierVector())
+          .set_create_scope(create_scope)
+          .set_create_mode(create_mode)
+          .set_node_type_list(std::move(node_types))
+          .set_edge_type_list(std::move(edge_types))
+          .set_label_list(std::move(labels))
+          .set_property_declaration_list(std::move(property_declarations))
+          .set_option_list(std::move(option_list))
+          .Build());
+
+  // Validates name collision. Property graph types share a single catalog
+  // namespace with property graphs and tables (see
+  // SimpleCatalog::global_names_), so the name must be unique across all three;
+  // otherwise catalog registration would fail. Mirrors the checks in
+  // ResolveCreatePropertyGraphStmt.
+  //
+  // Only the same-kind check honors CREATE OR REPLACE / CREATE IF NOT EXISTS: a
+  // graph type may replace/coexist with an existing graph type. A name already
+  // used by a property graph or a table is a cross-kind clash that those
+  // modifiers cannot satisfy, so it is rejected regardless of create mode.
+  GOOGLESQL_RETURN_IF_ERROR((ValidateCreationAgainstCatalog<PropertyGraphType>(
+      ast_stmt->name(), *create_property_graph_type_stmt, *resolver_.catalog_,
+      resolver_.analyzer_options_.find_options(),
+      "A property graph type with the same name is already defined. "
+      "Please use a different name")));
+  GOOGLESQL_RETURN_IF_ERROR((ValidateNoCrossKindCollision<PropertyGraph>(
+      ast_stmt->name(), *create_property_graph_type_stmt, *resolver_.catalog_,
+      resolver_.analyzer_options_.find_options(),
+      "The property graph type's name is used by a property graph under the "
+      "same name. Please use a different name")));
+  GOOGLESQL_RETURN_IF_ERROR((ValidateNoCrossKindCollision<Table>(
+      ast_stmt->name(), *create_property_graph_type_stmt, *resolver_.catalog_,
+      resolver_.analyzer_options_.find_options(),
+      "The property graph type's name is used by a table under the same name. "
+      "Please use a different name")));
+
+  *output = absl::WrapUnique(const_cast<ResolvedCreatePropertyGraphTypeStmt*>(
+      create_property_graph_type_stmt.release()));
   return absl::OkStatus();
 }
 

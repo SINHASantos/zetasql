@@ -271,8 +271,8 @@ absl::Status DatetimeRangeArrayGenerator::Generate(
   DatetimeValue end = range_end.value();
   GOOGLESQL_RET_CHECK(start.IsValid());
   GOOGLESQL_RET_CHECK(end.IsValid());
-  GOOGLESQL_RET_CHECK(IntervalDiffDatetimes(start, end)->GetAsNanos() <= 0)
-      << "invalid input RANGE value";
+  GOOGLESQL_ASSIGN_OR_RETURN(IntervalValue diff, IntervalDiffDatetimes(start, end));
+  GOOGLESQL_RET_CHECK(diff.GetAsNanos() <= 0) << "invalid input RANGE value";
 
   DatetimeValue current_start;
   DatetimeValue current_end = start;

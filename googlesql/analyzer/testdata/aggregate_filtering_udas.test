@@ -277,6 +277,7 @@ QueryStmt
                     +-FunctionCall(GoogleSQL:$greater(INT64, INT64) -> BOOL)
                       +-ColumnRef(type=INT64, column=$inlined_WrappedAggWithWhereModifier.e#3)
                       +-Literal(type=INT64, value=10)
+
 [SQLBUILDER_TARGET_SYNTAX_MODE standard]
 [SQLBUILDER_OUTPUT]
 SELECT
@@ -542,6 +543,7 @@ QueryStmt
                     +-FunctionCall(GoogleSQL:$greater(INT64, INT64) -> BOOL)
                       +-ColumnRef(type=INT64, column=$aggregate.$agg1#6)
                       +-Literal(type=INT64, value=10)
+
 [SQLBUILDER_TARGET_SYNTAX_MODE standard]
 [SQLBUILDER_OUTPUT]
 SELECT
@@ -709,6 +711,7 @@ QueryStmt
                     +-FunctionCall(GoogleSQL:$greater(INT64, INT64) -> BOOL)
                       +-ColumnRef(type=INT64, column=$aggregate.$agg2#31)
                       +-Literal(type=INT64, value=10)
+
 [SQLBUILDER_TARGET_SYNTAX_MODE standard]
 [SQLBUILDER_OUTPUT]
 SELECT
@@ -791,7 +794,7 @@ QueryStmt
   +-ProjectScan
     +-column_list=[no_arg_tvf_containing_filter_returns_one.result#1]
     +-input_scan=
-      +-TVFScan(column_list=[no_arg_tvf_containing_filter_returns_one.result#1], tvf=no_arg_tvf_containing_filter_returns_one(() -> TABLE<result INT64>), signature=() -> TABLE<result INT64>, column_index_list=[0], function_call_signature=() -> TABLE<result INT64>)
+      +-TVFScan(column_list=[no_arg_tvf_containing_filter_returns_one.result#1], tvf=no_arg_tvf_containing_filter_returns_one, signature=() -> TABLE<result INT64>, column_index_list=[0], function_call_signature=() -> TABLE<result INT64>)
 
 [SQLBUILDER_TARGET_SYNTAX_MODE standard]
 [SQLBUILDER_OUTPUT]
@@ -833,6 +836,7 @@ QueryStmt
                     +-FunctionCall(GoogleSQL:$greater(INT64, INT64) -> BOOL)
                       +-ColumnRef(type=INT64, column=$array.x#2)
                       +-Literal(type=INT64, value=2)
+
 [SQLBUILDER_TARGET_SYNTAX_MODE standard]
 [SQLBUILDER_OUTPUT]
 SELECT
@@ -864,7 +868,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=[templated_tvf_containing_filter_returns_one.result#20]
-        +-tvf=templated_tvf_containing_filter_returns_one((ANY TABLE unused) -> ANY TABLE)
+        +-tvf=templated_tvf_containing_filter_returns_one
         +-signature=(TABLE<int32 INT32, int64 INT64, uint32 UINT32, uint64 UINT64, string STRING, bytes BYTES, bool BOOL, float FLOAT, double DOUBLE, date DATE, timestamp_seconds TIMESTAMP, timestamp_millis TIMESTAMP, timestamp_micros TIMESTAMP, timestamp_nanos TIMESTAMP, timestamp TIMESTAMP, numeric NUMERIC, bignumeric BIGNUMERIC, json JSON, uuid UUID>) -> TABLE<result INT64>
         +-argument_list=
         | +-FunctionArgument
@@ -1036,6 +1040,7 @@ QueryStmt
                         +-FunctionCall(GoogleSQL:$greater(INT64, INT64) -> BOOL)
                           +-ColumnRef(type=INT64, column=$array.x#21)
                           +-Literal(type=INT64, value=2)
+
 [SQLBUILDER_TARGET_SYNTAX_MODE standard]
 [SQLBUILDER_OUTPUT]
 WITH
@@ -1160,6 +1165,7 @@ QueryStmt
     |                     +-Literal(type=BOOL, value=false)
     +-input_scan=
       +-SingleRowScan
+
 [SQLBUILDER_TARGET_SYNTAX_MODE standard]
 [SQLBUILDER_OUTPUT]
 SELECT
@@ -1274,6 +1280,7 @@ QueryStmt
     |                         +-Literal(type=BOOL, value=true)
     +-input_scan=
       +-SingleRowScan
+
 [SQLBUILDER_TARGET_SYNTAX_MODE standard]
 [SQLBUILDER_OUTPUT]
 SELECT

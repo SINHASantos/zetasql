@@ -34,7 +34,6 @@ QueryStmt
         +-array_zip_mode=
           +-Literal(type=ENUM<ARRAY_ZIP_MODE>, value=STRICT)
 
-
 [REWRITTEN AST]
 QueryStmt
 +-output_column_list=
@@ -226,7 +225,6 @@ QueryStmt
         +-array_zip_mode=
           +-Literal(type=ENUM<ARRAY_ZIP_MODE>, value=TRUNCATE)
 
-
 [REWRITTEN AST]
 QueryStmt
 +-output_column_list=
@@ -417,7 +415,6 @@ QueryStmt
         +-element_column_list=$array.[$unnest1#1, $unnest2#2]
         +-array_zip_mode=
           +-Literal(type=ENUM<ARRAY_ZIP_MODE>, value=PAD)
-
 
 [REWRITTEN AST]
 QueryStmt
@@ -623,7 +620,6 @@ QueryStmt
         +-element_column_list=$array.[$unnest1#1, $unnest2#2]
         +-array_zip_mode=
           +-Literal(type=ENUM<ARRAY_ZIP_MODE>, value=PAD)
-
 
 [REWRITTEN AST]
 QueryStmt
@@ -847,7 +843,6 @@ QueryStmt
             +-element_column_list=$array.[xs#3, arr2#4]
             +-array_zip_mode=
               +-Literal(type=ENUM<ARRAY_ZIP_MODE>, value=PAD)
-
 
 [REWRITTEN AST]
 QueryStmt
@@ -1093,7 +1088,6 @@ QueryStmt
             +-element_column_list=$array.[arr1#5, arr2#6]
             +-array_zip_mode=
               +-Literal(type=ENUM<ARRAY_ZIP_MODE>, value=PAD)
-
 
 [REWRITTEN AST]
 QueryStmt

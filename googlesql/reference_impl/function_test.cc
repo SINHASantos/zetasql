@@ -24,20 +24,27 @@
 #include <utility>
 #include <vector>
 
+#include "google/protobuf/timestamp.pb.h"
+#include "google/protobuf/wrappers.pb.h"
+#include "google/type/date.pb.h"
+#include "google/type/timeofday.pb.h"
 #include "googlesql/common/evaluator_registration_utils.h"
 #include "googlesql/common/internal_value.h"
 #include "googlesql/base/testing/status_matchers.h"
+#include "googlesql/public/civil_time.h"
 #include "googlesql/public/functions/date_time_util.h"
 #include "googlesql/public/interval_value.h"
 #include "googlesql/public/json_value.h"
 #include "googlesql/public/options.pb.h"
 #include "googlesql/public/types/array_type.h"
+#include "googlesql/public/types/declarative_type.h"
 #include "googlesql/public/types/map_type.h"
 #include "googlesql/public/types/proto_type.h"
 #include "googlesql/public/types/struct_type.h"
 #include "googlesql/public/types/type.h"
 #include "googlesql/public/types/type_factory.h"
 #include "googlesql/public/types/type_modifiers.h"
+#include "googlesql/public/types/vector_type_util.h"
 #include "googlesql/public/value.h"
 #include "googlesql/reference_impl/common.h"
 #include "googlesql/reference_impl/evaluation.h"
@@ -60,6 +67,8 @@
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_join.h"
 #include "absl/types/span.h"
+#include "google/protobuf/descriptor.h"
+#include "google/protobuf/dynamic_message.h"
 #include "googlesql/base/optional_ref.h"
 
 namespace googlesql {
@@ -570,6 +579,59 @@ TEST(NonDeterministicEvaluationContextTest,
   }
 }
 
+TEST(NonDeterministicEvaluationContextTest, EncodeVectorFunctionTest) {
+  TypeFactory type_factory;
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(const Type* float_array_type,
+                       type_factory.MakeArrayType(types::FloatType()));
+
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(const Type* vector_type, MakeVectorType(&type_factory));
+
+  EncodeVectorFunction encode_vector_fn(FunctionKind::kEncodeVector,
+                                        vector_type);
+
+  // Test 1: Deterministic array (unordered, 1 element)
+  {
+    EvaluationContext context{/*options=*/{}};
+    Value unordered_arr = InternalValue::ArrayChecked(
+        float_array_type->AsArray(), InternalValue::kIgnoresOrder,
+        {Value::Float(1.0)});
+
+    absl::StatusOr<Value> result =
+        encode_vector_fn.Eval({}, {unordered_arr}, &context);
+    GOOGLESQL_ASSERT_OK(result);
+    EXPECT_TRUE(context.IsDeterministicOutput());
+  }
+
+  // Test 2: Unordered array, identical elements (deterministic generation)
+  {
+    EvaluationContext context{/*options=*/{}};
+    Value unordered_arr = InternalValue::ArrayChecked(
+        float_array_type->AsArray(), InternalValue::kIgnoresOrder,
+        {Value::Float(1.0), Value::Float(1.0), Value::Float(1.0)});
+
+    absl::StatusOr<Value> result =
+        encode_vector_fn.Eval({}, {unordered_arr}, &context);
+    GOOGLESQL_ASSERT_OK(result);
+    // Even if elements are identical, consistent with other functions,
+    // unordered arrays larger than 1 element are currently considered
+    // non-deterministic.
+    EXPECT_FALSE(context.IsDeterministicOutput());
+  }
+
+  // Test 3: Unordered array, different elements (non-deterministic generation)
+  {
+    EvaluationContext context{/*options=*/{}};
+    Value unordered_arr = InternalValue::ArrayChecked(
+        float_array_type->AsArray(), InternalValue::kIgnoresOrder,
+        {Value::Float(1.0), Value::Float(2.0), Value::Float(3.0)});
+
+    absl::StatusOr<Value> result =
+        encode_vector_fn.Eval({}, {unordered_arr}, &context);
+    GOOGLESQL_ASSERT_OK(result);
+    EXPECT_FALSE(context.IsDeterministicOutput());
+  }
+}
+
 TEST(DynamicPropertyEqualsTest, DynamicPropertyEquals) {
   std::vector<Value> args;
   GOOGLESQL_ASSERT_OK_AND_ASSIGN(const JSONValue json_value,
@@ -1070,6 +1132,281 @@ TEST(CastFunctionTest, CastWithConstraintViolation) {
   VirtualTupleSlot slot(&result_value, &shared_proto_state);
   EXPECT_FALSE(cast_expr->Eval({}, &context, &slot, &status));
   EXPECT_THAT(status, StatusIs(absl::StatusCode::kOutOfRange));
+}
+
+struct CrossDescriptorTestCase {
+  // Name of the test case.
+  std::string name;
+  // GoogleSQL Type after conversion (e.g., TimestampType()).
+  const Type* output_type;
+  // Static C++ proto descriptor (from generated_pool()) used as the source
+  // schema template to rebuild in the dynamic DescriptorPool.
+  const google::protobuf::Descriptor* static_descriptor;
+  // Function to populate fields on the dynamic proto message.
+  std::function<void(google::protobuf::Message*, const google::protobuf::Descriptor*)>
+      populate_message;
+  // Expected GoogleSQL Value produced by FROM_PROTO evaluation.
+  Value expected_value;
+};
+
+class FromProtoCrossDescriptorTest
+    : public ::testing::TestWithParam<CrossDescriptorTestCase> {};
+
+// Verifies that FROM_PROTO correctly converts proto messages whose ProtoType
+// descriptor comes from a custom dynamic DescriptorPool distinct from
+// DescriptorPool::generated_pool().
+TEST_P(FromProtoCrossDescriptorTest, ConvertsFromCrossDescriptorPool) {
+  const CrossDescriptorTestCase& test_case = GetParam();
+  TypeFactory factory;
+
+  // Create a dynamic DescriptorPool.
+  google::protobuf::DescriptorPool dynamic_pool;
+  std::function<void(const google::protobuf::FileDescriptor*)> add_file_to_pool =
+      [&](const google::protobuf::FileDescriptor* file_desc) {
+        for (int i = 0; i < file_desc->dependency_count(); ++i) {
+          add_file_to_pool(file_desc->dependency(i));
+        }
+        if (dynamic_pool.FindFileByName(file_desc->name()) == nullptr) {
+          google::protobuf::FileDescriptorProto f_proto;
+          file_desc->CopyTo(&f_proto);
+          dynamic_pool.BuildFile(f_proto);
+        }
+      };
+
+  add_file_to_pool(test_case.static_descriptor->file());
+
+  const google::protobuf::Descriptor* dynamic_desc = dynamic_pool.FindMessageTypeByName(
+      test_case.static_descriptor->full_name());
+  ASSERT_NE(dynamic_desc, nullptr);
+  ASSERT_NE(dynamic_desc, test_case.static_descriptor);
+
+  // Instantiate a dynamic proto message using DynamicMessageFactory.
+  google::protobuf::DynamicMessageFactory dynamic_factory;
+  const google::protobuf::Message* prototype = dynamic_factory.GetPrototype(dynamic_desc);
+  std::unique_ptr<google::protobuf::Message> dynamic_message(prototype->New());
+
+  test_case.populate_message(dynamic_message.get(), dynamic_desc);
+
+  // Create a GoogleSQL Value from the dynamic proto message.
+  const ProtoType* proto_type = nullptr;
+  GOOGLESQL_ASSERT_OK(factory.MakeProtoType(dynamic_desc, &proto_type));
+  absl::Cord cord;
+  dynamic_message->SerializeToString(&cord);
+  Value dynamic_proto_val = Value::Proto(proto_type, cord);
+
+  // Evaluate FromProtoFunction for the test case output type.
+  FromProtoFunction from_proto_fn(FunctionKind::kFromProto,
+                                  test_case.output_type);
+
+  EvaluationContext context{/*options=*/{}};
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(
+      Value result, from_proto_fn.Eval(/*params=*/{},
+                                       /*args=*/{dynamic_proto_val}, &context));
+
+  EXPECT_EQ(result, test_case.expected_value);
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    AllTypes, FromProtoCrossDescriptorTest,
+    ::testing::Values(
+        CrossDescriptorTestCase{
+            .name = "Timestamp",
+            .output_type = types::TimestampType(),
+            .static_descriptor = google::protobuf::Timestamp::descriptor(),
+            .populate_message =
+                [](google::protobuf::Message* msg, const google::protobuf::Descriptor* desc) {
+                  const google::protobuf::FieldDescriptor* field =
+                      desc->FindFieldByName("seconds");
+                  msg->GetReflection()->SetInt64(msg, field, 123456);
+                },
+            .expected_value = Value::TimestampFromUnixMicros(123456000000LL),
+        },
+        CrossDescriptorTestCase{
+            .name = "Date",
+            .output_type = types::DateType(),
+            .static_descriptor = google::type::Date::descriptor(),
+            .populate_message =
+                [](google::protobuf::Message* msg, const google::protobuf::Descriptor* desc) {
+                  msg->GetReflection()->SetInt32(
+                      msg, desc->FindFieldByName("year"), 2026);
+                  msg->GetReflection()->SetInt32(
+                      msg, desc->FindFieldByName("month"), 7);
+                  msg->GetReflection()->SetInt32(
+                      msg, desc->FindFieldByName("day"), 22);
+                },
+            .expected_value =
+                []() {
+                  int32_t d;
+                  GOOGLESQL_CHECK_OK(functions::ConstructDate(2026, 7, 22, &d));
+                  return Value::Date(d);
+                }(),
+        },
+        CrossDescriptorTestCase{
+            .name = "TimeOfDay",
+            .output_type = types::TimeType(),
+            .static_descriptor = google::type::TimeOfDay::descriptor(),
+            .populate_message =
+                [](google::protobuf::Message* msg, const google::protobuf::Descriptor* desc) {
+                  msg->GetReflection()->SetInt32(
+                      msg, desc->FindFieldByName("hours"), 12);
+                  msg->GetReflection()->SetInt32(
+                      msg, desc->FindFieldByName("minutes"), 30);
+                  msg->GetReflection()->SetInt32(
+                      msg, desc->FindFieldByName("seconds"), 45);
+                },
+            .expected_value = Value::Time(TimeValue::FromHMSAndMicros(12, 30,
+                                                                      45, 0)),
+        },
+        CrossDescriptorTestCase{
+            .name = "DoubleValue",
+            .output_type = types::DoubleType(),
+            .static_descriptor = google::protobuf::DoubleValue::descriptor(),
+            .populate_message =
+                [](google::protobuf::Message* msg, const google::protobuf::Descriptor* desc) {
+                  msg->GetReflection()->SetDouble(
+                      msg, desc->FindFieldByName("value"), 3.14159);
+                },
+            .expected_value = Value::Double(3.14159),
+        },
+        CrossDescriptorTestCase{
+            .name = "FloatValue",
+            .output_type = types::FloatType(),
+            .static_descriptor = google::protobuf::FloatValue::descriptor(),
+            .populate_message =
+                [](google::protobuf::Message* msg, const google::protobuf::Descriptor* desc) {
+                  msg->GetReflection()->SetFloat(
+                      msg, desc->FindFieldByName("value"), 2.718f);
+                },
+            .expected_value = Value::Float(2.718f),
+        },
+        CrossDescriptorTestCase{
+            .name = "Int64Value",
+            .output_type = types::Int64Type(),
+            .static_descriptor = google::protobuf::Int64Value::descriptor(),
+            .populate_message =
+                [](google::protobuf::Message* msg, const google::protobuf::Descriptor* desc) {
+                  msg->GetReflection()->SetInt64(
+                      msg, desc->FindFieldByName("value"), 100000LL);
+                },
+            .expected_value = Value::Int64(100000LL),
+        },
+        CrossDescriptorTestCase{
+            .name = "UInt64Value",
+            .output_type = types::Uint64Type(),
+            .static_descriptor = google::protobuf::UInt64Value::descriptor(),
+            .populate_message =
+                [](google::protobuf::Message* msg, const google::protobuf::Descriptor* desc) {
+                  msg->GetReflection()->SetUInt64(
+                      msg, desc->FindFieldByName("value"), 200000ULL);
+                },
+            .expected_value = Value::Uint64(200000ULL),
+        },
+        CrossDescriptorTestCase{
+            .name = "Int32Value",
+            .output_type = types::Int32Type(),
+            .static_descriptor = google::protobuf::Int32Value::descriptor(),
+            .populate_message =
+                [](google::protobuf::Message* msg, const google::protobuf::Descriptor* desc) {
+                  msg->GetReflection()->SetInt32(
+                      msg, desc->FindFieldByName("value"), 12345);
+                },
+            .expected_value = Value::Int32(12345),
+        },
+        CrossDescriptorTestCase{
+            .name = "UInt32Value",
+            .output_type = types::Uint32Type(),
+            .static_descriptor = google::protobuf::UInt32Value::descriptor(),
+            .populate_message =
+                [](google::protobuf::Message* msg, const google::protobuf::Descriptor* desc) {
+                  msg->GetReflection()->SetUInt32(
+                      msg, desc->FindFieldByName("value"), 54321);
+                },
+            .expected_value = Value::Uint32(54321),
+        },
+        CrossDescriptorTestCase{
+            .name = "BoolValue",
+            .output_type = types::BoolType(),
+            .static_descriptor = google::protobuf::BoolValue::descriptor(),
+            .populate_message =
+                [](google::protobuf::Message* msg, const google::protobuf::Descriptor* desc) {
+                  msg->GetReflection()->SetBool(
+                      msg, desc->FindFieldByName("value"), true);
+                },
+            .expected_value = Value::Bool(true),
+        },
+        CrossDescriptorTestCase{
+            .name = "BytesValue",
+            .output_type = types::BytesType(),
+            .static_descriptor = google::protobuf::BytesValue::descriptor(),
+            .populate_message =
+                [](google::protobuf::Message* msg, const google::protobuf::Descriptor* desc) {
+                  msg->GetReflection()->SetString(
+                      msg, desc->FindFieldByName("value"), "hello bytes");
+                },
+            .expected_value = Value::Bytes("hello bytes"),
+        },
+        CrossDescriptorTestCase{
+            .name = "StringValue",
+            .output_type = types::StringType(),
+            .static_descriptor = google::protobuf::StringValue::descriptor(),
+            .populate_message =
+                [](google::protobuf::Message* msg, const google::protobuf::Descriptor* desc) {
+                  msg->GetReflection()->SetString(
+                      msg, desc->FindFieldByName("value"), "hello string");
+                },
+            .expected_value = Value::String("hello string"),
+        }),
+    [](const ::testing::TestParamInfo<CrossDescriptorTestCase>& info) {
+      return info.param.name;
+    });
+
+TEST(FromProtoCrossDescriptorTest, IncompatibleDescriptorParseFailure) {
+  TypeFactory factory;
+  google::protobuf::DescriptorPool dynamic_pool;
+  // Build a custom dynamic FileDescriptorProto for google.protobuf.Timestamp
+  // where field 1 ('seconds') is defined as TYPE_STRING instead of TYPE_INT64.
+  google::protobuf::FileDescriptorProto file_proto;
+  file_proto.set_name("google/protobuf/timestamp.proto");
+  file_proto.set_package("google.protobuf");
+  google::protobuf::DescriptorProto* msg_proto = file_proto.add_message_type();
+  msg_proto->set_name("Timestamp");
+  google::protobuf::FieldDescriptorProto* field_seconds = msg_proto->add_field();
+  field_seconds->set_name("seconds");
+  field_seconds->set_number(1);
+  field_seconds->set_label(google::protobuf::FieldDescriptorProto::LABEL_OPTIONAL);
+  field_seconds->set_type(google::protobuf::FieldDescriptorProto::TYPE_STRING);
+  const google::protobuf::FileDescriptor* file_desc = dynamic_pool.BuildFile(file_proto);
+  ASSERT_NE(file_desc, nullptr);
+  const google::protobuf::Descriptor* dynamic_desc =
+      file_desc->FindMessageTypeByName("Timestamp");
+  ASSERT_NE(dynamic_desc, nullptr);
+  // Instantiate dynamic message and set 'seconds' field to a string.
+  google::protobuf::DynamicMessageFactory dynamic_factory;
+  const google::protobuf::Message* prototype = dynamic_factory.GetPrototype(dynamic_desc);
+  std::unique_ptr<google::protobuf::Message> dynamic_message(prototype->New());
+  const google::protobuf::FieldDescriptor* field =
+      dynamic_desc->FindFieldByName("seconds");
+  dynamic_message->GetReflection()->SetString(dynamic_message.get(), field,
+                                              "incompatible_string_value");
+  // Create GoogleSQL Proto Value.
+  const ProtoType* proto_type = nullptr;
+  GOOGLESQL_ASSERT_OK(factory.MakeProtoType(dynamic_desc, &proto_type));
+  absl::Cord cord;
+  dynamic_message->SerializeToString(&cord);
+  Value dynamic_proto_val = Value::Proto(proto_type, cord);
+  // Evaluate FromProtoFunction for Timestamp.
+  FromProtoFunction from_proto_fn(FunctionKind::kFromProto,
+                                  types::TimestampType());
+  EvaluationContext context{/*options=*/{}};
+  absl::Status status =
+      from_proto_fn.Eval(/*params=*/{}, /*args=*/{dynamic_proto_val}, &context)
+          .status();
+  EXPECT_EQ(status.code(), absl::StatusCode::kOutOfRange);
+  EXPECT_THAT(
+      status.message(),
+      ::testing::HasSubstr(
+          "Failed to parse proto message from google.protobuf.Timestamp "
+          "to google.protobuf.Timestamp"));
 }
 
 }  // namespace

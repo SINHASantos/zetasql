@@ -144,8 +144,6 @@ using NameToTypeMap = absl::flat_hash_map<std::string, const Type*>;
 using NameToTableValuedFunctionMap =
     absl::flat_hash_map<std::string, std::unique_ptr<TableValuedFunction>>;
 
-inline constexpr absl::string_view kVectorTypeName = "VECTOR";
-
 // Adds VECTOR-related required options to the provided
 // FunctionSignatureOptions. It intentionally takes an r-value because it
 // creates a copy of the options.
@@ -654,9 +652,9 @@ void GetConditionalFunctions(TypeFactory* type_factory,
                              const GoogleSQLBuiltinFunctionOptions& options,
                              NameToFunctionMap* functions);
 
-void GetMiscellaneousFunctions(TypeFactory* type_factory,
-                               const GoogleSQLBuiltinFunctionOptions& options,
-                               NameToFunctionMap* functions);
+absl::Status GetMiscellaneousFunctions(
+    TypeFactory* type_factory, const GoogleSQLBuiltinFunctionOptions& options,
+    NameToFunctionMap* functions);
 
 absl::Status GetDistanceFunctions(
     TypeFactory* type_factory, const GoogleSQLBuiltinFunctionOptions& options,

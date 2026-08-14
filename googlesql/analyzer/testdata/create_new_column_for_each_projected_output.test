@@ -34,6 +34,7 @@ QueryStmt
             | +-b#2 := Literal(parse_location=55-56, type=INT64, value=2)
             +-input_scan=
               +-SingleRowScan
+
 [REPLACED_LITERALS]
 SELECT c AS d FROM (SELECT b AS c FROM (SELECT @_p0_INT64 AS a, @_p1_INT64 AS b));
 --
@@ -63,6 +64,7 @@ QueryStmt
             | +-b#2 := Literal(parse_location=55-56, type=INT64, value=2)
             +-input_scan=
               +-SingleRowScan
+
 [REPLACED_LITERALS]
 SELECT c AS d FROM (SELECT b AS c FROM (SELECT @_p0_INT64 AS a, @_p1_INT64 AS b));
 ==
@@ -87,6 +89,7 @@ QueryStmt
         | +-a#1 := Literal(parse_location=22-23, type=INT64, value=1)
         +-input_scan=
           +-SingleRowScan
+
 [REPLACED_LITERALS]
 SELECT a FROM (SELECT @_p0_INT64 AS a)
 --
@@ -109,6 +112,7 @@ QueryStmt
         | +-a#1 := Literal(parse_location=22-23, type=INT64, value=1)
         +-input_scan=
           +-SingleRowScan
+
 [REPLACED_LITERALS]
 SELECT a FROM (SELECT @_p0_INT64 AS a)
 ==
@@ -133,6 +137,7 @@ QueryStmt
         | +-a#1 := Literal(parse_location=27-28, type=INT64, value=1)
         +-input_scan=
           +-SingleRowScan
+
 [REPLACED_LITERALS]
 SELECT a AS b FROM (SELECT @_p0_INT64 AS a)
 --
@@ -155,6 +160,7 @@ QueryStmt
         | +-a#1 := Literal(parse_location=27-28, type=INT64, value=1)
         +-input_scan=
           +-SingleRowScan
+
 [REPLACED_LITERALS]
 SELECT a AS b FROM (SELECT @_p0_INT64 AS a)
 ==
@@ -183,6 +189,7 @@ QueryStmt
         | +-a#1 := Literal(parse_location=26-27, type=INT64, value=1)
         +-input_scan=
           +-SingleRowScan
+
 [REPLACED_LITERALS]
 SELECT a + @_p0_INT64 FROM (SELECT @_p1_INT64 AS a);
 ==
@@ -211,6 +218,7 @@ QueryStmt
         | +-a#1 := Literal(parse_location=31-32, type=INT64, value=1)
         +-input_scan=
           +-SingleRowScan
+
 [REPLACED_LITERALS]
 SELECT a + @_p0_INT64 AS b FROM (SELECT @_p1_INT64 AS a);
 ==
@@ -243,6 +251,7 @@ QueryStmt
             +-parse_location=36-41
             +-ColumnRef(parse_location=36-37, type=INT64, column=$subquery1.a#1)
             +-Literal(parse_location=40-41, type=INT64, value=0)
+
 [REPLACED_LITERALS]
 SELECT a FROM (SELECT @_p0_INT64 AS a) WHERE a > @_p1_INT64
 --
@@ -273,6 +282,7 @@ QueryStmt
             +-parse_location=36-41
             +-ColumnRef(parse_location=36-37, type=INT64, column=$subquery1.a#1)
             +-Literal(parse_location=40-41, type=INT64, value=0)
+
 [REPLACED_LITERALS]
 SELECT a FROM (SELECT @_p0_INT64 AS a) WHERE a > @_p1_INT64
 ==
@@ -305,6 +315,7 @@ QueryStmt
             +-parse_location=41-46
             +-ColumnRef(parse_location=41-42, type=INT64, column=$subquery1.a#1)
             +-Literal(parse_location=45-46, type=INT64, value=0)
+
 [REPLACED_LITERALS]
 SELECT a AS b FROM (SELECT @_p0_INT64 AS a) WHERE a > @_p1_INT64
 --
@@ -335,6 +346,7 @@ QueryStmt
             +-parse_location=41-46
             +-ColumnRef(parse_location=41-42, type=INT64, column=$subquery1.a#1)
             +-Literal(parse_location=45-46, type=INT64, value=0)
+
 [REPLACED_LITERALS]
 SELECT a AS b FROM (SELECT @_p0_INT64 AS a) WHERE a > @_p1_INT64
 ==
@@ -354,6 +366,7 @@ QueryStmt
     +-column_list=KeyValue.[Key#1, Value#2]
     +-input_scan=
       +-TableScan(parse_location=14-22, column_list=KeyValue.[Key#1, Value#2], table=KeyValue, column_index_list=[0, 1])
+
 [REPLACED_LITERALS]
 SELECT * FROM KeyValue;
 --
@@ -372,5 +385,6 @@ QueryStmt
     | +-Value#4 := ColumnRef(type=STRING, column=KeyValue.Value#2)
     +-input_scan=
       +-TableScan(parse_location=14-22, column_list=KeyValue.[Key#1, Value#2], table=KeyValue, column_index_list=[0, 1])
+
 [REPLACED_LITERALS]
 SELECT * FROM KeyValue;

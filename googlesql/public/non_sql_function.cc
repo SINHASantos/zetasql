@@ -44,9 +44,7 @@ NonSqlFunction::NonSqlFunction(
     const FunctionOptions& function_options, ModuleDetails module_details,
     const ResolvedCreateFunctionStmt* resolved_create_function_statement,
     const std::vector<std::string>& argument_names,
-    std::optional<ParseResumeLocation> parse_resume_location,
-    const std::vector<std::unique_ptr<const ResolvedComputedColumn>>*
-        aggregate_expression_list)
+    std::optional<ParseResumeLocation> parse_resume_location)
     : Function(name, kNonSqlFunctionGroup, mode, function_signatures,
                function_options),
       module_details_(module_details),
@@ -60,8 +58,6 @@ absl::Status NonSqlFunction::Create(
     const FunctionOptions& function_options, ModuleDetails module_details,
     const ResolvedCreateFunctionStmt* resolved_create_function_statement,
     const std::vector<std::string>& argument_names,
-    const std::vector<std::unique_ptr<const ResolvedComputedColumn>>*
-        aggregate_expression_list,
     std::optional<ParseResumeLocation> parse_resume_location,
     std::unique_ptr<NonSqlFunction>* non_sql_function) {
   if (parse_resume_location.has_value()) {
@@ -80,13 +76,10 @@ absl::Status NonSqlFunction::Create(
                  function_signature.arguments().size())
         << function_signature.DebugString();
   }
-  if (mode == FunctionEnums::AGGREGATE) {
-    GOOGLESQL_RET_CHECK(aggregate_expression_list != nullptr);
-  }
-  non_sql_function->reset(new NonSqlFunction(
-      name, mode, function_signatures, function_options, module_details,
-      resolved_create_function_statement, argument_names, parse_resume_location,
-      aggregate_expression_list));
+  non_sql_function->reset(
+      new NonSqlFunction(name, mode, function_signatures, function_options,
+                         module_details, resolved_create_function_statement,
+                         argument_names, parse_resume_location));
   return absl::OkStatus();
 }
 

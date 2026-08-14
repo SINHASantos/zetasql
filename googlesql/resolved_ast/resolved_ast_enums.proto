@@ -489,3 +489,21 @@ message ResolvedUpdateItemElementEnums {
     ELEMENT_PRESENCE_OPTIONAL = 2;
   }
 }
+
+message ResolvedUpdateScanEnums {
+  enum UpdateScanOutputMode {
+    OUTPUT_MODE_UNSPECIFIED = 0;
+    // Output the updated rows resulting from the update scan.
+    OUTPUT_UPDATED_ROWS = 1;
+    // Output the input rows as they were before the updates.
+    OUTPUT_INPUT_ROWS = 2;
+  }
+  enum UpdateCollisionActionType {
+    COLLISION_ACTION_UNSPECIFIED = 0;
+    // Produce an error when a collision occurs (multiple updates to the same
+    // row).
+    COLLISION_ACTION_ERROR = 1;
+    // Arbitrarily pick one update to apply when a collision occurs.
+    COLLISION_ACTION_PICK_ONE = 2;
+  }
+}

@@ -36,6 +36,7 @@
 #include "googlesql/public/analyzer.h"
 #include "googlesql/public/analyzer_output.h"
 #include "googlesql/public/annotation/collation.h"
+#include "googlesql/public/annotation/is_versioned.h"
 #include "googlesql/public/anon_function.h"
 #include "googlesql/public/builtin_function.pb.h"
 #include "googlesql/public/builtin_function_options.h"
@@ -665,6 +666,9 @@ SampleCatalogImpl::LoadDefaultSuppliedTypes(
   options_copy.argument_types[{
       FN_SINGLE_VECTOR_SEARCH_TVF_STRING_WITH_PROTO_OPTIONS, 3}] =
       approx_distance_function_options_proto_type;
+  options_copy.argument_types[{
+      FN_BATCH_HYBRID_VECTOR_SEARCH_TVF_WITH_PROTO_OPTIONS, 6}] =
+      approx_distance_function_options_proto_type;
   return options_copy;
 }
 
@@ -771,14 +775,14 @@ absl::Status SampleCatalogImpl::LoadCatalogImpl(
   RETURN_IF_ERROR_UNLESS_DBG(LoadMeasureTables(language_options));
   RETURN_IF_ERROR_UNLESS_DBG(
       LoadNonTemplatedSqlTableValuedFunctions(language_options));
-  RETURN_IF_ERROR_UNLESS_DBG(LoadAmlBasedPropertyGraphs());
+  RETURN_IF_ERROR_UNLESS_DBG(LoadAmlBasedPropertyGraphs(language_options));
   RETURN_IF_ERROR_UNLESS_DBG(LoadMultiSrcDstEdgePropertyGraphs());
   RETURN_IF_ERROR_UNLESS_DBG(LoadCompositeKeyPropertyGraphs());
   RETURN_IF_ERROR_UNLESS_DBG(LoadPropertyGraphWithDynamicLabelAndProperties());
   RETURN_IF_ERROR_UNLESS_DBG(LoadPropertyGraphWithReadOnlyDynamicProperties());
   RETURN_IF_ERROR_UNLESS_DBG(
       LoadPropertyGraphWithDynamicMultiLabelsAndProperties());
-  LoadRowTypeObjects();
+  RETURN_IF_ERROR_UNLESS_DBG(LoadRowTypeObjects(language_options));
   return absl::OkStatus();
 }
 
@@ -1093,6 +1097,11 @@ class LazySimpleTable : public SimpleTable {
                   absl::Span<const NameAndType> columns,
                   int64_t serialization_id = 0)
       : SimpleTable(name, columns, serialization_id),
+        column_list_mode_(column_list_mode) {}
+  LazySimpleTable(absl::string_view name, ColumnListMode column_list_mode,
+                  std::vector<const Column*>& columns, bool take_ownership,
+                  int64_t serialization_id = 0)
+      : SimpleTable(name, columns, take_ownership, serialization_id),
         column_list_mode_(column_list_mode) {}
 
   ColumnListMode GetColumnListMode() const override {
@@ -1523,6 +1532,163 @@ absl::Status SampleCatalogImpl::LoadTables() {
   GOOGLESQL_RET_CHECK_OK(collatedTable->AddColumn(struct_ci, /*is_owned=*/true));
   GOOGLESQL_RET_CHECK_OK(collatedTable->AddColumn(array_ci, /*is_owned=*/true));
   AddOwnedTable(collatedTable);
+
+  // Copy of table `CollatedTable` with ColumnListMode::LAZY.
+  std::vector<const Column*> collated_table_lazy_columns = {
+      string_ci, string_cs, struct_ci, array_ci};
+  LazySimpleTable* collated_table_lazy = new LazySimpleTable(
+      "CollatedTableLazy", Table::ColumnListMode::LAZY,
+      collated_table_lazy_columns, /*take_ownership=*/false);
+  AddOwnedTable(collated_table_lazy);
+
+  // Create VersionedTable for non-nested DML testing.
+  auto versionedTable = std::make_unique<SimpleTable>("VersionedTable");
+  const AnnotationMap* annotation_map_versioned;
+  {
+    std::unique_ptr<AnnotationMap> annotation_map =
+        AnnotationMap::Create(types_->get_string());
+    annotation_map->SetAnnotation<IsVersionedAnnotation>(SimpleValue::Int64(1));
+    GOOGLESQL_ASSIGN_OR_RETURN(annotation_map_versioned,
+                     types_->TakeOwnership(std::move(annotation_map)));
+  }
+
+  auto key_col = std::make_unique<SimpleColumn>(versionedTable->Name(), "key",
+                                                types_->get_int64());
+  auto val_col = std::make_unique<SimpleColumn>(
+      versionedTable->Name(), "val",
+      AnnotatedType(types_->get_string(), annotation_map_versioned));
+
+  GOOGLESQL_RET_CHECK_OK(versionedTable->AddColumn(std::move(key_col)));
+  GOOGLESQL_RET_CHECK_OK(versionedTable->AddColumn(std::move(val_col)));
+  AddOwnedTable(versionedTable.release());
+
+  // Create NestedVersionedTable for nested DML testing.
+  auto nestedVersionedTable =
+      std::make_unique<SimpleTable>("NestedVersionedTable");
+  const StructType* versioned_struct_type;
+  GOOGLESQL_RET_CHECK_OK(types_->MakeStructType(
+      {{"key", types_->get_int64()}, {"val", types_->get_string()}},
+      &versioned_struct_type));
+
+  const ArrayType* versioned_array_type;
+  GOOGLESQL_RET_CHECK_OK(
+      types_->MakeArrayType(versioned_struct_type, &versioned_array_type));
+
+  const AnnotationMap* annotation_map_nested_versioned;
+  {
+    std::unique_ptr<AnnotationMap> array_map =
+        AnnotationMap::Create(versioned_array_type);
+    StructAnnotationMap* array_map_typed = array_map->AsStructMap();
+    AnnotationMap* struct_map = array_map_typed->mutable_field(0);
+    StructAnnotationMap* struct_struct_map = struct_map->AsStructMap();
+    AnnotationMap* val_field_map = struct_struct_map->mutable_field(1);
+    val_field_map->SetAnnotation<IsVersionedAnnotation>(SimpleValue::Int64(1));
+    GOOGLESQL_ASSIGN_OR_RETURN(annotation_map_nested_versioned,
+                     types_->TakeOwnership(std::move(array_map)));
+  }
+
+  auto key_col_nested = std::make_unique<SimpleColumn>(
+      nestedVersionedTable->Name(), "key", types_->get_int64());
+  auto array_col_nested = std::make_unique<SimpleColumn>(
+      nestedVersionedTable->Name(), "array_col",
+      AnnotatedType(versioned_array_type, annotation_map_nested_versioned));
+
+  GOOGLESQL_RET_CHECK_OK(nestedVersionedTable->AddColumn(std::move(key_col_nested)));
+  GOOGLESQL_RET_CHECK_OK(nestedVersionedTable->AddColumn(std::move(array_col_nested)));
+  AddOwnedTable(nestedVersionedTable.release());
+
+  // Create DoublyNestedVersionedTable for doubly-nested DML versioning tests.
+  auto doublyNestedVersionedTable =
+      std::make_unique<SimpleTable>("DoublyNestedVersionedTable");
+  const StructType* inner_struct_type;
+  GOOGLESQL_RET_CHECK_OK(types_->MakeStructType({{"val", types_->get_string()}},
+                                      &inner_struct_type));
+
+  const StructType* element_struct_type;
+  GOOGLESQL_RET_CHECK_OK(types_->MakeStructType(
+      {{"key", types_->get_int64()}, {"inner_struct", inner_struct_type}},
+      &element_struct_type));
+
+  const ArrayType* doubly_nested_array_type;
+  GOOGLESQL_RET_CHECK_OK(
+      types_->MakeArrayType(element_struct_type, &doubly_nested_array_type));
+
+  const AnnotationMap* annotation_map_doubly_nested_versioned;
+  {
+    std::unique_ptr<AnnotationMap> array_map =
+        AnnotationMap::Create(doubly_nested_array_type);
+    StructAnnotationMap* array_map_typed = array_map->AsStructMap();
+
+    // Field 0 of array is the array element (element_struct_type)
+    AnnotationMap* element_map = array_map_typed->mutable_field(0);
+    StructAnnotationMap* element_struct_map = element_map->AsStructMap();
+
+    // Field 1 of element_struct is "inner_struct" (inner_struct_type)
+    AnnotationMap* inner_struct_map = element_struct_map->mutable_field(1);
+    StructAnnotationMap* inner_struct_struct_map =
+        inner_struct_map->AsStructMap();
+
+    // Field 0 of inner_struct is "val" (STRING)
+    AnnotationMap* val_field_map = inner_struct_struct_map->mutable_field(0);
+    val_field_map->SetAnnotation<IsVersionedAnnotation>(SimpleValue::Int64(1));
+
+    GOOGLESQL_ASSIGN_OR_RETURN(annotation_map_doubly_nested_versioned,
+                     types_->TakeOwnership(std::move(array_map)));
+  }
+
+  auto key_col_doubly_nested = std::make_unique<SimpleColumn>(
+      doublyNestedVersionedTable->Name(), "key", types_->get_int64());
+  auto array_col_doubly_nested = std::make_unique<SimpleColumn>(
+      doublyNestedVersionedTable->Name(), "array_col",
+      AnnotatedType(doubly_nested_array_type,
+                    annotation_map_doubly_nested_versioned));
+
+  GOOGLESQL_RET_CHECK_OK(
+      doublyNestedVersionedTable->AddColumn(std::move(key_col_doubly_nested)));
+  GOOGLESQL_RET_CHECK_OK(doublyNestedVersionedTable->AddColumn(
+      std::move(array_col_doubly_nested)));
+  AddOwnedTable(doublyNestedVersionedTable.release());
+
+  // Create MixedVersionedTable containing both a top-level versioned column
+  // and a nested versioned array column.
+  auto mixedVersionedTable =
+      std::make_unique<SimpleTable>("MixedVersionedTable");
+  auto key_col_mixed = std::make_unique<SimpleColumn>(
+      mixedVersionedTable->Name(), "key", types_->get_int64());
+  auto val_col_mixed = std::make_unique<SimpleColumn>(
+      mixedVersionedTable->Name(), "val",
+      AnnotatedType(types_->get_string(), annotation_map_versioned));
+  auto val_unversioned_col_mixed = std::make_unique<SimpleColumn>(
+      mixedVersionedTable->Name(), "val_unversioned", types_->get_string());
+  auto array_col_mixed = std::make_unique<SimpleColumn>(
+      mixedVersionedTable->Name(), "array_col",
+      AnnotatedType(versioned_array_type, annotation_map_nested_versioned));
+
+  GOOGLESQL_RET_CHECK_OK(mixedVersionedTable->AddColumn(std::move(key_col_mixed)));
+  GOOGLESQL_RET_CHECK_OK(mixedVersionedTable->AddColumn(std::move(val_col_mixed)));
+  GOOGLESQL_RET_CHECK_OK(
+      mixedVersionedTable->AddColumn(std::move(val_unversioned_col_mixed)));
+  GOOGLESQL_RET_CHECK_OK(mixedVersionedTable->AddColumn(std::move(array_col_mixed)));
+  AddOwnedTable(mixedVersionedTable.release());
+
+  // Create AmbiguousVersionedTable to test name resolution ambiguity between
+  // the implicit 'timestamp' pseudo-column and a physical column of the same
+  // name.
+  auto ambiguousVersionedTable =
+      std::make_unique<SimpleTable>("AmbiguousVersionedTable");
+  auto key_col_amb = std::make_unique<SimpleColumn>(
+      ambiguousVersionedTable->Name(), "key", types_->get_int64());
+  auto val_col_amb = std::make_unique<SimpleColumn>(
+      ambiguousVersionedTable->Name(), "val",
+      AnnotatedType(types_->get_string(), annotation_map_versioned));
+  auto timestamp_col_amb = std::make_unique<SimpleColumn>(
+      ambiguousVersionedTable->Name(), "timestamp", types_->get_string());
+
+  GOOGLESQL_RET_CHECK_OK(ambiguousVersionedTable->AddColumn(std::move(key_col_amb)));
+  GOOGLESQL_RET_CHECK_OK(ambiguousVersionedTable->AddColumn(std::move(val_col_amb)));
+  GOOGLESQL_RET_CHECK_OK(
+      ambiguousVersionedTable->AddColumn(std::move(timestamp_col_amb)));
+  AddOwnedTable(ambiguousVersionedTable.release());
 
   auto complex_collated_table = new SimpleTable("ComplexCollatedTable");
 
@@ -2244,6 +2410,14 @@ absl::Status SampleCatalogImpl::LoadMeasureTables(
     analyzer_options.mutable_language()->EnableLanguageFeature(
         FEATURE_DERIVED_MEASURE);
   }
+  if (language_options.LanguageFeatureEnabled(FEATURE_ROW_TYPE)) {
+    analyzer_options.mutable_language()->EnableLanguageFeature(
+        FEATURE_ROW_TYPE);
+  }
+  if (language_options.LanguageFeatureEnabled(FEATURE_MEASURES_IN_STRUCT)) {
+    analyzer_options.mutable_language()->EnableLanguageFeature(
+        FEATURE_MEASURES_IN_STRUCT);
+  }
 
   // key1, key2, country, quantity, price
   std::vector<std::tuple<int64_t, int64_t, std::string, int64_t, int64_t>>
@@ -2383,6 +2557,33 @@ absl::Status SampleCatalogImpl::LoadMeasureTables(
                                 Value::Int64(price), Value::Int64(quantity)});
   }
 
+  GOOGLESQL_RETURN_IF_ERROR(LoadBasicMeasureTables(analyzer_options,
+                                         measuretable_singlekey_data,
+                                         measuretable_twokeys_data));
+
+  GOOGLESQL_RETURN_IF_ERROR(LoadDerivedMeasureTables(
+      language_options, analyzer_options, measuretable_derived_data,
+      measuretable_twokeys_data, sales_facts_data));
+
+  GOOGLESQL_RETURN_IF_ERROR(LoadMeasureTablesWithAdvancedExprs(
+      analyzer_options, measuretable_singlekey_data,
+      measuretable_complexexprs_data));
+
+  GOOGLESQL_RETURN_IF_ERROR(LoadMeasureValueTables(language_options, analyzer_options,
+                                         struct_value_table_data,
+                                         int64_value_table_data));
+
+  GOOGLESQL_RETURN_IF_ERROR(LoadInvalidMeasureTables(analyzer_options));
+
+  GOOGLESQL_RETURN_IF_ERROR(LoadRowTypeMeasureTables(language_options, analyzer_options));
+
+  return absl::OkStatus();
+}
+
+absl::Status SampleCatalogImpl::LoadBasicMeasureTables(
+    AnalyzerOptions& analyzer_options,
+    const std::vector<std::vector<Value>>& singlekey_data,
+    const std::vector<std::vector<Value>>& twokeys_data) {
   GOOGLESQL_RETURN_IF_ERROR(AddTableWithMeasures(
       analyzer_options, "MeasureTable_SingleKey",
       {new SimpleColumn("MeasureTable_SingleKey", "key", types_->get_int64()),
@@ -2408,46 +2609,7 @@ absl::Status SampleCatalogImpl::LoadMeasureTables(
        {"measure_complex_ratio_metric",
         "SUM(AVG(price) + MIN(price) GROUP BY key) / "
         "SUM(AVG(price) + MAX(price) GROUP BY key)"}},
-      /*is_value_table=*/false, measuretable_singlekey_data));
-
-  if (language_options.LanguageFeatureEnabled(FEATURE_ENABLE_MEASURES) &&
-      language_options.LanguageFeatureEnabled(FEATURE_DERIVED_MEASURE)) {
-    GOOGLESQL_RETURN_IF_ERROR(AddTableWithMeasures(
-        analyzer_options, "MeasureTable_Derived",
-        {new SimpleColumn("MeasureTable_Derived", "key", types_->get_int64()),
-         new SimpleColumn("MeasureTable_Derived", "country",
-                          types_->get_string()),
-         new SimpleColumn("MeasureTable_Derived", "quantity",
-                          types_->get_int64()),
-         new SimpleColumn("MeasureTable_Derived", "price", types_->get_int64()),
-         new SimpleColumn("MeasureTable_Derived", "tax", types_->get_int64()),
-         new SimpleColumn("MeasureTable_Derived", "shipping",
-                          types_->get_int64())},
-        /*row_identity_column_indices=*/absl::btree_set<int>{0},
-        /*measures=*/
-        {{"measure_sum_price", "SUM(price)"},
-         {"measure_sum_quantity", "SUM(quantity)"},
-         {"measure_sum_tax", "SUM(tax)"},
-         {"measure_sum_shipping", "SUM(shipping)"},
-         {"measure_derived_sum_price_plus_one", "AGG(measure_sum_price) + 1"},
-         {"measure_derived_subtotal",
-          "AGG(measure_sum_price) + AGG(measure_sum_tax)"},
-         {"measure_derived_order_total",
-          "AGG(measure_derived_subtotal) + AGG(measure_sum_shipping)"},
-         {"measure_derived_twice_sum_price",
-          "AGG(measure_sum_price) + AGG(measure_sum_price)"},
-         {"measure_derived_sum_price_plus_two", "AGG(measure_sum_price) + 2"},
-         {"measure_derived_twice_sum_price_plus_one",
-          "AGG(measure_derived_sum_price_plus_one) + "
-          "AGG(measure_derived_sum_price_plus_one)"},
-         {"measure_derived_sum_price_plus_one_plus_two",
-          "AGG(measure_derived_sum_price_plus_one) + "
-          "AGG(measure_derived_sum_price_plus_two)"},
-         {"measure_derived_mixed_sum_price",
-          "AGG(measure_sum_price) + "
-          "AGG(measure_derived_sum_price_plus_one)"}},
-        /*is_value_table=*/false, measuretable_derived_data));
-  }
+      /*is_value_table=*/false, singlekey_data));
 
   GOOGLESQL_RETURN_IF_ERROR(AddTableWithMeasures(
       analyzer_options, "MeasureTable_TwoKeys",
@@ -2470,7 +2632,7 @@ absl::Status SampleCatalogImpl::LoadMeasureTables(
        {"measure_ratio_price_to_quantity_per_key",
         "SUM(ANY_VALUE(price) GROUP BY key1,key2) / "
         "SUM(ANY_VALUE(quantity) GROUP BY key1,key2)"}},
-      /*is_value_table=*/false, measuretable_twokeys_data));
+      /*is_value_table=*/false, twokeys_data));
 
   GOOGLESQL_RETURN_IF_ERROR(AddTableWithMeasures(
       analyzer_options, "MeasureTable_DifferentNames",
@@ -2485,7 +2647,7 @@ absl::Status SampleCatalogImpl::LoadMeasureTables(
       /*row_identity_column_indices=*/absl::btree_set<int>{0},
       /*measures=*/
       {{"measure_count_star_different_name", "COUNT(*)"}},
-      /*is_value_table=*/false, measuretable_singlekey_data));
+      /*is_value_table=*/false, singlekey_data));
 
   GOOGLESQL_RETURN_IF_ERROR(
       AddTableWithMeasures(analyzer_options, "MeasureTable_NoRowIdentity",
@@ -2502,20 +2664,6 @@ absl::Status SampleCatalogImpl::LoadMeasureTables(
       /*row_identity_column_indices=*/absl::btree_set<int>{0},
       /*measures=*/
       {{"measure_count_star", "COUNT(*)"}}, /*is_value_table=*/false));
-
-  if (language_options.LanguageFeatureEnabled(FEATURE_ENABLE_MEASURES) &&
-      language_options.LanguageFeatureEnabled(FEATURE_DERIVED_MEASURE)) {
-    GOOGLESQL_RETURN_IF_ERROR(AddTableWithMeasures(
-        analyzer_options, "MeasureValueTable_Struct",
-        {new SimpleColumn("MeasureValueTable_Struct", "value", struct_type_)},
-        /*row_identity_column_indices=*/absl::btree_set<int>{0},
-        /*measures=*/
-        {{"measure_count_star", "COUNT(*)", /*is_pseudo_column=*/true},
-         {"measure_sum_a", "SUM(a)", /*is_pseudo_column=*/true},
-         {"derived_measure_sum_a_plus_one", "AGG(measure_sum_a) + 1",
-          /*is_pseudo_column=*/true}},
-        /*is_value_table=*/true));
-  }
 
   GOOGLESQL_RETURN_IF_ERROR(AddTableWithMeasures(
       analyzer_options, "MeasureTable_WithPseudoColumns",
@@ -2534,205 +2682,135 @@ absl::Status SampleCatalogImpl::LoadMeasureTables(
           {"measure_count_star_per_key", "COUNT(* GROUP BY key)",
            /*is_pseudo_column=*/true},
       },
-      /*is_value_table=*/false, measuretable_singlekey_data));
+      /*is_value_table=*/false, singlekey_data));
 
-  GOOGLESQL_RETURN_IF_ERROR(AddTableWithMeasures(
-      analyzer_options, "MeasureTable_WithSubqueryMeasureExprs",
-      {new SimpleColumn("MeasureTable_WithSubqueryMeasureExprs", "key",
-                        types_->get_int64()),
-       new SimpleColumn("MeasureTable_WithSubqueryMeasureExprs", "country",
-                        types_->get_string()),
-       new SimpleColumn("MeasureTable_WithSubqueryMeasureExprs", "quantity",
-                        types_->get_int64()),
-       new SimpleColumn("MeasureTable_WithSubqueryMeasureExprs", "price",
-                        types_->get_int64())},
-      /*row_identity_column_indices=*/absl::btree_set<int>{0},
-      /*measures=*/
-      {{"measure_with_top_level_subquery",
-        "SUM(price) + (SELECT SUM(1) FROM UNNEST([1]))"},
-       {"measure_with_simple_subquery_in_aggregate_function",
-        "SUM((SELECT price))"},
-       {"measure_with_aggregate_subquery_in_aggregate_function",
-        "SUM((SELECT SUM(price) FROM UNNEST([1])))"},
-       {"measure_with_multiple_subqueries",
-        "SUM((SELECT SUM(price) FROM UNNEST([1]))) + (SELECT SUM(1) FROM "
-        "UNNEST([1]))"},
-       {"measure_with_deeply_nested_subquery",
-        "SUM((SELECT x FROM (SELECT (SELECT SUM(price) FROM UNNEST([1])) AS "
-        "x)))"},
-       {"measure_literal_one", "1", /*is_pseudo_column=*/true},
-       {"measure_one_plus_one", "1 + 1", /*is_pseudo_column=*/true},
-       {"measure_scalar_subquery",
-        "(SELECT SUM(x) FROM UNNEST([1, 2, 3]) AS x)",
-        /*is_pseudo_column=*/true}},
-      /*is_value_table=*/false, measuretable_singlekey_data));
+  return absl::OkStatus();
+}
 
-  GOOGLESQL_RETURN_IF_ERROR(AddTableWithMeasures(
-      analyzer_options, "MeasureTable_WithUdfs",
-      {new SimpleColumn("MeasureTable_WithUdfs", "key", types_->get_int64()),
-       new SimpleColumn("MeasureTable_WithUdfs", "country",
-                        types_->get_string()),
-       new SimpleColumn("MeasureTable_WithUdfs", "quantity",
-                        types_->get_int64()),
-       new SimpleColumn("MeasureTable_WithUdfs", "price", types_->get_int64())},
-      /*row_identity_column_indices=*/absl::btree_set<int>{0},
-      /*measures=*/
-      {
-          {"measure_with_top_level_udf", "SUM(price) + NullaryPi()"},
-          {"measure_with_udf_in_argument", "SUM(UnaryIncrement(price))"},
-          {"measure_with_udf_and_multilevel_aggregation",
-           "SUM(ANY_VALUE(UnaryIncrement(price)) group by "
-           "UnaryIncrement(key))"},
-          {"measure_with_udf_containing_multilevel_aggregation",
-           "SUM(COUNT(UnaryIncrement(price)) + NullaryWithMultiLevelAgg() "
-           "group by key)"},
-      },
-      /*is_value_table=*/false, measuretable_singlekey_data));
+absl::Status SampleCatalogImpl::LoadDerivedMeasureTables(
+    const LanguageOptions& language_options, AnalyzerOptions& analyzer_options,
+    const std::vector<std::vector<Value>>& derived_data,
+    const std::vector<std::vector<Value>>& twokeys_data,
+    const std::vector<std::vector<Value>>& sales_facts_data) {
+  if (language_options.LanguageFeatureEnabled(FEATURE_ENABLE_MEASURES) &&
+      language_options.LanguageFeatureEnabled(FEATURE_DERIVED_MEASURE)) {
+    std::vector<MeasureColumnDef> derived_measures = {
+        {"measure_sum_price", "SUM(price)"},
+        {"measure_sum_quantity", "SUM(quantity)"},
+        {"measure_sum_tax", "SUM(tax)"},
+        {"measure_sum_shipping", "SUM(shipping)"},
+        {"measure_derived_sum_price_plus_one", "AGG(measure_sum_price) + 1"},
+        {"measure_derived_subtotal",
+         "AGG(measure_sum_price) + AGG(measure_sum_tax)"},
+        {"measure_derived_order_total",
+         "AGG(measure_derived_subtotal) + AGG(measure_sum_shipping)"},
+        {"measure_derived_twice_sum_price",
+         "AGG(measure_sum_price) + AGG(measure_sum_price)"},
+        {"measure_derived_sum_price_plus_two", "AGG(measure_sum_price) + 2"},
+        {"measure_derived_twice_sum_price_plus_one",
+         "AGG(measure_derived_sum_price_plus_one) + "
+         "AGG(measure_derived_sum_price_plus_one)"},
+        {"measure_derived_sum_price_plus_one_plus_two",
+         "AGG(measure_derived_sum_price_plus_one) + "
+         "AGG(measure_derived_sum_price_plus_two)"},
+        {"measure_derived_mixed_sum_price",
+         "AGG(measure_sum_price) + "
+         "AGG(measure_derived_sum_price_plus_one)"},
+        {"measure_derived_with_subquery",
+         "AGG(measure_sum_price) + (SELECT SUM(x) FROM UNNEST([1, 2, 3]) as "
+         "x)"},
+        {"measure_derived_with_standard_aggregates",
+         "AGG(measure_sum_price) + SUM(tax)"},
+        {"measure_derived_with_group_by_aggregates",
+         "AGG(measure_sum_price) + AVG(SUM(tax) GROUP BY key)"},
+        {"measure_derived_nest_1", "AGG(measure_sum_price) + 1"},
+        {"measure_derived_nest_2", "AGG(measure_derived_nest_1) + 1"},
+        {"measure_derived_nest_3", "AGG(measure_derived_nest_2) + 1"},
+        {"measure_derived_nest_4", "AGG(measure_derived_nest_3) + 1"},
+        {"measure_derived_nest_5", "AGG(measure_derived_nest_4) + 1"}};
+    if (language_options.LanguageFeatureEnabled(FEATURE_MEASURES_IN_STRUCT)) {
+      derived_measures.push_back({"measure_derived_agg_struct",
+                                  "AGG(STRUCT(measure_sum_price AS m).m) + 1"});
+    }
 
-  // The column `arg` has a name conflict with the function argument of
-  // template UDF `TimesTwo(arg)`
-  // We deliberately use column name arg to ensure that the templated
-  // UDF TimesTwo(arg) resolves arg against the function argument name rather
-  // than the name of the column on the table.
-  GOOGLESQL_RETURN_IF_ERROR(AddTableWithMeasures(
-      analyzer_options, "MeasureTable_WithTemplatedUdfs",
-      {new SimpleColumn("MeasureTable_WithTemplatedUdfs", "key",
-                        types_->get_int64()),
-       new SimpleColumn("MeasureTable_WithTemplatedUdfs", "country",
-                        types_->get_string()),
-       new SimpleColumn("MeasureTable_WithTemplatedUdfs", "arg",
-                        types_->get_int64()),
-       new SimpleColumn("MeasureTable_WithTemplatedUdfs", "price",
-                        types_->get_int64())},
-      /*row_identity_column_indices=*/absl::btree_set<int>{0},
-      /*measures=*/
-      {
-          {"measure_with_top_level_udf",
-           "SUM(price) + SUM_DOUBLE_ARRAY([1, 2])"},
-          {"measure_with_udf_in_argument", "SUM(TimesTwo(price))"},
-          {"measure_with_udf_and_multilevel_aggregation",
-           "SUM(ANY_VALUE(TimesTwo(price)) group by "
-           "TimesTwo(key))"},
-          {"measure_with_udf_containing_multilevel_aggregation",
-           "SUM(COUNT(TimesTwo(price)) + NullaryWithMultiLevelAgg() "
-           "group by key)"},
-          {"measure_with_name_conflict_on_arg",
-           "SUM(ANY_VALUE(TimesTwo(price + 1)) + COUNT(TimesTwo(price + 2)) "
-           "group by key)"},
-      },
-      /*is_value_table=*/false, measuretable_singlekey_data));
+    GOOGLESQL_RETURN_IF_ERROR(AddTableWithMeasures(
+        analyzer_options, "MeasureTable_Derived",
+        {new SimpleColumn("MeasureTable_Derived", "key", types_->get_int64()),
+         new SimpleColumn("MeasureTable_Derived", "country",
+                          types_->get_string()),
+         new SimpleColumn("MeasureTable_Derived", "quantity",
+                          types_->get_int64()),
+         new SimpleColumn("MeasureTable_Derived", "price", types_->get_int64()),
+         new SimpleColumn("MeasureTable_Derived", "tax", types_->get_int64()),
+         new SimpleColumn("MeasureTable_Derived", "shipping",
+                          types_->get_int64())},
+        /*row_identity_column_indices=*/absl::btree_set<int>{0},
+        derived_measures,
+        /*is_value_table=*/false, derived_data));
 
-  GOOGLESQL_RETURN_IF_ERROR(AddTableWithMeasures(
-      analyzer_options, "StructValueTable_WithMeasures",
-      {new SimpleColumn("StructValueTable_WithMeasures", "value",
-                        doubly_nested_struct_type_),
-       new SimpleColumn("StructValueTable_WithMeasures", "key",
-                        types_->get_int64(), {.is_pseudo_column = true})},
-      /*row_identity_column_indices=*/absl::btree_set<int>{1},
-      /*measures=*/
-      {{"measure_count_star", "COUNT(*)", /*is_pseudo_column=*/true},
-       {"measure_sum_e", "SUM(e)", /*is_pseudo_column=*/true},
-       {"measure_ratio_sum_a_to_sum_c", "SUM(f.d.a) / SUM(f.c)",
-        /*is_pseudo_column=*/true},
-       {"measure_sum_key", "SUM(key)", /*is_pseudo_column=*/true}},
-      /*is_value_table=*/true, struct_value_table_data));
+    GOOGLESQL_RETURN_IF_ERROR(AddTableWithMeasures(
+        analyzer_options, "MeasureTable_TwoKeys_Derived",
+        {new SimpleColumn("MeasureTable_TwoKeys_Derived", "KEY1",
+                          types_->get_int64()),
+         new SimpleColumn("MeasureTable_TwoKeys_Derived", "key2",
+                          types_->get_int64()),
+         new SimpleColumn("MeasureTable_TwoKeys_Derived", "Country",
+                          types_->get_string()),
+         new SimpleColumn("MeasureTable_TwoKeys_Derived", "Quantity",
+                          types_->get_int64()),
+         new SimpleColumn("MeasureTable_TwoKeys_Derived", "Price",
+                          types_->get_int64())},
+        /*row_identity_column_indices=*/absl::btree_set<int>{0, 1},
+        /*measures=*/
+        {{"measure_sum_price", "SUM(price)"},
+         {"measure_derived_sum_price_plus_quantity",
+          "AGG(measure_sum_price) + SUM(quantity)"}},
+        /*is_value_table=*/false, twokeys_data));
+    GOOGLESQL_RETURN_IF_ERROR(AddTableWithMeasures(
+        analyzer_options, "MeasureTable_SalesFacts_Derived",
+        {new SimpleColumn("MeasureTable_SalesFacts_Derived", "item_id",
+                          types_->get_int64()),
+         new SimpleColumn("MeasureTable_SalesFacts_Derived", "store_id",
+                          types_->get_int64()),
+         new SimpleColumn("MeasureTable_SalesFacts_Derived", "price",
+                          types_->get_int64()),
+         new SimpleColumn("MeasureTable_SalesFacts_Derived", "quantity",
+                          types_->get_int64())},
+        /*row_identity_column_indices=*/absl::btree_set<int>{0, 1},
+        /*measures=*/
+        {{
+             .name = "measure_total_price",
+             .expression = "SUM(price)",
+             .is_pseudo_column = false,
+             .row_identity_column_indices = {{0}},
+         },
+         {
+             .name = "measure_total_quantity",
+             .expression = "SUM(quantity)",
+             .is_pseudo_column = false,
+             .row_identity_column_indices = {{1}},
+         },
+         {
+             .name = "measure_derived_total_price_plus_one",
+             .expression = "AGG(measure_total_price) + 1",
+             .is_pseudo_column = false,
+             .row_identity_column_indices = {{0}},
+         }},
+        /*is_value_table=*/false, sales_facts_data));
 
-  GOOGLESQL_RETURN_IF_ERROR(AddTableWithMeasures(
-      analyzer_options, "KitchenSinkValueTable_WithMeasures",
-      {new SimpleColumn("KitchenSinkValueTable_WithMeasures", "value",
-                        proto_KitchenSinkPB_),
-       new SimpleColumn("KitchenSinkValueTable_WithMeasures", "key",
-                        types_->get_int64(), {.is_pseudo_column = true})},
-      /*row_identity_column_indices=*/absl::btree_set<int>{1},
-      /*measures=*/
-      {{"measure_count_star", "COUNT(*)", /*is_pseudo_column=*/true},
-       {"measure_sum_int64", "SUM(int64_val)", /*is_pseudo_column=*/true},
-       {"measure_ratio_sum_int64_to_sum_int32",
-        "SUM(int64_val) / SUM(int32_val)",
-        /*is_pseudo_column=*/true},
-       {"measure_sum_key", "SUM(key)", /*is_pseudo_column=*/true}},
-      /*is_value_table=*/true));
+    const Table* measure_table_derived = nullptr;
+    GOOGLESQL_RETURN_IF_ERROR(
+        catalog_->GetTable("MeasureTable_Derived", &measure_table_derived));
+    GOOGLESQL_RET_CHECK(measure_table_derived != nullptr);
+    catalog_->AddOwnedTableValuedFunction(std::make_unique<TvfWithTableSchema>(
+        std::vector<std::string>{"MeasureTable_Derived_TVF"},
+        std::vector<FunctionSignature>{
+            FunctionSignature(ARG_KIND_RELATION, /*arguments=*/{},
+                              /*context_id=*/0, /*options=*/{})},
+        measure_table_derived));
+  }
 
-  GOOGLESQL_RETURN_IF_ERROR(AddTableWithMeasures(
-      analyzer_options, "Int64ValueTable_WithMeasures",
-      {new SimpleColumn("Int64ValueTable_WithMeasures", "value",
-                        types_->get_int64()),
-       new SimpleColumn("Int64ValueTable_WithMeasures", "key",
-                        types_->get_int64(), {.is_pseudo_column = true})},
-      /*row_identity_column_indices=*/absl::btree_set<int>{1},
-      /*measures=*/
-      {{"measure_count_star", "COUNT(*)", /*is_pseudo_column=*/true},
-       {"measure_sum_key", "SUM(key)", /*is_pseudo_column=*/true},
-       {"measure_literal_one", "1", /*is_pseudo_column=*/true},
-       {"measure_one_plus_one", "1 + 1", /*is_pseudo_column=*/true},
-       {"measure_scalar_subquery",
-        "(SELECT SUM(x) FROM UNNEST([1, 2, 3]) AS x)",
-        /*is_pseudo_column=*/true}},
-      /*is_value_table=*/true, int64_value_table_data));
-
-  // Table containing measure expressions that would ordinarily trigger
-  // rewrites. We disable these rewrites during measure expression analysis.
-  GOOGLESQL_RETURN_IF_ERROR(AddTableWithMeasures(
-      analyzer_options, "MeasureTable_WithRewritableExprs",
-      {new SimpleColumn("MeasureTable_WithRewritableExprs", "key",
-                        types_->get_int64()),
-       new SimpleColumn("MeasureTable_WithRewritableExprs", "country",
-                        types_->get_string()),
-       new SimpleColumn("MeasureTable_WithRewritableExprs", "quantity",
-                        types_->get_int64()),
-       new SimpleColumn("MeasureTable_WithRewritableExprs", "price",
-                        types_->get_int64())},
-      /*row_identity_column_indices=*/absl::btree_set<int>{0},
-      /*measures=*/
-      {{"measure_with_with_expr", "WITH(a AS SUM(price), a + 1)",
-        /*is_pseudo_column=*/true},
-       {"measure_with_array_remove_last_n",
-        "ARRAY_REMOVE_LAST_N([1,2], SUM(price))", /*is_pseudo_column=*/true}},
-      /*is_value_table=*/false, measuretable_singlekey_data));
-
-  // Table containing complex measure expressions that had triggered RQG
-  // failures in the past.
-  GOOGLESQL_RETURN_IF_ERROR(AddTableWithMeasures(
-      analyzer_options, "MeasureTable_ComplexExprs",
-      {new SimpleColumn("MeasureTable_ComplexExprs", "key",
-                        types_->get_int64()),
-       new SimpleColumn("MeasureTable_ComplexExprs", "country",
-                        types_->get_string()),
-       new SimpleColumn("MeasureTable_ComplexExprs", "array_val",
-                        int64array_type_)},
-      /*row_identity_column_indices=*/absl::btree_set<int>{0},
-      /*measures=*/
-      {{"measure_with_in_subquery",
-        "COUNTIF(((key) IN (SELECT scan_alias.a_2 AS renamed FROM (SELECT "
-        "key "
-        "AS a_1, key AS a_2) AS scan_alias)))"},
-       {"measure_with_lambda_containing_with_expr",
-        "SUM(ARRAY_FILTER([1, 2, 3], e -> WITH(a1 AS array_val, a2 AS key, "
-        "true))[OFFSET(0)])"},
-       {"measure_sum_one", "SUM(1)"},
-       {"measure_string_agg", "STRING_AGG(country, ',')"},
-       {"measure_bit_and", "BIT_AND(CAST(country AS BYTES), mode => 'PAD')"},
-       {"measure_aggregation_in_in_expr", "SUM(key) IN ((SELECT 1))"}},
-      /*is_value_table=*/false, measuretable_complexexprs_data));
-
-  GOOGLESQL_RETURN_IF_ERROR(AddTableWithMeasures(
-      analyzer_options, "MeasureTable_WithUdas",
-      {new SimpleColumn("MeasureTable_WithUdas", "key", types_->get_int64()),
-       new SimpleColumn("MeasureTable_WithUdas", "country",
-                        types_->get_string()),
-       new SimpleColumn("MeasureTable_WithUdas", "quantity",
-                        types_->get_int64()),
-       new SimpleColumn("MeasureTable_WithUdas", "price", types_->get_int64())},
-      /*row_identity_column_indices=*/absl::btree_set<int>{0},
-      /*measures=*/
-      {{"measure_uda_sum_price", "SumOfAggregateArgs(price)"},
-       {"measure_uda_sum_price_per_key",
-        "SumOfAggregateArgs(ANY_VALUE(price) GROUP BY key)"},
-       {"measure_uda_sum_max_price_per_country",
-        "SumOfAggregateArgs(MaxOfAggregateArgs(price) GROUP BY country)"}},
-      /*is_value_table=*/false, measuretable_singlekey_data));
-
-  // A Measure table the represents a "join" of two fact tables.
+  // A Measure table that represents a "join" of two fact tables.
   //
   // `price` is uniquely identified by `item_id`.
   // `quantity` is uniquely identified by `store_id`.
@@ -2801,6 +2879,235 @@ absl::Status SampleCatalogImpl::LoadMeasureTables(
         /*is_value_table=*/false, sales_facts_data));
   }
 
+  return absl::OkStatus();
+}
+
+absl::Status SampleCatalogImpl::LoadMeasureTablesWithAdvancedExprs(
+    AnalyzerOptions& analyzer_options,
+    const std::vector<std::vector<Value>>& singlekey_data,
+    const std::vector<std::vector<Value>>& complexexprs_data) {
+  GOOGLESQL_RETURN_IF_ERROR(AddTableWithMeasures(
+      analyzer_options, "MeasureTable_WithSubqueryMeasureExprs",
+      {new SimpleColumn("MeasureTable_WithSubqueryMeasureExprs", "key",
+                        types_->get_int64()),
+       new SimpleColumn("MeasureTable_WithSubqueryMeasureExprs", "country",
+                        types_->get_string()),
+       new SimpleColumn("MeasureTable_WithSubqueryMeasureExprs", "quantity",
+                        types_->get_int64()),
+       new SimpleColumn("MeasureTable_WithSubqueryMeasureExprs", "price",
+                        types_->get_int64())},
+      /*row_identity_column_indices=*/absl::btree_set<int>{0},
+      /*measures=*/
+      {{"measure_with_top_level_subquery",
+        "SUM(price) + (SELECT SUM(1) FROM UNNEST([1]))"},
+       {"measure_with_simple_subquery_in_aggregate_function",
+        "SUM((SELECT price))"},
+       {"measure_with_aggregate_subquery_in_aggregate_function",
+        "SUM((SELECT SUM(price) FROM UNNEST([1])))"},
+       {"measure_with_multiple_subqueries",
+        "SUM((SELECT SUM(price) FROM UNNEST([1]))) + (SELECT SUM(1) FROM "
+        "UNNEST([1]))"},
+       {"measure_with_deeply_nested_subquery",
+        "SUM((SELECT x FROM (SELECT (SELECT SUM(price) FROM UNNEST([1])) AS "
+        "x)))"},
+       {"measure_literal_one", "1", /*is_pseudo_column=*/true},
+       {"measure_one_plus_one", "1 + 1", /*is_pseudo_column=*/true},
+       {"measure_scalar_subquery",
+        "(SELECT SUM(x) FROM UNNEST([1, 2, 3]) AS x)",
+        /*is_pseudo_column=*/true}},
+      /*is_value_table=*/false, singlekey_data));
+
+  GOOGLESQL_RETURN_IF_ERROR(AddTableWithMeasures(
+      analyzer_options, "MeasureTable_WithUdfs",
+      {new SimpleColumn("MeasureTable_WithUdfs", "key", types_->get_int64()),
+       new SimpleColumn("MeasureTable_WithUdfs", "country",
+                        types_->get_string()),
+       new SimpleColumn("MeasureTable_WithUdfs", "quantity",
+                        types_->get_int64()),
+       new SimpleColumn("MeasureTable_WithUdfs", "price", types_->get_int64())},
+      /*row_identity_column_indices=*/absl::btree_set<int>{0},
+      /*measures=*/
+      {
+          {"measure_with_top_level_udf", "SUM(price) + NullaryPi()"},
+          {"measure_with_udf_in_argument", "SUM(UnaryIncrement(price))"},
+          {"measure_with_udf_and_multilevel_aggregation",
+           "SUM(ANY_VALUE(UnaryIncrement(price)) group by "
+           "UnaryIncrement(key))"},
+          {"measure_with_udf_containing_multilevel_aggregation",
+           "SUM(COUNT(UnaryIncrement(price)) + NullaryWithMultiLevelAgg() "
+           "group by key)"},
+      },
+      /*is_value_table=*/false, singlekey_data));
+
+  // The column `arg` has a name conflict with the function argument of
+  // template UDF `TimesTwo(arg)`
+  // We deliberately use column name arg to ensure that the templated
+  // UDF TimesTwo(arg) resolves arg against the function argument name rather
+  // than the name of the column on the table.
+  GOOGLESQL_RETURN_IF_ERROR(AddTableWithMeasures(
+      analyzer_options, "MeasureTable_WithTemplatedUdfs",
+      {new SimpleColumn("MeasureTable_WithTemplatedUdfs", "key",
+                        types_->get_int64()),
+       new SimpleColumn("MeasureTable_WithTemplatedUdfs", "country",
+                        types_->get_string()),
+       new SimpleColumn("MeasureTable_WithTemplatedUdfs", "arg",
+                        types_->get_int64()),
+       new SimpleColumn("MeasureTable_WithTemplatedUdfs", "price",
+                        types_->get_int64())},
+      /*row_identity_column_indices=*/absl::btree_set<int>{0},
+      /*measures=*/
+      {
+          {"measure_with_top_level_udf",
+           "SUM(price) + SUM_DOUBLE_ARRAY([1, 2])"},
+          {"measure_with_udf_in_argument", "SUM(TimesTwo(price))"},
+          {"measure_with_udf_and_multilevel_aggregation",
+           "SUM(ANY_VALUE(TimesTwo(price)) group by "
+           "TimesTwo(key))"},
+          {"measure_with_udf_containing_multilevel_aggregation",
+           "SUM(COUNT(TimesTwo(price)) + NullaryWithMultiLevelAgg() "
+           "group by key)"},
+          {"measure_with_name_conflict_on_arg",
+           "SUM(ANY_VALUE(TimesTwo(price + 1)) + COUNT(TimesTwo(price + 2)) "
+           "group by key)"},
+      },
+      /*is_value_table=*/false, singlekey_data));
+
+  // Table containing measure expressions that would ordinarily trigger
+  // rewrites. We disable these rewrites during measure expression analysis.
+  GOOGLESQL_RETURN_IF_ERROR(AddTableWithMeasures(
+      analyzer_options, "MeasureTable_WithRewritableExprs",
+      {new SimpleColumn("MeasureTable_WithRewritableExprs", "key",
+                        types_->get_int64()),
+       new SimpleColumn("MeasureTable_WithRewritableExprs", "country",
+                        types_->get_string()),
+       new SimpleColumn("MeasureTable_WithRewritableExprs", "quantity",
+                        types_->get_int64()),
+       new SimpleColumn("MeasureTable_WithRewritableExprs", "price",
+                        types_->get_int64())},
+      /*row_identity_column_indices=*/absl::btree_set<int>{0},
+      /*measures=*/
+      {{"measure_with_with_expr", "WITH(a AS SUM(price), a + 1)",
+        /*is_pseudo_column=*/true},
+       {"measure_with_array_remove_last_n",
+        "ARRAY_REMOVE_LAST_N([1,2], SUM(price))", /*is_pseudo_column=*/true}},
+      /*is_value_table=*/false, singlekey_data));
+
+  // Table containing complex measure expressions that had triggered RQG
+  // failures in the past.
+  GOOGLESQL_RETURN_IF_ERROR(AddTableWithMeasures(
+      analyzer_options, "MeasureTable_ComplexExprs",
+      {new SimpleColumn("MeasureTable_ComplexExprs", "key",
+                        types_->get_int64()),
+       new SimpleColumn("MeasureTable_ComplexExprs", "country",
+                        types_->get_string()),
+       new SimpleColumn("MeasureTable_ComplexExprs", "array_val",
+                        int64array_type_)},
+      /*row_identity_column_indices=*/absl::btree_set<int>{0},
+      /*measures=*/
+      {{"measure_with_in_subquery",
+        "COUNTIF(((key) IN (SELECT scan_alias.a_2 AS renamed FROM (SELECT "
+        "key "
+        "AS a_1, key AS a_2) AS scan_alias)))"},
+       {"measure_with_lambda_containing_with_expr",
+        "SUM(ARRAY_FILTER([1, 2, 3], e -> WITH(a1 AS array_val, a2 AS key, "
+        "true))[OFFSET(0)])"},
+       {"measure_sum_one", "SUM(1)"},
+       {"measure_string_agg", "STRING_AGG(country, ',')"},
+       {"measure_bit_and", "BIT_AND(CAST(country AS BYTES), mode => 'PAD')"},
+       {"measure_aggregation_in_in_expr", "SUM(key) IN ((SELECT 1))"}},
+      /*is_value_table=*/false, complexexprs_data));
+
+  GOOGLESQL_RETURN_IF_ERROR(AddTableWithMeasures(
+      analyzer_options, "MeasureTable_WithUdas",
+      {new SimpleColumn("MeasureTable_WithUdas", "key", types_->get_int64()),
+       new SimpleColumn("MeasureTable_WithUdas", "country",
+                        types_->get_string()),
+       new SimpleColumn("MeasureTable_WithUdas", "quantity",
+                        types_->get_int64()),
+       new SimpleColumn("MeasureTable_WithUdas", "price", types_->get_int64())},
+      /*row_identity_column_indices=*/absl::btree_set<int>{0},
+      /*measures=*/
+      {{"measure_uda_sum_price", "SumOfAggregateArgs(price)"},
+       {"measure_uda_sum_price_per_key",
+        "SumOfAggregateArgs(ANY_VALUE(price) GROUP BY key)"},
+       {"measure_uda_sum_max_price_per_country",
+        "SumOfAggregateArgs(MaxOfAggregateArgs(price) GROUP BY country)"}},
+      /*is_value_table=*/false, singlekey_data));
+
+  return absl::OkStatus();
+}
+
+absl::Status SampleCatalogImpl::LoadMeasureValueTables(
+    const LanguageOptions& language_options, AnalyzerOptions& analyzer_options,
+    const std::vector<std::vector<Value>>& struct_value_data,
+    const std::vector<std::vector<Value>>& int64_value_data) {
+  if (language_options.LanguageFeatureEnabled(FEATURE_ENABLE_MEASURES) &&
+      language_options.LanguageFeatureEnabled(FEATURE_DERIVED_MEASURE)) {
+    GOOGLESQL_RETURN_IF_ERROR(AddTableWithMeasures(
+        analyzer_options, "MeasureValueTable_Struct",
+        {new SimpleColumn("MeasureValueTable_Struct", "value", struct_type_)},
+        /*row_identity_column_indices=*/absl::btree_set<int>{0},
+        /*measures=*/
+        {{"measure_count_star", "COUNT(*)", /*is_pseudo_column=*/true},
+         {"measure_sum_a", "SUM(a)", /*is_pseudo_column=*/true},
+         {"derived_measure_sum_a_plus_one", "AGG(measure_sum_a) + 1",
+          /*is_pseudo_column=*/true}},
+        /*is_value_table=*/true));
+  }
+
+  GOOGLESQL_RETURN_IF_ERROR(AddTableWithMeasures(
+      analyzer_options, "StructValueTable_WithMeasures",
+      {new SimpleColumn("StructValueTable_WithMeasures", "value",
+                        doubly_nested_struct_type_),
+       new SimpleColumn("StructValueTable_WithMeasures", "key",
+                        types_->get_int64(), {.is_pseudo_column = true})},
+      /*row_identity_column_indices=*/absl::btree_set<int>{1},
+      /*measures=*/
+      {{"measure_count_star", "COUNT(*)", /*is_pseudo_column=*/true},
+       {"measure_sum_e", "SUM(e)", /*is_pseudo_column=*/true},
+       {"measure_ratio_sum_a_to_sum_c", "SUM(f.d.a) / SUM(f.c)",
+        /*is_pseudo_column=*/true},
+       {"measure_sum_key", "SUM(key)", /*is_pseudo_column=*/true}},
+      /*is_value_table=*/true, struct_value_data));
+
+  GOOGLESQL_RETURN_IF_ERROR(AddTableWithMeasures(
+      analyzer_options, "KitchenSinkValueTable_WithMeasures",
+      {new SimpleColumn("KitchenSinkValueTable_WithMeasures", "value",
+                        proto_KitchenSinkPB_),
+       new SimpleColumn("KitchenSinkValueTable_WithMeasures", "key",
+                        types_->get_int64(), {.is_pseudo_column = true})},
+      /*row_identity_column_indices=*/absl::btree_set<int>{1},
+      /*measures=*/
+      {{"measure_count_star", "COUNT(*)", /*is_pseudo_column=*/true},
+       {"measure_sum_int64", "SUM(int64_val)", /*is_pseudo_column=*/true},
+       {"measure_ratio_sum_int64_to_sum_int32",
+        "SUM(int64_val) / SUM(int32_val)",
+        /*is_pseudo_column=*/true},
+       {"measure_sum_key", "SUM(key)", /*is_pseudo_column=*/true}},
+      /*is_value_table=*/true));
+
+  GOOGLESQL_RETURN_IF_ERROR(AddTableWithMeasures(
+      analyzer_options, "Int64ValueTable_WithMeasures",
+      {new SimpleColumn("Int64ValueTable_WithMeasures", "value",
+                        types_->get_int64()),
+       new SimpleColumn("Int64ValueTable_WithMeasures", "key",
+                        types_->get_int64(), {.is_pseudo_column = true})},
+      /*row_identity_column_indices=*/absl::btree_set<int>{1},
+      /*measures=*/
+      {{"measure_count_star", "COUNT(*)", /*is_pseudo_column=*/true},
+       {"measure_sum_key", "SUM(key)", /*is_pseudo_column=*/true},
+       {"measure_literal_one", "1", /*is_pseudo_column=*/true},
+       {"measure_one_plus_one", "1 + 1", /*is_pseudo_column=*/true},
+       {"measure_scalar_subquery",
+        "(SELECT SUM(x) FROM UNNEST([1, 2, 3]) AS x)",
+        /*is_pseudo_column=*/true}},
+      /*is_value_table=*/true, int64_value_data));
+
+  return absl::OkStatus();
+}
+
+absl::Status SampleCatalogImpl::LoadInvalidMeasureTables(
+    AnalyzerOptions& analyzer_options) {
   // Invalid measure TVF: The underlying table has a measure column whose row
   // identity column is empty.
   {
@@ -2855,6 +3162,12 @@ absl::Status SampleCatalogImpl::LoadMeasureTables(
         /*is_value_table=*/false));
   }
 
+  return absl::OkStatus();
+}
+
+absl::Status SampleCatalogImpl::LoadRowTypeMeasureTables(
+    const LanguageOptions& language_options,
+    AnalyzerOptions& analyzer_options) {
   if (language_options.LanguageFeatureEnabled(FEATURE_ROW_TYPE)) {
     // Add test tables for measures in row types.
 
@@ -2896,6 +3209,49 @@ absl::Status SampleCatalogImpl::LoadMeasureTables(
     {
       const Table* measure_table = nullptr;
       GOOGLESQL_RETURN_IF_ERROR(
+          catalog_->FindTable({"MeasureTable_SingleKey"}, &measure_table));
+      const RowType* row_type = nullptr;
+      GOOGLESQL_RETURN_IF_ERROR(types_->MakeRowType(
+          measure_table, measure_table->FullName(), &row_type));
+
+      std::vector<MeasureColumnDef> measures;
+      if (language_options.LanguageFeatureEnabled(FEATURE_DERIVED_MEASURE)) {
+        measures.push_back(
+            {.name = "derived_measure_with_row",
+             .expression = "AGG(inner_row_col.measure_sum_price) + 1"});
+      }
+
+      GOOGLESQL_RETURN_IF_ERROR(AddTableWithMeasures(
+          analyzer_options, "MeasureTable_NestedRow_WithDerived",
+          {new SimpleColumn("MeasureTable_NestedRow_WithDerived", "key",
+                            types_->get_int64()),
+           new SimpleColumn("MeasureTable_NestedRow_WithDerived",
+                            "inner_row_col", row_type)},
+          /*row_identity_column_indices=*/absl::btree_set<int>{0}, measures,
+          /*is_value_table=*/false));
+    }
+    if (language_options.LanguageFeatureEnabled(FEATURE_ENABLE_MEASURES) &&
+        language_options.LanguageFeatureEnabled(FEATURE_DERIVED_MEASURE)) {
+      const Table* measure_table = nullptr;
+      GOOGLESQL_RETURN_IF_ERROR(
+          catalog_->FindTable({"MeasureTable_Derived"}, &measure_table));
+      const RowType* row_type = nullptr;
+      GOOGLESQL_RETURN_IF_ERROR(types_->MakeRowType(
+          measure_table, measure_table->FullName(), &row_type));
+
+      GOOGLESQL_RETURN_IF_ERROR(AddTableWithMeasures(
+          analyzer_options, "MeasureTable_NestedRow_WithDerivedType",
+          {new SimpleColumn("MeasureTable_NestedRow_WithDerivedType", "key",
+                            types_->get_int64()),
+           new SimpleColumn("MeasureTable_NestedRow_WithDerivedType",
+                            "inner_row_col", row_type)},
+          /*row_identity_column_indices=*/absl::btree_set<int>{0},
+          /*measures=*/{},
+          /*is_value_table=*/false));
+    }
+    {
+      const Table* measure_table = nullptr;
+      GOOGLESQL_RETURN_IF_ERROR(
           catalog_->FindTable({"MeasureTable_NestedRow"}, &measure_table));
       const RowType* row_type = nullptr;
       GOOGLESQL_RETURN_IF_ERROR(types_->MakeRowType(
@@ -2904,6 +3260,62 @@ absl::Status SampleCatalogImpl::LoadMeasureTables(
       GOOGLESQL_RETURN_IF_ERROR(AddTableBackedTvf(
           "tvf_returning_nested_measure_row_type",
           {TVFSchemaColumn("row_type_col", row_type)}, *catalog_));
+    }
+
+    // tvf_returning_nested_row_with_derived_type
+    if (language_options.LanguageFeatureEnabled(FEATURE_ENABLE_MEASURES) &&
+        language_options.LanguageFeatureEnabled(FEATURE_DERIVED_MEASURE)) {
+      const Table* measure_table = nullptr;
+      GOOGLESQL_RETURN_IF_ERROR(catalog_->FindTable(
+          {"MeasureTable_NestedRow_WithDerivedType"}, &measure_table));
+      const RowType* row_type = nullptr;
+      GOOGLESQL_RETURN_IF_ERROR(types_->MakeRowType(
+          measure_table, measure_table->FullName(), &row_type));
+
+      GOOGLESQL_RETURN_IF_ERROR(AddTableBackedTvf(
+          "tvf_returning_nested_row_with_derived_type",
+          {TVFSchemaColumn("row_type_col", row_type)}, *catalog_));
+    }
+
+    // tvf_returning_derived_measure_row_type
+    if (language_options.LanguageFeatureEnabled(FEATURE_ENABLE_MEASURES) &&
+        language_options.LanguageFeatureEnabled(FEATURE_DERIVED_MEASURE)) {
+      const Table* measure_table = nullptr;
+      GOOGLESQL_RETURN_IF_ERROR(
+          catalog_->FindTable({"MeasureTable_Derived"}, &measure_table));
+      const RowType* row_type = nullptr;
+      GOOGLESQL_RETURN_IF_ERROR(types_->MakeRowType(
+          measure_table, measure_table->FullName(), &row_type));
+
+      GOOGLESQL_RETURN_IF_ERROR(AddTableBackedTvf(
+          "tvf_returning_derived_measure_row_type",
+          {TVFSchemaColumn("normal_col_1", types_->get_string()),
+           TVFSchemaColumn("row_type_col", row_type)},
+          *catalog_));
+    }
+
+    if (language_options.LanguageFeatureEnabled(FEATURE_ENABLE_MEASURES) &&
+        language_options.LanguageFeatureEnabled(FEATURE_DERIVED_MEASURE)) {
+      const Table* base_measure_table = nullptr;
+      GOOGLESQL_RETURN_IF_ERROR(
+          catalog_->FindTable({"MeasureTable_SingleKey"}, &base_measure_table));
+      const RowType* row_type = nullptr;
+      GOOGLESQL_RETURN_IF_ERROR(types_->MakeRowType(
+          base_measure_table, base_measure_table->FullName(), &row_type));
+
+      std::vector<MeasureColumnDef> derived_measures_with_row_type = {
+          {"measure_derived_from_row_field",
+           "AGG(row_col.measure_sum_quantity) + 1"}};
+
+      GOOGLESQL_RETURN_IF_ERROR(AddTableWithMeasures(
+          analyzer_options, "MeasureTable_DerivedWithRowType",
+          {new SimpleColumn("MeasureTable_DerivedWithRowType", "key",
+                            types_->get_int64()),
+           new SimpleColumn("MeasureTable_DerivedWithRowType", "row_col",
+                            row_type)},
+          /*row_identity_column_indices=*/absl::btree_set<int>{0},
+          derived_measures_with_row_type,
+          /*is_value_table=*/false));
     }
   }
 
@@ -3259,6 +3671,12 @@ void SampleCatalogImpl::LoadViews(const LanguageOptions& language_options) {
   add_view(
       "CREATE VIEW DefinerRightsView SQL SECURITY DEFINER AS "
       "SELECT 1 AS a, 'x' AS b, false AS c;");
+  add_view(
+      "CREATE VIEW DuplicateColumnsView SQL SECURITY INVOKER AS "
+      "SELECT key AS k1, key AS k2, key as k3 FROM KeyValue");
+  add_view(
+      "CREATE VIEW DuplicateColumnsDefinerView SQL SECURITY DEFINER AS "
+      "SELECT key AS k1, key AS k2, key as k3 FROM KeyValue");
 }
 
 absl::Status SampleCatalogImpl::LoadNestedCatalogs() {
@@ -6735,7 +7153,8 @@ absl::Status SampleCatalogImpl::LoadTemplatedSQLUDFs() {
   return absl::OkStatus();
 }
 
-absl::Status SampleCatalogImpl::LoadAmlBasedPropertyGraphs() {
+absl::Status SampleCatalogImpl::LoadAmlBasedPropertyGraphs(
+    const LanguageOptions& language_options) {
   typedef std::pair<std::string, const Type*> NameAndType;
   // First, add all the common underlying tables to be shared across the
   // different AML graphs.
@@ -6877,6 +7296,25 @@ absl::Status SampleCatalogImpl::LoadAmlBasedPropertyGraphs() {
   GOOGLESQL_RETURN_IF_ERROR(LoadBasicAmlWithTimestampsPropertyGraph());
   GOOGLESQL_RETURN_IF_ERROR(LoadEnhancedAmlPropertyGraph());
   GOOGLESQL_RETURN_IF_ERROR(LoadAmlDmlPropertyGraph());
+
+  {
+    LanguageOptions graph_udf_language = language_options;
+    graph_udf_language.EnableLanguageFeature(FEATURE_SQL_GRAPH);
+    graph_udf_language.EnableLanguageFeature(FEATURE_SQL_GRAPH_CALL);
+    graph_udf_language.AddSupportedStatementKind(RESOLVED_CREATE_FUNCTION_STMT);
+    GOOGLESQL_RETURN_IF_ERROR(graph_udf_language.EnableReservableKeyword("GRAPH_TABLE"));
+    GOOGLESQL_RETURN_IF_ERROR(AddSqlDefinedFunctionFromCreate(
+        R"( CREATE FUNCTION GraphCallScanCorrelated(x INT64)
+            AS ((SELECT gt.a FROM graph_table(
+                   aml
+                   MATCH (n:Person)
+                   CALL (n) {
+                     RETURN n.age + x AS a
+                   }
+                   RETURN a
+                 ) gt LIMIT 1)); )",
+        graph_udf_language));
+  }
 
   return absl::OkStatus();
 }
@@ -13374,6 +13812,9 @@ absl::Status SampleCatalogImpl::AddSqlDefinedFunctionFromCreate(
   language.EnableLanguageFeature(FEATURE_AGGREGATE_FILTERING);
   language.EnableLanguageFeature(FEATURE_LATERAL_JOIN);
   language.EnableLanguageFeature(FEATURE_GROUP_BY_STRUCT);
+  language.EnableLanguageFeature(FEATURE_SQL_GRAPH);
+  language.EnableLanguageFeature(FEATURE_SQL_GRAPH_ADVANCED_QUERY);
+  language.EnableLanguageFeature(FEATURE_SQL_GRAPH_CALL);
   AnalyzerOptions analyzer_options;
   analyzer_options.set_language(language);
   analyzer_options.set_enabled_rewrites(/*rewrites=*/{});
@@ -13482,6 +13923,11 @@ absl::Status SampleCatalogImpl::LoadScalarSqlFunctions(
       )",
       language_options));
 
+  // Used to ensure collation is handled correctly even in the body.
+  GOOGLESQL_RETURN_IF_ERROR(AddSqlDefinedFunctionFromCreate(
+      R"sql( CREATE FUNCTION UdfStringEq(a STRING, b STRING) AS (a = b); )sql",
+      language_options));
+
   // Creating the function using AnalyzeExpressionForAssignmentToType results in
   // a function body expression with ResolvedExpressionColumn where arguments
   // are referenced instead of a ResolvedArgumentRef. That appears to be done
@@ -13516,6 +13962,25 @@ absl::Status SampleCatalogImpl::LoadScalarSqlFunctionsFromStandardModule(
   GOOGLESQL_RETURN_IF_ERROR(AddSqlDefinedFunctionFromCreate(
       R"( CREATE FUNCTION ReferencesArgInsideCte(a INT64)
           AS ((WITH t AS (SELECT a AS c) SELECT c FROM t)); )",
+      language_options));
+
+  GOOGLESQL_RETURN_IF_ERROR(AddSqlDefinedFunctionFromCreate(
+      R"( CREATE FUNCTION ReferencesArgInsideNestedCte(a INT64)
+          AS ((WITH outer_cte AS (
+                 WITH inner_cte AS (SELECT 1 AS dummy)
+                 SELECT a AS val FROM inner_cte
+               )
+               SELECT val FROM outer_cte)); )",
+      language_options));
+
+  GOOGLESQL_RETURN_IF_ERROR(AddSqlDefinedFunctionFromCreate(
+      R"( CREATE FUNCTION SubqueryInExprNestedCorrelated(x INT64)
+          AS ((SELECT 1 FROM (SELECT 1) WHERE x IN (SELECT 1))); )",
+      language_options));
+
+  GOOGLESQL_RETURN_IF_ERROR(AddSqlDefinedFunctionFromCreate(
+      R"( CREATE FUNCTION LateralJoinLeftScanCorrelated(x INT64)
+          AS ((SELECT val FROM (SELECT x AS a) CROSS JOIN LATERAL (SELECT a AS val))); )",
       language_options));
 
   GOOGLESQL_RETURN_IF_ERROR(AddSqlDefinedFunctionFromCreate(
@@ -13743,6 +14208,15 @@ absl::Status SampleCatalogImpl::LoadAggregateSqlFunctions(
         another_agg_arg INT64
       ) AS (
         ARRAY_AGG(agg_arg HAVING MAX another_agg_arg)
+      );)sql",
+      language_options));
+
+  GOOGLESQL_RETURN_IF_ERROR(AddSqlDefinedFunctionFromCreate(
+      R"sql(
+      CREATE AGGREGATE FUNCTION UdaReferencingArgInSubquery(
+        agg_arg INT64
+      ) AS (
+        ARRAY_AGG((SELECT agg_arg FROM (SELECT 1)))
       );)sql",
       language_options));
 
@@ -13991,7 +14465,8 @@ absl::Status SampleCatalogImpl::LoadAggregateSqlFunctions(
   return absl::OkStatus();
 }
 
-void SampleCatalogImpl::LoadRowTypeObjects() {
+absl::Status SampleCatalogImpl::LoadRowTypeObjects(
+    const LanguageOptions& language_options) {
   const std::vector<SimpleTable::NameAndType> key_value_columns = {
       {"Key", types_->get_int64()}, {"Value", types_->get_string()}};
   const std::vector<std::vector<Value>> key_value_contents = {
@@ -14009,6 +14484,47 @@ void SampleCatalogImpl::LoadRowTypeObjects() {
       "KeyValueFindOnly", Table::ColumnListMode::FIND_ONLY, key_value_columns);
   key_value_find_only_table->SetContents(key_value_contents);
   AddOwnedTable(key_value_find_only_table);
+
+  // Objects below this reference ROW types, so aren't valid if not enabled.
+  if (!language_options.LanguageFeatureEnabled(FEATURE_ROW_TYPE)) {
+    return absl::OkStatus();
+  }
+
+  // Backing table for single-level nested ROW type columns. Provides the schema
+  // for the ROW type used as a column in RowTypeSingleNested.
+  auto* inner_row_table = new SimpleTable(
+      "InnerRowTypeTable", {{{"nested_field", types_->get_string()},
+                             {"other_field", types_->get_string()}}});
+  AddOwnedTable(inner_row_table);
+
+  // Table with a single level of ROW type nesting.
+  // Schema: ROW<key STRING, val INT64, nested_row ROW<InnerRowTypeTable>>
+  const Type* inner_row_type = nullptr;
+  GOOGLESQL_RETURN_IF_ERROR(types_->MakeRowType(
+      inner_row_table, inner_row_table->FullName(), &inner_row_type));
+  LazySimpleTable* single_nested_table = new LazySimpleTable(
+      "RowTypeSingleNested", Table::ColumnListMode::FIND_ONLY,
+      {{"key", types_->get_string()},
+       {"val", types_->get_int64()},
+       {"nested_row", inner_row_type}});
+  AddOwnedTable(single_nested_table);
+
+  // Table with recursively-nested ROW types (infinite nesting).
+  // Schema: ROW<key STRING, col2 STRING, col3 INT64,
+  //             middle ROW<RowTypeRecursiveNested>>
+  LazySimpleTable* recursive_nested_table = new LazySimpleTable(
+      "RowTypeRecursiveNested", Table::ColumnListMode::FIND_ONLY,
+      {{"key", types_->get_string()},
+       {"col2", types_->get_string()},
+       {"col3", types_->get_int64()}});
+  const Type* recursive_row_type = nullptr;
+  GOOGLESQL_RETURN_IF_ERROR(types_->MakeRowType(recursive_nested_table,
+                                      recursive_nested_table->FullName(),
+                                      &recursive_row_type));
+  GOOGLESQL_RETURN_IF_ERROR(recursive_nested_table->AddColumn(
+      new SimpleColumn("RowTypeRecursiveNested", "middle", recursive_row_type),
+      /*is_owned=*/true));
+  AddOwnedTable(recursive_nested_table);
 
   // A TVF which returns a ROW type as one column.
   TVFComputeResultTypeCallback result_type_callback_1 =
@@ -14157,6 +14673,68 @@ void SampleCatalogImpl::LoadRowTypeObjects() {
       TableValuedFunctionOptions()
           .set_compute_result_type_callback(result_type_callback_4)
           .AddRequiredLanguageFeature(FEATURE_ROW_TYPE)));
+
+  // A TVF which returns a ROW type containing a nested ROW type.
+  TVFComputeResultTypeCallback result_type_callback_5 =
+      [](Catalog* catalog, TypeFactory* type_factory,
+         const FunctionSignature& signature,
+         const std::vector<TVFInputArgumentType>& actual_arguments,
+         const AnalyzerOptions& analyzer_options)
+      -> absl::StatusOr<std::shared_ptr<googlesql::TVFSignature>> {
+    const Table* backing_table;
+    GOOGLESQL_RETURN_IF_ERROR(
+        catalog->FindTable(/*path=*/{"RowTypeSingleNested"}, &backing_table));
+    const RowType* row_type;
+    GOOGLESQL_RETURN_IF_ERROR(type_factory->MakeRowType(
+        backing_table, "tvf_returning_row_type_single_nested.row_col",
+        &row_type));
+    return std::make_unique<TVFSignature>(
+        actual_arguments,
+        TVFRelation({TVFSchemaColumn("normal_col_1", types::StringType()),
+                     TVFSchemaColumn("row_col", row_type),
+                     TVFSchemaColumn("normal_col_2", types::Int64Type())}),
+        TVFSignatureOptions{.row_type_rewrite_callback =
+                                TVFSignature::BaseRowTypeRewriteCallback});
+  };
+  catalog_->AddOwnedTableValuedFunction(new TableValuedFunction(
+      {"tvf_returning_row_type_single_nested"}, /*group=*/"RowTypeTest",
+      {FunctionSignature(FunctionArgumentType::AnyRelation(), {},
+                         /*context_id=*/-1)},
+      TableValuedFunctionOptions()
+          .set_compute_result_type_callback(result_type_callback_5)
+          .AddRequiredLanguageFeature(FEATURE_ROW_TYPE)));
+
+  // A TVF which returns a ROW type containing recursive nested ROW type.
+  TVFComputeResultTypeCallback result_type_callback_6 =
+      [](Catalog* catalog, TypeFactory* type_factory,
+         const FunctionSignature& signature,
+         const std::vector<TVFInputArgumentType>& actual_arguments,
+         const AnalyzerOptions& analyzer_options)
+      -> absl::StatusOr<std::shared_ptr<googlesql::TVFSignature>> {
+    const Table* backing_table;
+    GOOGLESQL_RETURN_IF_ERROR(catalog->FindTable(/*path=*/{"RowTypeRecursiveNested"},
+                                       &backing_table));
+    const RowType* row_type;
+    GOOGLESQL_RETURN_IF_ERROR(type_factory->MakeRowType(
+        backing_table, "tvf_returning_row_type_recursive_nested.row_col",
+        &row_type));
+    return std::make_unique<TVFSignature>(
+        actual_arguments,
+        TVFRelation({TVFSchemaColumn("normal_col_1", types::StringType()),
+                     TVFSchemaColumn("row_col", row_type),
+                     TVFSchemaColumn("normal_col_2", types::Int64Type())}),
+        TVFSignatureOptions{.row_type_rewrite_callback =
+                                TVFSignature::BaseRowTypeRewriteCallback});
+  };
+  catalog_->AddOwnedTableValuedFunction(new TableValuedFunction(
+      {"tvf_returning_row_type_recursive_nested"}, /*group=*/"RowTypeTest",
+      {FunctionSignature(FunctionArgumentType::AnyRelation(), {},
+                         /*context_id=*/-1)},
+      TableValuedFunctionOptions()
+          .set_compute_result_type_callback(result_type_callback_6)
+          .AddRequiredLanguageFeature(FEATURE_ROW_TYPE)));
+
+  return absl::OkStatus();
 }
 
 void SampleCatalogImpl::ForceLinkProtoTypes() {

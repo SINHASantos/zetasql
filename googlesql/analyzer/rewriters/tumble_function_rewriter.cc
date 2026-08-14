@@ -67,11 +67,13 @@ class TumbleRewriteVisitor : public ResolvedASTRewriteVisitor {
  public:
   TumbleRewriteVisitor(const AnalyzerOptions& analyzer_options,
                        Catalog& catalog, TypeFactory& type_factory,
-                       ColumnFactory& column_factory)
+                       ColumnFactory& column_factory,
+                       CteQueryNameGenerator& cte_name_generator)
       : analyzer_options_(analyzer_options),
         catalog_(catalog),
         type_factory_(type_factory),
         column_factory_(column_factory),
+        cte_name_generator_(cte_name_generator),
         fn_builder_(analyzer_options, catalog, type_factory),
         product_mode_(analyzer_options.language().product_mode()) {}
 
@@ -253,12 +255,14 @@ class TumbleRewriteVisitor : public ResolvedASTRewriteVisitor {
         MakeResolvedComputedColumn(raw_origin_col, std::move(origin_expr)));
 
     // -- Part 2: Validate arguments and project final output.
+    std::string cte_name =
+        cte_name_generator_.MakeUniqueCteName("_tumble_params");
     std::vector<std::unique_ptr<const ResolvedComputedColumn>> final_exprs;
     ResolvedColumnList final_cols;
 
     // window_size (Validation chain).
-    ResolvedColumn tumble_window_col = column_factory_.MakeCol(
-        "$tumble_params", "window_size", raw_window_col.type());
+    ResolvedColumn tumble_window_col =
+        column_factory_.MakeCol(cte_name, "window_size", raw_window_col.type());
     final_cols.push_back(tumble_window_col);
     {
       auto raw_ws_ref =
@@ -278,14 +282,13 @@ class TumbleRewriteVisitor : public ResolvedASTRewriteVisitor {
               )sql",
                             {{"raw_ws", raw_ws_ref.get()}}),
           _.With(ExpectAnalyzeSubstituteSuccess));
-
       final_exprs.push_back(MakeResolvedComputedColumn(
           tumble_window_col, std::move(validated_window_size_expr)));
     }
 
     // origin (Validation).
-    ResolvedColumn tumble_origin_col = column_factory_.MakeCol(
-        "$tumble_params", "origin", raw_origin_col.type());
+    ResolvedColumn tumble_origin_col =
+        column_factory_.MakeCol(cte_name, "origin", raw_origin_col.type());
     final_cols.push_back(tumble_origin_col);
     {
       auto raw_origin_ref =
@@ -306,10 +309,7 @@ class TumbleRewriteVisitor : public ResolvedASTRewriteVisitor {
     }
 
     return ResolvedWithEntryBuilder()
-        // TODO: b/535152130 - The injected CTE name "_tumble_params" can
-        // collide with user-defined CTEs. CTE names in a ResolvedAST must be
-        // globally unique.
-        .set_with_query_name("_tumble_params")
+        .set_with_query_name(cte_name)
         .set_with_subquery(
             ResolvedProjectScanBuilder()
                 .set_column_list(final_cols)
@@ -377,7 +377,8 @@ class TumbleRewriteVisitor : public ResolvedASTRewriteVisitor {
           auto ts_col_ref,
           BuildTimestampColumnExpression(
               args.timestamp_column,
-              args.argument_column_list[args.timestamp_column.column_index]));
+              args.argument_column_list[args.timestamp_column.column_index],
+              fn_builder_));
       std::vector<std::unique_ptr<const ResolvedExpr>> bucket_args;
       bucket_args.push_back(std::move(ts_col_ref));
       GOOGLESQL_ASSIGN_OR_RETURN(auto window_size_expr, get_window_size_expr());
@@ -449,6 +450,7 @@ class TumbleRewriteVisitor : public ResolvedASTRewriteVisitor {
   Catalog& catalog_;
   TypeFactory& type_factory_;
   ColumnFactory& column_factory_;
+  CteQueryNameGenerator& cte_name_generator_;
   FunctionCallBuilder fn_builder_;
   ProductMode product_mode_;
 };
@@ -466,8 +468,12 @@ class TumbleFunctionRewriter : public Rewriter {
     ColumnFactory column_factory(0, options.id_string_pool().get(),
                                  options.column_id_sequence_number());
 
+    CteQueryNameGenerator cte_name_generator;
+    if (input != nullptr) {
+      GOOGLESQL_RETURN_IF_ERROR(input->Accept(&cte_name_generator));
+    }
     TumbleRewriteVisitor rewriter(options, catalog, type_factory,
-                                  column_factory);
+                                  column_factory, cte_name_generator);
     return rewriter.VisitAll(std::move(input));
   }
 

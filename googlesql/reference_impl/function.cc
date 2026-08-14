@@ -24,18 +24,21 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <functional>
 #include <initializer_list>
+#include <iterator>
 #include <limits>
 #include <memory>
 #include <optional>
+#include <queue>
+#include <random>
 #include <string>
 #include <type_traits>
 #include <utility>
 #include <variant>
 #include <vector>
 
-#include "googlesql/base/logging.h"
 #include "google/protobuf/duration.pb.h"
 #include "google/protobuf/timestamp.pb.h"
 #include "google/protobuf/wrappers.pb.h"
@@ -45,7 +48,9 @@
 #include "googlesql/common/errors.h"
 #include "googlesql/common/initialize_required_fields.h"
 #include "googlesql/common/internal_value.h"
+#include "googlesql/common/thread_stack.h"
 #include "googlesql/proto/anon_output_with_report.pb.h"
+#include "googlesql/proto/kmeans_options.pb.h"
 #include "googlesql/public/anonymization_utils.h"
 #include "googlesql/public/builtin_function.pb.h"
 #include "googlesql/public/cast.h"
@@ -66,9 +71,11 @@
 #include "googlesql/public/functions/datetime.pb.h"
 #include "googlesql/public/functions/differential_privacy.pb.h"
 #include "googlesql/public/functions/distance.h"
+#include "googlesql/public/functions/endianness.pb.h"
 #include "googlesql/public/functions/rank_type.pb.h"
 #include "googlesql/public/functions/rounding_mode.pb.h"
 #include "googlesql/public/interval_value.h"
+#include "googlesql/public/kmeans_options.h"
 #include "googlesql/public/pico_time.h"
 #include "googlesql/public/proto/type_annotation.pb.h"
 #include "googlesql/public/table_valued_function.h"
@@ -76,24 +83,28 @@
 #include "googlesql/public/timestamp_picos_value.h"
 #include "googlesql/public/types/timestamp_util.h"
 #include "googlesql/public/types/type.h"
+#include "googlesql/public/types/vector_type_util.h"
 #include "googlesql/public/uuid_value.h"
+#include "googlesql/public/value.pb.h"
 #include "googlesql/reference_impl/functions/like.h"
 #include "googlesql/reference_impl/operator.h"
 #include "googlesql/reference_impl/tuple.h"
 #include "googlesql/reference_impl/variable_id.h"
+#include "googlesql/resolved_ast/resolved_collation.h"
 #include "absl/base/attributes.h"
 #include "absl/base/const_init.h"
+#include "absl/base/log_severity.h"
 #include "absl/base/no_destructor.h"
 #include "absl/container/flat_hash_map.h"
 #include "absl/container/flat_hash_set.h"
 #include "googlesql/base/check.h"
 #include "absl/log/die_if_null.h"
+#include "absl/log/log.h"
 #include "absl/numeric/int128.h"
 #include "absl/random/distributions.h"
 #include "absl/strings/ascii.h"
 #include "absl/strings/match.h"
 #include "absl/strings/str_format.h"
-#include "absl/strings/str_join.h"
 #include "absl/strings/substitute.h"
 #include "absl/time/civil_time.h"
 #include "google/protobuf/descriptor.h"
@@ -101,6 +112,7 @@
 #include "google/protobuf/io/coded_stream.h"
 #include "google/protobuf/io/zero_copy_stream_impl_lite.h"
 #include "google/protobuf/util/time_util.h"
+#include "googlesql/base/optional_ref.h"
 #include "googlesql/public/functions/string_format.h"
 #include "googlesql/public/functions/generate_array.h"
 #include "googlesql/public/functions/json.h"
@@ -151,9 +163,7 @@
 #include "algorithms/quantiles.h"
 #include "googlesql/base/status_macros.h"
 #include "googlesql/base/map_util.h"
-#include "googlesql/base/optional_ref.h"
 #include "googlesql/base/exactfloat.h"
-#include "re2/re2.h"
 #include "googlesql/base/ret_check.h"
 #include "googlesql/base/status_builder.h"
 
@@ -587,6 +597,12 @@ FunctionMap::FunctionMap() {
                      "BitCastToUint32");
     RegisterFunction(FunctionKind::kBitCastToUint64, "bit_cast_to_uint64",
                      "BitCastToUint64");
+    RegisterFunction(FunctionKind::kBitCastToFloat, "bit_cast_to_float",
+                     "BitCastToFloat");
+    RegisterFunction(FunctionKind::kBitCastToDouble, "bit_cast_to_double",
+                     "BitCastToDouble");
+    RegisterFunction(FunctionKind::kBitCastToBytes, "bit_cast_to_bytes",
+                     "BitCastToBytes");
     RegisterFunction(FunctionKind::kCount, "count", "Count");
     RegisterFunction(FunctionKind::kCountIf, "countif", "CountIf");
     RegisterFunction(FunctionKind::kDateAdd, "date_add", "Date_add");
@@ -778,6 +794,7 @@ FunctionMap::FunctionMap() {
     RegisterFunction(FunctionKind::kArrayTransform, "array_transform",
                      "Array_transform");
     RegisterFunction(FunctionKind::kApply, "apply", "Apply");
+    RegisterFunction(FunctionKind::kNullIfWithLambda, "nullif", "NullIf");
     RegisterFunction(FunctionKind::kTimestampDiff, "timestamp_diff",
                      "Timestamp_diff");
     RegisterFunction(FunctionKind::kTimestampAdd, "timestamp_add",
@@ -1132,6 +1149,8 @@ FunctionMap::FunctionMap() {
                      "ArrayFindAll");
     RegisterFunction(FunctionKind::kPropertyExists, "property_exists",
                      "PropertyExists");
+    RegisterFunction(FunctionKind::kElementDefinitionNameIs,
+                     "element_definition_name_is", "ElementDefinitionNameIs");
     RegisterFunction(FunctionKind::kSameGraphElement, "same",
                      "SameGraphElement");
     RegisterFunction(FunctionKind::kAllDifferentGraphElement, "all_different",
@@ -1180,6 +1199,12 @@ FunctionMap::FunctionMap() {
                      "ManhattanDistance");
     RegisterFunction(FunctionKind::kL1Norm, "l1_norm", "L1Norm");
     RegisterFunction(FunctionKind::kL2Norm, "l2_norm", "L2Norm");
+    RegisterFunction(FunctionKind::kEncodeVector, "encode_vector",
+                     "EncodeVector");
+    RegisterFunction(FunctionKind::kDecodeVector, "decode_vector",
+                     "DecodeVector");
+    RegisterFunction(FunctionKind::kVectorFloat32Length, "vector_length",
+                     "VectorFloat32Length");
     RegisterFunction(FunctionKind::kEditDistance, "edit_distance",
                      "EditDistance");
     RegisterFunction(FunctionKind::kArrayZip, "array_zip", "ArrayZip");
@@ -1233,8 +1258,9 @@ FunctionMap::FunctionMap() {
                      "zstd_decompress_to_string", "ZstdDecompressToString");
     RegisterFunction(FunctionKind::kTumble, "tumble", "Tumble");
     RegisterFunction(FunctionKind::kHop, "hop", "Hop");
-    RegisterFunction(FunctionKind::kBatchVectorSearchTVFWithProtoOptions,
-                     "vector_search", "VectorSearch");
+    RegisterFunction(FunctionKind::kVectorSearchTVF, "vector_search",
+                     "VectorSearch");
+    RegisterFunction(FunctionKind::kKMeansTVF, "kmeans", "KMeans");
     RegisterFunction(FunctionKind::kAiIf, "ai.if", "AI.IF");
   }();
 }  // NOLINT(readability/fn_size)
@@ -1929,6 +1955,8 @@ BuiltinFunctionRegistry::GetTableValuedFunctionMap() {
 
 // Sets the provided EvaluationContext to have non-deterministic output if the
 // given array has more than one element and is not order-preserving.
+// TODO - Improve the deterministic checks for array with identical
+// elements.
 void MaybeSetNonDeterministicArrayOutput(const Value& array,
                                          EvaluationContext* context) {
   ABSL_DCHECK(array.type()->IsArray());
@@ -2062,33 +2090,44 @@ static absl::Status CheckVectorDistanceInputType(
       << absl::Substitute("Input type size must be exactly $0 but got $1",
                           num_vectors, input_types.size());
 
-  for (int i = 0; i < input_types.size(); ++i) {
-    GOOGLESQL_RET_CHECK(input_types[i]->IsArray()) << "All input types must be arrays";
+  std::vector<const Type*> effective_types;
+  effective_types.reserve(input_types.size());
+  for (const Type* type : input_types) {
+    if (IsVectorType(type)) {
+      effective_types.push_back(types::FloatArrayType());
+    } else {
+      effective_types.push_back(type);
+    }
+  }
+
+  for (int i = 0; i < effective_types.size(); ++i) {
+    GOOGLESQL_RET_CHECK(effective_types[i]->IsArray())
+        << "All input types must be arrays or vectors";
   }
 
   std::string same_element_type_error_message =
       "Array element types must be the same";
 
-  if (input_types[0]->AsArray()->element_type()->IsDouble()) {
+  if (effective_types[0]->AsArray()->element_type()->IsDouble()) {
     if (options.expect_pair_of_vectors) {
-      GOOGLESQL_RET_CHECK(input_types[1]->AsArray()->element_type()->IsDouble())
+      GOOGLESQL_RET_CHECK(effective_types[1]->AsArray()->element_type()->IsDouble())
           << same_element_type_error_message;
     }
     return absl::OkStatus();
   }
 
-  if (input_types[0]->AsArray()->element_type()->IsFloat()) {
+  if (effective_types[0]->AsArray()->element_type()->IsFloat()) {
     if (options.expect_pair_of_vectors) {
-      GOOGLESQL_RET_CHECK(input_types[1]->AsArray()->element_type()->IsFloat())
+      GOOGLESQL_RET_CHECK(effective_types[1]->AsArray()->element_type()->IsFloat())
           << same_element_type_error_message;
     }
     return absl::OkStatus();
   }
 
   if (options.allow_int64_elements) {
-    if (input_types[0]->AsArray()->element_type()->IsInt64()) {
+    if (effective_types[0]->AsArray()->element_type()->IsInt64()) {
       if (options.expect_pair_of_vectors) {
-        GOOGLESQL_RET_CHECK(input_types[1]->AsArray()->element_type()->IsInt64())
+        GOOGLESQL_RET_CHECK(effective_types[1]->AsArray()->element_type()->IsInt64())
             << same_element_type_error_message;
       }
       return absl::OkStatus();
@@ -2096,15 +2135,18 @@ static absl::Status CheckVectorDistanceInputType(
   }
 
   if (options.allow_struct_elements) {
-    if (input_types[0]->AsArray()->element_type()->IsStruct()) {
-      for (int i = 0; i < input_types.size(); ++i) {
-        GOOGLESQL_RET_CHECK(input_types[i]->AsArray()->element_type()->IsStruct())
+    if (effective_types[0]->AsArray()->element_type()->IsStruct()) {
+      for (int i = 0; i < effective_types.size(); ++i) {
+        GOOGLESQL_RET_CHECK(effective_types[i]->AsArray()->element_type()->IsStruct())
             << same_element_type_error_message;
-        GOOGLESQL_RET_CHECK_EQ(
-            input_types[i]->AsArray()->element_type()->AsStruct()->num_fields(),
-            2)
+        GOOGLESQL_RET_CHECK_EQ(effective_types[i]
+                         ->AsArray()
+                         ->element_type()
+                         ->AsStruct()
+                         ->num_fields(),
+                     2)
             << "Array struct element type must have exactly 2 fields";
-        GOOGLESQL_RET_CHECK(input_types[i]
+        GOOGLESQL_RET_CHECK(effective_types[i]
                       ->AsArray()
                       ->element_type()
                       ->AsStruct()
@@ -2113,13 +2155,13 @@ static absl::Status CheckVectorDistanceInputType(
             << "Array struct 2nd element type must be DOUBLE";
 
         if (options.expect_pair_of_vectors) {
-          auto key_type0 = input_types[0]
+          auto key_type0 = effective_types[0]
                                ->AsArray()
                                ->element_type()
                                ->AsStruct()
                                ->fields()[0]
                                .type;
-          auto key_type1 = input_types[1]
+          auto key_type1 = effective_types[1]
                                ->AsArray()
                                ->element_type()
                                ->AsStruct()
@@ -2149,6 +2191,7 @@ CreateCosineDistanceFunction(std::vector<const Type*>& input_types,
                                           .allow_struct_elements = true}));
 
   bool is_signature_dense =
+      IsVectorType(input_types[0]) ||
       input_types[0]->AsArray()->element_type()->IsDouble() ||
       input_types[0]->AsArray()->element_type()->IsFloat();
   if (is_signature_dense) {
@@ -2188,6 +2231,7 @@ CreateEuclideanDistanceFunction(std::vector<const Type*>& input_types,
                                           .allow_int64_elements = false,
                                           .allow_struct_elements = true}));
   bool is_signature_dense =
+      IsVectorType(input_types[0]) ||
       input_types[0]->AsArray()->element_type()->IsDouble() ||
       input_types[0]->AsArray()->element_type()->IsFloat();
   if (is_signature_dense) {
@@ -2339,8 +2383,10 @@ BuiltinTableValuedFunction::Create(FunctionKind kind) {
       return std::make_unique<TumbleTVF>(kind);
     case FunctionKind::kHop:
       return std::make_unique<HopTVF>(kind);
-    case FunctionKind::kBatchVectorSearchTVFWithProtoOptions:
-      return std::make_unique<BatchVectorSearchTVFWithProtoOptions>(kind);
+    case FunctionKind::kVectorSearchTVF:
+      return std::make_unique<VectorSearchTVF>(kind);
+    case FunctionKind::kKMeansTVF:
+      return std::make_unique<KMeansTVF>(kind);
     default:
       GOOGLESQL_ASSIGN_OR_RETURN(BuiltinTableValuedFunction * function,
                        BuiltinFunctionRegistry::GetTableValuedFunction(kind));
@@ -2428,6 +2474,9 @@ BuiltinScalarFunction::CreateValidatedRaw(
     case FunctionKind::kBitCastToInt64:
     case FunctionKind::kBitCastToUint32:
     case FunctionKind::kBitCastToUint64:
+    case FunctionKind::kBitCastToFloat:
+    case FunctionKind::kBitCastToDouble:
+    case FunctionKind::kBitCastToBytes:
       return new BitCastFunction(kind, output_type);
     case FunctionKind::kLike:
     case FunctionKind::kLikeWithCollation: {
@@ -2559,6 +2608,11 @@ BuiltinScalarFunction::CreateValidatedRaw(
       GOOGLESQL_RET_CHECK(arguments[1]->has_inline_lambda_expr());
       return new ApplyFunction(kind, output_type,
                                arguments[1]->mutable_inline_lambda_expr());
+    case FunctionKind::kNullIfWithLambda:
+      GOOGLESQL_RET_CHECK_EQ(2, arguments.size());
+      GOOGLESQL_RET_CHECK(arguments[1]->has_inline_lambda_expr());
+      return new NullIfLambdaFunction(
+          kind, output_type, arguments[1]->mutable_inline_lambda_expr());
     case FunctionKind::kLength:
     case FunctionKind::kByteLength:
     case FunctionKind::kCharLength:
@@ -2819,6 +2873,12 @@ BuiltinScalarFunction::CreateValidatedRaw(
     }
     case FunctionKind::kEditDistance:
       return new EditDistanceFunction(kind, output_type);
+    case FunctionKind::kEncodeVector:
+      return new EncodeVectorFunction(kind, output_type);
+    case FunctionKind::kDecodeVector:
+      return new DecodeVectorFunction(kind, output_type);
+    case FunctionKind::kVectorFloat32Length:
+      return new VectorFloat32LengthFunction(kind, output_type);
     case FunctionKind::kArrayZip: {
       GOOGLESQL_ASSIGN_OR_RETURN(const InlineLambdaExpr* inline_lambda_expr,
                        GetLambdaArgumentForArrayZip(arguments));
@@ -5780,11 +5840,15 @@ bool BitCastFunction::Eval(absl::Span<const TupleData* const> params,
                            absl::Span<const Value> args,
                            EvaluationContext* context, Value* result,
                            absl::Status* status) const {
-  ABSL_DCHECK_EQ(args.size(), 1);
+  ABSL_DCHECK_GE(args.size(), 1);
   if (HasNulls(args)) {
     *result = Value::Null(output_type());
     return true;
   }
+  const functions::Endianness endianness =
+      args.size() > 1 && !args[1].is_null()
+          ? static_cast<functions::Endianness>(args[1].enum_value())
+          : functions::Endianness::LITTLE;
   const Value& val = args[0];
   switch (FCT(kind(), val.type_kind())) {
     case FCT(FunctionKind::kBitCastToInt32, TYPE_UINT32):
@@ -5805,6 +5869,102 @@ bool BitCastFunction::Eval(absl::Span<const TupleData* const> params,
     case FCT(FunctionKind::kBitCastToUint64, TYPE_UINT64):
       *result = val;
       return true;
+    case FCT(FunctionKind::kBitCastToInt32, TYPE_BYTES): {
+      int32_t out = 0;
+      if (!functions::BitCast(val.bytes_value(), &out, status, endianness)) {
+        return false;
+      }
+      *result = Value::Int32(out);
+      return true;
+    }
+    case FCT(FunctionKind::kBitCastToUint32, TYPE_BYTES): {
+      uint32_t out = 0;
+      if (!functions::BitCast(val.bytes_value(), &out, status, endianness)) {
+        return false;
+      }
+      *result = Value::Uint32(out);
+      return true;
+    }
+    case FCT(FunctionKind::kBitCastToInt64, TYPE_BYTES): {
+      int64_t out = 0;
+      if (!functions::BitCast(val.bytes_value(), &out, status, endianness)) {
+        return false;
+      }
+      *result = Value::Int64(out);
+      return true;
+    }
+    case FCT(FunctionKind::kBitCastToUint64, TYPE_BYTES): {
+      uint64_t out = 0;
+      if (!functions::BitCast(val.bytes_value(), &out, status, endianness)) {
+        return false;
+      }
+      *result = Value::Uint64(out);
+      return true;
+    }
+    case FCT(FunctionKind::kBitCastToFloat, TYPE_BYTES): {
+      float out = 0.0f;
+      if (!functions::BitCast(val.bytes_value(), &out, status, endianness)) {
+        return false;
+      }
+      *result = Value::Float(out);
+      return true;
+    }
+    case FCT(FunctionKind::kBitCastToDouble, TYPE_BYTES): {
+      double out = 0.0;
+      if (!functions::BitCast(val.bytes_value(), &out, status, endianness)) {
+        return false;
+      }
+      *result = Value::Double(out);
+      return true;
+    }
+    case FCT(FunctionKind::kBitCastToBytes, TYPE_FLOAT): {
+      std::string out;
+      if (!functions::BitCast(val.float_value(), &out, status, endianness)) {
+        return false;
+      }
+      *result = Value::Bytes(out);
+      return true;
+    }
+    case FCT(FunctionKind::kBitCastToBytes, TYPE_DOUBLE): {
+      std::string out;
+      if (!functions::BitCast(val.double_value(), &out, status, endianness)) {
+        return false;
+      }
+      *result = Value::Bytes(out);
+      return true;
+    }
+    case FCT(FunctionKind::kBitCastToBytes, TYPE_INT32): {
+      std::string out;
+      if (!functions::BitCast(val.int32_value(), &out, status, endianness)) {
+        return false;
+      }
+      *result = Value::Bytes(out);
+      return true;
+    }
+    case FCT(FunctionKind::kBitCastToBytes, TYPE_UINT32): {
+      std::string out;
+      if (!functions::BitCast(val.uint32_value(), &out, status, endianness)) {
+        return false;
+      }
+      *result = Value::Bytes(out);
+      return true;
+    }
+    case FCT(FunctionKind::kBitCastToBytes, TYPE_INT64): {
+      std::string out;
+      if (!functions::BitCast(val.int64_value(), &out, status, endianness)) {
+        return false;
+      }
+      *result = Value::Bytes(out);
+      return true;
+    }
+    case FCT(FunctionKind::kBitCastToBytes, TYPE_UINT64): {
+      std::string out;
+      if (!functions::BitCast(val.uint64_value(), &out, status, endianness)) {
+        return false;
+      }
+      *result = Value::Bytes(out);
+      return true;
+    }
     default:
       *status = ::googlesql_base::UnimplementedErrorBuilder()
                 << "Unsupported argument or output type for bit_cast.";
@@ -11361,6 +11521,38 @@ absl::StatusOr<Value> AddMonthsFunction::Eval(
   }
 }
 
+// Copies protos from `from` into `to`, handling messages that may originate
+// from different DescriptorPool instances (e.g., a DescriptorPool loaded during
+// compliance tests vs. DescriptorPool::generated_pool() for protos included in
+// the binary).
+//
+// Standard `Message::CopyFrom` asserts that both messages share the same
+// DescriptorPool. When there are different DescriptorPools,
+// `CopyFromMaybeCrossDescriptorPool` falls back to serializing and parsing the
+// message contents.
+static absl::Status CopyFromMaybeCrossDescriptorPool(
+    const google::protobuf::Message& from, google::protobuf::Message* to) {
+  if (from.GetDescriptor() == to->GetDescriptor()) {
+    to->CopyFrom(from);
+    return absl::OkStatus();
+  }
+  absl::Cord cord;
+  GOOGLESQL_RET_CHECK(from.SerializePartialToString(&cord))
+      << "Failed to serialize proto message of type "
+      << from.GetDescriptor()->full_name();
+  GOOGLESQL_RET_CHECK(to->ParsePartialFromString(cord))
+      << "Failed to parse proto message from "
+      << from.GetDescriptor()->full_name() << " to "
+      << to->GetDescriptor()->full_name();
+  if (!to->GetReflection()->GetUnknownFields(*to).empty()) {
+    return absl::OutOfRangeError(
+        absl::StrCat("Failed to parse proto message from ",
+                     from.GetDescriptor()->full_name(), " to ",
+                     to->GetDescriptor()->full_name()));
+  }
+  return absl::OkStatus();
+}
+
 absl::StatusOr<Value> FromProtoFunction::Eval(
     absl::Span<const TupleData* const> params,
     const absl::Span<const Value> args, EvaluationContext* context) const {
@@ -11371,15 +11563,18 @@ absl::StatusOr<Value> FromProtoFunction::Eval(
   if (output_type()->kind() == args[0].type_kind()) {
     return args[0];
   }
+
   google::protobuf::DynamicMessageFactory factory;
   std::unique_ptr<google::protobuf::Message> message;
   message.reset(args[0].ToMessage(&factory));
+
   switch (output_type()->kind()) {
     case TYPE_TIMESTAMP: {
       google::protobuf::Timestamp proto_timestamp;
       functions::TimestampScale scale = GetTimestampScale(
           context->GetLanguageOptions(), /*support_picos=*/true);
-      proto_timestamp.CopyFrom(*message);
+      GOOGLESQL_RETURN_IF_ERROR(
+          CopyFromMaybeCrossDescriptorPool(*message, &proto_timestamp));
 
       if (scale == functions::TimestampScale::kMicroseconds) {
         int64_t timestamp;
@@ -11396,7 +11591,7 @@ absl::StatusOr<Value> FromProtoFunction::Eval(
     case TYPE_DATE: {
       int32_t date;
       google::type::Date proto_date;
-      proto_date.CopyFrom(*message);
+      GOOGLESQL_RETURN_IF_ERROR(CopyFromMaybeCrossDescriptorPool(*message, &proto_date));
       GOOGLESQL_RETURN_IF_ERROR(functions::ConvertProto3DateToDate(proto_date, &date));
       return Value::Date(date);
       break;
@@ -11404,7 +11599,8 @@ absl::StatusOr<Value> FromProtoFunction::Eval(
     case TYPE_TIME: {
       TimeValue time;
       google::type::TimeOfDay proto_time_of_day;
-      proto_time_of_day.CopyFrom(*message);
+      GOOGLESQL_RETURN_IF_ERROR(
+          CopyFromMaybeCrossDescriptorPool(*message, &proto_time_of_day));
       GOOGLESQL_RETURN_IF_ERROR(functions::ConvertProto3TimeOfDayToTime(
           proto_time_of_day, GetTimestampScale(context->GetLanguageOptions()),
           &time));
@@ -11414,7 +11610,8 @@ absl::StatusOr<Value> FromProtoFunction::Eval(
     case TYPE_DOUBLE: {
       double double_value;
       google::protobuf::DoubleValue proto_double_wrapper;
-      proto_double_wrapper.CopyFrom(*message);
+      GOOGLESQL_RETURN_IF_ERROR(
+          CopyFromMaybeCrossDescriptorPool(*message, &proto_double_wrapper));
       GOOGLESQL_RETURN_IF_ERROR(
           functions::ConvertProto3WrapperToType<google::protobuf::DoubleValue>(
               proto_double_wrapper, &double_value));
@@ -11424,7 +11621,8 @@ absl::StatusOr<Value> FromProtoFunction::Eval(
     case TYPE_FLOAT: {
       float float_value;
       google::protobuf::FloatValue proto_float_wrapper;
-      proto_float_wrapper.CopyFrom(*message);
+      GOOGLESQL_RETURN_IF_ERROR(
+          CopyFromMaybeCrossDescriptorPool(*message, &proto_float_wrapper));
       GOOGLESQL_RETURN_IF_ERROR(
           functions::ConvertProto3WrapperToType<google::protobuf::FloatValue>(
               proto_float_wrapper, &float_value));
@@ -11434,7 +11632,8 @@ absl::StatusOr<Value> FromProtoFunction::Eval(
     case TYPE_INT64: {
       int64_t int64_value;
       google::protobuf::Int64Value proto_int64_wrapper;
-      proto_int64_wrapper.CopyFrom(*message);
+      GOOGLESQL_RETURN_IF_ERROR(
+          CopyFromMaybeCrossDescriptorPool(*message, &proto_int64_wrapper));
       GOOGLESQL_RETURN_IF_ERROR(
           functions::ConvertProto3WrapperToType<google::protobuf::Int64Value>(
               proto_int64_wrapper, &int64_value));
@@ -11444,7 +11643,8 @@ absl::StatusOr<Value> FromProtoFunction::Eval(
     case TYPE_UINT64: {
       uint64_t uint64_value;
       google::protobuf::UInt64Value proto_uint64_wrapper;
-      proto_uint64_wrapper.CopyFrom(*message);
+      GOOGLESQL_RETURN_IF_ERROR(
+          CopyFromMaybeCrossDescriptorPool(*message, &proto_uint64_wrapper));
       GOOGLESQL_RETURN_IF_ERROR(
           functions::ConvertProto3WrapperToType<google::protobuf::UInt64Value>(
               proto_uint64_wrapper, &uint64_value));
@@ -11454,7 +11654,8 @@ absl::StatusOr<Value> FromProtoFunction::Eval(
     case TYPE_INT32: {
       int32_t int32_value;
       google::protobuf::Int32Value proto_int32_wrapper;
-      proto_int32_wrapper.CopyFrom(*message);
+      GOOGLESQL_RETURN_IF_ERROR(
+          CopyFromMaybeCrossDescriptorPool(*message, &proto_int32_wrapper));
       GOOGLESQL_RETURN_IF_ERROR(
           functions::ConvertProto3WrapperToType<google::protobuf::Int32Value>(
               proto_int32_wrapper, &int32_value));
@@ -11464,7 +11665,8 @@ absl::StatusOr<Value> FromProtoFunction::Eval(
     case TYPE_UINT32: {
       uint32_t uint32_value;
       google::protobuf::UInt32Value proto_uint32_wrapper;
-      proto_uint32_wrapper.CopyFrom(*message);
+      GOOGLESQL_RETURN_IF_ERROR(
+          CopyFromMaybeCrossDescriptorPool(*message, &proto_uint32_wrapper));
       GOOGLESQL_RETURN_IF_ERROR(
           functions::ConvertProto3WrapperToType<google::protobuf::UInt32Value>(
               proto_uint32_wrapper, &uint32_value));
@@ -11474,7 +11676,8 @@ absl::StatusOr<Value> FromProtoFunction::Eval(
     case TYPE_BOOL: {
       bool bool_value;
       google::protobuf::BoolValue proto_bool_wrapper;
-      proto_bool_wrapper.CopyFrom(*message);
+      GOOGLESQL_RETURN_IF_ERROR(
+          CopyFromMaybeCrossDescriptorPool(*message, &proto_bool_wrapper));
       GOOGLESQL_RETURN_IF_ERROR(
           functions::ConvertProto3WrapperToType<google::protobuf::BoolValue>(
               proto_bool_wrapper, &bool_value));
@@ -11484,7 +11687,8 @@ absl::StatusOr<Value> FromProtoFunction::Eval(
     case TYPE_BYTES: {
       absl::Cord bytes_value;
       google::protobuf::BytesValue proto_bytes_wrapper;
-      proto_bytes_wrapper.CopyFrom(*message);
+      GOOGLESQL_RETURN_IF_ERROR(
+          CopyFromMaybeCrossDescriptorPool(*message, &proto_bytes_wrapper));
       GOOGLESQL_RETURN_IF_ERROR(
           functions::ConvertProto3WrapperToType<google::protobuf::BytesValue>(
               proto_bytes_wrapper, &bytes_value));
@@ -11494,7 +11698,8 @@ absl::StatusOr<Value> FromProtoFunction::Eval(
     case TYPE_STRING: {
       std::string string_value;
       google::protobuf::StringValue proto_string_wrapper;
-      proto_string_wrapper.CopyFrom(*message);
+      GOOGLESQL_RETURN_IF_ERROR(
+          CopyFromMaybeCrossDescriptorPool(*message, &proto_string_wrapper));
       GOOGLESQL_RETURN_IF_ERROR(
           functions::ConvertProto3WrapperToType<google::protobuf::StringValue>(
               proto_string_wrapper, &string_value));
@@ -11504,7 +11709,7 @@ absl::StatusOr<Value> FromProtoFunction::Eval(
     case TYPE_INTERVAL: {
       IntervalValue interval_value;
       google::protobuf::Duration duration;
-      duration.CopyFrom(*message);
+      GOOGLESQL_RETURN_IF_ERROR(CopyFromMaybeCrossDescriptorPool(*message, &duration));
 
       // Ensure the message is valid:
       if (duration.seconds() < TimeUtil::kDurationMinSeconds ||
@@ -13188,6 +13393,28 @@ static ::googlesql_base::StatusBuilder DistanceFunctionResultConverter(
   return ::googlesql_base::StatusBuilder(original_status);
 }
 
+namespace {
+// Helper to decode an encoded VECTOR into an ARRAY<FLOAT>.
+static absl::StatusOr<Value> DecodeFloat32Vector(const Value& vector) {
+  GOOGLESQL_ASSIGN_OR_RETURN(Value backing_val, vector.backing_value());
+  ValueProto value_proto;
+  if (!value_proto.ParseFromString(backing_val.bytes_value())) {
+    return ::googlesql_base::InvalidArgumentErrorBuilder()
+           << "Failed to parse VECTOR backing value";
+  }
+  return Value::Deserialize(value_proto, types::FloatArrayType());
+}
+
+// If the input is a VECTOR, decode it into an ARRAY<FLOAT>. Otherwise, return
+// the input value.
+static absl::StatusOr<Value> MaybeExtractArrayFromVector(const Value& arg) {
+  if (IsVectorType(arg.type())) {
+    return DecodeFloat32Vector(arg);
+  }
+  return arg;
+}
+}  // namespace
+
 absl::StatusOr<Value> CosineDistanceFunctionDense::Eval(
     absl::Span<const TupleData* const> params, absl::Span<const Value> args,
     EvaluationContext* context) const {
@@ -13196,10 +13423,13 @@ absl::StatusOr<Value> CosineDistanceFunctionDense::Eval(
     return Value::Null(output_type());
   }
   for (const Value& arg : args) {
-    MaybeSetNonDeterministicArrayOutput(arg, context);
+    if (arg.type()->IsArray()) {
+      MaybeSetNonDeterministicArrayOutput(arg, context);
+    }
   }
-  GOOGLESQL_ASSIGN_OR_RETURN(Value result,
-                   functions::CosineDistanceDense(args[0], args[1]),
+  GOOGLESQL_ASSIGN_OR_RETURN(Value v0, MaybeExtractArrayFromVector(args[0]));
+  GOOGLESQL_ASSIGN_OR_RETURN(Value v1, MaybeExtractArrayFromVector(args[1]));
+  GOOGLESQL_ASSIGN_OR_RETURN(Value result, functions::CosineDistanceDense(v0, v1),
                    _.With(&DistanceFunctionResultConverter));
   return result;
 }
@@ -13245,8 +13475,9 @@ absl::StatusOr<Value> ApproxCosineDistanceFunction::Eval(
   }
   // Approximate distance functions are nondeterministic.
   context->SetNonDeterministicOutput();
-  GOOGLESQL_ASSIGN_OR_RETURN(Value result,
-                   functions::CosineDistanceDense(args[0], args[1]),
+  GOOGLESQL_ASSIGN_OR_RETURN(Value v0, MaybeExtractArrayFromVector(args[0]));
+  GOOGLESQL_ASSIGN_OR_RETURN(Value v1, MaybeExtractArrayFromVector(args[1]));
+  GOOGLESQL_ASSIGN_OR_RETURN(Value result, functions::CosineDistanceDense(v0, v1),
                    _.With(&DistanceFunctionResultConverter));
   return result;
 }
@@ -13259,10 +13490,13 @@ absl::StatusOr<Value> EuclideanDistanceFunctionDense::Eval(
     return Value::Null(output_type());
   }
   for (const Value& arg : args) {
-    MaybeSetNonDeterministicArrayOutput(arg, context);
+    if (arg.type()->IsArray()) {
+      MaybeSetNonDeterministicArrayOutput(arg, context);
+    }
   }
-  GOOGLESQL_ASSIGN_OR_RETURN(Value result,
-                   functions::EuclideanDistanceDense(args[0], args[1]),
+  GOOGLESQL_ASSIGN_OR_RETURN(Value v0, MaybeExtractArrayFromVector(args[0]));
+  GOOGLESQL_ASSIGN_OR_RETURN(Value v1, MaybeExtractArrayFromVector(args[1]));
+  GOOGLESQL_ASSIGN_OR_RETURN(Value result, functions::EuclideanDistanceDense(v0, v1),
                    _.With(&DistanceFunctionResultConverter));
   return result;
 }
@@ -13309,8 +13543,9 @@ absl::StatusOr<Value> ApproxEuclideanDistanceFunction::Eval(
   }
   // Approximate distance functions are nondeterministic.
   context->SetNonDeterministicOutput();
-  GOOGLESQL_ASSIGN_OR_RETURN(Value result,
-                   functions::EuclideanDistanceDense(args[0], args[1]),
+  GOOGLESQL_ASSIGN_OR_RETURN(Value v0, MaybeExtractArrayFromVector(args[0]));
+  GOOGLESQL_ASSIGN_OR_RETURN(Value v1, MaybeExtractArrayFromVector(args[1]));
+  GOOGLESQL_ASSIGN_OR_RETURN(Value result, functions::EuclideanDistanceDense(v0, v1),
                    _.With(&DistanceFunctionResultConverter));
   return result;
 }
@@ -13323,9 +13558,13 @@ absl::StatusOr<Value> DotProductFunction::Eval(
     return Value::Null(output_type());
   }
   for (const Value& arg : args) {
-    MaybeSetNonDeterministicArrayOutput(arg, context);
+    if (arg.type()->IsArray()) {
+      MaybeSetNonDeterministicArrayOutput(arg, context);
+    }
   }
-  GOOGLESQL_ASSIGN_OR_RETURN(Value result, functions::DotProduct(args[0], args[1]));
+  GOOGLESQL_ASSIGN_OR_RETURN(Value v0, MaybeExtractArrayFromVector(args[0]));
+  GOOGLESQL_ASSIGN_OR_RETURN(Value v1, MaybeExtractArrayFromVector(args[1]));
+  GOOGLESQL_ASSIGN_OR_RETURN(Value result, functions::DotProduct(v0, v1));
   return result;
 }
 
@@ -13344,7 +13583,9 @@ absl::StatusOr<Value> ApproxDotProductFunction::Eval(
   }
   // Approximate distance functions are nondeterministic.
   context->SetNonDeterministicOutput();
-  GOOGLESQL_ASSIGN_OR_RETURN(Value result, functions::DotProduct(args[0], args[1]));
+  GOOGLESQL_ASSIGN_OR_RETURN(Value v0, MaybeExtractArrayFromVector(args[0]));
+  GOOGLESQL_ASSIGN_OR_RETURN(Value v1, MaybeExtractArrayFromVector(args[1]));
+  GOOGLESQL_ASSIGN_OR_RETURN(Value result, functions::DotProduct(v0, v1));
   return result;
 }
 
@@ -13356,10 +13597,13 @@ absl::StatusOr<Value> ManhattanDistanceFunction::Eval(
     return Value::Null(output_type());
   }
   for (const Value& arg : args) {
-    MaybeSetNonDeterministicArrayOutput(arg, context);
+    if (arg.type()->IsArray()) {
+      MaybeSetNonDeterministicArrayOutput(arg, context);
+    }
   }
-  GOOGLESQL_ASSIGN_OR_RETURN(Value result,
-                   functions::ManhattanDistance(args[0], args[1]));
+  GOOGLESQL_ASSIGN_OR_RETURN(Value v0, MaybeExtractArrayFromVector(args[0]));
+  GOOGLESQL_ASSIGN_OR_RETURN(Value v1, MaybeExtractArrayFromVector(args[1]));
+  GOOGLESQL_ASSIGN_OR_RETURN(Value result, functions::ManhattanDistance(v0, v1));
   return result;
 }
 
@@ -13370,7 +13614,8 @@ absl::StatusOr<Value> L1NormFunction::Eval(
   if (HasNulls(args)) {
     return Value::Null(output_type());
   }
-  GOOGLESQL_ASSIGN_OR_RETURN(Value result, functions::L1Norm(args[0]));
+  GOOGLESQL_ASSIGN_OR_RETURN(Value v0, MaybeExtractArrayFromVector(args[0]));
+  GOOGLESQL_ASSIGN_OR_RETURN(Value result, functions::L1Norm(v0));
   return result;
 }
 
@@ -13381,7 +13626,8 @@ absl::StatusOr<Value> L2NormFunction::Eval(
   if (HasNulls(args)) {
     return Value::Null(output_type());
   }
-  GOOGLESQL_ASSIGN_OR_RETURN(Value result, functions::L2Norm(args[0]));
+  GOOGLESQL_ASSIGN_OR_RETURN(Value v0, MaybeExtractArrayFromVector(args[0]));
+  GOOGLESQL_ASSIGN_OR_RETURN(Value result, functions::L2Norm(v0));
   return result;
 }
 
@@ -13421,6 +13667,83 @@ absl::StatusOr<Value> EditDistanceFunction::Eval(
   }
 
   return Value::Int64(result);
+}
+
+absl::StatusOr<Value> EncodeVectorFunction::Eval(
+    absl::Span<const TupleData* const> params, absl::Span<const Value> args,
+    EvaluationContext* context) const {
+  // ENCODE_VECTOR always has at least one argument, the input float array.
+  GOOGLESQL_RET_CHECK(!args.empty());
+  if (args[0].is_null()) {
+    return Value::Null(output_type());
+  }
+
+  // A VECTOR must carry at least one element and must be a float array.
+  GOOGLESQL_RET_CHECK(args[0].type()->IsArray());
+  if (args[0].num_elements() == 0) {
+    return ::googlesql_base::OutOfRangeErrorBuilder()
+           << "The input ARRAY to ENCODE_VECTOR must not be empty";
+  }
+  GOOGLESQL_RET_CHECK(args[0].type()->AsArray()->element_type()->IsFloat());
+
+  // Handle non-determinism.
+  MaybeSetNonDeterministicArrayOutput(args[0], context);
+
+  // Handle optional arguments.
+  if (args.size() > 1 && !args[1].is_null()) {
+    GOOGLESQL_RET_CHECK(args[1].type()->IsInt64());
+    int64_t expected_length = args[1].int64_value();
+    if (args[0].num_elements() != expected_length) {
+      return ::googlesql_base::OutOfRangeErrorBuilder()
+             << "Input ARRAY does not have a matching array_length ("
+             << args[0].num_elements() << ") with the length ("
+             << expected_length << ")";
+    }
+  }
+
+  // Convert the input float array to bytes.
+  GOOGLESQL_ASSIGN_OR_RETURN(auto elements, args[0].elements_view());
+  for (const Value& elem : elements) {
+    if (elem.is_null()) {
+      return ::googlesql_base::OutOfRangeErrorBuilder()
+             << "NULL values are not permitted in ENCODE_VECTOR";
+    }
+    GOOGLESQL_RET_CHECK(elem.type()->IsFloat());
+    float f = elem.float_value();
+    if (std::isnan(f) || std::isinf(f)) {
+      return ::googlesql_base::OutOfRangeErrorBuilder()
+             << "NaN, +inf, or -inf values are not permitted in ENCODE_VECTOR";
+    }
+  }
+
+  ValueProto value_proto;
+  if (absl::Status status = args[0].Serialize(&value_proto); !status.ok()) {
+    return status;
+  }
+  return Value::Declarative(output_type()->AsDeclarativeType(),
+                            Value::Bytes(value_proto.SerializeAsString()));
+}
+
+absl::StatusOr<Value> DecodeVectorFunction::Eval(
+    absl::Span<const TupleData* const> params, absl::Span<const Value> args,
+    EvaluationContext* context) const {
+  GOOGLESQL_RET_CHECK_EQ(args.size(), 1);
+  if (HasNulls(args)) {
+    return Value::Null(output_type());
+  }
+  return DecodeFloat32Vector(args[0]);
+}
+
+absl::StatusOr<Value> VectorFloat32LengthFunction::Eval(
+    absl::Span<const TupleData* const> params, absl::Span<const Value> args,
+    EvaluationContext* context) const {
+  GOOGLESQL_RET_CHECK_EQ(args.size(), 1);
+  if (HasNulls(args)) {
+    return Value::Null(output_type());
+  }
+
+  GOOGLESQL_ASSIGN_OR_RETURN(Value decoded_array, DecodeFloat32Vector(args[0]));
+  return Value::Int64(decoded_array.num_elements());
 }
 
 // Returns true if the all elements of the given `array` are equal, or if the
@@ -13646,6 +13969,25 @@ absl::StatusOr<Value> ApplyFunction::Eval(
   return lambda_result;
 }
 
+absl::StatusOr<Value> NullIfLambdaFunction::Eval(
+    absl::Span<const TupleData* const> params, absl::Span<const Value> args,
+    EvaluationContext* evaluation_context) const {
+  LambdaEvaluationContext context(params, evaluation_context);
+
+  GOOGLESQL_RET_CHECK_EQ(args.size(), 1);
+  GOOGLESQL_RET_CHECK_EQ(lambda_->num_args(), 1);
+
+  if (args[0].is_null()) {
+    return Value::Null(output_type());
+  }
+
+  GOOGLESQL_ASSIGN_OR_RETURN(Value lambda_result, context.EvaluateLambda(lambda_, args));
+  if (!lambda_result.is_null() && lambda_result.bool_value()) {
+    return Value::Null(output_type());
+  }
+  return args[0];
+}
+
 std::vector<std::unique_ptr<AlgebraArg>> ConvertValueExprsToAlgebraArgs(
     std::vector<std::unique_ptr<ValueExpr>>&& arguments) {
   std::vector<std::unique_ptr<AlgebraArg>> converted_arguments;
@@ -13666,9 +14008,35 @@ absl::StatusOr<Value> ExtractTimestampFromValue(
     }
     if (step.kind == TypeFieldPathStep::STRUCT_FIELD) {
       current_value = current_value.field(step.struct_field_index);
+    } else if (step.kind == TypeFieldPathStep::PROTO_FIELD) {
+      Value extracted_val;
+      GOOGLESQL_RETURN_IF_ERROR(ReadProtoField(
+          step.proto_field_descriptor,
+          ProtoType::GetFormatAnnotation(step.proto_field_descriptor),
+          step.type,
+          /*default_value=*/Value::Null(step.type), current_value.ToCord(),
+          &extracted_val));
+      current_value = std::move(extracted_val);
     } else {
       return absl::InternalError("Unknown TypeFieldPathStep kind");
     }
+  }
+
+  if (current_value.is_null()) {
+    return current_value;
+  }
+
+  if (current_value.type()->IsProto()) {
+    google::protobuf::Timestamp proto_timestamp;
+    bool is_valid =
+        proto_timestamp.ParsePartialFromString(current_value.ToCord());
+    GOOGLESQL_RET_CHECK(is_valid) << "Failed to parse timestamp field as "
+                           "google.protobuf.Timestamp proto: "
+                        << current_value;
+    absl::Time timestamp;
+    GOOGLESQL_RETURN_IF_ERROR(functions::ConvertProto3TimestampToTimestamp(
+        proto_timestamp, &timestamp));
+    current_value = Value::Timestamp(timestamp);
   }
 
   return current_value;
@@ -13756,9 +14124,10 @@ TumbleTVF::CreateEvaluator(
 
   const TVFRelation input_relation = tvf_signature->argument(0).relation();
 
+  auto type_factory = std::make_unique<googlesql::TypeFactory>();
   absl::StatusOr<ResolvedTimestampColumnPath> timestamp_column_path =
       ResolveTimestampColumnPath(input_relation, timestamp_column_name,
-                                 /*type_factory=*/nullptr);
+                                 type_factory.get());
   if (!timestamp_column_path.ok()) {
     if (timestamp_column_path.status().code() ==
         absl::StatusCode::kInvalidArgument) {
@@ -13796,7 +14165,7 @@ TumbleTVF::CreateEvaluator(
   return std::make_unique<TumbleTVF::TumbleResultIterator>(
       std::move(input_iterator), std::move(output_columns),
       std::move(included_columns), std::move(*timestamp_column_path),
-      std::move(window_size), origin);
+      std::move(window_size), origin, std::move(type_factory));
 }
 
 bool HopTVF::HopResultIterator::NextRow() {
@@ -13809,9 +14178,14 @@ bool HopTVF::HopResultIterator::NextRow() {
     return false;
   }
 
-  const Value& event_time = input_->GetValue(timestamp_column_index_);
+  absl::StatusOr<Value> event_time =
+      ExtractTimestampFromValue(input_.get(), timestamp_column_path_);
+  if (!event_time.ok()) {
+    status_ = event_time.status();
+    return false;
+  }
 
-  if (event_time.is_null()) {
+  if (event_time->is_null()) {
     // If the timestamp is NULL, produce one row with NULL window bounds.
     int output_col_idx = 0;
     for (int i = 0; i < included_columns_.size(); ++i) {
@@ -13826,7 +14200,7 @@ bool HopTVF::HopResultIterator::NextRow() {
     return true;
   }
 
-  googlesql::PicoTime event_pico_time = event_time.ToUnixPicos().ToPicoTime();
+  googlesql::PicoTime event_pico_time = event_time->ToUnixPicos().ToPicoTime();
 
   // Determine the last possible window start.
   // A window [start, end) contains the event if start <= event < end.
@@ -13942,33 +14316,18 @@ absl::StatusOr<std::unique_ptr<EvaluatorTableIterator>> HopTVF::CreateEvaluator(
   GOOGLESQL_RET_CHECK(args[1].value->type()->IsString());
   std::string timestamp_column_name = args[1].value->string_value();
 
-  int timestamp_column_index = -1;
-  int found_count = 0;
-  for (int i = 0; i < input_iterator->NumColumns(); ++i) {
-    if (googlesql_base::CaseEqual(input_iterator->GetColumnName(i),
-                               timestamp_column_name)) {
-      if (input_iterator->GetColumnType(i)->IsTimestamp()) {
-        timestamp_column_index = i;
-      }
-      found_count++;
+  const TVFRelation input_relation = tvf_signature->argument(0).relation();
+
+  auto type_factory = std::make_unique<googlesql::TypeFactory>();
+  absl::StatusOr<ResolvedTimestampColumnPath> timestamp_column_path =
+      ResolveTimestampColumnPath(input_relation, timestamp_column_name,
+                                 type_factory.get());
+  if (!timestamp_column_path.ok()) {
+    if (timestamp_column_path.status().code() ==
+        absl::StatusCode::kInvalidArgument) {
+      return absl::OutOfRangeError(timestamp_column_path.status().message());
     }
-  }
-
-  if (timestamp_column_index == -1 && found_count > 0) {
-    return absl::OutOfRangeError(absl::StrCat("Timestamp column '",
-                                              timestamp_column_name,
-                                              "' is not of TIMESTAMP type."));
-  }
-
-  if (timestamp_column_index == -1 && found_count == 0) {
-    return absl::OutOfRangeError(absl::StrCat("Timestamp column '",
-                                              timestamp_column_name,
-                                              "' not found in input table."));
-  }
-  if (found_count > 1) {
-    return absl::OutOfRangeError(
-        absl::StrCat("Timestamp_column '", timestamp_column_name,
-                     "' is ambiguous in the input table."));
+    return timestamp_column_path.status();
   }
 
   GOOGLESQL_RET_CHECK(args[3].value);
@@ -13995,27 +14354,25 @@ absl::StatusOr<std::unique_ptr<EvaluatorTableIterator>> HopTVF::CreateEvaluator(
   std::vector<bool> included_columns;
   included_columns.reserve(input_iterator->NumColumns());
   for (int i = 0; i < input_iterator->NumColumns(); ++i) {
-    std::string column_name = input_iterator->GetColumnName(i);
-    if (absl::AsciiStrToUpper(column_name) != "WINDOW_START" &&
-        absl::AsciiStrToUpper(column_name) != "WINDOW_END") {
-      output_columns.emplace_back(column_name,
-                                  input_iterator->GetColumnType(i));
-      included_columns.push_back(true);
-    } else {
-      included_columns.push_back(false);
-    }
+    output_columns.emplace_back(input_iterator->GetColumnName(i),
+                                input_iterator->GetColumnType(i));
+    included_columns.push_back(true);
   }
   output_columns.emplace_back("WINDOW_START", types::TimestampType());
   output_columns.emplace_back("WINDOW_END", types::TimestampType());
 
   return std::make_unique<HopTVF::HopResultIterator>(
       std::move(input_iterator), std::move(output_columns),
-      std::move(included_columns), timestamp_column_index,
-      std::move(window_size), std::move(step_size), origin);
+      std::move(included_columns), std::move(*timestamp_column_path),
+      std::move(window_size), std::move(step_size), origin,
+      std::move(type_factory));
 }
 
 namespace {
 
+// Evaluator iterator that implements the batch vector search logic. It fetches
+// and caches all target base rows, then iterates over query rows to compute
+// distances and find the nearest base rows.
 class BatchVectorSearchResultIterator : public EvaluatorTableIterator {
  public:
   explicit BatchVectorSearchResultIterator(
@@ -14023,18 +14380,21 @@ class BatchVectorSearchResultIterator : public EvaluatorTableIterator {
       std::unique_ptr<EvaluatorTableIterator> query_iterator,
       std::vector<TVFSchemaColumn> output_columns, std::string column_to_search,
       std::string query_column_to_search, bool query_column_to_search_provided,
-      int64_t top_k, std::string distance_type, Value max_distance,
-      std::unique_ptr<TypeFactory> type_factory)
+      bool is_batch, int64_t top_k, std::string distance_type,
+      Value max_distance, std::unique_ptr<TypeFactory> type_factory)
       : base_iterator_(std::move(base_iterator)),
         query_iterator_(std::move(query_iterator)),
         column_to_search_(std::move(column_to_search)),
         query_column_to_search_(std::move(query_column_to_search)),
         query_column_to_search_provided_(query_column_to_search_provided),
+        is_batch_(is_batch),
         top_k_(top_k),
         distance_type_(std::move(distance_type)),
         max_distance_(max_distance),
         output_columns_(std::move(output_columns)),
         type_factory_(std::move(type_factory)) {}
+
+  ~BatchVectorSearchResultIterator() override = default;
 
   int NumColumns() const override {
     return static_cast<int>(output_columns_.size());
@@ -14087,6 +14447,10 @@ class BatchVectorSearchResultIterator : public EvaluatorTableIterator {
     }
   };
 
+  const StructType* GetBaseRowStructType() const {
+    return output_columns_[1].type->AsStruct();
+  }
+
   absl::Status InitializeBaseData();
   bool ProcessNextQueryRow();
   absl::StatusOr<Value> ComputeDistance(const Value& v1, const Value& v2);
@@ -14097,6 +14461,7 @@ class BatchVectorSearchResultIterator : public EvaluatorTableIterator {
   std::string column_to_search_;
   std::string query_column_to_search_;
   bool query_column_to_search_provided_;
+  bool is_batch_;
   int64_t top_k_;
   std::string distance_type_;
   Value max_distance_;
@@ -14121,45 +14486,161 @@ class BatchVectorSearchResultIterator : public EvaluatorTableIterator {
   std::unique_ptr<TypeFactory> type_factory_;
 };
 
+// An EvaluatorTableIterator that wraps a single Value. It iterates over exactly
+// this single value, yielding it as the single column of the row. This is used
+// to wrap a query value argument into an iterator interface to reuse the batch
+// logic.
+class SingleValueEvaluatorTableIterator : public EvaluatorTableIterator {
+ public:
+  explicit SingleValueEvaluatorTableIterator(Value value)
+      : value_(std::move(value)) {}
+
+  int NumColumns() const override { return 1; }
+
+  std::string GetColumnName(int i) const override { return "query_value"; }
+
+  const Type* GetColumnType(int i) const override { return value_.type(); }
+
+  const Value& GetValue(int i) const override { return value_; }
+
+  // An iterator that yields exactly one row containing a single value.
+  // `done_` tracks whether this single row has already been consumed.
+  bool NextRow() override {
+    if (done_) return false;
+    done_ = true;
+    return true;
+  }
+
+  absl::Status Status() const override { return absl::OkStatus(); }
+  absl::Status Cancel() override { return absl::OkStatus(); }
+  void SetDeadline(absl::Time deadline) override {}
+
+ private:
+  Value value_;
+  bool done_ = false;
+};
+
+class SingleVectorSearchResultIterator : public EvaluatorTableIterator {
+ public:
+  explicit SingleVectorSearchResultIterator(
+      std::unique_ptr<EvaluatorTableIterator> batch_iterator)
+      : batch_iterator_(std::move(batch_iterator)) {
+    ABSL_DCHECK_EQ(batch_iterator_->NumColumns(), 3);
+  }
+
+  int NumColumns() const override { return 2; }
+
+  std::string GetColumnName(int i) const override {
+    IsValidIndex(i);
+    return batch_iterator_->GetColumnName(i + 1);
+  }
+
+  const Type* GetColumnType(int i) const override {
+    IsValidIndex(i);
+    return batch_iterator_->GetColumnType(i + 1);
+  }
+
+  const Value& GetValue(int i) const override {
+    IsValidIndex(i);
+    return batch_iterator_->GetValue(i + 1);
+  }
+
+  bool NextRow() override { return batch_iterator_->NextRow(); }
+
+  absl::Status Status() const override { return batch_iterator_->Status(); }
+  absl::Status Cancel() override { return batch_iterator_->Cancel(); }
+  void SetDeadline(absl::Time deadline) override {
+    batch_iterator_->SetDeadline(deadline);
+  }
+
+ private:
+  void IsValidIndex(int i) const {
+    ABSL_DCHECK_GE(i, 0);
+    ABSL_DCHECK_LT(i, 2);
+  }
+
+  std::unique_ptr<EvaluatorTableIterator> batch_iterator_;
+};
+
 }  // namespace
 
 absl::StatusOr<std::unique_ptr<EvaluatorTableIterator>>
-BatchVectorSearchTVFWithProtoOptions::CreateEvaluator(
+VectorSearchTVF::CreateEvaluator(
     std::vector<TableValuedFunction::TvfEvaluatorArg> args,
     std::shared_ptr<FunctionSignature> function_call_signature,
     std::shared_ptr<const TVFSignature> tvf_signature,
     EvaluationContext* context) {
-  GOOGLESQL_RET_CHECK(args.size() == 8);
+  // Indices for arguments in the batch version of VECTOR_SEARCH.
+  // The single version of VECTOR_SEARCH has the same arguments starting from
+  // the `options` argument, but shifted left by 1 (i.e. index - 1) because
+  // it lacks the `query_column_to_search` argument.
+  constexpr int kBatchBaseTableIdx = 0;
+  constexpr int kBatchBaseColumnNameIdx = 1;
+  constexpr int kBatchQueryTableIdx = 2;
+  constexpr int kBatchQueryColumnNameIdx = 3;
+  [[maybe_unused]] constexpr int kBatchOptionsIdx = 4;
+  constexpr int kBatchTopKIdx = 5;
+  constexpr int kBatchDistanceTypeIdx = 6;
+  constexpr int kBatchMaxDistanceIdx = 7;
+
+  GOOGLESQL_RET_CHECK(args.size() >= 3);
+
+  const bool is_batch = (args[kBatchQueryTableIdx].relation != nullptr);
+
+  if (is_batch) {
+    GOOGLESQL_RET_CHECK(args.size() == kBatchMaxDistanceIdx + 1);
+  } else {
+    GOOGLESQL_RET_CHECK(args.size() == kBatchMaxDistanceIdx);
+  }
+
+  const int top_k_idx = is_batch ? kBatchTopKIdx : kBatchTopKIdx - 1;
+  const int distance_type_idx =
+      is_batch ? kBatchDistanceTypeIdx : kBatchDistanceTypeIdx - 1;
+  const int max_distance_idx =
+      is_batch ? kBatchMaxDistanceIdx : kBatchMaxDistanceIdx - 1;
 
   std::unique_ptr<EvaluatorTableIterator> base_table_iter =
-      std::move(args[0].relation);
+      std::move(args[kBatchBaseTableIdx].relation);
   GOOGLESQL_RET_CHECK(base_table_iter != nullptr);
 
-  GOOGLESQL_RET_CHECK(args[1].value.has_value() && args[1].value->type()->IsString());
-  std::string base_column_name = args[1].value->string_value();
+  GOOGLESQL_RET_CHECK(args[kBatchBaseColumnNameIdx].value.has_value() &&
+            args[kBatchBaseColumnNameIdx].value->type()->IsString());
+  std::string base_column_name =
+      args[kBatchBaseColumnNameIdx].value->string_value();
 
-  std::unique_ptr<EvaluatorTableIterator> query_table_iter =
-      std::move(args[2].relation);
-  GOOGLESQL_RET_CHECK(query_table_iter != nullptr);
-
+  std::unique_ptr<EvaluatorTableIterator> query_table_iter;
   std::string query_column_name;
   bool query_column_to_search_provided = true;
-  if (!args[3].value.has_value() || args[3].value->is_null()) {
-    query_column_to_search_provided = false;
-    // By default, set the query column name to the first column in the query
-    // table. We will validate later that
-    // 1) Either the column exists in the query table and its type matches the
-    // base column type.
-    // 2) Or if not, that the query table has only one column and its type
-    // matches the base column type.
-    query_column_name = base_column_name;
+
+  if (is_batch) {
+    query_table_iter = std::move(args[kBatchQueryTableIdx].relation);
+    GOOGLESQL_RET_CHECK(query_table_iter != nullptr);
+
+    if (!args[kBatchQueryColumnNameIdx].value.has_value() ||
+        args[kBatchQueryColumnNameIdx].value->is_null()) {
+      query_column_to_search_provided = false;
+      // By default, set the query column name to the first column in the query
+      // table. We will validate later that
+      // 1) Either the column exists in the query table and its type matches the
+      // base column type.
+      // 2) Or if not, that the query table has only one column and its type
+      // matches the base column type.
+      query_column_name = base_column_name;
+    } else {
+      GOOGLESQL_RET_CHECK(args[kBatchQueryColumnNameIdx].value.has_value() &&
+                args[kBatchQueryColumnNameIdx].value->type()->IsString());
+      query_column_name = args[kBatchQueryColumnNameIdx].value->string_value();
+    }
   } else {
-    GOOGLESQL_RET_CHECK(args[3].value.has_value() && args[3].value->type()->IsString());
-    query_column_name = args[3].value->string_value();
+    GOOGLESQL_RET_CHECK(args[kBatchQueryTableIdx].value.has_value());
+    Value query_value = args[kBatchQueryTableIdx].value.value();
+    query_table_iter =
+        std::make_unique<SingleValueEvaluatorTableIterator>(query_value);
+    query_column_name = "query_value";
   }
-  // 5th argument is an engine supplied option. It must be already provided
+
+  // This argument is an engine supplied option. It must be already provided
   // during function registration.
-  int top_k_idx = 5;
   GOOGLESQL_RET_CHECK(args[top_k_idx].value.has_value() &&
             args[top_k_idx].value->type()->IsInt64());
   int top_k = static_cast<int>(args[top_k_idx].value->int64_value());
@@ -14170,7 +14651,6 @@ BatchVectorSearchTVFWithProtoOptions::CreateEvaluator(
         "least 1");
   }
 
-  int distance_type_idx = 6;
   std::string distance_type =
       !args[distance_type_idx].value.has_value() ||
               args[distance_type_idx].value->is_null()
@@ -14185,7 +14665,6 @@ BatchVectorSearchTVFWithProtoOptions::CreateEvaluator(
   }
 
   double max_distance = std::numeric_limits<double>::infinity();
-  int max_distance_idx = 7;
   if (args[max_distance_idx].value.has_value() &&
       !args[max_distance_idx].value->is_null()) {
     GOOGLESQL_RET_CHECK(args[max_distance_idx].value->type()->IsDouble());
@@ -14193,6 +14672,8 @@ BatchVectorSearchTVFWithProtoOptions::CreateEvaluator(
   }
 
   std::vector<TVFSchemaColumn> output_columns;
+  auto type_factory = std::make_unique<googlesql::TypeFactory>();
+
   std::vector<StructType::StructField> query_fields;
   query_fields.reserve(query_table_iter->NumColumns());
   for (int i = 0; i < query_table_iter->NumColumns(); ++i) {
@@ -14200,7 +14681,6 @@ BatchVectorSearchTVFWithProtoOptions::CreateEvaluator(
                             query_table_iter->GetColumnType(i)});
   }
   const StructType* query_struct_type;
-  auto type_factory = std::make_unique<googlesql::TypeFactory>();
   GOOGLESQL_RET_CHECK_OK(type_factory->MakeStructType(query_fields, &query_struct_type));
   output_columns.push_back({"query", query_struct_type});
 
@@ -14215,12 +14695,19 @@ BatchVectorSearchTVFWithProtoOptions::CreateEvaluator(
   output_columns.push_back({"base", base_struct_type});
   output_columns.push_back({"distance", types::DoubleType()});
 
-  return std::make_unique<BatchVectorSearchResultIterator>(
+  auto batch_iter = std::make_unique<BatchVectorSearchResultIterator>(
       std::move(base_table_iter), std::move(query_table_iter),
       std::move(output_columns), std::move(base_column_name),
-      std::move(query_column_name), query_column_to_search_provided, top_k,
-      std::move(distance_type), Value::Double(max_distance),
+      std::move(query_column_name), query_column_to_search_provided, is_batch,
+      top_k, std::move(distance_type), Value::Double(max_distance),
       std::move(type_factory));
+
+  if (is_batch) {
+    return batch_iter;
+  } else {
+    return std::make_unique<SingleVectorSearchResultIterator>(
+        std::move(batch_iter));
+  }
 }
 
 bool BatchVectorSearchResultIterator::NextRow() {
@@ -14281,49 +14768,54 @@ absl::Status BatchVectorSearchResultIterator::InitializeBaseData() {
     for (int i = 0; i < base_iterator_->NumColumns(); ++i) {
       fields.push_back(base_iterator_->GetValue(i));
     }
-    const StructType* struct_type =
-        output_columns_[1].type->AsStruct();  // base
+    const StructType* struct_type = GetBaseRowStructType();  // base
     base_rows_.push_back(Value::Struct(struct_type, fields));
   }
   if (!base_iterator_->Status().ok()) {
     return base_iterator_->Status();
   }
-  // Reset found_count. We will use the same variable to check for ambiguity in
-  // the query table.
-  found_count = 0;
-  // By default, query_column_to_search, if not provided, is set to
-  // column_to_search. We check if it exists in the query table. If not, we
-  // check further based on whether it's provided or not.
-  for (int i = 0; i < query_iterator_->NumColumns(); ++i) {
-    if (googlesql_base::CaseEqual(query_iterator_->GetColumnName(i),
-                               query_column_to_search_)) {
-      query_embedding_col_idx_ = i;
-      found_count++;
-    }
-  }
-  if (found_count > 1) {
-    return absl::OutOfRangeError(absl::Substitute(
-        "Column $0 is ambiguous in the query table", query_column_to_search_));
-  }
-  if (query_embedding_col_idx_ == -1) {
-    // If the column is not found, we check if it was provided or not. It is an
-    // error if it was provided and it doesn't exist in the query table.
-    if (query_column_to_search_provided_) {
-      return absl::OutOfRangeError(
-          absl::Substitute("Unrecognized name $0 in query table argument",
-                           query_column_to_search_));
-    } else {
-      // If not provided, we assume that the query table has only one column.
-      // Throw an error otherwise.
-      if (query_iterator_->NumColumns() == 1) {
-        query_embedding_col_idx_ = 0;
-      } else {
-        return absl::OutOfRangeError(
-            "Cannot infer query column. `query_column_to_search` was not "
-            "provided, and the query table has multiple columns but none match "
-            "the name of `column_to_search`");
+  if (is_batch_) {
+    // Reset found_count. We will use the same variable to check for ambiguity
+    // in the query table.
+    found_count = 0;
+    // By default, query_column_to_search, if not provided, is set to
+    // column_to_search. We check if it exists in the query table. If not, we
+    // check further based on whether it's provided or not.
+    for (int i = 0; i < query_iterator_->NumColumns(); ++i) {
+      if (googlesql_base::CaseEqual(query_iterator_->GetColumnName(i),
+                                 query_column_to_search_)) {
+        query_embedding_col_idx_ = i;
+        found_count++;
       }
     }
+    if (found_count > 1) {
+      return absl::OutOfRangeError(
+          absl::Substitute("Column $0 is ambiguous in the query table",
+                           query_column_to_search_));
+    }
+    if (query_embedding_col_idx_ == -1) {
+      // If the column is not found, we check if it was provided or not. It is
+      // an error if it was provided and it doesn't exist in the query table.
+      if (query_column_to_search_provided_) {
+        return absl::OutOfRangeError(
+            absl::Substitute("Unrecognized name $0 in query table argument",
+                             query_column_to_search_));
+      } else {
+        // If not provided, we assume that the query table has only one column.
+        // Throw an error otherwise.
+        if (query_iterator_->NumColumns() == 1) {
+          query_embedding_col_idx_ = 0;
+        } else {
+          return absl::OutOfRangeError(
+              "Cannot infer query column. `query_column_to_search` was not "
+              "provided, and the query table has multiple columns but none "
+              "match "
+              "the name of `column_to_search`");
+        }
+      }
+    }
+  } else {
+    query_embedding_col_idx_ = 0;
   }
   const Type* query_embedding_type =
       query_iterator_->GetColumnType(query_embedding_col_idx_);
@@ -14331,23 +14823,42 @@ absl::Status BatchVectorSearchResultIterator::InitializeBaseData() {
       !(query_embedding_type->IsArray() &&
         (query_embedding_type->AsArray()->element_type()->IsFloat() ||
          query_embedding_type->AsArray()->element_type()->IsDouble()))) {
-    return absl::OutOfRangeError(
-        "The column specified by the `query_column_to_search` argument of "
-        "VECTOR_SEARCH TVF must be of type ARRAY<DOUBLE> or ARRAY<FLOAT> or "
-        "STRING");
+    if (is_batch_) {
+      return absl::OutOfRangeError(
+          "The column specified by the `query_column_to_search` argument of "
+          "VECTOR_SEARCH TVF must be of type ARRAY<DOUBLE> or ARRAY<FLOAT> or "
+          "STRING");
+    } else {
+      return absl::OutOfRangeError(
+          "The `query_value` argument of VECTOR_SEARCH TVF must be of type "
+          "ARRAY<DOUBLE> or ARRAY<FLOAT> or STRING");
+    }
   }
 
   if (!base_embedding_type->Equals(query_embedding_type)) {
-    return absl::OutOfRangeError(
-        "The column types of argument `column_to_search` in the base table "
-        "and argument `query_column_to_search` in the query table must be the "
-        "same");
+    if (is_batch_) {
+      return absl::OutOfRangeError(
+          "The column types of argument `column_to_search` in the base table "
+          "and argument `query_column_to_search` in the query table must be "
+          "the "
+          "same");
+    } else {
+      return absl::OutOfRangeError(
+          "The column type of argument `column_to_search` in the base table "
+          "and the type of argument `query_value` must be the same");
+    }
   }
 
   if (base_embedding_type->IsString() || query_embedding_type->IsString()) {
-    return absl::OutOfRangeError(
-        "STRING column_type for arguments `column_to_search` or "
-        "`query_column_to_search` is not supported");
+    if (is_batch_) {
+      return absl::OutOfRangeError(
+          "STRING column_type for arguments `column_to_search` or "
+          "`query_column_to_search` is not supported");
+    } else {
+      return absl::OutOfRangeError(
+          "STRING type for arguments `column_to_search` or "
+          "`query_value` is not supported");
+    }
   }
   return absl::OkStatus();
 }
@@ -14365,8 +14876,7 @@ bool BatchVectorSearchResultIterator::ProcessNextQueryRow() {
   for (int i = 0; i < query_iterator_->NumColumns(); ++i) {
     query_fields.push_back(query_iterator_->GetValue(i));
   }
-  const StructType* query_struct_type =
-      output_columns_[0].type->AsStruct();  // query
+  const StructType* query_struct_type = output_columns_[0].type->AsStruct();
   Value query_row = Value::Struct(query_struct_type, query_fields);
   Value query_embedding = query_iterator_->GetValue(query_embedding_col_idx_);
 
@@ -14432,6 +14942,455 @@ absl::StatusOr<Value> BatchVectorSearchResultIterator::ComputeDistance(
   return absl::OutOfRangeError(
       "`distance_type` argument of VECTOR_SEARCH TVF must be set to one of "
       "'COSINE', 'DOT_PRODUCT', or 'EUCLIDEAN'");
+}
+
+namespace {
+// TODO: Move this and vector search TVF related classes to a
+// separate file.
+class KMeansResultIterator : public EvaluatorTableIterator {
+ public:
+  KMeansResultIterator(std::unique_ptr<EvaluatorTableIterator> base_iterator,
+                       std::string vector_column_name, int64_t k,
+                       KMeansOptions options,
+                       std::vector<TVFSchemaColumn> output_columns,
+                       std::unique_ptr<TypeFactory> type_factory)
+      : base_iterator_(std::move(base_iterator)),
+        vector_column_name_(std::move(vector_column_name)),
+        k_(k),
+        options_(std::move(options)),
+        output_columns_(std::move(output_columns)),
+        type_factory_(std::move(type_factory)) {
+    ABSL_DCHECK_EQ(output_columns_.size(), 2);
+  }
+
+  int NumColumns() const override { return 2; }
+  std::string GetColumnName(int i) const override {
+    return output_columns_[i].name;
+  }
+  const Type* GetColumnType(int i) const override {
+    return output_columns_[i].type;
+  }
+  const Value& GetValue(int i) const override {
+    return current_output_values_[i];
+  }
+
+  bool NextRow() override {
+    if (!status_.ok()) {
+      return false;
+    }
+    if (!clustered_) {
+      status_ = PerformClustering();
+      if (!status_.ok()) {
+        return false;
+      }
+      clustered_ = true;
+    }
+    if (current_centroid_idx_ >= centroids_.size()) {
+      return false;
+    }
+    current_output_values_[0] = Value::Int64(current_centroid_idx_ + 1);
+    current_output_values_[1] = centroids_[current_centroid_idx_];
+    current_centroid_idx_++;
+    return true;
+  }
+
+  absl::Status Status() const override { return status_; }
+  absl::Status Cancel() override { return base_iterator_->Cancel(); }
+  void SetDeadline(absl::Time deadline) override {
+    base_iterator_->SetDeadline(deadline);
+  }
+
+ private:
+  struct ValidatedInput {
+    std::vector<Value> valid_vectors;
+    std::vector<Value> distinct_vectors;
+  };
+
+  absl::Status InitCentroids(const std::vector<Value>& distinct_vectors,
+                             int64_t restart_idx,
+                             std::vector<Value>& out_centroids) {
+    out_centroids.clear();
+    GOOGLESQL_RET_CHECK(!distinct_vectors.empty());
+
+    if (options_.init_method() == KMeansOptions::KMEANSPP) {
+      std::vector<bool> is_centroid(distinct_vectors.size(), false);
+      std::mt19937 gen(restart_idx);
+      // Pick first centroid uniformly at random from distinct vectors.
+      size_t first_idx = absl::Uniform<size_t>(gen, 0, distinct_vectors.size());
+      out_centroids.push_back(distinct_vectors[first_idx]);
+      is_centroid[first_idx] = true;
+
+      std::vector<double> min_dists(distinct_vectors.size(),
+                                    std::numeric_limits<double>::infinity());
+      // Initialize min_dists with distances to the first centroid.
+      for (size_t i = 0; i < distinct_vectors.size(); ++i) {
+        GOOGLESQL_ASSIGN_OR_RETURN(Value dist_val, ComputeDistance(out_centroids[0],
+                                                         distinct_vectors[i]));
+        min_dists[i] = dist_val.double_value();
+      }
+
+      while (out_centroids.size() < k_) {
+        std::vector<double> weights(distinct_vectors.size(), 0.0);
+        double total_weight = 0.0;
+        for (size_t i = 0; i < distinct_vectors.size(); ++i) {
+          if (!is_centroid[i]) {
+            double dist = min_dists[i];
+            weights[i] = dist * dist;
+            total_weight += weights[i];
+          }
+        }
+
+        size_t best_idx = distinct_vectors.size();
+        if (total_weight <= 0) {
+          // Fallback to deterministic selection of the next available
+          // non-centroid.
+          for (size_t i = 0; i < distinct_vectors.size(); ++i) {
+            if (!is_centroid[i]) {
+              best_idx = i;
+              break;
+            }
+          }
+          GOOGLESQL_RET_CHECK_NE(best_idx, distinct_vectors.size())
+              << "Failed to find non-centroid vector";
+        } else {
+          std::discrete_distribution<size_t> distribution(weights.begin(),
+                                                          weights.end());
+          best_idx = distribution(gen);
+        }
+
+        const Value& new_centroid = distinct_vectors[best_idx];
+        out_centroids.push_back(new_centroid);
+        is_centroid[best_idx] = true;
+
+        // Update min_dists with distances to the new centroid.
+        if (out_centroids.size() < k_) {
+          for (size_t i = 0; i < distinct_vectors.size(); ++i) {
+            GOOGLESQL_ASSIGN_OR_RETURN(
+                Value dist_val,
+                ComputeDistance(new_centroid, distinct_vectors[i]));
+            double d = dist_val.double_value();
+            if (d < min_dists[i]) {
+              min_dists[i] = d;
+            }
+          }
+        }
+      }
+    } else {
+      std::mt19937 gen(restart_idx);
+      std::sample(distinct_vectors.begin(), distinct_vectors.end(),
+                  std::back_inserter(out_centroids), k_, gen);
+    }
+    return absl::OkStatus();
+  }
+
+  absl::StatusOr<ValidatedInput> GetAndValidateInputVectors(
+      int vector_col_idx) {
+    std::vector<Value> valid_vectors;
+    size_t expected_len = 0;
+    bool first_vector = true;
+
+    while (base_iterator_->NextRow()) {
+      Value vec = base_iterator_->GetValue(vector_col_idx);
+      // If the vector is NULL, we skip it irrespective of the value of
+      // fail_on_invalid_vector config.
+      if (vec.is_null()) {
+        continue;
+      }
+      if (vec.elements().empty()) {
+        if (options_.fail_on_invalid_vector()) {
+          return absl::OutOfRangeError("Invalid vector: empty vector");
+        }
+        continue;
+      }
+      if (BuiltinScalarFunction::HasNulls(vec.elements())) {
+        if (options_.fail_on_invalid_vector()) {
+          return absl::OutOfRangeError(
+              "Unexpected NULL element in input array");
+        }
+        continue;
+      }
+
+      bool has_invalid_float = false;
+      bool is_all_zeros = true;
+      for (const Value& elem : vec.elements()) {
+        double val =
+            elem.type()->IsFloat() ? elem.float_value() : elem.double_value();
+        if (!std::isfinite(val)) {
+          has_invalid_float = true;
+          break;
+        }
+        if (std::fpclassify(val) != FP_ZERO) {
+          is_all_zeros = false;
+        }
+      }
+      if (has_invalid_float) {
+        if (options_.fail_on_invalid_vector()) {
+          return absl::OutOfRangeError(
+              "Invalid vector element: NaN or Infinity");
+        }
+        continue;
+      }
+      // If fail_on_invalid_vector is true, all-zero vectors are rejected.
+      // Otherwise, they are ignored and skipped.
+      if (is_all_zeros) {
+        if (options_.fail_on_invalid_vector()) {
+          return absl::OutOfRangeError("Invalid vector element: all zeros");
+        }
+        continue;
+      }
+
+      size_t len = vec.elements().size();
+      if (first_vector) {
+        expected_len = len;
+        first_vector = false;
+      } else if (len != expected_len) {
+        return absl::OutOfRangeError(absl::Substitute(
+            "Array length mismatch: $0 and $1", expected_len, len));
+      }
+      valid_vectors.push_back(vec);
+    }
+    GOOGLESQL_RETURN_IF_ERROR(base_iterator_->Status());
+
+    if (valid_vectors.size() < k_) {
+      return absl::OutOfRangeError(absl::Substitute(
+          "Number of valid input vectors ($0) is less than requested number of "
+          "clusters ($1)",
+          valid_vectors.size(), k_));
+    }
+
+    std::vector<Value> distinct_vectors = valid_vectors;
+    std::sort(distinct_vectors.begin(), distinct_vectors.end(),
+              [](const Value& a, const Value& b) { return a.LessThan(b); });
+    distinct_vectors.erase(
+        std::unique(distinct_vectors.begin(), distinct_vectors.end()),
+        distinct_vectors.end());
+
+    if (distinct_vectors.size() < k_) {
+      return absl::OutOfRangeError(absl::Substitute(
+          "Number of distinct input vectors ($0) is less than requested number "
+          "of clusters ($1)",
+          distinct_vectors.size(), k_));
+    }
+    return ValidatedInput{std::move(valid_vectors),
+                          std::move(distinct_vectors)};
+  }
+
+  absl::Status RunKMeansIterations(const std::vector<Value>& valid_vectors,
+                                   const Type* element_type,
+                                   std::vector<Value>& centroids) {
+    int64_t actual_k = centroids.size();
+    std::vector<int64_t> assignments(valid_vectors.size(), -1);
+
+    for (int64_t iter = 0; iter < options_.num_iterations(); ++iter) {
+      std::vector<std::vector<Value>> assigned_vectors(actual_k);
+      bool changed = false;
+
+      for (size_t v_idx = 0; v_idx < valid_vectors.size(); ++v_idx) {
+        const Value& vec = valid_vectors[v_idx];
+        int64_t best_c = 0;
+        double min_dist = std::numeric_limits<double>::infinity();
+        for (int64_t c = 0; c < actual_k; ++c) {
+          GOOGLESQL_ASSIGN_OR_RETURN(Value dist_val, ComputeDistance(centroids[c], vec));
+          double d = dist_val.double_value();
+          if (d < min_dist) {
+            min_dist = d;
+            best_c = c;
+          }
+        }
+        assigned_vectors[best_c].push_back(vec);
+        if (assignments[v_idx] != best_c) {
+          assignments[v_idx] = best_c;
+          changed = true;
+        }
+      }
+
+      if (!changed) {
+        break;
+      }
+
+      for (int64_t c = 0; c < actual_k; ++c) {
+        if (assigned_vectors[c].empty()) {
+          continue;
+        }
+        GOOGLESQL_ASSIGN_OR_RETURN(Value mean_vec,
+                         ComputeMean(assigned_vectors[c], element_type));
+        centroids[c] = mean_vec;
+      }
+    }
+    return absl::OkStatus();
+  }
+
+  absl::Status PerformClustering() {
+    int vector_col_idx = -1;
+    for (int i = 0; i < base_iterator_->NumColumns(); ++i) {
+      if (googlesql_base::CaseEqual(base_iterator_->GetColumnName(i),
+                                 vector_column_name_)) {
+        vector_col_idx = i;
+        break;
+      }
+    }
+    GOOGLESQL_RET_CHECK_NE(vector_col_idx, -1) << "Vector column not found";
+
+    const Type* vector_type = base_iterator_->GetColumnType(vector_col_idx);
+    if (!vector_type->IsArray() ||
+        (!vector_type->AsArray()->element_type()->IsFloat() &&
+         !vector_type->AsArray()->element_type()->IsDouble())) {
+      return absl::OutOfRangeError(
+          "The column specified by the `vectors_column` argument of KMeans TVF "
+          "must be of type ARRAY<DOUBLE> or ARRAY<FLOAT>");
+    }
+
+    // 1. Extract the collection and validation of input vectors:
+    GOOGLESQL_ASSIGN_OR_RETURN(ValidatedInput validated_input,
+                     GetAndValidateInputVectors(vector_col_idx));
+
+    // 2. Initialize centroids:
+    std::vector<Value> current_centroids;
+    GOOGLESQL_RETURN_IF_ERROR(InitCentroids(validated_input.distinct_vectors,
+                                  /*restart_idx=*/0, current_centroids));
+
+    // 3. Run the KMeans iterations:
+    const Type* element_type = vector_type->AsArray()->element_type();
+    GOOGLESQL_RETURN_IF_ERROR(RunKMeansIterations(validated_input.valid_vectors,
+                                        element_type, current_centroids));
+
+    centroids_ = std::move(current_centroids);
+    return absl::OkStatus();
+  }
+
+  absl::StatusOr<Value> ComputeDistance(const Value& v1, const Value& v2) {
+    switch (options_.distance_type()) {
+      case KMeansOptions::EUCLIDEAN:
+      case KMeansOptions::DISTANCE_TYPE_UNSPECIFIED:
+        return functions::EuclideanDistanceDense(v1, v2);
+      default:
+        return absl::InternalError("Unknown distance type");
+    }
+  }
+
+  absl::StatusOr<Value> ComputeMean(const std::vector<Value>& vectors,
+                                    const Type* element_type) {
+    GOOGLESQL_RET_CHECK(!vectors.empty()) << "Empty vectors for mean";
+    size_t len = vectors[0].elements().size();
+    std::vector<double> sums(len, 0.0);
+    for (const Value& vec : vectors) {
+      for (size_t i = 0; i < len; ++i) {
+        double val = element_type->IsFloat() ? vec.elements()[i].float_value()
+                                             : vec.elements()[i].double_value();
+        sums[i] += val;
+      }
+    }
+    std::vector<Value> mean_elems;
+    mean_elems.reserve(len);
+    double count = vectors.size();
+    for (size_t i = 0; i < len; ++i) {
+      double m = sums[i] / count;
+      if (element_type->IsFloat()) {
+        mean_elems.push_back(Value::Float(static_cast<float>(m)));
+      } else {
+        mean_elems.push_back(Value::Double(m));
+      }
+    }
+    return Value::Array(output_columns_[1].type->AsArray(), mean_elems);
+  }
+
+  std::unique_ptr<EvaluatorTableIterator> base_iterator_;
+  std::string vector_column_name_;
+  int64_t k_;
+  KMeansOptions options_;
+  std::vector<TVFSchemaColumn> output_columns_;
+  std::unique_ptr<TypeFactory> type_factory_;
+
+  bool clustered_ = false;
+  std::vector<Value> centroids_;
+  int current_centroid_idx_ = 0;
+  std::array<Value, 2> current_output_values_;
+  absl::Status status_;
+};
+
+}  // namespace
+
+absl::StatusOr<std::unique_ptr<EvaluatorTableIterator>>
+KMeansTVF::CreateEvaluator(
+    std::vector<TableValuedFunction::TvfEvaluatorArg> args,
+    std::shared_ptr<FunctionSignature> function_call_signature,
+    std::shared_ptr<const TVFSignature> tvf_signature,
+    EvaluationContext* context) {
+  if (context) {
+    context->SetNonDeterministicOutput();
+  }
+  GOOGLESQL_RET_CHECK(args.size() == 4);
+  std::unique_ptr<EvaluatorTableIterator> input_table_iter =
+      std::move(args[0].relation);
+  GOOGLESQL_RET_CHECK(input_table_iter != nullptr);
+
+  GOOGLESQL_RET_CHECK(args[1].value.has_value() && args[1].value->type()->IsString());
+  std::string vectors_column_name = args[1].value->string_value();
+
+  GOOGLESQL_RET_CHECK(args[2].value.has_value() && args[2].value->type()->IsInt64());
+  int64_t k = args[2].value->int64_value();
+  if (k <= 0) {
+    return absl::OutOfRangeError(
+        "Argument 'k' to table-valued function KMEANS must be at least 1");
+  }
+
+  KMeansOptions options = DefaultKMeansOptions();
+
+  if (args[3].value.has_value() && !args[3].value->is_null()) {
+    GOOGLESQL_RET_CHECK(args[3].value->type()->IsProto());
+    if (!options.MergeFromString(args[3].value->proto_value())) {
+      return absl::OutOfRangeError("Invalid options proto in KMEANS");
+    }
+  }
+
+  if (options.num_iterations() < 1) {
+    return absl::OutOfRangeError(
+        "num_iterations in KMeansOptions must be at least 1");
+  }
+  if (options.num_restarts() < 1) {
+    return absl::OutOfRangeError(
+        "num_restarts in KMeansOptions must be at least 1");
+  }
+  if (options.min_relative_progress() < 0.0) {
+    return absl::OutOfRangeError(
+        "min_relative_progress in KMeansOptions must be non-negative");
+  }
+  if (options.distance_type() == KMeansOptions::DISTANCE_TYPE_UNSPECIFIED) {
+    return absl::OutOfRangeError(
+        "distance_type in KMeansOptions must not be set to unspecified");
+  }
+  if (options.init_method() == KMeansOptions::INIT_METHOD_UNSPECIFIED) {
+    return absl::OutOfRangeError(
+        "init_method in KMeansOptions must not be set to unspecified");
+  }
+
+  std::vector<TVFSchemaColumn> output_columns;
+  auto type_factory = std::make_unique<googlesql::TypeFactory>();
+  output_columns.push_back({"cluster_id", type_factory->get_int64()});
+
+  int vector_col_idx = -1;
+  int found_count = 0;
+  for (int i = 0; i < input_table_iter->NumColumns(); ++i) {
+    if (googlesql_base::CaseEqual(input_table_iter->GetColumnName(i),
+                               vectors_column_name)) {
+      vector_col_idx = i;
+      found_count++;
+    }
+  }
+  if (vector_col_idx == -1) {
+    return absl::OutOfRangeError(absl::Substitute(
+        "Unrecognized name $0 in input table argument", vectors_column_name));
+  }
+  if (found_count > 1) {
+    return absl::OutOfRangeError(absl::Substitute(
+        "Column $0 is ambiguous in the base table", vectors_column_name));
+  }
+  const Type* vector_type = input_table_iter->GetColumnType(vector_col_idx);
+  output_columns.push_back({"cluster_vector", vector_type});
+
+  return std::make_unique<KMeansResultIterator>(
+      std::move(input_table_iter), vectors_column_name, k, options,
+      std::move(output_columns), std::move(type_factory));
 }
 
 absl::StatusOr<Value> AiIfFunction::Eval(

@@ -169,20 +169,24 @@ struct ExprResolutionInfoOptions {
   // in the constructor arg rather than by using options.
   // For ExprResolutionInfo derived from a parent, these update the name scopes.
   // Normally, the only allowed update is to replace `name_scope` with
-  // the parent's `aggregate_name_scope` or `analytic_name_scope`.
+  // the parent's `aggregate_name_scope`, `analytic_name_scope`, or
+  // `estimator_name_scope`.
   const NameScope* name_scope = nullptr;
   const NameScope* aggregate_name_scope = nullptr;
   const NameScope* analytic_name_scope = nullptr;
+  const NameScope* estimator_name_scope = nullptr;
 
   // Normally, when creating a child ExprResolutionInfo, name_scope is
   // only allowed to be overridden to the value of the parent's
-  // `aggregate_name_scope` or `analytic_name_scope`, and those scopes cannot
-  // be changed.  Unusual cases where setting brand new scopes is required are
-  // supported if this is set to true.
+  // `aggregate_name_scope`, `analytic_name_scope`, or
+  // `estimator_name_scope`, and those scopes cannot be changed.  Unusual cases
+  // where setting brand new scopes is required are supported if this is set
+  // to true.
   bool allow_new_scopes = false;
 
   std::optional<bool> allows_aggregation;
   std::optional<bool> allows_analytic;
+  std::optional<bool> allows_estimator_function;
   std::optional<bool> allows_horizontal_aggregation;
 
   std::optional<bool> use_post_grouping_columns;
@@ -271,11 +275,18 @@ struct ExprResolutionInfo {
   // are in this expression.  Never NULL.
   const NameScope* const analytic_name_scope = nullptr;
 
+  // NameScope to use while resolving any estimator function arguments that
+  // are in this expression.  Never NULL.
+  const NameScope* const estimator_name_scope = nullptr;
+
   // Indicates whether this expression allows aggregations.
   const bool allows_aggregation = false;
 
   // Indicates whether this expression allows analytic functions.
   const bool allows_analytic = false;
+
+  // Indicates whether this expression allows estimator functions.
+  const bool allows_estimator_function = false;
 
   // Indicates whether the expression is an expression of a graph measure
   // property.

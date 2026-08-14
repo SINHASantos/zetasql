@@ -36,7 +36,7 @@ public class DeclarativeTypeTest {
     DeclarativeType type1 =
         factory.createDeclarativeType(
             DeclarativeTypeDescriptor.builder()
-                .setTypeId(new DeclarativeTypeDescriptor.TypeId("NS", "T1", 1))
+                .setTypeId(new DeclarativeTypeDescriptor.TypeId("NS", "T1", /* versionId= */ "v1"))
                 .setDisplayName("display_t1")
                 .setBackingType(TypeFactory.createSimpleType(GoogleSQLType.TypeKind.TYPE_INT64))
                 .build());
@@ -44,15 +44,15 @@ public class DeclarativeTypeTest {
     DeclarativeType type1Same =
         factory.createDeclarativeType(
             DeclarativeTypeDescriptor.builder()
-                .setTypeId(new DeclarativeTypeDescriptor.TypeId("NS", "T1", 1))
+                .setTypeId(new DeclarativeTypeDescriptor.TypeId("NS", "T1", /* versionId= */ "v1"))
                 .setDisplayName("display_t1")
                 .setBackingType(TypeFactory.createSimpleType(GoogleSQLType.TypeKind.TYPE_INT64))
                 .build());
 
-    DeclarativeType typeDifferentCounter =
+    DeclarativeType typeDifferentVersionId =
         factory.createDeclarativeType(
             DeclarativeTypeDescriptor.builder()
-                .setTypeId(new DeclarativeTypeDescriptor.TypeId("NS", "T1", 2))
+                .setTypeId(new DeclarativeTypeDescriptor.TypeId("NS", "T1", /* versionId= */ "v2"))
                 .setDisplayName("display_t1")
                 .setBackingType(TypeFactory.createSimpleType(GoogleSQLType.TypeKind.TYPE_INT64))
                 .build());
@@ -60,7 +60,7 @@ public class DeclarativeTypeTest {
     assertThat(type1.equals(type1Same)).isTrue();
     assertThat(type1.hashCode()).isEqualTo(type1Same.hashCode());
 
-    assertThat(type1.equals(typeDifferentCounter)).isFalse();
+    assertThat(type1.equals(typeDifferentVersionId)).isFalse();
   }
 
   @Test
@@ -69,7 +69,7 @@ public class DeclarativeTypeTest {
     DeclarativeType type1 =
         factory.createDeclarativeType(
             DeclarativeTypeDescriptor.builder()
-                .setTypeId(new DeclarativeTypeDescriptor.TypeId("NS", "T1", 1))
+                .setTypeId(new DeclarativeTypeDescriptor.TypeId("NS", "T1", /* versionId= */ "v1"))
                 .setDisplayName("display_t1")
                 .setBackingType(TypeFactory.createSimpleType(GoogleSQLType.TypeKind.TYPE_INT64))
                 .build());
@@ -77,7 +77,8 @@ public class DeclarativeTypeTest {
     assertThat(type1.isDeclarativeType()).isTrue();
     assertThat(type1.asDeclarativeType()).isSameInstanceAs(type1);
     assertThat(type1.isGoogleSqlBuiltin()).isFalse();
-    assertThat(type1.getId()).isEqualTo(new DeclarativeTypeDescriptor.TypeId("NS", "T1", 1));
+    assertThat(type1.getId())
+        .isEqualTo(new DeclarativeTypeDescriptor.TypeId("NS", "T1", /* versionId= */ "v1"));
     assertThat(type1.typeName(ProductMode.PRODUCT_INTERNAL)).isEqualTo("display_t1");
     assertThat(type1.debugString(false)).isEqualTo("display_t1");
 
@@ -95,7 +96,7 @@ public class DeclarativeTypeTest {
 
     DeclarativeTypeDescriptor descriptor =
         DeclarativeTypeDescriptor.builder()
-            .setTypeId(new DeclarativeTypeDescriptor.TypeId("NS", "T1", 0))
+            .setTypeId(new DeclarativeTypeDescriptor.TypeId("NS", "T1", /* versionId= */ ""))
             .setDisplayName("t1")
             .setBackingType(TypeFactory.createSimpleType(GoogleSQLType.TypeKind.TYPE_INT64))
             .setReturningStrategy(DeclarativeTypeProto.ReturningStrategy.RETURNING_DELEGATED)

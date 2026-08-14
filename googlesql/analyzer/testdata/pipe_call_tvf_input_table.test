@@ -90,7 +90,7 @@ QueryStmt
 +-query=
   +-TVFScan
     +-column_list=[tvf_two_relation_args_return_proto_value_table.$col0#4]
-    +-tvf=tvf_two_relation_args_return_proto_value_table((ANY TABLE, ANY TABLE) -> TABLE<PROTO<googlesql_test.TestExtraPB>>)
+    +-tvf=tvf_two_relation_args_return_proto_value_table
     +-signature=(TABLE<$col1 STRING>, TABLE<Key INT64, Value STRING>) -> TABLE<PROTO<googlesql_test.TestExtraPB>>
     +-argument_list=
     | +-FunctionArgument
@@ -172,7 +172,7 @@ QueryStmt
 +-query=
   +-TVFScan
     +-column_list=[tvf_two_relation_args_return_proto_value_table.$col0#4]
-    +-tvf=tvf_two_relation_args_return_proto_value_table((ANY TABLE, ANY TABLE) -> TABLE<PROTO<googlesql_test.TestExtraPB>>)
+    +-tvf=tvf_two_relation_args_return_proto_value_table
     +-signature=(TABLE<Key INT64, Value STRING>, TABLE<$col1 STRING>) -> TABLE<PROTO<googlesql_test.TestExtraPB>>
     +-argument_list=
     | +-FunctionArgument
@@ -271,7 +271,7 @@ QueryStmt
 +-query=
   +-TVFScan
     +-column_list=tvf_optional_scalars_named_table.[column_bool#3, column_bytes#4]
-    +-tvf=tvf_optional_scalars_named_table((optional ANY TYPE, optional ANY TYPE, optional ANY TABLE foobar) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+    +-tvf=tvf_optional_scalars_named_table
     +-signature=(literal INT64, literal INT64, TABLE<Key INT64, Value STRING>) -> TABLE<column_bool BOOL, column_bytes BYTES>
     +-argument_list=
     | +-FunctionArgument
@@ -301,7 +301,7 @@ QueryStmt
 +-query=
   +-TVFScan
     +-column_list=tvf_optional_scalars_named_table.[column_bool#3, column_bytes#4]
-    +-tvf=tvf_optional_scalars_named_table((optional ANY TYPE, optional ANY TYPE, optional ANY TABLE foobar) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+    +-tvf=tvf_optional_scalars_named_table
     +-signature=(literal INT64, null INT64, TABLE<Key INT64, Value STRING>) -> TABLE<column_bool BOOL, column_bytes BYTES>
     +-argument_list=
     | +-FunctionArgument
@@ -416,7 +416,7 @@ QueryStmt
 +-query=
   +-TVFScan
     +-column_list=[tvf_two_relation_args_return_proto_value_table.$col0#6]
-    +-tvf=tvf_two_relation_args_return_proto_value_table((ANY TABLE, ANY TABLE) -> TABLE<PROTO<googlesql_test.TestExtraPB>>)
+    +-tvf=tvf_two_relation_args_return_proto_value_table
     +-signature=(TABLE<Key INT64, Value STRING>, TABLE<key INT32, TestEnum ENUM<googlesql_test.TestEnum>, KitchenSink PROTO<googlesql_test.KitchenSinkPB>>) -> TABLE<PROTO<googlesql_test.TestExtraPB>>
     +-argument_list=
     | +-FunctionArgument
@@ -442,7 +442,7 @@ QueryStmt
 +-query=
   +-TVFScan
     +-column_list=[tvf_two_relation_args_return_proto_value_table.$col0#6]
-    +-tvf=tvf_two_relation_args_return_proto_value_table((ANY TABLE, ANY TABLE) -> TABLE<PROTO<googlesql_test.TestExtraPB>>)
+    +-tvf=tvf_two_relation_args_return_proto_value_table
     +-signature=(TABLE<key INT32, TestEnum ENUM<googlesql_test.TestEnum>, KitchenSink PROTO<googlesql_test.KitchenSinkPB>>, TABLE<Key INT64, Value STRING>) -> TABLE<PROTO<googlesql_test.TestExtraPB>>
     +-argument_list=
     | +-FunctionArgument
@@ -500,7 +500,7 @@ QueryStmt
 +-query=
   +-TVFScan
     +-column_list=tvf_joinx.[x#5, y#6, z#7]
-    +-tvf=tvf_joinx((ANY TABLE t1, ANY TABLE t2) -> ANY TABLE)
+    +-tvf=tvf_joinx
     +-signature=(TABLE<x INT64, y INT64>, TABLE<x INT64, z INT64>) -> TABLE<x INT64, y INT64, z INT64>
     +-argument_list=
     | +-FunctionArgument
@@ -552,7 +552,7 @@ QueryStmt
 +-query=
   +-TVFScan
     +-column_list=tvf_joinx.[x#5, z#6, y#7]
-    +-tvf=tvf_joinx((ANY TABLE t1, ANY TABLE t2) -> ANY TABLE)
+    +-tvf=tvf_joinx
     +-signature=(TABLE<x INT64, z INT64>, TABLE<x INT64, y INT64>) -> TABLE<x INT64, z INT64, y INT64>
     +-argument_list=
     | +-FunctionArgument
@@ -602,7 +602,7 @@ QueryStmt
 +-query=
   +-TVFScan
     +-column_list=tvf_joinx.[x#5, z#6, y#7]
-    +-tvf=tvf_joinx((ANY TABLE t1, ANY TABLE t2) -> ANY TABLE)
+    +-tvf=tvf_joinx
     +-signature=(TABLE<x INT64, z INT64>, TABLE<x INT64, y INT64>) -> TABLE<x INT64, z INT64, y INT64>
     +-argument_list=
     | +-FunctionArgument
@@ -652,7 +652,7 @@ QueryStmt
 +-query=
   +-TVFScan
     +-column_list=tvf_joinx.[x#5, y#6, z#7]
-    +-tvf=tvf_joinx((ANY TABLE t1, ANY TABLE t2) -> ANY TABLE)
+    +-tvf=tvf_joinx
     +-signature=(TABLE<x INT64, y INT64>, TABLE<x INT64, z INT64>) -> TABLE<x INT64, y INT64, z INT64>
     +-argument_list=
     | +-FunctionArgument

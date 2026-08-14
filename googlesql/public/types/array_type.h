@@ -149,6 +149,8 @@ class ArrayType : public ListBackedType {
   absl::HashState HashTypeParameter(absl::HashState state) const override;
   absl::HashState HashValueContent(const ValueContent& value,
                                    absl::HashState state) const override;
+  absl::HashState HashValueContentIgnoringFloat(
+      const ValueContent& value, absl::HashState state) const override;
   bool EqualElementMultiSet(const ValueContent& x, const ValueContent& y,
                             const ValueEqualityCheckOptions& options) const;
   bool ValueContentEquals(

@@ -42,6 +42,7 @@
 #include "absl/log/log.h"
 #include "absl/status/status.h"
 #include "googlesql/base/status_macros.h"
+#include "absl/status/statusor.h"
 #include "absl/strings/match.h"
 #include "absl/strings/str_join.h"
 #include "absl/strings/string_view.h"
@@ -889,6 +890,25 @@ inline absl::StatusOr<GraphDynamicLabelProperties> MergeDynamicLabelProperties(
       .dynamic_properties = left.dynamic_properties ? left.dynamic_properties
                                                     : right.dynamic_properties};
 }
+
+// Holds the optional parsed clauses for a CREATE TABLE FUNCTION statement.
+// All fields are optional and will be nullptr if the corresponding clause
+// was not specified.
+struct TVFDeclarationOptions {
+  ASTIdentifier* language = nullptr;
+  ASTWithConnectionClause* connection = nullptr;
+  ASTOptionsList* options = nullptr;
+};
+
+// Processes a list of TVF declaration option nodes (LANGUAGE, WITH CONNECTION,
+// OPTIONS) which can appear in any order.
+//
+// Expects 'nodes' to only contain ASTIdentifier, ASTWithConnectionClause, or
+// ASTOptionsList.
+// Returns a TVFDeclarationOptions struct containing the parsed clauses, or a
+// syntax error if any clause is duplicated.
+absl::StatusOr<TVFDeclarationOptions> ProcessTVFDeclarationOptions(
+    absl::Span<ASTNode* const> nodes);
 
 absl::Status AddWarningIfReserved(absl::string_view keyword,
                                   const ParseLocationRange& location,

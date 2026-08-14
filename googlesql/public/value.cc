@@ -962,6 +962,29 @@ const Value& Value::FindFieldByName(absl::string_view name) const {
   return invalid_value;
 }
 
+absl::StatusOr<Value> Value::FindStructFieldByNameCaseInsensitive(
+    absl::string_view name) const {
+  if (is_null()) {
+    return absl::InvalidArgumentError("Null struct value");
+  }
+  if (!type()->IsStruct()) {
+    return absl::InvalidArgumentError(
+        absl::StrCat("Not a struct type: ", type()->DebugString()));
+  }
+  bool is_ambiguous = false;
+  int found_idx = -1;
+  const StructType::StructField* field_def =
+      type()->AsStruct()->FindField(name, &is_ambiguous, &found_idx);
+  if (is_ambiguous) {
+    return absl::InvalidArgumentError(
+        absl::StrCat("Ambiguous field lookup: ", name));
+  }
+  if (field_def == nullptr) {
+    return absl::NotFoundError(absl::StrCat("Field not found: ", name));
+  }
+  return field(found_idx);
+}
+
 // Always returns false.
 static bool TypesDiffer(const Value& x, const Value& y, std::string* reason) {
   if (reason) {
@@ -1019,6 +1042,13 @@ void Value::FillDeepOrderKindSpec(const Value& v, DeepOrderKindSpec* spec) {
       for (auto& [key, value] : v.map_entries()) {
         Value::FillDeepOrderKindSpec(key, &map_key_spec);
         Value::FillDeepOrderKindSpec(value, &map_value_spec);
+      }
+      break;
+    }
+    case TYPE_DECLARATIVE: {
+      auto backing_val_or = v.backing_value();
+      if (backing_val_or.ok()) {
+        Value::FillDeepOrderKindSpec(backing_val_or.value(), spec);
       }
       break;
     }

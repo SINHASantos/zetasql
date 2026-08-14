@@ -121,7 +121,7 @@ message LanguageFeatureOptions {
 //
 // It's deprecated to use an enum ID which corresponds to a version. All new
 // enum names should use the next available ID starting from 0.
-// Next ID: 178
+// Next ID: 184
 enum LanguageFeature {
   reserved 3 to 4, 36 to 39, 44 to 46, 48, 54, 55, 74, 99, 107, 108, 110, 124,
       132, 134, 140, 13003, 13046, 14001, 14012, 14022, 14024, 14040, 14061,
@@ -944,12 +944,7 @@ enum LanguageFeature {
   // Enable the GoogleSQL standard version of the AI.IF function.
   // Prevents naming conflicts since some engines already have their own version
   // of AI.IF.
-  FEATURE_AI_IF = 163 [
-    // This feature will continue to remain in development until the function
-    // signature is finalized and MODEL references for scalar functions are
-    // supported as arguments (b/456818445).
-    (language_feature_options).in_development = true
-  ];
+  FEATURE_AI_IF = 163;
 
   // Enable the ALIGN Operator ((broken link)).
   // TODO: b/451574497 - Remove in_development flag.
@@ -988,6 +983,22 @@ enum LanguageFeature {
 
   // Enable the Variant Type.
   FEATURE_VARIANT_TYPE = 177 [(language_feature_options).in_development = true];
+
+  // Disable AI.IF to prevent breaking engine catalogs. This opt-out flag is
+  // provided to prevent breaking catalogs (such as Spanner's) where there are
+  // naming conflicts with existing engine-specific functions also named AI.IF.
+  // TODO: Remove this flag once engine catalogs are compatible
+  // with the GoogleSQL built-in AI.IF function.
+  FEATURE_DISABLE_AI_IF = 178
+      [(language_feature_options).ideally_enabled = false];
+
+  // Enables BIT_CAST functions for BYTES <-> integer and float types.
+  FEATURE_BIT_CAST_BYTES_FUNCTIONS = 180
+      [(language_feature_options).in_development = true];
+
+  // Enable CAST operators. See (broken link):cast-operator for details.
+  FEATURE_CAST_OPERATORS = 181
+      [(language_feature_options).in_development = true];
 
   // -> Add more cross-version features here.
   // -> DO NOT add more versioned features into versions that are frozen.
@@ -2126,6 +2137,16 @@ enum LanguageFeature {
   FEATURE_TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS = 14124
       [(language_feature_options).language_version = VERSION_1_4];
 
+  // Temporary flag to safely rollout support for *ALL* annotations on SQL
+  // TODO: b/465180968 - Once rolled out, this should be merged with
+  // FEATURE_TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS, which currently
+  // controls collation. The final name should be the other flag as well.
+  //
+  // REQUIRES: FEATURE_TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS, since
+  // collation also must be supported, and to ensure an easier transition.
+  FEATURE_ALL_TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS = 179
+      [(language_feature_options).language_version = VERSION_1_5];
+
   // Enables CREATE LIVE TABLE statement.
   // See (broken link) for more details.
   FEATURE_CREATE_LIVE_TABLE = 14131 [
@@ -2225,6 +2246,12 @@ enum LanguageFeature {
         ideally_enabled: false,
         in_development: true
       }];
+
+  // Enables NULLIF(a, lambda) overload.
+  FEATURE_NULLIF_WITH_LAMBDA = 182 [
+    (language_feature_options).language_version = VERSION_1_5,
+    (language_feature_options).in_development = true
+  ];
 
   // User code that switches on this enum must have a default case so
   // builds won't break if new enums get added.

@@ -420,7 +420,7 @@ QueryStmt
           +-MatchRecognizeScan
             +-column_list=[$aggregate.$agg1#6]
             +-input_scan=
-            | +-TVFScan(column_list=tvf_no_args.[column_bool#1, column_bytes#2], tvf=tvf_no_args(() -> TABLE<column_bool BOOL, column_bytes BYTES>), signature=() -> TABLE<column_bool BOOL, column_bytes BYTES>, column_index_list=[0, 1], function_call_signature=() -> TABLE<column_bool BOOL, column_bytes BYTES>)
+            | +-TVFScan(column_list=tvf_no_args.[column_bool#1, column_bytes#2], tvf=tvf_no_args, signature=() -> TABLE<column_bool BOOL, column_bytes BYTES>, column_index_list=[0, 1], function_call_signature=() -> TABLE<column_bool BOOL, column_bytes BYTES>)
             +-analytic_function_group_list=
             | +-AnalyticFunctionGroup
             |   +-order_by=
@@ -3771,6 +3771,7 @@ QueryStmt
             +-match_number_column=$match_recognize.$match_number#3
             +-match_row_number_column=$match_recognize.$match_row_number#4
             +-classifier_column=$match_recognize.$classifier#5
+
 [UNDECLARED_PARAMETERS]
 --
 ALTERNATION GROUPS:
@@ -3828,6 +3829,7 @@ QueryStmt
             +-match_number_column=$match_recognize.$match_number#3
             +-match_row_number_column=$match_recognize.$match_row_number#4
             +-classifier_column=$match_recognize.$classifier#5
+
 [UNDECLARED_PARAMETERS]
 --
 ALTERNATION GROUPS:
@@ -3885,6 +3887,7 @@ QueryStmt
             +-match_number_column=$match_recognize.$match_number#3
             +-match_row_number_column=$match_recognize.$match_row_number#4
             +-classifier_column=$match_recognize.$classifier#5
+
 [UNDECLARED_PARAMETERS]
 --
 ALTERNATION GROUP: use_LonGeST_match,@p

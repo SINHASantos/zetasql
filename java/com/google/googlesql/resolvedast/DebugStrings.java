@@ -78,6 +78,10 @@ import javax.annotation.Nullable;
  * Helper functions for generating debug strings for {@link ResolvedNode}s.
  */
 class DebugStrings {
+  // TODO: Remove the flag once it is rolled out in external tests.
+  private static final boolean OMIT_TVF_SIGNATURES =
+      Boolean.parseBoolean(
+          System.getProperty("googlesql.omitTvfSignaturesInResolvedAstDebugString", "false"));
 
   // isDefaultValue functions for different node field types, similar to the C++ implementations in
   // googlesql/resolved_ast/resolved_ast.cc.template
@@ -248,7 +252,7 @@ class DebugStrings {
   }
 
   static String toStringImpl(TableValuedFunction tvf) {
-    return tvf.toString();
+    return OMIT_TVF_SIGNATURES ? tvf.getFullName() : tvf.toString();
   }
 
   static String toStringImpl(TVFSignature signature) {
@@ -355,7 +359,7 @@ class DebugStrings {
   }
 
   static String toStringVerbose(FunctionSignature signature) {
-    return signature.debugString(/*functionName=*/"", /*verbose=*/true);
+    return signature.debugString(/* functionName= */ "", /* verbose= */ true);
   }
 
   // Custom implementation for the list of enums. Named uniquely to avoid collisions with any other
@@ -446,11 +450,11 @@ class DebugStrings {
     }
     if (!node.getArgumentList().isEmpty()) {
       // Use empty name to avoid printing "arguments=" with extra indentation.
-      fields.add(new DebugStringField(/*name=*/ "", node.getArgumentList()));
+      fields.add(new DebugStringField(/* name= */ "", node.getArgumentList()));
     }
     if (!node.getGenericArgumentList().isEmpty()) {
       // Use empty name to avoid printing "generic_arguments=" with extra indentation.
-      fields.add(new DebugStringField(/*name=*/ "", node.getGenericArgumentList()));
+      fields.add(new DebugStringField(/* name= */ "", node.getGenericArgumentList()));
     }
     if (!node.getHintList().isEmpty()) {
       fields.add(new DebugStringField("hint_list", node.getHintList()));

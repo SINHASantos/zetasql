@@ -73,7 +73,8 @@ ExecuteQueryWebRequest::ExecuteQueryWebRequest(
     std::string query, std::string catalog,
     std::string enabled_language_features,
     std::string enabled_language_features_text,
-    std::string enabled_ast_rewrites, std::string enabled_ast_rewrites_text)
+    std::string enabled_ast_rewrites, std::string enabled_ast_rewrites_text,
+    std::string resolved_ast_render_mode)
     : modes_(ModeSetFromStrings(str_modes)),
       sql_mode_(sql_mode),
       target_syntax_mode_(
@@ -84,7 +85,8 @@ ExecuteQueryWebRequest::ExecuteQueryWebRequest(
       enabled_language_features_text_(
           std::move(enabled_language_features_text)),
       enabled_ast_rewrites_(std::move(enabled_ast_rewrites)),
-      enabled_ast_rewrites_text_(std::move(enabled_ast_rewrites_text)) {
+      enabled_ast_rewrites_text_(std::move(enabled_ast_rewrites_text)),
+      resolved_ast_render_mode_(std::move(resolved_ast_render_mode)) {
   // The query retrieved from the POST body has newlines as \r\n as per the
 
   // encoding rules for the form-urlencoded content-type. Replace these with
@@ -209,9 +211,13 @@ bool ExecuteQueryWebHandler::HandleRequest(
   }
   template_params.insert(std::pair("ast_rewrites", ast_rewrites));
 
+  bool is_linear = request.resolved_ast_render_mode().empty()
+                       ? config.linear_resolved_ast()
+                       : request.linear_resolved_ast();
+
   if (!request.query().empty()) {
     std::string error_msg;
-    ExecuteQueryWebWriter params_writer(template_params);
+    ExecuteQueryWebWriter params_writer(template_params, is_linear);
     if (!ExecuteQuery(request, config, error_msg, params_writer)) {
       // Error message is already in params_writer
     }
@@ -237,6 +243,12 @@ bool ExecuteQueryWebHandler::HandleRequest(
                                ExecuteQueryConfig::target_syntax_mode_name(
                                    request.target_syntax_mode()))] = true;
 
+  if (is_linear) {
+    template_params["resolved_ast_render_mode_linear"] = true;
+  } else {
+    template_params["resolved_ast_render_mode_tree"] = true;
+  }
+
   template_params[std::string("language_features_text")] =
       request.GetEnabledLanguageFeaturesTextStr();
   template_params[std::string("ast_rewrites_text")] =
@@ -246,7 +258,8 @@ bool ExecuteQueryWebHandler::HandleRequest(
   std::string rendered =
       mstch::render(templates_.GetWebPageContents(), template_params,
                     {{"body", templates_.GetWebPageBody()},
-                     {"table", templates_.GetTable()}});
+                     {"table", templates_.GetTable()},
+                     {"inline_js", templates_.GetInlineJS()}});
 
   if (writer(rendered) <= 0) {
     ABSL_LOG(WARNING) << "Error writing rendered HTML.";
@@ -269,6 +282,9 @@ absl::Status ExecuteQueryWebHandler::ExecuteQueryImpl(
   // Note: target_syntax_mode in request has a flag-based default in its
   // constructor.
   config.set_target_syntax_mode(request.target_syntax_mode());
+  if (!request.resolved_ast_render_mode().empty()) {
+    config.set_linear_resolved_ast(request.linear_resolved_ast());
+  }
 
   config.mutable_analyzer_options().set_error_message_mode(
       ERROR_MESSAGE_MULTI_LINE_WITH_CARET);

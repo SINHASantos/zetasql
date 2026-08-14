@@ -357,7 +357,7 @@ std::string Unparse(const ASTNode* root);
 // If <input> cannot be any known statement type, or is a script statement,
 // returns -1.
 // <*statement_is_ctas> will be set to true iff the query is CREATE
-// TABLE AS SELECT, and false otherwise.
+// TABLE AS SELECT or CREATE LIVE TABLE AS SELECT, and false otherwise.
 ASTNodeKind ParseStatementKind(
     absl::string_view input, const LanguageOptions& language_options,
     parser::MacroExpansionMode macro_expansion_mode,
@@ -377,7 +377,7 @@ inline ASTNodeKind ParseStatementKind(absl::string_view input,
 // <language_options> are used for parsing.
 //
 // <statement_is_ctas> cannot null; its content will be set to true iff
-// the query is CREATE TABLE AS SELECT.
+// the query is CREATE TABLE AS SELECT or CREATE LIVE TABLE AS SELECT.
 ASTNodeKind ParseNextStatementKind(
     const ParseResumeLocation& resume_location,
     const LanguageOptions& language_options,

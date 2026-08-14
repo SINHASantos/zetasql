@@ -42,6 +42,7 @@
 #include "googlesql/resolved_ast/resolved_column.h"
 #include "googlesql/resolved_ast/resolved_node.h"
 #include "googlesql/resolved_ast/target_syntax.h"
+#include "googlesql/base/case.h"
 #include "absl/base/attributes.h"
 #include "absl/cleanup/cleanup.h"
 #include "absl/container/btree_map.h"
@@ -437,11 +438,14 @@ class SQLBuilder : public ResolvedASTVisitor {
   absl::Status VisitResolvedCreateTableAsSelectStmt(
       const ResolvedCreateTableAsSelectStmt* node) override;
   absl::Status VisitResolvedCreateTableAsSelectStmtImpl(
-      const ResolvedCreateTableAsSelectStmt* node, bool generate_as_pipe);
+      const ResolvedCreateTableAsSelectStmtBase* node, bool generate_as_pipe,
+      absl::string_view table_type = "TABLE");
   absl::Status VisitResolvedCreateViewStmt(
       const ResolvedCreateViewStmt* node) override;
   absl::Status VisitResolvedCreateLiveTableStmt(
       const ResolvedCreateLiveTableStmt* node) override;
+  absl::Status VisitResolvedCreateLiveTableAsSelectStmt(
+      const ResolvedCreateLiveTableAsSelectStmt* node) override;
   absl::Status VisitResolvedCreateMaterializedViewStmt(
       const ResolvedCreateMaterializedViewStmt* node) override;
   absl::Status VisitResolvedCreateApproxViewStmt(
@@ -575,6 +579,8 @@ class SQLBuilder : public ResolvedASTVisitor {
       const ResolvedAggregateFunctionCall* node) override;
   absl::Status VisitResolvedAnalyticFunctionCall(
       const ResolvedAnalyticFunctionCall* node) override;
+  absl::Status VisitResolvedEstimatorFunctionCall(
+      const ResolvedEstimatorFunctionCall* node) override;
   absl::Status VisitResolvedInlineLambda(
       const ResolvedInlineLambda* node) override;
   absl::Status VisitResolvedSequence(const ResolvedSequence* node) override;
@@ -705,8 +711,7 @@ class SQLBuilder : public ResolvedASTVisitor {
       const ResolvedPipeExportDataScan* node) override;
   absl::Status VisitResolvedPipeCreateTableScan(
       const ResolvedPipeCreateTableScan* node) override;
-  absl::Status VisitResolvedPipeInsertScan(
-      const ResolvedPipeInsertScan* node) override;
+  absl::Status VisitResolvedInsertScan(const ResolvedInsertScan* node) override;
   absl::Status VisitResolvedBarrierScan(
       const ResolvedBarrierScan* node) override;
   absl::Status VisitResolvedSubpipeline(
@@ -736,8 +741,12 @@ class SQLBuilder : public ResolvedASTVisitor {
       const ResolvedWindowFrameExpr* node) override;
   absl::Status VisitResolvedCreateEntityStmt(
       const ResolvedCreateEntityStmt* node) override;
+  absl::Status VisitResolvedCreateDataPolicyStmt(
+      const ResolvedCreateDataPolicyStmt* node) override;
   absl::Status VisitResolvedAlterEntityStmt(
       const ResolvedAlterEntityStmt* node) override;
+  absl::Status VisitResolvedAlterDataPolicyStmt(
+      const ResolvedAlterDataPolicyStmt* node) override;
   absl::Status VisitResolvedAuxLoadDataStmt(
       const ResolvedAuxLoadDataStmt* node) override;
   absl::Status VisitResolvedUpdateConstructor(
@@ -748,6 +757,8 @@ class SQLBuilder : public ResolvedASTVisitor {
   // Visit methods for graph related nodes.
   absl::Status VisitResolvedCreatePropertyGraphStmt(
       const ResolvedCreatePropertyGraphStmt* node) override;
+  absl::Status VisitResolvedCreatePropertyGraphTypeStmt(
+      const ResolvedCreatePropertyGraphTypeStmt* node) override;
   absl::Status VisitResolvedGraphTableScan(
       const ResolvedGraphTableScan* node) override;
   absl::Status VisitResolvedGraphNodeScan(
@@ -895,6 +906,36 @@ class SQLBuilder : public ResolvedASTVisitor {
       const std::unique_ptr<const ResolvedGraphElementTable>& node,
       const absl::flat_hash_map<std::string, const ResolvedGraphElementLabel*>&
           name_to_label,
+      std::string& sql);
+
+  // Graph element/label/property names are case-insensitive SQL identifiers, so
+  // the maps that resolve an element type's referenced labels and properties
+  // are keyed case-insensitively, matching the Validator.
+  template <typename T>
+  using CaseInsensitiveNameMap =
+      absl::flat_hash_map<absl::string_view, T,
+                          googlesql_base::StringViewCaseHash,
+                          googlesql_base::StringViewCaseEqual>;
+
+  // Helper methods to append element type SQL strings to `sql` for a
+  // CREATE PROPERTY GRAPH TYPE statement. `name_to_label` and
+  // `name_to_property_decl` map names to the statement-level labels and
+  // property declarations so each element type can emit its inline
+  // PROPERTIES(...) clause.
+  absl::Status AppendElementTypes(
+      absl::Span<const std::unique_ptr<const ResolvedGraphElementType>>
+          element_types,
+      const CaseInsensitiveNameMap<const ResolvedGraphElementLabel*>&
+          name_to_label,
+      const CaseInsensitiveNameMap<const ResolvedGraphPropertyDeclaration*>&
+          name_to_property_decl,
+      std::string& sql);
+  absl::Status AppendElementType(
+      const ResolvedGraphElementType* element_type,
+      const CaseInsensitiveNameMap<const ResolvedGraphElementLabel*>&
+          name_to_label,
+      const CaseInsensitiveNameMap<const ResolvedGraphPropertyDeclaration*>&
+          name_to_property_decl,
       std::string& sql);
 
   // Helper method to take an output column list and convert it to its

@@ -21,6 +21,7 @@ import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.fail;
 
+import com.google.protos.googlesql.VectorEncodingId;
 import com.google.googlesql.GoogleSQLTypeParameters.NumericTypeParametersProto;
 import com.google.googlesql.GoogleSQLTypeParameters.StringTypeParametersProto;
 import com.google.googlesql.GoogleSQLTypeParameters.TypeParametersProto;
@@ -63,6 +64,21 @@ public final class TypeParametersTest {
     assertThat(typeParameters.isVectorTypeParameters()).isTrue();
     assertThat(typeParameters.getVectorTypeParameters().getLength()).isEqualTo(10);
     assertThat(typeParameters.debugString()).isEqualTo("(length=10)");
+  }
+
+  @Test
+  public void createVectorTypeParametersWithLengthAndEncoding() {
+    VectorTypeParametersProto proto =
+        VectorTypeParametersProto.newBuilder()
+            .setLength(10)
+            .setEncoding(VectorEncodingId.Id.FLOAT32)
+            .build();
+    TypeParameters typeParameters = new TypeParameters(proto);
+    assertThat(typeParameters.isVectorTypeParameters()).isTrue();
+    assertThat(typeParameters.getVectorTypeParameters().getLength()).isEqualTo(10);
+    assertThat(typeParameters.getVectorTypeParameters().getEncoding())
+        .isEqualTo(VectorEncodingId.Id.FLOAT32);
+    assertThat(typeParameters.debugString()).isEqualTo("(length=10, encoding=FLOAT32)");
   }
 
   @Test
@@ -196,6 +212,21 @@ public final class TypeParametersTest {
     var expected =
         assertThrows(IllegalArgumentException.class, () -> TypeParameters.deserialize(proto));
     assertThat(expected).hasMessageThat().contains("length must be larger than 0");
+
+    // encoding == UNKNOWN_VECTOR_ENCODING.
+    TypeParametersProto protoUnknownEncoding =
+        TypeParametersProto.newBuilder()
+            .setVectorTypeParameters(
+                VectorTypeParametersProto.newBuilder()
+                    .setLength(10)
+                    .setEncoding(VectorEncodingId.Id.UNKNOWN_VECTOR_ENCODING))
+            .build();
+    var expectedUnknownEncoding =
+        assertThrows(
+            IllegalArgumentException.class, () -> TypeParameters.deserialize(protoUnknownEncoding));
+    assertThat(expectedUnknownEncoding)
+        .hasMessageThat()
+        .contains("Unrecognized VECTOR encoding: \"UNKNOWN_VECTOR_ENCODING\"");
   }
 
   @Test

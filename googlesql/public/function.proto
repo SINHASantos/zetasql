@@ -24,10 +24,6 @@ option java_package = "com.google.googlesql";
 option java_outer_classname = "GoogleSQLFunctions";
 
 enum SignatureArgumentKind {
-  // TODO: Remove allow_alias and all deprecated aliases below
-  // once all downstreams are updated.
-  option allow_alias = true;
-
   // A specific concrete Type.  Each argument with ARG_KIND_EXPR_FIXED
   // should include an instance of the Type object to indicate the exact type to
   // use.
@@ -211,41 +207,6 @@ enum SignatureArgumentKind {
   // ARG_KIND_EXPR_MAP_ANY_1_2[KEY(ARG_KIND_EXPR_ANY_1)] ->
   // ARG_KIND_EXPR_ANY_2
   ARG_KIND_EXPR_MAP_ANY_1_2 = 29;
-
-  ARG_TYPE_FIXED = 0 [deprecated = true];
-  ARG_TYPE_ANY_1 = 1 [deprecated = true];
-  ARG_TYPE_ANY_2 = 2 [deprecated = true];
-  ARG_TYPE_ANY_3 = 23 [deprecated = true];
-  ARG_TYPE_ANY_4 = 25 [deprecated = true];
-  ARG_TYPE_ANY_5 = 27 [deprecated = true];
-  ARG_TYPE_STRING_ANY = 33 [deprecated = true];
-  ARG_ARRAY_TYPE_ANY_1 = 3 [deprecated = true];
-  ARG_ARRAY_TYPE_ANY_2 = 4 [deprecated = true];
-  ARG_ARRAY_TYPE_ANY_3 = 24 [deprecated = true];
-  ARG_ARRAY_TYPE_ANY_4 = 26 [deprecated = true];
-  ARG_ARRAY_TYPE_ANY_5 = 28 [deprecated = true];
-  ARG_PROTO_MAP_ANY = 14 [deprecated = true];
-  ARG_PROTO_MAP_KEY_ANY = 15 [deprecated = true];
-  ARG_PROTO_MAP_VALUE_ANY = 16 [deprecated = true];
-  ARG_PROTO_ANY = 5 [deprecated = true];
-  ARG_STRUCT_ANY = 6 [deprecated = true];
-  ARG_ENUM_ANY = 7 [deprecated = true];
-  ARG_TYPE_ARBITRARY = 8 [deprecated = true];
-  ARG_TYPE_RELATION = 9 [deprecated = true];
-  ARG_TYPE_VOID = 10 [deprecated = true];
-  ARG_TYPE_MODEL = 11 [deprecated = true];
-  ARG_TYPE_CONNECTION = 12 [deprecated = true];
-  ARG_TYPE_DESCRIPTOR = 13 [deprecated = true];
-  ARG_TYPE_LAMBDA = 17 [deprecated = true];
-  ARG_RANGE_TYPE_ANY_1 = 18 [deprecated = true];
-  ARG_TYPE_GRAPH_NODE = 19 [deprecated = true];
-  ARG_TYPE_GRAPH_EDGE = 20 [deprecated = true];
-  ARG_TYPE_GRAPH_ELEMENT = 21 [deprecated = true];
-  ARG_TYPE_GRAPH_PATH = 30 [deprecated = true];
-  ARG_TYPE_GRAPH = 32 [deprecated = true];
-  ARG_TYPE_SEQUENCE = 22 [deprecated = true];
-  ARG_MEASURE_TYPE_ANY_1 = 31 [deprecated = true];
-  ARG_MAP_TYPE_ANY_1_2 = 29 [deprecated = true];
 
   __SignatureArgumentKind__switch_must_have_a_default__ = -1;
 }

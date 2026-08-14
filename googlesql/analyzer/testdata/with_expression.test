@@ -74,6 +74,7 @@ QueryStmt
     |                   +-SingleRowScan
     +-input_scan=
       +-SingleRowScan
+
 [SQLBUILDER_TARGET_SYNTAX_MODE standard]
 [SQLBUILDER_OUTPUT]
 SELECT
@@ -195,6 +196,7 @@ QueryStmt
     |               +-SingleRowScan
     +-input_scan=
       +-TableScan(column_list=KeyValue.[Key#1, Value#2], table=KeyValue, column_index_list=[0, 1])
+
 [SQLBUILDER_TARGET_SYNTAX_MODE standard]
 [SQLBUILDER_OUTPUT]
 SELECT
@@ -336,6 +338,7 @@ QueryStmt
     |                           +-SingleRowScan
     +-input_scan=
       +-SingleRowScan
+
 [SQLBUILDER_TARGET_SYNTAX_MODE standard]
 [SQLBUILDER_OUTPUT]
 SELECT
@@ -496,6 +499,7 @@ QueryStmt
     |                   +-SingleRowScan
     +-input_scan=
       +-SingleRowScan
+
 [SQLBUILDER_TARGET_SYNTAX_MODE standard]
 [SQLBUILDER_OUTPUT]
 SELECT
@@ -685,6 +689,7 @@ QueryStmt
           +-$agg1#4 :=
             +-AggregateFunctionCall(GoogleSQL:sum(INT64) -> INT64)
               +-ColumnRef(type=INT64, column=KeyValue.Key#1)
+
 [SQLBUILDER_TARGET_SYNTAX_MODE standard]
 [SQLBUILDER_OUTPUT]
 SELECT
@@ -903,6 +908,7 @@ QueryStmt
           +-$agg2#5 :=
             +-AggregateFunctionCall(GoogleSQL:sum(INT64) -> INT64)
               +-ColumnRef(type=INT64, column=KeyValue.Key#1)
+
 [SQLBUILDER_TARGET_SYNTAX_MODE standard]
 [SQLBUILDER_OUTPUT]
 SELECT
@@ -1091,6 +1097,7 @@ QueryStmt
           +-$agg1#4 :=
             +-AggregateFunctionCall(GoogleSQL:sum(INT64) -> INT64)
               +-ColumnRef(type=INT64, column=KeyValue.Key#1)
+
 [SQLBUILDER_TARGET_SYNTAX_MODE standard]
 [SQLBUILDER_OUTPUT]
 SELECT
@@ -1286,6 +1293,7 @@ QueryStmt
           +-$agg2#5 :=
             +-AggregateFunctionCall(GoogleSQL:sum(INT64) -> INT64)
               +-ColumnRef(type=INT64, column=KeyValue.Key#1)
+
 [SQLBUILDER_TARGET_SYNTAX_MODE standard]
 [SQLBUILDER_OUTPUT]
 SELECT
@@ -1471,6 +1479,7 @@ QueryStmt
         | +-a_1#1 := Literal(type=ARRAY<INT64>, value=[1, 2, 3])
         +-input_scan=
           +-SingleRowScan
+
 [SQLBUILDER_TARGET_SYNTAX_MODE standard]
 [SQLBUILDER_OUTPUT]
 SELECT
@@ -1512,3 +1521,224 @@ SELECT
        |> SELECT
             a_7 AS a_7
      ) AS unnest_scan2;
+
+==
+
+[language_features=MAXIMUM,+WITH_EXPRESSION,+ANNOTATION_FRAMEWORK,+COLLATION_SUPPORT]
+SELECT WITH(a AS COLLATE('foo', 'und:ci'), a = 'FOO');
+--
+QueryStmt
++-output_column_list=
+| +-$query.$col1#2 AS `$col1` [BOOL]
++-query=
+  +-ProjectScan
+    +-column_list=[$query.$col1#2]
+    +-expr_list=
+    | +-$col1#2 :=
+    |   +-WithExpr
+    |     +-type=BOOL
+    |     +-assignment_list=
+    |     | +-a#1 :=
+    |     |   +-FunctionCall(GoogleSQL:collate(STRING, STRING) -> STRING)
+    |     |     +-type_annotation_map={Collation:"und:ci"}
+    |     |     +-Literal(type=STRING, value="foo")
+    |     |     +-Literal(type=STRING, value="und:ci", preserve_in_literal_remover=TRUE)
+    |     +-expr=
+    |       +-FunctionCall(GoogleSQL:$equal(STRING, STRING) -> BOOL)
+    |         +-ColumnRef(type=STRING, type_annotation_map={Collation:"und:ci"}, column=$with_expr.a#1{Collation:"und:ci"})
+    |         +-Literal(type=STRING, value="FOO")
+    |         +-collation_list=[und:ci]
+    +-input_scan=
+      +-SingleRowScan
+
+[SQLBUILDER_TARGET_SYNTAX_MODE standard]
+[SQLBUILDER_OUTPUT]
+SELECT
+  WITH(a_2 AS `COLLATE`("foo", "und:ci"), a_2 = "FOO") AS a_1;
+
+[SQLBUILDER_TARGET_SYNTAX_MODE pipe]
+[SQLBUILDER_OUTPUT]
+SELECT
+  WITH(a_2 AS `COLLATE`("foo", "und:ci"), a_2 = "FOO") AS a_1;
+
+[REWRITTEN AST]
+QueryStmt
++-output_column_list=
+| +-$query.$col1#2 AS `$col1` [BOOL]
++-query=
+  +-ProjectScan
+    +-column_list=[$query.$col1#2]
+    +-expr_list=
+    | +-$col1#2 :=
+    |   +-SubqueryExpr
+    |     +-type=BOOL
+    |     +-subquery_type=SCALAR
+    |     +-subquery=
+    |       +-ProjectScan
+    |         +-column_list=[$with_expr.injected#3]
+    |         +-expr_list=
+    |         | +-injected#3 :=
+    |         |   +-FunctionCall(GoogleSQL:$equal(STRING, STRING) -> BOOL)
+    |         |     +-ColumnRef(type=STRING, type_annotation_map={Collation:"und:ci"}, column=$with_expr.a#1{Collation:"und:ci"})
+    |         |     +-Literal(type=STRING, value="FOO")
+    |         |     +-collation_list=[und:ci]
+    |         +-input_scan=
+    |           +-ProjectScan
+    |             +-column_list=[$with_expr.a#1{Collation:"und:ci"}]
+    |             +-expr_list=
+    |             | +-a#1 :=
+    |             |   +-FunctionCall(GoogleSQL:collate(STRING, STRING) -> STRING)
+    |             |     +-type_annotation_map={Collation:"und:ci"}
+    |             |     +-Literal(type=STRING, value="foo")
+    |             |     +-Literal(type=STRING, value="und:ci", preserve_in_literal_remover=TRUE)
+    |             +-input_scan=
+    |               +-SingleRowScan
+    +-input_scan=
+      +-SingleRowScan
+
+[SQLBUILDER_TARGET_SYNTAX_MODE standard]
+[SQLBUILDER_OUTPUT]
+SELECT
+  (
+    SELECT
+      (projectscan_3.a_2) = "FOO" AS a_4
+    FROM
+      (
+        SELECT
+          `COLLATE`("foo", "und:ci") AS a_2
+      ) AS projectscan_3
+  ) AS a_1;
+
+[SQLBUILDER_TARGET_SYNTAX_MODE pipe]
+[SQLBUILDER_OUTPUT]
+SELECT
+  (
+    SELECT
+      `COLLATE`("foo", "und:ci") AS a_2
+    |> AS projectscan_3
+    |> SELECT
+         (projectscan_3.a_2) = "FOO" AS a_4
+  ) AS a_1;
+==
+
+[language_features=MAXIMUM,+WITH_EXPRESSION,+ANNOTATION_FRAMEWORK,+COLLATION_SUPPORT]
+SELECT WITH(a AS COLLATE('foo', 'und:ci'), b AS COLLATE('bar', 'und:ci'), CONCAT(a, b));
+--
+QueryStmt
++-output_column_list=
+| +-$query.$col1#3{Collation:"und:ci"} AS `$col1` [STRING]
++-query=
+  +-ProjectScan
+    +-column_list=[$query.$col1#3{Collation:"und:ci"}]
+    +-expr_list=
+    | +-$col1#3 :=
+    |   +-WithExpr
+    |     +-type=STRING
+    |     +-type_annotation_map={Collation:"und:ci"}
+    |     +-assignment_list=
+    |     | +-a#1 :=
+    |     | | +-FunctionCall(GoogleSQL:collate(STRING, STRING) -> STRING)
+    |     | |   +-type_annotation_map={Collation:"und:ci"}
+    |     | |   +-Literal(type=STRING, value="foo")
+    |     | |   +-Literal(type=STRING, value="und:ci", preserve_in_literal_remover=TRUE)
+    |     | +-b#2 :=
+    |     |   +-FunctionCall(GoogleSQL:collate(STRING, STRING) -> STRING)
+    |     |     +-type_annotation_map={Collation:"und:ci"}
+    |     |     +-Literal(type=STRING, value="bar")
+    |     |     +-Literal(type=STRING, value="und:ci", preserve_in_literal_remover=TRUE)
+    |     +-expr=
+    |       +-FunctionCall(GoogleSQL:concat(STRING, repeated(1) STRING) -> STRING)
+    |         +-type_annotation_map={Collation:"und:ci"}
+    |         +-ColumnRef(type=STRING, type_annotation_map={Collation:"und:ci"}, column=$with_expr.a#1{Collation:"und:ci"})
+    |         +-ColumnRef(type=STRING, type_annotation_map={Collation:"und:ci"}, column=$with_expr.b#2{Collation:"und:ci"})
+    +-input_scan=
+      +-SingleRowScan
+
+[SQLBUILDER_TARGET_SYNTAX_MODE standard]
+[SQLBUILDER_OUTPUT]
+SELECT
+  WITH(a_2 AS `COLLATE`("foo", "und:ci"), a_3 AS `COLLATE`("bar", "und:ci"), CONCAT(a_2, a_3)) AS a_1;
+
+[SQLBUILDER_TARGET_SYNTAX_MODE pipe]
+[SQLBUILDER_OUTPUT]
+SELECT
+  WITH(a_2 AS `COLLATE`("foo", "und:ci"), a_3 AS `COLLATE`("bar", "und:ci"), CONCAT(a_2, a_3)) AS a_1;
+
+[REWRITTEN AST]
+QueryStmt
++-output_column_list=
+| +-$query.$col1#3{Collation:"und:ci"} AS `$col1` [STRING]
++-query=
+  +-ProjectScan
+    +-column_list=[$query.$col1#3{Collation:"und:ci"}]
+    +-expr_list=
+    | +-$col1#3 :=
+    |   +-SubqueryExpr
+    |     +-type=STRING
+    |     +-type_annotation_map={Collation:"und:ci"}
+    |     +-subquery_type=SCALAR
+    |     +-subquery=
+    |       +-ProjectScan
+    |         +-column_list=[$with_expr.injected#4{Collation:"und:ci"}]
+    |         +-expr_list=
+    |         | +-injected#4 :=
+    |         |   +-FunctionCall(GoogleSQL:concat(STRING, repeated(1) STRING) -> STRING)
+    |         |     +-type_annotation_map={Collation:"und:ci"}
+    |         |     +-ColumnRef(type=STRING, type_annotation_map={Collation:"und:ci"}, column=$with_expr.a#1{Collation:"und:ci"})
+    |         |     +-ColumnRef(type=STRING, type_annotation_map={Collation:"und:ci"}, column=$with_expr.b#2{Collation:"und:ci"})
+    |         +-input_scan=
+    |           +-ProjectScan
+    |             +-column_list=$with_expr.[a#1, b#2]
+    |             +-expr_list=
+    |             | +-b#2 :=
+    |             |   +-FunctionCall(GoogleSQL:collate(STRING, STRING) -> STRING)
+    |             |     +-type_annotation_map={Collation:"und:ci"}
+    |             |     +-Literal(type=STRING, value="bar")
+    |             |     +-Literal(type=STRING, value="und:ci", preserve_in_literal_remover=TRUE)
+    |             +-input_scan=
+    |               +-ProjectScan
+    |                 +-column_list=[$with_expr.a#1{Collation:"und:ci"}]
+    |                 +-expr_list=
+    |                 | +-a#1 :=
+    |                 |   +-FunctionCall(GoogleSQL:collate(STRING, STRING) -> STRING)
+    |                 |     +-type_annotation_map={Collation:"und:ci"}
+    |                 |     +-Literal(type=STRING, value="foo")
+    |                 |     +-Literal(type=STRING, value="und:ci", preserve_in_literal_remover=TRUE)
+    |                 +-input_scan=
+    |                   +-SingleRowScan
+    +-input_scan=
+      +-SingleRowScan
+
+[SQLBUILDER_TARGET_SYNTAX_MODE standard]
+[SQLBUILDER_OUTPUT]
+SELECT
+  (
+    SELECT
+      CONCAT(projectscan_5.a_2, projectscan_5.a_4) AS a_6
+    FROM
+      (
+        SELECT
+          projectscan_3.a_2 AS a_2,
+          `COLLATE`("bar", "und:ci") AS a_4
+        FROM
+          (
+            SELECT
+              `COLLATE`("foo", "und:ci") AS a_2
+          ) AS projectscan_3
+      ) AS projectscan_5
+  ) AS a_1;
+
+[SQLBUILDER_TARGET_SYNTAX_MODE pipe]
+[SQLBUILDER_OUTPUT]
+SELECT
+  (
+    SELECT
+      `COLLATE`("foo", "und:ci") AS a_2
+    |> AS projectscan_3
+    |> SELECT
+         projectscan_3.a_2 AS a_2,
+         `COLLATE`("bar", "und:ci") AS a_4
+    |> AS projectscan_5
+    |> SELECT
+         CONCAT(projectscan_5.a_2, projectscan_5.a_4) AS a_6
+  ) AS a_1;

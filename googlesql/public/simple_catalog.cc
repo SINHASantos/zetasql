@@ -16,6 +16,7 @@
 
 #include "googlesql/public/simple_catalog.h"
 
+#include <algorithm>
 #include <cstdint>
 #include <functional>
 #include <memory>
@@ -1183,12 +1184,15 @@ int SimpleCatalog::RemoveFunctionsLocked(
       [predicate](std::pair<const std::string, const Function*> pair) {
         return predicate(pair.second);
       });
-  for (auto it = owned_functions_.begin(); it < owned_functions_.end(); ++it) {
-    if (predicate(it->get())) {
-      removed.emplace_back(std::move(*it));
-      owned_functions_.erase(it);
-    }
+  auto part_it = std::stable_partition(
+      owned_functions_.begin(), owned_functions_.end(),
+      [predicate](const std::unique_ptr<const Function>& f) {
+        return !predicate(f.get());
+      });
+  for (auto it = part_it; it != owned_functions_.end(); ++it) {
+    removed.emplace_back(std::move(*it));
   }
+  owned_functions_.erase(part_it, owned_functions_.end());
   return num_removed;
 }
 
@@ -1263,13 +1267,17 @@ int SimpleCatalog::RemoveTableValuedFunctionsLocked(
           std::pair<const std::string, const TableValuedFunction*> pair) {
         return predicate(pair.second);
       });
-  for (auto it = owned_table_valued_functions_.begin();
-       it < owned_table_valued_functions_.end(); ++it) {
-    if (predicate(it->get())) {
-      removed.emplace_back(std::move(*it));
-      owned_table_valued_functions_.erase(it);
-    }
+  auto part_it = std::stable_partition(
+      owned_table_valued_functions_.begin(),
+      owned_table_valued_functions_.end(),
+      [predicate](const std::unique_ptr<const TableValuedFunction>& f) {
+        return !predicate(f.get());
+      });
+  for (auto it = part_it; it != owned_table_valued_functions_.end(); ++it) {
+    removed.emplace_back(std::move(*it));
   }
+  owned_table_valued_functions_.erase(part_it,
+                                      owned_table_valued_functions_.end());
   return num_removed;
 }
 
@@ -1339,7 +1347,6 @@ TypeFactory* SimpleCatalog::type_factory() {
 }
 
 namespace {
-
 absl::StatusOr<const Type*> DeserializeNamedType(
     const SimpleCatalogProto::NamedTypeProto& named_type_proto,
     const TypeDeserializer& type_deserializer) {

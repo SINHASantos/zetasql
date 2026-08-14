@@ -34,6 +34,7 @@
 #include "gtest/gtest.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
+#include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
 #include "re2/re2.h"
 
@@ -511,6 +512,34 @@ TEST(InitializeWithOptions, CaseInsensitive) {
 
   ASSERT_TRUE(reg_exp->Match("defgh", &out, &status));
   EXPECT_FALSE(out);
+}
+
+TEST(MakeRegExp, LongInvalidPatternErrorIsTruncated) {
+  const std::string long_invalid_pattern =
+      absl::StrCat("[", std::string(100 * 1024, 'a'));
+
+  for (const absl::StatusOr<std::unique_ptr<const RegExp>>& re :
+       {MakeRegExpUtf8(long_invalid_pattern),
+        MakeRegExpBytes(long_invalid_pattern)}) {
+    ASSERT_FALSE(re.ok());
+    EXPECT_THAT(re.status(),
+                absl_testing::StatusIs(
+                    absl::StatusCode::kOutOfRange,
+                    testing::HasSubstr("Cannot parse regular expression")));
+    EXPECT_LT(re.status().message().size(), long_invalid_pattern.size());
+    EXPECT_THAT(re.status().message(), testing::HasSubstr("..."));
+  }
+}
+
+TEST(MakeRegExp, InvalidPatternErrorIsEscaped) {
+  absl::StatusOr<std::unique_ptr<const RegExp>> re = MakeRegExpUtf8("[\n");
+  ASSERT_FALSE(re.ok());
+  EXPECT_THAT(re.status().message(),
+              testing::HasSubstr("Cannot parse regular expression"));
+  // The newline appears as the two-character escape "\n", never as a raw
+  // newline byte.
+  EXPECT_THAT(re.status().message(), testing::HasSubstr("\\n"));
+  EXPECT_THAT(re.status().message(), testing::Not(testing::HasSubstr("\n")));
 }
 
 }  // anonymous namespace

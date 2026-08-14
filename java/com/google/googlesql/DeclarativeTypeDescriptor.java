@@ -37,20 +37,20 @@ public final class DeclarativeTypeDescriptor implements Serializable {
 
     private final String nameSpace;
     private final String localId;
-    private final int counter;
+    private final String versionId;
 
-    public TypeId(String nameSpace, String localId, int counter) {
+    public TypeId(String nameSpace, String localId, String versionId) {
       Preconditions.checkNotNull(nameSpace);
       Preconditions.checkArgument(!nameSpace.isEmpty(), "nameSpace must not be empty");
       Preconditions.checkNotNull(localId);
       Preconditions.checkArgument(!localId.isEmpty(), "localId must not be empty");
-      Preconditions.checkArgument(counter >= 0, "counter must be >= 0");
+      Preconditions.checkNotNull(versionId);
       if (nameSpace.equals(GOOGLE_SQL_NAMESPACE)) {
-        Preconditions.checkArgument(counter == 0, "counter must be 0 for built-ins");
+        Preconditions.checkArgument(versionId.isEmpty(), "versionId must be empty for built-ins");
       }
       this.nameSpace = nameSpace;
       this.localId = localId;
-      this.counter = counter;
+      this.versionId = versionId;
     }
 
     public String getNameSpace() {
@@ -61,8 +61,8 @@ public final class DeclarativeTypeDescriptor implements Serializable {
       return localId;
     }
 
-    public int getCounter() {
-      return counter;
+    public String getVersionId() {
+      return versionId;
     }
 
     public boolean isGoogleSqlBuiltin() {
@@ -79,14 +79,14 @@ public final class DeclarativeTypeDescriptor implements Serializable {
         return false;
       }
       TypeId that = (TypeId) o;
-      return counter == that.counter
+      return Objects.equals(versionId, that.versionId)
           && Objects.equals(nameSpace, that.nameSpace)
           && Objects.equals(localId, that.localId);
     }
 
     @Override
     public int hashCode() {
-      return Objects.hash(nameSpace, localId, counter);
+      return Objects.hash(nameSpace, localId, versionId);
     }
   }
 
@@ -256,7 +256,7 @@ public final class DeclarativeTypeDescriptor implements Serializable {
         .getTypeIdBuilder()
         .setNameSpace(typeId.getNameSpace())
         .setLocalId(typeId.getLocalId())
-        .setCounter(typeId.getCounter());
+        .setVersionId(typeId.getVersionId());
     builder
         .setDisplayName(displayName)
         .setCoercionFromBackingType(coercionFromBackingType)

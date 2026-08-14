@@ -25,6 +25,7 @@ namespace googlesql {
 // This covers cases:
 //   <input> OP {ANY|SOME|ALL} UNNEST(<array-expression>)
 //   <input> OP {ANY|SOME|ALL} (pattern1, ...)
+//   <input> OP {ANY|SOME|ALL} (<subquery>)
 // for OP in =, !=, <, <=, >, >=.
 const Rewriter* GetQuantifiedComparisonRewriter();
 

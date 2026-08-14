@@ -1397,13 +1397,31 @@ QueryStmt
 SELECT * FROM TimeseriesTable ALIGN (
   TIMESTAMP ts_col
   PERIOD INTERVAL 1 MINUTE
-  OUTPUT WITHIN {{RANGE FROM TIMESTAMP('2000-01-01') TO 1 PERIOD FOLLOWING|RANGE FROM INTERVAL "1" MINUTE|"1" PERIOD FOLLOWING|[1] PRECEDING}}
+  OUTPUT WITHIN {{RANGE FROM TIMESTAMP('2000-01-01') TO 1 PERIOD FOLLOWING|RANGE FROM TIMESTAMP('2000-01-01') TO UNBOUNDED FOLLOWING|RANGE FROM 1 PERIOD PRECEDING TO TIMESTAMP('2000-01-01')|RANGE FROM UNBOUNDED PRECEDING TO TIMESTAMP('2000-01-01')|RANGE FROM INTERVAL "1" MINUTE|"1" PERIOD FOLLOWING|[1] PRECEDING}}
 )
 --
 ALTERNATION GROUP: RANGE FROM TIMESTAMP('2000-01-01') TO 1 PERIOD FOLLOWING
 --
-ERROR: A WITHIN clause cannot mix absolute (TIMESTAMP) and relative (INTERVAL or PERIOD) bounds [at 4:17]
+ERROR: A WITHIN clause cannot mix TIMESTAMP bound with other bounds [at 4:17]
   OUTPUT WITHIN RANGE FROM TIMESTAMP('2000-01-01') TO 1 PERIOD FOLLOWING
+                ^
+--
+ALTERNATION GROUP: RANGE FROM TIMESTAMP('2000-01-01') TO UNBOUNDED FOLLOWING
+--
+ERROR: A WITHIN clause cannot mix TIMESTAMP bound with other bounds [at 4:17]
+  OUTPUT WITHIN RANGE FROM TIMESTAMP('2000-01-01') TO UNBOUNDED FOLLOWING
+                ^
+--
+ALTERNATION GROUP: RANGE FROM 1 PERIOD PRECEDING TO TIMESTAMP('2000-01-01')
+--
+ERROR: A WITHIN clause cannot mix TIMESTAMP bound with other bounds [at 4:17]
+  OUTPUT WITHIN RANGE FROM 1 PERIOD PRECEDING TO TIMESTAMP('2000-01-01')
+                ^
+--
+ALTERNATION GROUP: RANGE FROM UNBOUNDED PRECEDING TO TIMESTAMP('2000-01-01')
+--
+ERROR: A WITHIN clause cannot mix TIMESTAMP bound with other bounds [at 4:17]
+  OUTPUT WITHIN RANGE FROM UNBOUNDED PRECEDING TO TIMESTAMP('2000-01-01')
                 ^
 --
 ALTERNATION GROUP: RANGE FROM INTERVAL "1" MINUTE
@@ -1437,7 +1455,7 @@ ERROR: WITHIN bound expression must be a query constant [at 4:17]
                 ^
 ==
 
-# TODO: b/477116035 - Support METRICS clause.
+# simple metrics expression
 SELECT * FROM TimeseriesTable ALIGN (
   TIMESTAMP ts_col
   PERIOD INTERVAL 1 MINUTE
@@ -1445,20 +1463,235 @@ SELECT * FROM TimeseriesTable ALIGN (
   METRICS SUM(requests) WITHIN (1 PERIOD PRECEDING) AS total_requests
 )
 --
-ERROR: METRICS clause is not supported [at 5:3]
-  METRICS SUM(requests) WITHIN (1 PERIOD PRECEDING) AS total_requests
-  ^
+
+QueryStmt
++-output_column_list=
+| +-$align.total_requests#8 AS total_requests [INT64]
+| +-$align.aligned_timestamp#6 AS ts_col [TIMESTAMP]
++-query=
+  +-ProjectScan
+    +-column_list=$align.[total_requests#8, aligned_timestamp#6]
+    +-input_scan=
+      +-ProjectScan
+        +-column_list=[$align.aligned_timestamp#6, $estimator.$estimator1#7, $align.total_requests#8]
+        +-expr_list=
+        | +-total_requests#8 := ColumnRef(type=INT64, column=$estimator.$estimator1#7)
+        +-input_scan=
+          +-AlignScan
+            +-column_list=[$align.aligned_timestamp#6, $estimator.$estimator1#7]
+            +-input_scan=
+            | +-TableScan(column_list=TimeseriesTable.[ts_col#3, requests#5], table=TimeseriesTable, column_index_list=[2, 4])
+            +-timestamp_column=
+            | +-ColumnRef(type=TIMESTAMP, column=TimeseriesTable.ts_col#3)
+            +-period=
+            | +-FunctionCall(GoogleSQL:$interval(INT64, ENUM<googlesql.functions.DateTimestampPart>) -> INTERVAL)
+            |   +-Literal(type=INT64, value=1)
+            |   +-Literal(type=ENUM<googlesql.functions.DateTimestampPart>, value=MINUTE)
+            +-origin=
+            | +-FunctionCall(GoogleSQL:timestamp(STRING, optional(0) STRING) -> TIMESTAMP)
+            |   +-Literal(type=STRING, value="2000-01-01")
+            +-output_within=
+            | +-WithinBounds
+            |   +-lower_bound=
+            |   | +-WithinBoundExpr(within_bound_kind=UNBOUNDED PRECEDING)
+            |   +-upper_bound=
+            |     +-WithinBoundExpr(within_bound_kind=ANCHOR TIMESTAMP)
+            +-aligned_timestamp_column=$align.aligned_timestamp#6
+            +-estimator_function_list=
+              +-$estimator1#7 :=
+                +-EstimatorFunctionCall(GoogleSQL:sum(INT64) -> INT64)
+                  +-ColumnRef(type=INT64, column=TimeseriesTable.requests#5)
+                  +-within_bounds=
+                    +-WithinBounds
+                      +-lower_bound=
+                      | +-WithinBoundExpr(within_bound_kind=PERIOD PRECEDING)
+                      |   +-Literal(type=INT64, value=1)
+                      +-upper_bound=
+                        +-WithinBoundExpr(within_bound_kind=ANCHOR TIMESTAMP)
+==
+
+# metrics expressions using timestamp, aligned_timestamp, TIMESTAMP and PARTITION BY aliases
+SELECT * FROM TimeseriesTable ALIGN (
+  TIMESTAMP ts_col
+  PERIOD INTERVAL 1 MINUTE
+  ORIGIN TIMESTAMP('2000-01-01')
+  PARTITION BY borg_job AS b, borg_task_num + 1 as task_num
+  METRICS AVG(requests) WITHIN (1 PERIOD PRECEDING) AS t1,
+          aligned_timestamp +
+            SUM(aligned_timestamp - timestamp) WITHIN (1 PERIOD FOLLOWING) AS t2,
+          SUM(aligned_timestamp - ts_col) WITHIN (1 PERIOD FOLLOWING) +
+            aligned_timestamp AS t3,
+          task_num + AVG(task_num) WITHIN () -
+            SUM(requests) WITHIN (RANGE FROM INTERVAL 5 MINUTE PRECEDING
+                                        TO INTERVAL 1 MINUTE FOLLOWING) AS t4
+)
+--
+QueryStmt
++-output_column_list=
+| +-$align.b#6 AS b [STRING]
+| +-$align.task_num#7 AS task_num [INT64]
+| +-$align.t1#10 AS t1 [DOUBLE]
+| +-$align.t2#12 AS t2 [TIMESTAMP]
+| +-$align.t3#14 AS t3 [TIMESTAMP]
+| +-$align.t4#17 AS t4 [DOUBLE]
+| +-$align.aligned_timestamp#8 AS ts_col [TIMESTAMP]
++-query=
+  +-ProjectScan
+    +-column_list=$align.[b#6, task_num#7, t1#10, t2#12, t3#14, t4#17, aligned_timestamp#8]
+    +-input_scan=
+      +-ProjectScan
+        +-column_list=[$align.b#6, $align.task_num#7, $align.aligned_timestamp#8, $estimator.$estimator1#9, $estimator.$estimator2#11, $estimator.$estimator3#13, $estimator.$estimator4#15, $estimator.$estimator5#16, $align.t1#10, $align.t2#12, $align.t3#14, $align.t4#17]
+        +-expr_list=
+        | +-t1#10 := ColumnRef(type=DOUBLE, column=$estimator.$estimator1#9)
+        | +-t2#12 :=
+        | | +-FunctionCall(GoogleSQL:$add(TIMESTAMP, INTERVAL) -> TIMESTAMP)
+        | |   +-ColumnRef(type=TIMESTAMP, column=$align.aligned_timestamp#8)
+        | |   +-ColumnRef(type=INTERVAL, column=$estimator.$estimator2#11)
+        | +-t3#14 :=
+        | | +-FunctionCall(GoogleSQL:$add(INTERVAL, TIMESTAMP) -> TIMESTAMP)
+        | |   +-ColumnRef(type=INTERVAL, column=$estimator.$estimator3#13)
+        | |   +-ColumnRef(type=TIMESTAMP, column=$align.aligned_timestamp#8)
+        | +-t4#17 :=
+        |   +-FunctionCall(GoogleSQL:$subtract(DOUBLE, DOUBLE) -> DOUBLE)
+        |     +-FunctionCall(GoogleSQL:$add(DOUBLE, DOUBLE) -> DOUBLE)
+        |     | +-Cast(INT64 -> DOUBLE)
+        |     | | +-ColumnRef(type=INT64, column=$align.task_num#7)
+        |     | +-ColumnRef(type=DOUBLE, column=$estimator.$estimator4#15)
+        |     +-Cast(INT64 -> DOUBLE)
+        |       +-ColumnRef(type=INT64, column=$estimator.$estimator5#16)
+        +-input_scan=
+          +-AlignScan
+            +-column_list=[$align.b#6, $align.task_num#7, $align.aligned_timestamp#8, $estimator.$estimator1#9, $estimator.$estimator2#11, $estimator.$estimator3#13, $estimator.$estimator4#15, $estimator.$estimator5#16]
+            +-input_scan=
+            | +-ProjectScan
+            |   +-column_list=[TimeseriesTable.borg_job#1, TimeseriesTable.borg_task_num#2, TimeseriesTable.ts_col#3, TimeseriesTable.requests#5, $align.b#6, $align.task_num#7]
+            |   +-expr_list=
+            |   | +-b#6 := ColumnRef(type=STRING, column=TimeseriesTable.borg_job#1)
+            |   | +-task_num#7 :=
+            |   |   +-FunctionCall(GoogleSQL:$add(INT64, INT64) -> INT64)
+            |   |     +-ColumnRef(type=INT64, column=TimeseriesTable.borg_task_num#2)
+            |   |     +-Literal(type=INT64, value=1)
+            |   +-input_scan=
+            |     +-TableScan(column_list=TimeseriesTable.[borg_job#1, borg_task_num#2, ts_col#3, requests#5], table=TimeseriesTable, column_index_list=[0, 1, 2, 4])
+            +-timestamp_column=
+            | +-ColumnRef(type=TIMESTAMP, column=TimeseriesTable.ts_col#3)
+            +-period=
+            | +-FunctionCall(GoogleSQL:$interval(INT64, ENUM<googlesql.functions.DateTimestampPart>) -> INTERVAL)
+            |   +-Literal(type=INT64, value=1)
+            |   +-Literal(type=ENUM<googlesql.functions.DateTimestampPart>, value=MINUTE)
+            +-origin=
+            | +-FunctionCall(GoogleSQL:timestamp(STRING, optional(0) STRING) -> TIMESTAMP)
+            |   +-Literal(type=STRING, value="2000-01-01")
+            +-output_within=
+            | +-WithinBounds
+            |   +-lower_bound=
+            |   | +-WithinBoundExpr(within_bound_kind=UNBOUNDED PRECEDING)
+            |   +-upper_bound=
+            |     +-WithinBoundExpr(within_bound_kind=ANCHOR TIMESTAMP)
+            +-partition_by_list=
+            | +-ColumnRef(type=STRING, column=$align.b#6)
+            | +-ColumnRef(type=INT64, column=$align.task_num#7)
+            +-aligned_timestamp_column=$align.aligned_timestamp#8
+            +-estimator_function_list=
+              +-$estimator1#9 :=
+              | +-EstimatorFunctionCall(GoogleSQL:avg(INT64) -> DOUBLE)
+              |   +-ColumnRef(type=INT64, column=TimeseriesTable.requests#5)
+              |   +-within_bounds=
+              |     +-WithinBounds
+              |       +-lower_bound=
+              |       | +-WithinBoundExpr(within_bound_kind=PERIOD PRECEDING)
+              |       |   +-Literal(type=INT64, value=1)
+              |       +-upper_bound=
+              |         +-WithinBoundExpr(within_bound_kind=ANCHOR TIMESTAMP)
+              +-$estimator2#11 :=
+              | +-EstimatorFunctionCall(GoogleSQL:sum(INTERVAL) -> INTERVAL)
+              |   +-FunctionCall(GoogleSQL:$subtract(TIMESTAMP, TIMESTAMP) -> INTERVAL)
+              |   | +-ColumnRef(type=TIMESTAMP, column=$align.aligned_timestamp#8)
+              |   | +-ColumnRef(type=TIMESTAMP, column=TimeseriesTable.ts_col#3)
+              |   +-within_bounds=
+              |     +-WithinBounds
+              |       +-lower_bound=
+              |       | +-WithinBoundExpr(within_bound_kind=ANCHOR TIMESTAMP)
+              |       +-upper_bound=
+              |         +-WithinBoundExpr(within_bound_kind=PERIOD FOLLOWING)
+              |           +-Literal(type=INT64, value=1)
+              +-$estimator3#13 :=
+              | +-EstimatorFunctionCall(GoogleSQL:sum(INTERVAL) -> INTERVAL)
+              |   +-FunctionCall(GoogleSQL:$subtract(TIMESTAMP, TIMESTAMP) -> INTERVAL)
+              |   | +-ColumnRef(type=TIMESTAMP, column=$align.aligned_timestamp#8)
+              |   | +-ColumnRef(type=TIMESTAMP, column=TimeseriesTable.ts_col#3)
+              |   +-within_bounds=
+              |     +-WithinBounds
+              |       +-lower_bound=
+              |       | +-WithinBoundExpr(within_bound_kind=ANCHOR TIMESTAMP)
+              |       +-upper_bound=
+              |         +-WithinBoundExpr(within_bound_kind=PERIOD FOLLOWING)
+              |           +-Literal(type=INT64, value=1)
+              +-$estimator4#15 :=
+              | +-EstimatorFunctionCall(GoogleSQL:avg(INT64) -> DOUBLE)
+              |   +-ColumnRef(type=INT64, column=$align.task_num#7)
+              |   +-within_bounds=
+              |     +-WithinBounds
+              |       +-lower_bound=
+              |       | +-WithinBoundExpr(within_bound_kind=UNBOUNDED PRECEDING)
+              |       +-upper_bound=
+              |         +-WithinBoundExpr(within_bound_kind=UNBOUNDED FOLLOWING)
+              +-$estimator5#16 :=
+                +-EstimatorFunctionCall(GoogleSQL:sum(INT64) -> INT64)
+                  +-ColumnRef(type=INT64, column=TimeseriesTable.requests#5)
+                  +-within_bounds=
+                    +-WithinBounds
+                      +-lower_bound=
+                      | +-WithinBoundExpr(within_bound_kind=INTERVAL PRECEDING)
+                      |   +-FunctionCall(GoogleSQL:$interval(INT64, ENUM<googlesql.functions.DateTimestampPart>) -> INTERVAL)
+                      |     +-Literal(type=INT64, value=5)
+                      |     +-Literal(type=ENUM<googlesql.functions.DateTimestampPart>, value=MINUTE)
+                      +-upper_bound=
+                        +-WithinBoundExpr(within_bound_kind=INTERVAL FOLLOWING)
+                          +-FunctionCall(GoogleSQL:$interval(INT64, ENUM<googlesql.functions.DateTimestampPart>) -> INTERVAL)
+                            +-Literal(type=INT64, value=1)
+                            +-Literal(type=ENUM<googlesql.functions.DateTimestampPart>, value=MINUTE)
+==
+
+# table columns are not allowed outside estimator functions
+SELECT * FROM TimeseriesTable ALIGN (
+  TIMESTAMP ts_col
+  PERIOD INTERVAL 1 MINUTE
+  ORIGIN TIMESTAMP('2000-01-01')
+  METRICS requests + SUM(requests) WITHIN (1 PERIOD PRECEDING) AS total_requests
+)
+--
+ERROR: Unrecognized name: requests [at 5:11]
+  METRICS requests + SUM(requests) WITHIN (1 PERIOD PRECEDING) AS total_requests
+          ^
+==
+
+# Lambda arguments are not supported.
+SELECT * FROM TimeseriesTable ALIGN (
+  TIMESTAMP ts_col
+  PERIOD INTERVAL 1 MINUTE
+  ORIGIN TIMESTAMP('2000-01-01')
+  METRICS fn_aggregate_named_lambda(requests, named_lambda => x -> x) WITHIN (1 PERIOD PRECEDING) AS total_requests
+)
+--
+ERROR: Lambda arguments are not implemented for aggregate functions [at 5:63]
+...fn_aggregate_named_lambda(requests, named_lambda => x -> x) WITHIN (1 PERI...
+                                                       ^
 ==
 
 # Correlated columns are allowed
 SELECT * FROM (
   SELECT INTERVAL 1 MINUTE AS a_col,
-         TIMESTAMP('2000-01-01 00:00:00+00') AS b_col)
+         TIMESTAMP('2000-01-01 00:00:00+00') AS b_col,
+         1 AS c_col)
 WHERE EXISTS(SELECT * FROM TimeseriesTable ALIGN (
     TIMESTAMP {{b_col|ts_col + a_col}}
     PERIOD a_col
     ORIGIN b_col
+    OUTPUT WITHIN RANGE FROM INTERVAL c_col MINUTE PRECEDING
     PARTITION BY b_col AS b, ts_col + a_col AS t, borg_job, borg_task_num + 1 as task_num
+    METRICS b_col + SUM(a_col) WITHIN (INTERVAL c_col MINUTE PRECEDING) AS m1,
+            LENGTH(FORMAT_TIMESTAMP("%b %Y", b_col)) + SUM(c_col + requests) WITHIN () AS m2
 ))
 --
 ALTERNATION GROUP: b_col
@@ -1467,23 +1700,25 @@ QueryStmt
 +-output_column_list=
 | +-$subquery1.a_col#1 AS a_col [INTERVAL]
 | +-$subquery1.b_col#2 AS b_col [TIMESTAMP]
+| +-$subquery1.c_col#3 AS c_col [INT64]
 +-query=
   +-ProjectScan
-    +-column_list=$subquery1.[a_col#1, b_col#2]
+    +-column_list=$subquery1.[a_col#1, b_col#2, c_col#3]
     +-input_scan=
       +-FilterScan
-        +-column_list=$subquery1.[a_col#1, b_col#2]
+        +-column_list=$subquery1.[a_col#1, b_col#2, c_col#3]
         +-input_scan=
         | +-ProjectScan
-        |   +-column_list=$subquery1.[a_col#1, b_col#2]
+        |   +-column_list=$subquery1.[a_col#1, b_col#2, c_col#3]
         |   +-expr_list=
         |   | +-a_col#1 :=
         |   | | +-FunctionCall(GoogleSQL:$interval(INT64, ENUM<googlesql.functions.DateTimestampPart>) -> INTERVAL)
         |   | |   +-Literal(type=INT64, value=1)
         |   | |   +-Literal(type=ENUM<googlesql.functions.DateTimestampPart>, value=MINUTE)
         |   | +-b_col#2 :=
-        |   |   +-FunctionCall(GoogleSQL:timestamp(STRING, optional(0) STRING) -> TIMESTAMP)
-        |   |     +-Literal(type=STRING, value="2000-01-01 00:00:00+00")
+        |   | | +-FunctionCall(GoogleSQL:timestamp(STRING, optional(0) STRING) -> TIMESTAMP)
+        |   | |   +-Literal(type=STRING, value="2000-01-01 00:00:00+00")
+        |   | +-c_col#3 := Literal(type=INT64, value=1)
         |   +-input_scan=
         |     +-SingleRowScan
         +-filter_expr=
@@ -1493,46 +1728,89 @@ QueryStmt
             +-parameter_list=
             | +-ColumnRef(type=INTERVAL, column=$subquery1.a_col#1)
             | +-ColumnRef(type=TIMESTAMP, column=$subquery1.b_col#2)
+            | +-ColumnRef(type=INT64, column=$subquery1.c_col#3)
             +-subquery=
               +-ProjectScan
-                +-column_list=$align.[b#8, t#9, borg_job#10, task_num#11, aligned_timestamp#12]
+                +-column_list=$align.[b#9, t#10, borg_job#11, task_num#12, m1#15, m2#17, aligned_timestamp#13]
                 +-input_scan=
-                  +-AlignScan
-                    +-column_list=$align.[b#8, t#9, borg_job#10, task_num#11, aligned_timestamp#12]
+                  +-ProjectScan
+                    +-column_list=[$align.b#9, $align.t#10, $align.borg_job#11, $align.task_num#12, $align.aligned_timestamp#13, $estimator.$estimator1#14, $estimator.$estimator2#16, $align.m1#15, $align.m2#17]
+                    +-expr_list=
+                    | +-m1#15 :=
+                    | | +-FunctionCall(GoogleSQL:$add(TIMESTAMP, INTERVAL) -> TIMESTAMP)
+                    | |   +-ColumnRef(type=TIMESTAMP, column=$subquery1.b_col#2, is_correlated=TRUE)
+                    | |   +-ColumnRef(type=INTERVAL, column=$estimator.$estimator1#14)
+                    | +-m2#17 :=
+                    |   +-FunctionCall(GoogleSQL:$add(INT64, INT64) -> INT64)
+                    |     +-FunctionCall(GoogleSQL:length(STRING) -> INT64)
+                    |     | +-FunctionCall(GoogleSQL:format_timestamp(STRING, TIMESTAMP, optional(0) STRING) -> STRING)
+                    |     |   +-Literal(type=STRING, value="%b %Y")
+                    |     |   +-ColumnRef(type=TIMESTAMP, column=$subquery1.b_col#2, is_correlated=TRUE)
+                    |     +-ColumnRef(type=INT64, column=$estimator.$estimator2#16)
                     +-input_scan=
-                    | +-ProjectScan
-                    |   +-column_list=[TimeseriesTable.borg_job#3, TimeseriesTable.borg_task_num#4, TimeseriesTable.ts_col#5, $align.b#8, $align.t#9, $align.borg_job#10, $align.task_num#11]
-                    |   +-expr_list=
-                    |   | +-b#8 := ColumnRef(type=TIMESTAMP, column=$subquery1.b_col#2, is_correlated=TRUE)
-                    |   | +-t#9 :=
-                    |   | | +-FunctionCall(GoogleSQL:$add(TIMESTAMP, INTERVAL) -> TIMESTAMP)
-                    |   | |   +-ColumnRef(type=TIMESTAMP, column=TimeseriesTable.ts_col#5)
-                    |   | |   +-ColumnRef(type=INTERVAL, column=$subquery1.a_col#1, is_correlated=TRUE)
-                    |   | +-borg_job#10 := ColumnRef(type=STRING, column=TimeseriesTable.borg_job#3)
-                    |   | +-task_num#11 :=
-                    |   |   +-FunctionCall(GoogleSQL:$add(INT64, INT64) -> INT64)
-                    |   |     +-ColumnRef(type=INT64, column=TimeseriesTable.borg_task_num#4)
-                    |   |     +-Literal(type=INT64, value=1)
-                    |   +-input_scan=
-                    |     +-TableScan(column_list=TimeseriesTable.[borg_job#3, borg_task_num#4, ts_col#5], table=TimeseriesTable, column_index_list=[0, 1, 2])
-                    +-timestamp_column=
-                    | +-ColumnRef(type=TIMESTAMP, column=$subquery1.b_col#2, is_correlated=TRUE)
-                    +-period=
-                    | +-ColumnRef(type=INTERVAL, column=$subquery1.a_col#1, is_correlated=TRUE)
-                    +-origin=
-                    | +-ColumnRef(type=TIMESTAMP, column=$subquery1.b_col#2, is_correlated=TRUE)
-                    +-output_within=
-                    | +-WithinBounds
-                    |   +-lower_bound=
-                    |   | +-WithinBoundExpr(within_bound_kind=UNBOUNDED PRECEDING)
-                    |   +-upper_bound=
-                    |     +-WithinBoundExpr(within_bound_kind=ANCHOR TIMESTAMP)
-                    +-partition_by_list=
-                    | +-ColumnRef(type=TIMESTAMP, column=$align.b#8)
-                    | +-ColumnRef(type=TIMESTAMP, column=$align.t#9)
-                    | +-ColumnRef(type=STRING, column=$align.borg_job#10)
-                    | +-ColumnRef(type=INT64, column=$align.task_num#11)
-                    +-aligned_timestamp_column=$align.aligned_timestamp#12
+                      +-AlignScan
+                        +-column_list=[$align.b#9, $align.t#10, $align.borg_job#11, $align.task_num#12, $align.aligned_timestamp#13, $estimator.$estimator1#14, $estimator.$estimator2#16]
+                        +-input_scan=
+                        | +-ProjectScan
+                        |   +-column_list=[TimeseriesTable.borg_job#4, TimeseriesTable.borg_task_num#5, TimeseriesTable.ts_col#6, TimeseriesTable.requests#8, $align.b#9, $align.t#10, $align.borg_job#11, $align.task_num#12]
+                        |   +-expr_list=
+                        |   | +-b#9 := ColumnRef(type=TIMESTAMP, column=$subquery1.b_col#2, is_correlated=TRUE)
+                        |   | +-t#10 :=
+                        |   | | +-FunctionCall(GoogleSQL:$add(TIMESTAMP, INTERVAL) -> TIMESTAMP)
+                        |   | |   +-ColumnRef(type=TIMESTAMP, column=TimeseriesTable.ts_col#6)
+                        |   | |   +-ColumnRef(type=INTERVAL, column=$subquery1.a_col#1, is_correlated=TRUE)
+                        |   | +-borg_job#11 := ColumnRef(type=STRING, column=TimeseriesTable.borg_job#4)
+                        |   | +-task_num#12 :=
+                        |   |   +-FunctionCall(GoogleSQL:$add(INT64, INT64) -> INT64)
+                        |   |     +-ColumnRef(type=INT64, column=TimeseriesTable.borg_task_num#5)
+                        |   |     +-Literal(type=INT64, value=1)
+                        |   +-input_scan=
+                        |     +-TableScan(column_list=TimeseriesTable.[borg_job#4, borg_task_num#5, ts_col#6, requests#8], table=TimeseriesTable, column_index_list=[0, 1, 2, 4])
+                        +-timestamp_column=
+                        | +-ColumnRef(type=TIMESTAMP, column=$subquery1.b_col#2, is_correlated=TRUE)
+                        +-period=
+                        | +-ColumnRef(type=INTERVAL, column=$subquery1.a_col#1, is_correlated=TRUE)
+                        +-origin=
+                        | +-ColumnRef(type=TIMESTAMP, column=$subquery1.b_col#2, is_correlated=TRUE)
+                        +-output_within=
+                        | +-WithinBounds
+                        |   +-lower_bound=
+                        |   | +-WithinBoundExpr(within_bound_kind=INTERVAL PRECEDING)
+                        |   |   +-FunctionCall(GoogleSQL:$interval(INT64, ENUM<googlesql.functions.DateTimestampPart>) -> INTERVAL)
+                        |   |     +-ColumnRef(type=INT64, column=$subquery1.c_col#3, is_correlated=TRUE)
+                        |   |     +-Literal(type=ENUM<googlesql.functions.DateTimestampPart>, value=MINUTE)
+                        |   +-upper_bound=
+                        |     +-WithinBoundExpr(within_bound_kind=ANCHOR TIMESTAMP)
+                        +-partition_by_list=
+                        | +-ColumnRef(type=TIMESTAMP, column=$align.b#9)
+                        | +-ColumnRef(type=TIMESTAMP, column=$align.t#10)
+                        | +-ColumnRef(type=STRING, column=$align.borg_job#11)
+                        | +-ColumnRef(type=INT64, column=$align.task_num#12)
+                        +-aligned_timestamp_column=$align.aligned_timestamp#13
+                        +-estimator_function_list=
+                          +-$estimator1#14 :=
+                          | +-EstimatorFunctionCall(GoogleSQL:sum(INTERVAL) -> INTERVAL)
+                          |   +-ColumnRef(type=INTERVAL, column=$subquery1.a_col#1, is_correlated=TRUE)
+                          |   +-within_bounds=
+                          |     +-WithinBounds
+                          |       +-lower_bound=
+                          |       | +-WithinBoundExpr(within_bound_kind=INTERVAL PRECEDING)
+                          |       |   +-FunctionCall(GoogleSQL:$interval(INT64, ENUM<googlesql.functions.DateTimestampPart>) -> INTERVAL)
+                          |       |     +-ColumnRef(type=INT64, column=$subquery1.c_col#3, is_correlated=TRUE)
+                          |       |     +-Literal(type=ENUM<googlesql.functions.DateTimestampPart>, value=MINUTE)
+                          |       +-upper_bound=
+                          |         +-WithinBoundExpr(within_bound_kind=ANCHOR TIMESTAMP)
+                          +-$estimator2#16 :=
+                            +-EstimatorFunctionCall(GoogleSQL:sum(INT64) -> INT64)
+                              +-FunctionCall(GoogleSQL:$add(INT64, INT64) -> INT64)
+                              | +-ColumnRef(type=INT64, column=$subquery1.c_col#3, is_correlated=TRUE)
+                              | +-ColumnRef(type=INT64, column=TimeseriesTable.requests#8)
+                              +-within_bounds=
+                                +-WithinBounds
+                                  +-lower_bound=
+                                  | +-WithinBoundExpr(within_bound_kind=UNBOUNDED PRECEDING)
+                                  +-upper_bound=
+                                    +-WithinBoundExpr(within_bound_kind=UNBOUNDED FOLLOWING)
 --
 ALTERNATION GROUP: ts_col + a_col
 --
@@ -1540,23 +1818,25 @@ QueryStmt
 +-output_column_list=
 | +-$subquery1.a_col#1 AS a_col [INTERVAL]
 | +-$subquery1.b_col#2 AS b_col [TIMESTAMP]
+| +-$subquery1.c_col#3 AS c_col [INT64]
 +-query=
   +-ProjectScan
-    +-column_list=$subquery1.[a_col#1, b_col#2]
+    +-column_list=$subquery1.[a_col#1, b_col#2, c_col#3]
     +-input_scan=
       +-FilterScan
-        +-column_list=$subquery1.[a_col#1, b_col#2]
+        +-column_list=$subquery1.[a_col#1, b_col#2, c_col#3]
         +-input_scan=
         | +-ProjectScan
-        |   +-column_list=$subquery1.[a_col#1, b_col#2]
+        |   +-column_list=$subquery1.[a_col#1, b_col#2, c_col#3]
         |   +-expr_list=
         |   | +-a_col#1 :=
         |   | | +-FunctionCall(GoogleSQL:$interval(INT64, ENUM<googlesql.functions.DateTimestampPart>) -> INTERVAL)
         |   | |   +-Literal(type=INT64, value=1)
         |   | |   +-Literal(type=ENUM<googlesql.functions.DateTimestampPart>, value=MINUTE)
         |   | +-b_col#2 :=
-        |   |   +-FunctionCall(GoogleSQL:timestamp(STRING, optional(0) STRING) -> TIMESTAMP)
-        |   |     +-Literal(type=STRING, value="2000-01-01 00:00:00+00")
+        |   | | +-FunctionCall(GoogleSQL:timestamp(STRING, optional(0) STRING) -> TIMESTAMP)
+        |   | |   +-Literal(type=STRING, value="2000-01-01 00:00:00+00")
+        |   | +-c_col#3 := Literal(type=INT64, value=1)
         |   +-input_scan=
         |     +-SingleRowScan
         +-filter_expr=
@@ -1566,50 +1846,93 @@ QueryStmt
             +-parameter_list=
             | +-ColumnRef(type=INTERVAL, column=$subquery1.a_col#1)
             | +-ColumnRef(type=TIMESTAMP, column=$subquery1.b_col#2)
+            | +-ColumnRef(type=INT64, column=$subquery1.c_col#3)
             +-subquery=
               +-ProjectScan
-                +-column_list=$align.[b#9, t#10, borg_job#11, task_num#12, aligned_timestamp#13]
+                +-column_list=$align.[b#10, t#11, borg_job#12, task_num#13, m1#16, m2#18, aligned_timestamp#14]
                 +-input_scan=
-                  +-AlignScan
-                    +-column_list=$align.[b#9, t#10, borg_job#11, task_num#12, aligned_timestamp#13]
+                  +-ProjectScan
+                    +-column_list=[$align.b#10, $align.t#11, $align.borg_job#12, $align.task_num#13, $align.aligned_timestamp#14, $estimator.$estimator1#15, $estimator.$estimator2#17, $align.m1#16, $align.m2#18]
+                    +-expr_list=
+                    | +-m1#16 :=
+                    | | +-FunctionCall(GoogleSQL:$add(TIMESTAMP, INTERVAL) -> TIMESTAMP)
+                    | |   +-ColumnRef(type=TIMESTAMP, column=$subquery1.b_col#2, is_correlated=TRUE)
+                    | |   +-ColumnRef(type=INTERVAL, column=$estimator.$estimator1#15)
+                    | +-m2#18 :=
+                    |   +-FunctionCall(GoogleSQL:$add(INT64, INT64) -> INT64)
+                    |     +-FunctionCall(GoogleSQL:length(STRING) -> INT64)
+                    |     | +-FunctionCall(GoogleSQL:format_timestamp(STRING, TIMESTAMP, optional(0) STRING) -> STRING)
+                    |     |   +-Literal(type=STRING, value="%b %Y")
+                    |     |   +-ColumnRef(type=TIMESTAMP, column=$subquery1.b_col#2, is_correlated=TRUE)
+                    |     +-ColumnRef(type=INT64, column=$estimator.$estimator2#17)
                     +-input_scan=
-                    | +-ProjectScan
-                    |   +-column_list=[TimeseriesTable.borg_job#3, TimeseriesTable.borg_task_num#4, TimeseriesTable.ts_col#5, $align.timestamp#8, $align.b#9, $align.t#10, $align.borg_job#11, $align.task_num#12]
-                    |   +-expr_list=
-                    |   | +-timestamp#8 :=
-                    |   | | +-FunctionCall(GoogleSQL:$add(TIMESTAMP, INTERVAL) -> TIMESTAMP)
-                    |   | |   +-ColumnRef(type=TIMESTAMP, column=TimeseriesTable.ts_col#5)
-                    |   | |   +-ColumnRef(type=INTERVAL, column=$subquery1.a_col#1, is_correlated=TRUE)
-                    |   | +-b#9 := ColumnRef(type=TIMESTAMP, column=$subquery1.b_col#2, is_correlated=TRUE)
-                    |   | +-t#10 :=
-                    |   | | +-FunctionCall(GoogleSQL:$add(TIMESTAMP, INTERVAL) -> TIMESTAMP)
-                    |   | |   +-ColumnRef(type=TIMESTAMP, column=TimeseriesTable.ts_col#5)
-                    |   | |   +-ColumnRef(type=INTERVAL, column=$subquery1.a_col#1, is_correlated=TRUE)
-                    |   | +-borg_job#11 := ColumnRef(type=STRING, column=TimeseriesTable.borg_job#3)
-                    |   | +-task_num#12 :=
-                    |   |   +-FunctionCall(GoogleSQL:$add(INT64, INT64) -> INT64)
-                    |   |     +-ColumnRef(type=INT64, column=TimeseriesTable.borg_task_num#4)
-                    |   |     +-Literal(type=INT64, value=1)
-                    |   +-input_scan=
-                    |     +-TableScan(column_list=TimeseriesTable.[borg_job#3, borg_task_num#4, ts_col#5], table=TimeseriesTable, column_index_list=[0, 1, 2])
-                    +-timestamp_column=
-                    | +-ColumnRef(type=TIMESTAMP, column=$align.timestamp#8)
-                    +-period=
-                    | +-ColumnRef(type=INTERVAL, column=$subquery1.a_col#1, is_correlated=TRUE)
-                    +-origin=
-                    | +-ColumnRef(type=TIMESTAMP, column=$subquery1.b_col#2, is_correlated=TRUE)
-                    +-output_within=
-                    | +-WithinBounds
-                    |   +-lower_bound=
-                    |   | +-WithinBoundExpr(within_bound_kind=UNBOUNDED PRECEDING)
-                    |   +-upper_bound=
-                    |     +-WithinBoundExpr(within_bound_kind=ANCHOR TIMESTAMP)
-                    +-partition_by_list=
-                    | +-ColumnRef(type=TIMESTAMP, column=$align.b#9)
-                    | +-ColumnRef(type=TIMESTAMP, column=$align.t#10)
-                    | +-ColumnRef(type=STRING, column=$align.borg_job#11)
-                    | +-ColumnRef(type=INT64, column=$align.task_num#12)
-                    +-aligned_timestamp_column=$align.aligned_timestamp#13
+                      +-AlignScan
+                        +-column_list=[$align.b#10, $align.t#11, $align.borg_job#12, $align.task_num#13, $align.aligned_timestamp#14, $estimator.$estimator1#15, $estimator.$estimator2#17]
+                        +-input_scan=
+                        | +-ProjectScan
+                        |   +-column_list=[TimeseriesTable.borg_job#4, TimeseriesTable.borg_task_num#5, TimeseriesTable.ts_col#6, TimeseriesTable.requests#8, $align.timestamp#9, $align.b#10, $align.t#11, $align.borg_job#12, $align.task_num#13]
+                        |   +-expr_list=
+                        |   | +-timestamp#9 :=
+                        |   | | +-FunctionCall(GoogleSQL:$add(TIMESTAMP, INTERVAL) -> TIMESTAMP)
+                        |   | |   +-ColumnRef(type=TIMESTAMP, column=TimeseriesTable.ts_col#6)
+                        |   | |   +-ColumnRef(type=INTERVAL, column=$subquery1.a_col#1, is_correlated=TRUE)
+                        |   | +-b#10 := ColumnRef(type=TIMESTAMP, column=$subquery1.b_col#2, is_correlated=TRUE)
+                        |   | +-t#11 :=
+                        |   | | +-FunctionCall(GoogleSQL:$add(TIMESTAMP, INTERVAL) -> TIMESTAMP)
+                        |   | |   +-ColumnRef(type=TIMESTAMP, column=TimeseriesTable.ts_col#6)
+                        |   | |   +-ColumnRef(type=INTERVAL, column=$subquery1.a_col#1, is_correlated=TRUE)
+                        |   | +-borg_job#12 := ColumnRef(type=STRING, column=TimeseriesTable.borg_job#4)
+                        |   | +-task_num#13 :=
+                        |   |   +-FunctionCall(GoogleSQL:$add(INT64, INT64) -> INT64)
+                        |   |     +-ColumnRef(type=INT64, column=TimeseriesTable.borg_task_num#5)
+                        |   |     +-Literal(type=INT64, value=1)
+                        |   +-input_scan=
+                        |     +-TableScan(column_list=TimeseriesTable.[borg_job#4, borg_task_num#5, ts_col#6, requests#8], table=TimeseriesTable, column_index_list=[0, 1, 2, 4])
+                        +-timestamp_column=
+                        | +-ColumnRef(type=TIMESTAMP, column=$align.timestamp#9)
+                        +-period=
+                        | +-ColumnRef(type=INTERVAL, column=$subquery1.a_col#1, is_correlated=TRUE)
+                        +-origin=
+                        | +-ColumnRef(type=TIMESTAMP, column=$subquery1.b_col#2, is_correlated=TRUE)
+                        +-output_within=
+                        | +-WithinBounds
+                        |   +-lower_bound=
+                        |   | +-WithinBoundExpr(within_bound_kind=INTERVAL PRECEDING)
+                        |   |   +-FunctionCall(GoogleSQL:$interval(INT64, ENUM<googlesql.functions.DateTimestampPart>) -> INTERVAL)
+                        |   |     +-ColumnRef(type=INT64, column=$subquery1.c_col#3, is_correlated=TRUE)
+                        |   |     +-Literal(type=ENUM<googlesql.functions.DateTimestampPart>, value=MINUTE)
+                        |   +-upper_bound=
+                        |     +-WithinBoundExpr(within_bound_kind=ANCHOR TIMESTAMP)
+                        +-partition_by_list=
+                        | +-ColumnRef(type=TIMESTAMP, column=$align.b#10)
+                        | +-ColumnRef(type=TIMESTAMP, column=$align.t#11)
+                        | +-ColumnRef(type=STRING, column=$align.borg_job#12)
+                        | +-ColumnRef(type=INT64, column=$align.task_num#13)
+                        +-aligned_timestamp_column=$align.aligned_timestamp#14
+                        +-estimator_function_list=
+                          +-$estimator1#15 :=
+                          | +-EstimatorFunctionCall(GoogleSQL:sum(INTERVAL) -> INTERVAL)
+                          |   +-ColumnRef(type=INTERVAL, column=$subquery1.a_col#1, is_correlated=TRUE)
+                          |   +-within_bounds=
+                          |     +-WithinBounds
+                          |       +-lower_bound=
+                          |       | +-WithinBoundExpr(within_bound_kind=INTERVAL PRECEDING)
+                          |       |   +-FunctionCall(GoogleSQL:$interval(INT64, ENUM<googlesql.functions.DateTimestampPart>) -> INTERVAL)
+                          |       |     +-ColumnRef(type=INT64, column=$subquery1.c_col#3, is_correlated=TRUE)
+                          |       |     +-Literal(type=ENUM<googlesql.functions.DateTimestampPart>, value=MINUTE)
+                          |       +-upper_bound=
+                          |         +-WithinBoundExpr(within_bound_kind=ANCHOR TIMESTAMP)
+                          +-$estimator2#17 :=
+                            +-EstimatorFunctionCall(GoogleSQL:sum(INT64) -> INT64)
+                              +-FunctionCall(GoogleSQL:$add(INT64, INT64) -> INT64)
+                              | +-ColumnRef(type=INT64, column=$subquery1.c_col#3, is_correlated=TRUE)
+                              | +-ColumnRef(type=INT64, column=TimeseriesTable.requests#8)
+                              +-within_bounds=
+                                +-WithinBounds
+                                  +-lower_bound=
+                                  | +-WithinBoundExpr(within_bound_kind=UNBOUNDED PRECEDING)
+                                  +-upper_bound=
+                                    +-WithinBoundExpr(within_bound_kind=UNBOUNDED FOLLOWING)
 ==
 
 # ALIGN operator cannot be combined with other postfix operators or itself
@@ -1762,7 +2085,7 @@ QueryStmt
         |   +-input_scan=
         |     +-TVFScan
         |       +-column_list=tvf_templated_select_relation_arg_using_select_star.[borg_job#6, ts_col#8]
-        |       +-tvf=tvf_templated_select_relation_arg_using_select_star((ANY TABLE) -> ANY TABLE)
+        |       +-tvf=tvf_templated_select_relation_arg_using_select_star
         |       +-signature=(TABLE<borg_job STRING, borg_task_num INT64, ts_col TIMESTAMP, gcu DOUBLE, requests INT64>) -> TABLE<borg_job STRING, borg_task_num INT64, ts_col TIMESTAMP, gcu DOUBLE, requests INT64>
         |       +-argument_list=
         |       | +-FunctionArgument
@@ -1846,7 +2169,7 @@ QueryStmt
         +-input_scan=
         | +-TVFScan
         |   +-column_list=[tvf_templated_select_relation_arg_using_select_star.timestamp#8]
-        |   +-tvf=tvf_templated_select_relation_arg_using_select_star((ANY TABLE) -> ANY TABLE)
+        |   +-tvf=tvf_templated_select_relation_arg_using_select_star
         |   +-signature=(TABLE<borg_job STRING, borg_task_num INT64, timestamp TIMESTAMP, gcu DOUBLE, requests INT64>) -> TABLE<borg_job STRING, borg_task_num INT64, timestamp TIMESTAMP, gcu DOUBLE, requests INT64>
         |   +-argument_list=
         |   | +-FunctionArgument
@@ -2249,7 +2572,7 @@ QueryStmt
         |   +-right_scan=
         |   | +-TVFScan
         |   |   +-column_list=[tvf_templated_select_relation_arg_using_select_star.Value#9]
-        |   |   +-tvf=tvf_templated_select_relation_arg_using_select_star((ANY TABLE) -> ANY TABLE)
+        |   |   +-tvf=tvf_templated_select_relation_arg_using_select_star
         |   |   +-signature=(TABLE<Key INT64, Value STRING>) -> TABLE<Key INT64, Value STRING>
         |   |   +-argument_list=
         |   |   | +-FunctionArgument

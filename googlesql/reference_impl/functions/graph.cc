@@ -43,6 +43,7 @@
 #include "absl/status/status.h"
 #include "googlesql/base/status_macros.h"
 #include "absl/status/statusor.h"
+#include "absl/strings/match.h"
 #include "absl/strings/string_view.h"
 #include "absl/time/time.h"
 #include "absl/types/span.h"
@@ -125,6 +126,15 @@ class SourceDestPredicateFunction : public SimpleBuiltinScalarFunction {
 class PropertyExistsFunction : public SimpleBuiltinScalarFunction {
  public:
   PropertyExistsFunction(FunctionKind kind, const Type* output_type)
+      : SimpleBuiltinScalarFunction(kind, output_type) {}
+  absl::StatusOr<Value> Eval(absl::Span<const TupleData* const> params,
+                             absl::Span<const Value> args,
+                             EvaluationContext* context) const override;
+};
+
+class ElementDefinitionNameIsFunction : public SimpleBuiltinScalarFunction {
+ public:
+  ElementDefinitionNameIsFunction(FunctionKind kind, const Type* output_type)
       : SimpleBuiltinScalarFunction(kind, output_type) {}
   absl::StatusOr<Value> Eval(absl::Span<const TupleData* const> params,
                              absl::Span<const Value> args,
@@ -334,6 +344,23 @@ absl::StatusOr<Value> PropertyExistsFunction::Eval(
   }
   GOOGLESQL_RETURN_IF_ERROR(s);
   return Value::Bool(true);
+}
+
+absl::StatusOr<Value> ElementDefinitionNameIsFunction::Eval(
+    absl::Span<const TupleData* const> params, absl::Span<const Value> args,
+    EvaluationContext* context) const {
+  GOOGLESQL_RET_CHECK_EQ(args.size(), 2);
+  const Value& graph_element_value = args[0];
+  const Value& table_name_value = args[1];
+  GOOGLESQL_RET_CHECK(graph_element_value.type()->IsGraphElement());
+  GOOGLESQL_RET_CHECK(table_name_value.type()->IsString());
+  GOOGLESQL_RET_CHECK(!table_name_value.is_null());
+  if (graph_element_value.is_null()) {
+    return Value::Null(output_type());
+  }
+  return Value::Bool(
+      googlesql_base::CaseEqual(graph_element_value.GetDefinitionName(),
+                             table_name_value.string_value()));
 }
 
 absl::StatusOr<Value> LabelsFunction::Eval(
@@ -786,6 +813,11 @@ void RegisterBuiltinGraphFunctions() {
       {FunctionKind::kPropertyExists},
       [](FunctionKind kind, const Type* output_type) {
         return new PropertyExistsFunction(kind, output_type);
+      });
+  BuiltinFunctionRegistry::RegisterScalarFunction(
+      {FunctionKind::kElementDefinitionNameIs},
+      [](FunctionKind kind, const Type* output_type) {
+        return new ElementDefinitionNameIsFunction(kind, output_type);
       });
   BuiltinFunctionRegistry::RegisterScalarFunction(
       {FunctionKind::kLabels}, [](FunctionKind kind, const Type* output_type) {

@@ -45,7 +45,8 @@ class ExecuteQueryWebRequest {
       std::string query, std::string catalog,
       std::string enabled_language_features,
       std::string enabled_language_features_text,
-      std::string enabled_ast_rewrites, std::string enabled_ast_rewrites_text);
+      std::string enabled_ast_rewrites, std::string enabled_ast_rewrites_text,
+      std::string resolved_ast_render_mode = "");
 
   const std::string& query() const { return query_; }
   const ModeSet& modes() const { return modes_; }
@@ -56,6 +57,12 @@ class ExecuteQueryWebRequest {
     return target_syntax_mode_;
   }
   const std::string& catalog() const { return catalog_; }
+  const std::string& resolved_ast_render_mode() const {
+    return resolved_ast_render_mode_;
+  }
+  bool linear_resolved_ast() const {
+    return resolved_ast_render_mode_ == "linear";
+  }
 
   std::string GetEnabledLanguageFeaturesOptionsStr() const {
     if (enabled_language_features_text_.empty()) {
@@ -92,6 +99,7 @@ class ExecuteQueryWebRequest {
   std::string enabled_language_features_text_;
   std::string enabled_ast_rewrites_;
   std::string enabled_ast_rewrites_text_;
+  std::string resolved_ast_render_mode_;
 };
 
 // Handler for a web request. This class takes an incoming request, executes

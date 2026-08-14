@@ -497,6 +497,10 @@ bool IsTypeCastableToJson(const Type* from_type,
   if (from_type->IsJson()) {
     return true;
   }
+  if (!language_options.LanguageFeatureEnabled(
+          LanguageFeature::FEATURE_CAST_TO_JSON_TYPE)) {
+    return false;
+  }
   switch (from_type->kind()) {
     case TYPE_BOOL:
     case TYPE_INT32:
@@ -522,8 +526,10 @@ bool IsTypeCastableToJson(const Type* from_type,
     case TYPE_GRAPH_ELEMENT:
     case TYPE_GRAPH_PATH:
     case TYPE_PROTO:
-      return language_options.LanguageFeatureEnabled(
-          LanguageFeature::FEATURE_CAST_TO_JSON_TYPE);
+      return absl::c_all_of(
+          from_type->ComponentTypes(), [&](const Type* component_type) {
+            return IsTypeCastableToJson(component_type, language_options);
+          });
     default:
       return false;
   }

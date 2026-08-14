@@ -265,6 +265,9 @@ class Algebrizer {
   absl::StatusOr<std::unique_ptr<NewStructExpr>> AlgebrizeMakeStruct(
       const ResolvedMakeStruct* make_struct);
 
+  absl::StatusOr<std::unique_ptr<ValueExpr>> AlgebrizeMakeMap(
+      const ResolvedMakeMap* make_map);
+
   absl::StatusOr<std::unique_ptr<FieldValueExpr>> AlgebrizeGetStructField(
       const ResolvedGetStructField* get_struct_field);
 
@@ -814,6 +817,16 @@ class Algebrizer {
       const TableScanColumnInfoMap& column_info_map,
       const FilterConjunctInfo& conjunct_info,
       std::vector<std::unique_ptr<ColumnFilterArg>>* and_filters);
+
+  // Algebrizes a boundary expression used in a WITHIN clause of an estimator
+  // function or an OUTPUT WITHIN clause of an ALIGN operator.
+  absl::StatusOr<std::unique_ptr<WithinBoundExprArg>> AlgebrizeWithinBoundExpr(
+      const ResolvedWithinBoundExpr* /*absl_nonnull*/ bound_expr);
+
+  // Algebrizes an ALIGN operator scan. Converts a ResolvedAlignScan into an
+  // `AlignOp`.
+  absl::StatusOr<std::unique_ptr<RelationalOp>> AlgebrizeAlignScan(
+      const ResolvedAlignScan* align_scan);
 
   // Algebrizes the resolved AST for an AnalyticScan. The AnalyticScan is
   // converted to a sequence of AnalyticOp, one per analytic function group.

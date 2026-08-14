@@ -662,6 +662,38 @@ TEST_F(ExpressionAlgebrizerTest, AlgebrizeResolvedNullExpressions) {
   TestAlgebrizeExpression(null_string.get(), "ConstExpr(String(NULL))");
 }
 
+TEST_F(ExpressionAlgebrizerTest, AlgebrizeResolvedMapLiteral) {
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(const Type* type,
+                       type_factory_.MakeMapType(StringType(), Int64Type()));
+  const MapType* map_type = type->AsMap();
+  std::vector<std::unique_ptr<const ResolvedMakeMapEntry>> entries;
+  entries.push_back(
+      MakeResolvedMakeMapEntry(MakeResolvedLiteral(Value::String("a")),
+                               MakeResolvedLiteral(Value::Int64(1))));
+  entries.push_back(
+      MakeResolvedMakeMapEntry(MakeResolvedLiteral(Value::String("b")),
+                               MakeResolvedLiteral(Value::Int64(2))));
+  std::unique_ptr<const ResolvedExpr> make_map(
+      MakeResolvedMakeMap(map_type, std::move(entries)));
+
+  LanguageOptions language_options;
+  language_options.EnableLanguageFeature(FEATURE_MAP_TYPE);
+  std::unique_ptr<ValueExpr> algebra_output;
+  Parameters parameters(ParameterMap{});
+  ParameterMap column_map;
+  SystemVariablesAlgebrizerMap system_variables_map;
+  GOOGLESQL_ASSERT_OK(Algebrizer::AlgebrizeExpression(
+      language_options, AlgebrizerOptions(), &type_factory_, make_map.get(),
+      &algebra_output, &parameters, &column_map, &system_variables_map));
+  EXPECT_EQ(algebra_output->DebugString(true),
+            "NewMapExpr(\n"
+            "+-type: MAP<STRING, INT64>,\n"
+            "+-0 key: ConstExpr(String(\"a\")),\n"
+            "+-0 value: ConstExpr(Int64(1)),\n"
+            "+-1 key: ConstExpr(String(\"b\")),\n"
+            "+-1 value: ConstExpr(Int64(2)))");
+}
+
 TEST_F(StatementAlgebrizerTest, SingleRowScan) {
   // Create a resolved AST for a single row scan with zero columns.
   ResolvedColumnList zero_columns;

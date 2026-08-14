@@ -645,7 +645,8 @@ absl::Status Resolver::MakeEqualityComparison(
   std::unique_ptr<ResolvedFunctionCall> resolved_function_call;
   GOOGLESQL_RETURN_IF_ERROR(function_resolver_->ResolveGeneralFunctionCall(
       ast_location, {ast_location, ast_location},
-      /*match_internal_signatures=*/false, "$equal", /*is_analytic=*/false,
+      /*match_internal_signatures=*/false, "$equal",
+      FunctionResolver::ClauseRequirement::kNone,
       MakeNodeVector(std::move(expr1), std::move(expr2)),
       /*named_arguments=*/{}, /*expected_result_type=*/nullptr,
       &resolved_function_call));
@@ -685,8 +686,9 @@ absl::Status Resolver::MakeCoalesceExpr(
   size_t exprs_size = exprs.size();
   GOOGLESQL_RETURN_IF_ERROR(function_resolver_->ResolveGeneralFunctionCall(
       ast_location, std::vector<const ASTNode*>(exprs_size, ast_location),
-      /*match_internal_signatures=*/false, "coalesce", /*is_analytic=*/false,
-      std::move(exprs), /*named_arguments=*/{},
+      /*match_internal_signatures=*/false, "coalesce",
+      FunctionResolver::ClauseRequirement::kNone, std::move(exprs),
+      /*named_arguments=*/{},
       /*expected_result_type=*/nullptr, &resolved_function_call));
 
   *output_expr = std::move(resolved_function_call);
@@ -710,8 +712,9 @@ absl::Status Resolver::MakeAndExpr(
     std::unique_ptr<ResolvedFunctionCall> resolved_function_call;
     GOOGLESQL_RETURN_IF_ERROR(function_resolver_->ResolveGeneralFunctionCall(
         ast_location, std::vector<const ASTNode*>(expr_count, ast_location),
-        /*match_internal_signatures=*/false, "$and", /*is_analytic=*/false,
-        std::move(exprs), /*named_arguments=*/{},
+        /*match_internal_signatures=*/false, "$and",
+        FunctionResolver::ClauseRequirement::kNone, std::move(exprs),
+        /*named_arguments=*/{},
         /*expected_result_type=*/nullptr, &resolved_function_call));
 
     GOOGLESQL_RET_CHECK_EQ(resolved_function_call->function()->mode(), Function::SCALAR);
@@ -2304,8 +2307,8 @@ absl::Status Resolver::PruneColumnLists(const ResolvedNode* node) const {
             node->GetAs<ResolvedInsertStmt>()->column_access_list_size() == 0)
       << "SetColumnAccessList was called before PruneColumnList";
 
-  GOOGLESQL_RET_CHECK(node->node_kind() != googlesql::RESOLVED_PIPE_INSERT_SCAN ||
-            node->GetAs<ResolvedPipeInsertScan>()
+  GOOGLESQL_RET_CHECK(node->node_kind() != googlesql::RESOLVED_INSERT_SCAN ||
+            node->GetAs<ResolvedInsertScan>()
                     ->insert_stmt()
                     ->column_access_list_size() == 0)
       << "SetColumnAccessList was called before PruneColumnList";

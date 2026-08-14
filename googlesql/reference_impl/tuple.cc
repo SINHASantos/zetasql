@@ -39,36 +39,6 @@
 #include "googlesql/base/ret_check.h"
 
 namespace googlesql {
-namespace {
-
-// Check that `num_bytes` can be represented as an int64_t. If not, populates
-// `status` with a ResourceExhaustedError and returns false. Otherwise, returns
-// true and sets `res` to the int64_t representation of `num_bytes`.
-bool SafeUInt64ToInt64NumBytes(uint64_t num_bytes, int64_t* res,
-                               absl::Status* status) {
-  if (num_bytes > static_cast<uint64_t>(std::numeric_limits<int64_t>::max())) {
-    *status = absl::ResourceExhaustedError(absl::Substitute(
-        "Out of memory: impossible to request $0 bytes.", num_bytes));
-    return false;
-  }
-  *res = static_cast<int64_t>(num_bytes);
-  return true;
-}
-
-}  // namespace
-
-// -------------------------------------------------------
-// MemoryAccountant
-// -------------------------------------------------------
-
-bool MemoryAccountant::RequestUInt64Bytes(uint64_t num_bytes,
-                                          absl::Status* status) {
-  int64_t num_bytes_int64;
-  if (!SafeUInt64ToInt64NumBytes(num_bytes, &num_bytes_int64, status)) {
-    return false;
-  }
-  return RequestBytes(num_bytes_int64, status);
-}
 
 // -------------------------------------------------------
 // TupleSchema

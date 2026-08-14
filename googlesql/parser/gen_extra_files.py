@@ -41,9 +41,19 @@ def GetClasses(input_filename):
   concrete_classes = []
   abstract_classes = ['ASTNode']
   for input_line in open(input_filename):
+    # Concrete final classes.
     m = re.search('^class (AST[a-zA-Z]*) final : public', input_line)
     if m:
       concrete_classes.append(m.group(1))
+      continue
+    # Non-final concrete classes (marked with a comment in the template).
+    m = re.search(
+        r'^class (AST[a-zA-Z]*) /\* non-final concrete \*/ : public', input_line
+    )
+    if m:
+      concrete_classes.append(m.group(1))
+      continue
+    # Abstract classes.
     m = re.search('^class (AST[a-zA-Z]*) : public', input_line)
     if m:
       abstract_classes.append(m.group(1))

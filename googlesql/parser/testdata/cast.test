@@ -1,0 +1,586 @@
+[default language_features=NONE]
+
+SELECT CAST(1 as int64)
+--
+QueryStatement [0-23] [SELECT CAST(1 as int64)]
+  Query [0-23] [SELECT CAST(1 as int64)]
+    Select [0-23] [SELECT CAST(1 as int64)]
+      SelectList [7-23] [CAST(1 as int64)]
+        SelectColumn [7-23] [CAST(1 as int64)]
+          CastExpression [7-23] [CAST(1 as int64)]
+            IntLiteral(1) [12-13] [1]
+            SimpleType [17-22] [int64]
+              PathExpression [17-22] [int64]
+                Identifier(int64) [17-22] [int64]
+--
+SELECT
+  CAST(1 AS int64)
+==
+
+SELECT
+  1 :: INT64,
+  -1.2344 :: DOUBLE,
+  (1 + 2) :: DOUBLE,
+  1 + 2 :: DOUBLE,
+  FALSE AND 1 :: BOOL,
+  '2026-04-16' :: DATE,
+  '+1y-2mon -5min -2d' :: INTERVAL,
+  CURRENT_TIMESTAMP()::TIMESTAMP(12),
+  NULL :: MAP<STRING, STRING>,
+  {f1:1, f2:2}::package.MyProto,
+  {} :: STRUCT<>,
+  @@symvar :: STRUCT<>,
+  [] :: ARRAY<INT64>
+--
+QueryStatement [0-329] [SELECT   1...ARRAY<INT64>]
+  Query [0-329] [SELECT   1...ARRAY<INT64>]
+    Select [0-329] [SELECT   1...ARRAY<INT64>]
+      SelectList [9-329] [1 :: INT64...ARRAY<INT64>]
+        SelectColumn [9-19] [1 :: INT64]
+          CastExpression [9-19] [1 :: INT64]
+            IntLiteral(1) [9-10] [1]
+            SimpleType [14-19] [INT64]
+              PathExpression [14-19] [INT64]
+                Identifier(INT64) [14-19] [INT64]
+        SelectColumn [23-40] [-1.2344 :: DOUBLE]
+          UnaryExpression(-) [23-40] [-1.2344 :: DOUBLE]
+            CastExpression [24-40] [1.2344 :: DOUBLE]
+              FloatLiteral(1.2344) [24-30] [1.2344]
+              SimpleType [34-40] [DOUBLE]
+                PathExpression [34-40] [DOUBLE]
+                  Identifier(DOUBLE) [34-40] [DOUBLE]
+        SelectColumn [44-61] [(1 + 2) :: DOUBLE]
+          CastExpression [44-61] [(1 + 2) :: DOUBLE]
+            BinaryExpression(+) [45-50] [1 + 2]
+              IntLiteral(1) [45-46] [1]
+              IntLiteral(2) [49-50] [2]
+            SimpleType [55-61] [DOUBLE]
+              PathExpression [55-61] [DOUBLE]
+                Identifier(DOUBLE) [55-61] [DOUBLE]
+        SelectColumn [65-80] [1 + 2 :: DOUBLE]
+          BinaryExpression(+) [65-80] [1 + 2 :: DOUBLE]
+            IntLiteral(1) [65-66] [1]
+            CastExpression [69-80] [2 :: DOUBLE]
+              IntLiteral(2) [69-70] [2]
+              SimpleType [74-80] [DOUBLE]
+                PathExpression [74-80] [DOUBLE]
+                  Identifier(DOUBLE) [74-80] [DOUBLE]
+        SelectColumn [84-103] [FALSE AND 1 :: BOOL]
+          AndExpr [84-103] [FALSE AND 1 :: BOOL]
+            BooleanLiteral(FALSE) [84-89] [FALSE]
+            CastExpression [94-103] [1 :: BOOL]
+              IntLiteral(1) [94-95] [1]
+              SimpleType [99-103] [BOOL]
+                PathExpression [99-103] [BOOL]
+                  Identifier(BOOL) [99-103] [BOOL]
+        SelectColumn [107-127] ['2026-04-16' :: DATE]
+          CastExpression [107-127] ['2026-04-16' :: DATE]
+            StringLiteral [107-119] ['2026-04-16']
+              StringLiteralComponent('2026-04-16') [107-119] ['2026-04-16']
+            SimpleType [123-127] [DATE]
+              PathExpression [123-127] [DATE]
+                Identifier(DATE) [123-127] [DATE]
+        SelectColumn [131-163] ['+1y-2mon...: INTERVAL]
+          CastExpression [131-163] ['+1y-2mon...: INTERVAL]
+            StringLiteral [131-151] ['+1y-2mon -5min -2d']
+              StringLiteralComponent('+1y-2mon -5min -2d') [131-151] ['+1y-2mon -5min -2d']
+            SimpleType [155-163] [INTERVAL]
+              PathExpression [155-163] [INTERVAL]
+                Identifier(`INTERVAL`) [155-163] [INTERVAL]
+        SelectColumn [167-201] [CURRENT_TIMESTAMP...ESTAMP(12)]
+          CastExpression [167-201] [CURRENT_TIMESTAMP...ESTAMP(12)]
+            FunctionCall [167-186] [CURRENT_TIMESTAMP()]
+              PathExpression [167-184] [CURRENT_TIMESTAMP]
+                Identifier(`CURRENT_TIMESTAMP`) [167-184] [CURRENT_TIMESTAMP]
+            SimpleType [188-201] [TIMESTAMP(12)]
+              PathExpression [188-197] [TIMESTAMP]
+                Identifier(TIMESTAMP) [188-197] [TIMESTAMP]
+              TypeParameterList [197-200] [(12]
+                IntLiteral(12) [198-200] [12]
+        SelectColumn [205-232] [NULL :: MAP<STRING, STRING>]
+          CastExpression [205-232] [NULL :: MAP<STRING, STRING>]
+            NullLiteral(NULL) [205-209] [NULL]
+            MapType [213-232] [MAP<STRING, STRING>]
+              SimpleType [217-223] [STRING]
+                PathExpression [217-223] [STRING]
+                  Identifier(STRING) [217-223] [STRING]
+              SimpleType [225-231] [STRING]
+                PathExpression [225-231] [STRING]
+                  Identifier(STRING) [225-231] [STRING]
+        SelectColumn [236-265] [{f1:1, f2:2}::package.MyProto]
+          CastExpression [236-265] [{f1:1, f2:2}::package.MyProto]
+            BracedConstructor [236-248] [{f1:1, f2:2}]
+              BracedConstructorField [237-241] [f1:1]
+                BracedConstructorLhs [237-239] [f1]
+                  PathExpression [237-239] [f1]
+                    Identifier(f1) [237-239] [f1]
+                BracedConstructorFieldValue [240-241] [1]
+                  IntLiteral(1) [240-241] [1]
+              BracedConstructorField [243-247] [f2:2]
+                BracedConstructorLhs [243-245] [f2]
+                  PathExpression [243-245] [f2]
+                    Identifier(f2) [243-245] [f2]
+                BracedConstructorFieldValue [246-247] [2]
+                  IntLiteral(2) [246-247] [2]
+            SimpleType [250-265] [package.MyProto]
+              PathExpression [250-265] [package.MyProto]
+                Identifier(package) [250-257] [package]
+                Identifier(MyProto) [258-265] [MyProto]
+        SelectColumn [269-283] [{} :: STRUCT<>]
+          CastExpression [269-283] [{} :: STRUCT<>]
+            BracedConstructor [269-271] [{}]
+            StructType [275-283] [STRUCT<>]
+        SelectColumn [287-307] [@@symvar :: STRUCT<>]
+          CastExpression [287-307] [@@symvar :: STRUCT<>]
+            SystemVariableExpr [287-295] [@@symvar]
+              PathExpression [289-295] [symvar]
+                Identifier(symvar) [289-295] [symvar]
+            StructType [299-307] [STRUCT<>]
+        SelectColumn [311-329] [[] :: ARRAY<INT64>]
+          CastExpression [311-329] [[] :: ARRAY<INT64>]
+            ArrayConstructor [311-313] [[]]
+            ArrayType [317-329] [ARRAY<INT64>]
+              SimpleType [323-328] [INT64]
+                PathExpression [323-328] [INT64]
+                  Identifier(INT64) [323-328] [INT64]
+--
+SELECT
+  CAST(1 AS INT64),
+  -CAST(1.2344 AS DOUBLE),
+  CAST((1 + 2) AS DOUBLE),
+  1 + CAST(2 AS DOUBLE),
+  FALSE AND CAST(1 AS BOOL),
+  CAST('2026-04-16' AS DATE),
+  CAST('+1y-2mon -5min -2d' AS INTERVAL),
+  CAST(`CURRENT_TIMESTAMP`() AS TIMESTAMP(12)),
+  CAST(NULL AS MAP< STRING, STRING >),
+  CAST({
+    f1 : 1,
+    f2 : 2
+  } AS package.MyProto),
+  CAST({ } AS STRUCT< >),
+  CAST(@@symvar AS STRUCT< >),
+  CAST(ARRAY[] AS ARRAY< INT64 >)
+
+==
+
+SELECT
+  1 ?:: INT64,
+  -1.2344 ?:: DOUBLE,
+  (1 + 2) ?:: DOUBLE,
+  1 + 2 ?:: DOUBLE,
+  FALSE AND 1 ?:: BOOL,
+  '2026-04-16' ?:: DATE,
+  '+1y-2mon -5min -2d' ?:: INTERVAL,
+  CURRENT_TIMESTAMP()?::TIMESTAMP(12),
+  NULL ?:: MAP<STRING, STRING>,
+  {f1:1, f2:2}?::package.MyProto,
+  {} ?:: STRUCT<>,
+  @@symvar ?:: STRUCT<>,
+  [] ?:: ARRAY<INT64>
+--
+QueryStatement [0-342] [SELECT   1...ARRAY<INT64>]
+  Query [0-342] [SELECT   1...ARRAY<INT64>]
+    Select [0-342] [SELECT   1...ARRAY<INT64>]
+      SelectList [9-342] [1 ?:: INT64...ARRAY<INT64>]
+        SelectColumn [9-20] [1 ?:: INT64]
+          CastExpression(return_null_on_error=true) [9-20] [1 ?:: INT64]
+            IntLiteral(1) [9-10] [1]
+            SimpleType [15-20] [INT64]
+              PathExpression [15-20] [INT64]
+                Identifier(INT64) [15-20] [INT64]
+        SelectColumn [24-42] [-1.2344 ?:: DOUBLE]
+          UnaryExpression(-) [24-42] [-1.2344 ?:: DOUBLE]
+            CastExpression(return_null_on_error=true) [25-42] [1.2344 ?:: DOUBLE]
+              FloatLiteral(1.2344) [25-31] [1.2344]
+              SimpleType [36-42] [DOUBLE]
+                PathExpression [36-42] [DOUBLE]
+                  Identifier(DOUBLE) [36-42] [DOUBLE]
+        SelectColumn [46-64] [(1 + 2) ?:: DOUBLE]
+          CastExpression(return_null_on_error=true) [46-64] [(1 + 2) ?:: DOUBLE]
+            BinaryExpression(+) [47-52] [1 + 2]
+              IntLiteral(1) [47-48] [1]
+              IntLiteral(2) [51-52] [2]
+            SimpleType [58-64] [DOUBLE]
+              PathExpression [58-64] [DOUBLE]
+                Identifier(DOUBLE) [58-64] [DOUBLE]
+        SelectColumn [68-84] [1 + 2 ?:: DOUBLE]
+          BinaryExpression(+) [68-84] [1 + 2 ?:: DOUBLE]
+            IntLiteral(1) [68-69] [1]
+            CastExpression(return_null_on_error=true) [72-84] [2 ?:: DOUBLE]
+              IntLiteral(2) [72-73] [2]
+              SimpleType [78-84] [DOUBLE]
+                PathExpression [78-84] [DOUBLE]
+                  Identifier(DOUBLE) [78-84] [DOUBLE]
+        SelectColumn [88-108] [FALSE AND 1 ?:: BOOL]
+          AndExpr [88-108] [FALSE AND 1 ?:: BOOL]
+            BooleanLiteral(FALSE) [88-93] [FALSE]
+            CastExpression(return_null_on_error=true) [98-108] [1 ?:: BOOL]
+              IntLiteral(1) [98-99] [1]
+              SimpleType [104-108] [BOOL]
+                PathExpression [104-108] [BOOL]
+                  Identifier(BOOL) [104-108] [BOOL]
+        SelectColumn [112-133] ['2026-04-16' ?:: DATE]
+          CastExpression(return_null_on_error=true) [112-133] ['2026-04-16' ?:: DATE]
+            StringLiteral [112-124] ['2026-04-16']
+              StringLiteralComponent('2026-04-16') [112-124] ['2026-04-16']
+            SimpleType [129-133] [DATE]
+              PathExpression [129-133] [DATE]
+                Identifier(DATE) [129-133] [DATE]
+        SelectColumn [137-170] ['+1y-2mon...: INTERVAL]
+          CastExpression(return_null_on_error=true) [137-170] ['+1y-2mon...: INTERVAL]
+            StringLiteral [137-157] ['+1y-2mon -5min -2d']
+              StringLiteralComponent('+1y-2mon -5min -2d') [137-157] ['+1y-2mon -5min -2d']
+            SimpleType [162-170] [INTERVAL]
+              PathExpression [162-170] [INTERVAL]
+                Identifier(`INTERVAL`) [162-170] [INTERVAL]
+        SelectColumn [174-209] [CURRENT_TIMESTAMP...ESTAMP(12)]
+          CastExpression(return_null_on_error=true) [174-209] [CURRENT_TIMESTAMP...ESTAMP(12)]
+            FunctionCall [174-193] [CURRENT_TIMESTAMP()]
+              PathExpression [174-191] [CURRENT_TIMESTAMP]
+                Identifier(`CURRENT_TIMESTAMP`) [174-191] [CURRENT_TIMESTAMP]
+            SimpleType [196-209] [TIMESTAMP(12)]
+              PathExpression [196-205] [TIMESTAMP]
+                Identifier(TIMESTAMP) [196-205] [TIMESTAMP]
+              TypeParameterList [205-208] [(12]
+                IntLiteral(12) [206-208] [12]
+        SelectColumn [213-241] [NULL ?:: MAP<STRING, STRING>]
+          CastExpression(return_null_on_error=true) [213-241] [NULL ?:: MAP<STRING, STRING>]
+            NullLiteral(NULL) [213-217] [NULL]
+            MapType [222-241] [MAP<STRING, STRING>]
+              SimpleType [226-232] [STRING]
+                PathExpression [226-232] [STRING]
+                  Identifier(STRING) [226-232] [STRING]
+              SimpleType [234-240] [STRING]
+                PathExpression [234-240] [STRING]
+                  Identifier(STRING) [234-240] [STRING]
+        SelectColumn [245-275] [{f1:1, f2:2}?::package.MyProto]
+          CastExpression(return_null_on_error=true) [245-275] [{f1:1, f2:2}?::package.MyProto]
+            BracedConstructor [245-257] [{f1:1, f2:2}]
+              BracedConstructorField [246-250] [f1:1]
+                BracedConstructorLhs [246-248] [f1]
+                  PathExpression [246-248] [f1]
+                    Identifier(f1) [246-248] [f1]
+                BracedConstructorFieldValue [249-250] [1]
+                  IntLiteral(1) [249-250] [1]
+              BracedConstructorField [252-256] [f2:2]
+                BracedConstructorLhs [252-254] [f2]
+                  PathExpression [252-254] [f2]
+                    Identifier(f2) [252-254] [f2]
+                BracedConstructorFieldValue [255-256] [2]
+                  IntLiteral(2) [255-256] [2]
+            SimpleType [260-275] [package.MyProto]
+              PathExpression [260-275] [package.MyProto]
+                Identifier(package) [260-267] [package]
+                Identifier(MyProto) [268-275] [MyProto]
+        SelectColumn [279-294] [{} ?:: STRUCT<>]
+          CastExpression(return_null_on_error=true) [279-294] [{} ?:: STRUCT<>]
+            BracedConstructor [279-281] [{}]
+            StructType [286-294] [STRUCT<>]
+        SelectColumn [298-319] [@@symvar ?:: STRUCT<>]
+          CastExpression(return_null_on_error=true) [298-319] [@@symvar ?:: STRUCT<>]
+            SystemVariableExpr [298-306] [@@symvar]
+              PathExpression [300-306] [symvar]
+                Identifier(symvar) [300-306] [symvar]
+            StructType [311-319] [STRUCT<>]
+        SelectColumn [323-342] [[] ?:: ARRAY<INT64>]
+          CastExpression(return_null_on_error=true) [323-342] [[] ?:: ARRAY<INT64>]
+            ArrayConstructor [323-325] [[]]
+            ArrayType [330-342] [ARRAY<INT64>]
+              SimpleType [336-341] [INT64]
+                PathExpression [336-341] [INT64]
+                  Identifier(INT64) [336-341] [INT64]
+--
+SELECT
+  SAFE_CAST(1 AS INT64),
+  -SAFE_CAST(1.2344 AS DOUBLE),
+  SAFE_CAST((1 + 2) AS DOUBLE),
+  1 + SAFE_CAST(2 AS DOUBLE),
+  FALSE AND SAFE_CAST(1 AS BOOL),
+  SAFE_CAST('2026-04-16' AS DATE),
+  SAFE_CAST('+1y-2mon -5min -2d' AS INTERVAL),
+  SAFE_CAST(`CURRENT_TIMESTAMP`() AS TIMESTAMP(12)),
+  SAFE_CAST(NULL AS MAP< STRING, STRING >),
+  SAFE_CAST({
+    f1 : 1,
+    f2 : 2
+  } AS package.MyProto),
+  SAFE_CAST({ } AS STRUCT< >),
+  SAFE_CAST(@@symvar AS STRUCT< >),
+  SAFE_CAST(ARRAY[] AS ARRAY< INT64 >)
+==
+
+SELECT {{??::| ? ?::}} INT64
+--
+ALTERNATION GROUP: ??::
+--
+ERROR: Syntax error: ?:: must be separated by whitespace or comments [at 1:9]
+SELECT ??:: INT64
+        ^
+--
+ALTERNATION GROUP:  ? ?::
+--
+QueryStatement [0-19] [SELECT  ? ?:: INT64]
+  Query [0-19] [SELECT  ? ?:: INT64]
+    Select [0-19] [SELECT  ? ?:: INT64]
+      SelectList [8-19] [? ?:: INT64]
+        SelectColumn [8-19] [? ?:: INT64]
+          CastExpression(return_null_on_error=true) [8-19] [? ?:: INT64]
+            ParameterExpr(1) [8-9] [?]
+            SimpleType [14-19] [INT64]
+              PathExpression [14-19] [INT64]
+                Identifier(INT64) [14-19] [INT64]
+--
+SELECT
+  SAFE_CAST(? AS INT64)
+==
+
+SELECT 1::t.*
+--
+ERROR: Syntax error: Unexpected "*" [at 1:13]
+SELECT 1::t.*
+            ^
+==
+
+SELECT (1::t).*
+--
+QueryStatement [0-15] [SELECT (1::t).*]
+  Query [0-15] [SELECT (1::t).*]
+    Select [0-15] [SELECT (1::t).*]
+      SelectList [7-15] [(1::t).*]
+        SelectColumn [7-15] [(1::t).*]
+          DotStar [7-15] [(1::t).*]
+            CastExpression [8-12] [1::t]
+              IntLiteral(1) [8-9] [1]
+              SimpleType [11-12] [t]
+                PathExpression [11-12] [t]
+                  Identifier(t) [11-12] [t]
+--
+SELECT
+  CAST(1 AS t).*
+==
+
+SELECT 1::t.(member)
+--
+ERROR: Syntax error: Unexpected "(" [at 1:13]
+SELECT 1::t.(member)
+            ^
+==
+
+SELECT (1::t).member
+--
+QueryStatement [0-20] [SELECT (1::t).member]
+  Query [0-20] [SELECT (1::t).member]
+    Select [0-20] [SELECT (1::t).member]
+      SelectList [7-20] [(1::t).member]
+        SelectColumn [7-20] [(1::t).member]
+          DotIdentifier [7-20] [(1::t).member]
+            CastExpression [8-12] [1::t]
+              IntLiteral(1) [8-9] [1]
+              SimpleType [11-12] [t]
+                PathExpression [11-12] [t]
+                  Identifier(t) [11-12] [t]
+            Identifier(member) [14-20] [member]
+--
+SELECT
+  CAST(1 AS t).member
+==
+
+SELECT **x::t, NOT x::t,  x | y::t, x ^ y::t, x = y?::t, x & y ?:: t
+--
+QueryStatement [0-68] [SELECT **x...& y ?:: t]
+  Query [0-68] [SELECT **x...& y ?:: t]
+    Select [0-68] [SELECT **x...& y ?:: t]
+      SelectList [7-68] [**x::t, NOT...& y ?:: t]
+        SelectColumn [7-13] [**x::t]
+          UnpackExpression [7-13] [**x::t]
+            CastExpression [9-13] [x::t]
+              PathExpression [9-10] [x]
+                Identifier(x) [9-10] [x]
+              SimpleType [12-13] [t]
+                PathExpression [12-13] [t]
+                  Identifier(t) [12-13] [t]
+        SelectColumn [15-23] [NOT x::t]
+          UnaryExpression(NOT) [15-23] [NOT x::t]
+            CastExpression [19-23] [x::t]
+              PathExpression [19-20] [x]
+                Identifier(x) [19-20] [x]
+              SimpleType [22-23] [t]
+                PathExpression [22-23] [t]
+                  Identifier(t) [22-23] [t]
+        SelectColumn [26-34] [x | y::t]
+          BinaryExpression(|) [26-34] [x | y::t]
+            PathExpression [26-27] [x]
+              Identifier(x) [26-27] [x]
+            CastExpression [30-34] [y::t]
+              PathExpression [30-31] [y]
+                Identifier(y) [30-31] [y]
+              SimpleType [33-34] [t]
+                PathExpression [33-34] [t]
+                  Identifier(t) [33-34] [t]
+        SelectColumn [36-44] [x ^ y::t]
+          BinaryExpression(^) [36-44] [x ^ y::t]
+            PathExpression [36-37] [x]
+              Identifier(x) [36-37] [x]
+            CastExpression [40-44] [y::t]
+              PathExpression [40-41] [y]
+                Identifier(y) [40-41] [y]
+              SimpleType [43-44] [t]
+                PathExpression [43-44] [t]
+                  Identifier(t) [43-44] [t]
+        SelectColumn [46-55] [x = y?::t]
+          BinaryExpression(=) [46-55] [x = y?::t]
+            PathExpression [46-47] [x]
+              Identifier(x) [46-47] [x]
+            CastExpression(return_null_on_error=true) [50-55] [y?::t]
+              PathExpression [50-51] [y]
+                Identifier(y) [50-51] [y]
+              SimpleType [54-55] [t]
+                PathExpression [54-55] [t]
+                  Identifier(t) [54-55] [t]
+        SelectColumn [57-68] [x & y ?:: t]
+          BinaryExpression(&) [57-68] [x & y ?:: t]
+            PathExpression [57-58] [x]
+              Identifier(x) [57-58] [x]
+            CastExpression(return_null_on_error=true) [61-68] [y ?:: t]
+              PathExpression [61-62] [y]
+                Identifier(y) [61-62] [y]
+              SimpleType [67-68] [t]
+                PathExpression [67-68] [t]
+                  Identifier(t) [67-68] [t]
+--
+SELECT
+  ** (CAST(x AS t)),
+  NOT CAST(x AS t),
+  x | CAST(y AS t),
+  x ^ CAST(y AS t),
+  x = SAFE_CAST(y AS t),
+  x & SAFE_CAST(y AS t)
+==
+
+SELECT
+  struct_col.field::STRING,
+  '123'::INT64::DOUBLE,
+  '123'?::INT64::DOUBLE,
+  module.some_constant :: INT64,
+  "abc" "def" :: STRING,
+  CASE WHEN x > 0 THEN 4 END :: BOOL,
+  x::INT64 * y::INT64
+--
+QueryStatement [0-201] [SELECT   struct_c...* y::INT64]
+  Query [0-201] [SELECT   struct_c...* y::INT64]
+    Select [0-201] [SELECT   struct_c...* y::INT64]
+      SelectList [9-201] [struct_col...* y::INT64]
+        SelectColumn [9-33] [struct_col.field::STRING]
+          CastExpression [9-33] [struct_col.field::STRING]
+            PathExpression [9-25] [struct_col.field]
+              Identifier(struct_col) [9-19] [struct_col]
+              Identifier(field) [20-25] [field]
+            SimpleType [27-33] [STRING]
+              PathExpression [27-33] [STRING]
+                Identifier(STRING) [27-33] [STRING]
+        SelectColumn [37-57] ['123'::INT64::DOUBLE]
+          CastExpression [37-57] ['123'::INT64::DOUBLE]
+            CastExpression [37-49] ['123'::INT64]
+              StringLiteral [37-42] ['123']
+                StringLiteralComponent('123') [37-42] ['123']
+              SimpleType [44-49] [INT64]
+                PathExpression [44-49] [INT64]
+                  Identifier(INT64) [44-49] [INT64]
+            SimpleType [51-57] [DOUBLE]
+              PathExpression [51-57] [DOUBLE]
+                Identifier(DOUBLE) [51-57] [DOUBLE]
+        SelectColumn [61-82] ['123'?::INT64::DOUBLE]
+          CastExpression [61-82] ['123'?::INT64::DOUBLE]
+            CastExpression(return_null_on_error=true) [61-74] ['123'?::INT64]
+              StringLiteral [61-66] ['123']
+                StringLiteralComponent('123') [61-66] ['123']
+              SimpleType [69-74] [INT64]
+                PathExpression [69-74] [INT64]
+                  Identifier(INT64) [69-74] [INT64]
+            SimpleType [76-82] [DOUBLE]
+              PathExpression [76-82] [DOUBLE]
+                Identifier(DOUBLE) [76-82] [DOUBLE]
+        SelectColumn [86-115] [module.some_constant :: INT64]
+          CastExpression [86-115] [module.some_constant :: INT64]
+            PathExpression [86-106] [module.some_constant]
+              Identifier(module) [86-92] [module]
+              Identifier(some_constant) [93-106] [some_constant]
+            SimpleType [110-115] [INT64]
+              PathExpression [110-115] [INT64]
+                Identifier(INT64) [110-115] [INT64]
+        SelectColumn [119-140] ["abc" "def" :: STRING]
+          CastExpression [119-140] ["abc" "def" :: STRING]
+            StringLiteral [119-130] ["abc" "def"]
+              StringLiteralComponent("abc") [119-124] ["abc"]
+              StringLiteralComponent("def") [125-130] ["def"]
+            SimpleType [134-140] [STRING]
+              PathExpression [134-140] [STRING]
+                Identifier(STRING) [134-140] [STRING]
+        SelectColumn [144-178] [CASE WHEN...END :: BOOL]
+          CastExpression [144-178] [CASE WHEN...END :: BOOL]
+            CaseNoValueExpression [144-170] [CASE WHEN x > 0 THEN 4 END]
+              BinaryExpression(>) [154-159] [x > 0]
+                PathExpression [154-155] [x]
+                  Identifier(x) [154-155] [x]
+                IntLiteral(0) [158-159] [0]
+              IntLiteral(4) [165-166] [4]
+            SimpleType [174-178] [BOOL]
+              PathExpression [174-178] [BOOL]
+                Identifier(BOOL) [174-178] [BOOL]
+        SelectColumn [182-201] [x::INT64 * y::INT64]
+          BinaryExpression(*) [182-201] [x::INT64 * y::INT64]
+            CastExpression [182-190] [x::INT64]
+              PathExpression [182-183] [x]
+                Identifier(x) [182-183] [x]
+              SimpleType [185-190] [INT64]
+                PathExpression [185-190] [INT64]
+                  Identifier(INT64) [185-190] [INT64]
+            CastExpression [193-201] [y::INT64]
+              PathExpression [193-194] [y]
+                Identifier(y) [193-194] [y]
+              SimpleType [196-201] [INT64]
+                PathExpression [196-201] [INT64]
+                  Identifier(INT64) [196-201] [INT64]
+--
+SELECT
+  CAST(struct_col.field AS STRING),
+  CAST(CAST('123' AS INT64) AS DOUBLE),
+  CAST(SAFE_CAST('123' AS INT64) AS DOUBLE),
+  CAST(module.some_constant AS INT64),
+  CAST("abc" "def" AS STRING),
+  CAST(
+  CASE
+    WHEN x > 0 THEN 4
+  END AS BOOL),
+  CAST(x AS INT64) * CAST(y AS INT64)
+==
+
+select expr :: identifier.a, expr :: identifier.a.b.c;
+--
+QueryStatement [0-53] [select expr...identifier.a.b.c]
+  Query [0-53] [select expr...identifier.a.b.c]
+    Select [0-53] [select expr...identifier.a.b.c]
+      SelectList [7-53] [expr :: identifie...fier.a.b.c]
+        SelectColumn [7-27] [expr :: identifier.a]
+          CastExpression [7-27] [expr :: identifier.a]
+            PathExpression [7-11] [expr]
+              Identifier(expr) [7-11] [expr]
+            SimpleType [15-27] [identifier.a]
+              PathExpression [15-27] [identifier.a]
+                Identifier(identifier) [15-25] [identifier]
+                Identifier(a) [26-27] [a]
+        SelectColumn [29-53] [expr :: identifier.a.b.c]
+          CastExpression [29-53] [expr :: identifier.a.b.c]
+            PathExpression [29-33] [expr]
+              Identifier(expr) [29-33] [expr]
+            SimpleType [37-53] [identifier.a.b.c]
+              PathExpression [37-53] [identifier.a.b.c]
+                Identifier(identifier) [37-47] [identifier]
+                Identifier(a) [48-49] [a]
+                Identifier(b) [50-51] [b]
+                Identifier(c) [52-53] [c]
+--
+SELECT
+  CAST(expr AS identifier.a),
+  CAST(expr AS identifier.a.b.c)

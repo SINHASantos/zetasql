@@ -23,6 +23,7 @@
 #include <vector>
 
 #include "googlesql/base/atomic_sequence_num.h"
+#include "google/protobuf/timestamp.pb.h"
 #include "googlesql/base/testing/status_matchers.h"
 #include "googlesql/public/analyzer_options.h"
 #include "googlesql/public/builtin_function.pb.h"
@@ -554,6 +555,27 @@ TEST_F(FunctionCallBuilderTest, LikeTest) {
 FunctionCall(GoogleSQL:$like(STRING, STRING) -> BOOL)
 +-Literal(type=STRING, value="bar", has_explicit_type=TRUE)
 +-Literal(type=STRING, value="%r", has_explicit_type=TRUE)
+)"));
+}
+
+TEST_F(FunctionCallBuilderTest, FromProtoTest) {
+  const Type* proto_type = nullptr;
+  GOOGLESQL_ASSERT_OK(type_factory_.MakeProtoType(
+      google::protobuf::Timestamp::descriptor(), &proto_type));
+  ASSERT_NE(proto_type, nullptr);
+
+  std::unique_ptr<ResolvedExpr> input =
+      MakeResolvedLiteral(proto_type, Value::Null(proto_type),
+                          /*has_explicit_type=*/true);
+  ASSERT_NE(input, nullptr);
+
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(
+      std::unique_ptr<const ResolvedExpr> from_proto_fn,
+      fn_builder_.FromProto(std::move(input), FN_FROM_PROTO_TIMESTAMP,
+                            types::TimestampType()));
+  EXPECT_EQ(from_proto_fn->DebugString(), absl::StripLeadingAsciiWhitespace(R"(
+FunctionCall(GoogleSQL:from_proto(PROTO<google.protobuf.Timestamp>) -> TIMESTAMP)
++-Literal(type=PROTO<google.protobuf.Timestamp>, value=NULL, has_explicit_type=TRUE)
 )"));
 }
 
@@ -3054,6 +3076,216 @@ TEST(RewriteUtilsTest, CorrelateColumnRefsHandlesCopyFailureGracefully) {
   EXPECT_THAT(CorrelateColumnRefs(*subquery),
               StatusIs(absl::StatusCode::kInvalidArgument,
                        HasSubstr("Unhandled node type in deep copy")));
+}
+
+TEST_F(TVFUtilsTest, CteQueryNameGeneratorScansExistingCteNamesInAst) {
+  auto with_entry_1 =
+      MakeResolvedWithEntry("cte_1", MakeResolvedSingleRowScan());
+  auto with_entry_base =
+      MakeResolvedWithEntry("cte", MakeResolvedSingleRowScan());
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(auto with_scan,
+                       ResolvedWithScanBuilder()
+                           .add_with_entry_list(std::move(with_entry_1))
+                           .add_with_entry_list(std::move(with_entry_base))
+                           .set_query(MakeResolvedSingleRowScan())
+                           .set_recursive(false)
+                           .Build());
+
+  CteQueryNameGenerator generator;
+  GOOGLESQL_EXPECT_OK(with_scan->Accept(&generator));
+
+  // Passing empty base_name falls back to "cte", which collides with existing
+  // "cte" and "cte_1" in AST, producing "cte_2".
+  EXPECT_EQ(generator.MakeUniqueCteName(""), "cte_2");
+  EXPECT_EQ(generator.MakeUniqueCteName(""), "cte_3");
+
+  // First time using "hop_params" -> uses "hop_params" directly since no
+  // collision
+  EXPECT_EQ(generator.MakeUniqueCteName("hop_params"), "hop_params");
+
+  // Second time using "hop_params" -> collides, gets "hop_params_4" (since
+  // max_seen_index is 4)
+  EXPECT_EQ(generator.MakeUniqueCteName("hop_params"), "hop_params_4");
+  EXPECT_EQ(generator.max_seen_index(), 4);
+
+  // Third time using "hop_params" -> collides, gets "hop_params_5"
+  EXPECT_EQ(generator.MakeUniqueCteName("hop_params"), "hop_params_5");
+  EXPECT_EQ(generator.max_seen_index(), 5);
+
+  // First time using "tumble_params" -> uses "tumble_params" directly
+  EXPECT_EQ(generator.MakeUniqueCteName("tumble_params"), "tumble_params");
+}
+
+TEST(RewriteUtilsTest, ReplaceScanColumnsSimple) {
+  IdStringPool id_string_pool;
+  googlesql_base::SequenceNumber sequence;
+  ColumnFactory factory(0, id_string_pool, sequence);
+  SimpleTable table("tab", {{"col", types::Int64Type()}});
+  std::unique_ptr<ResolvedTableScan> input = MakeResolvedTableScan(
+      /*column_list=*/{factory.MakeCol("tab", "col", types::Int64Type())},
+      /*table=*/&table,
+      /*for_system_time_expr=*/nullptr);
+  input->add_column_index_list(0);
+
+  EXPECT_EQ(input->column_list(0).column_id(), 1);
+
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(
+      std::unique_ptr<const ResolvedScan> output,
+      ReplaceScanColumns(factory, *input, input->column_index_list(),
+                         input->column_list()));
+
+  EXPECT_EQ(output->column_list(0).column_id(), 1);
+}
+
+TEST(RewriteUtilsTest, ReplaceScanColumnsOutOfOrder) {
+  IdStringPool id_string_pool;
+  googlesql_base::SequenceNumber sequence;
+  ColumnFactory factory(0, id_string_pool, sequence);
+  SimpleTable table("tab", {
+                               {"col1", types::Int64Type()},
+                               {"col2", types::Int64Type()},
+                           });
+  std::unique_ptr<ResolvedTableScan> input = MakeResolvedTableScan(
+      /*column_list=*/{factory.MakeCol("tab", "col1", types::Int64Type()),
+                       factory.MakeCol("tab", "col2", types::Int64Type())},
+      /*table=*/&table,
+      /*for_system_time_expr=*/nullptr);
+
+  EXPECT_EQ(input->column_list(0).column_id(), 1);
+  EXPECT_EQ(input->column_list(1).column_id(), 2);
+
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(
+      std::unique_ptr<const ResolvedScan> output,
+      ReplaceScanColumns(factory, *input,
+                         {1, 0},  // Note the out-of-order indices.
+                         input->column_list()));
+
+  EXPECT_EQ(output->column_list(0).column_id(), 2);
+  EXPECT_EQ(output->column_list(1).column_id(), 1);
+}
+
+TEST(RewriteUtilsTest, ReplaceScanColumnsDuplicateColumns) {
+  IdStringPool id_string_pool;
+  googlesql_base::SequenceNumber sequence;
+  ColumnFactory factory(0, id_string_pool, sequence);
+  SimpleTable table("tab", {{"col", types::Int64Type()}});
+
+  ResolvedColumn col = factory.MakeCol("tab", "col", types::Int64Type());
+  ResolvedColumn col2 = factory.MakeCol("tab", "col", types::Int64Type());
+  std::unique_ptr<ResolvedScan> input =
+      MakeResolvedProjectScan({col, col}, {},
+                              MakeResolvedTableScan(
+                                  /*column_list=*/
+                                  {col},
+                                  /*table=*/&table,
+                                  /*for_system_time_expr=*/nullptr));
+
+  EXPECT_EQ(input->column_list(0).column_id(), 1);
+  EXPECT_EQ(input->column_list(1).column_id(), 1);
+
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(
+      std::unique_ptr<const ResolvedScan> output,
+      ReplaceScanColumns(factory, *input, {0, 1}, {col, col2}));
+
+  EXPECT_EQ(output->column_list(0).column_id(), 1);
+  EXPECT_EQ(output->column_list(1).column_id(), 2);
+  const ResolvedComputedColumn* computed_column =
+      output->GetAs<ResolvedProjectScan>()->expr_list(0);
+  EXPECT_EQ(computed_column->column().column_id(), 2);
+  EXPECT_EQ(computed_column->column().name(), "col");
+  EXPECT_EQ(
+      computed_column->expr()->GetAs<ResolvedColumnRef>()->column().column_id(),
+      1);
+}
+
+TEST(RewriteUtilsTest, ReplaceScanColumnsOutOfOrderDuplicateColumns) {
+  IdStringPool id_string_pool;
+  googlesql_base::SequenceNumber sequence;
+  ColumnFactory factory(0, id_string_pool, sequence);
+  SimpleTable table("tab", {{"col", types::Int64Type()}});
+
+  ResolvedColumn col = factory.MakeCol("tab", "col", types::Int64Type());
+  ResolvedColumn col2 = factory.MakeCol("tab", "col", types::Int64Type());
+  std::unique_ptr<ResolvedScan> input =
+      MakeResolvedProjectScan({col, col}, {},
+                              MakeResolvedTableScan(
+                                  /*column_list=*/
+                                  {col},
+                                  /*table=*/&table,
+                                  /*for_system_time_expr=*/nullptr));
+
+  EXPECT_EQ(input->column_list(0).column_id(), 1);
+  EXPECT_EQ(input->column_list(1).column_id(), 1);
+
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(
+      std::unique_ptr<const ResolvedScan> output,
+      ReplaceScanColumns(factory, *input,
+                         {1, 0},  // Note the out-of-order indices.
+                         {col, col2}));
+
+  EXPECT_EQ(output->column_list(0).column_id(), 2);
+  EXPECT_EQ(output->column_list(1).column_id(), 1);
+  const ResolvedComputedColumn* computed_column =
+      output->GetAs<ResolvedProjectScan>()->expr_list(0);
+  EXPECT_EQ(computed_column->column().column_id(), 2);
+  EXPECT_EQ(computed_column->column().name(), "col");
+  EXPECT_EQ(
+      computed_column->expr()->GetAs<ResolvedColumnRef>()->column().column_id(),
+      1);
+}
+
+TEST(RewriteUtilsTest, ReplaceScanColumnsMultipleDuplicateColumns) {
+  IdStringPool id_string_pool;
+  googlesql_base::SequenceNumber sequence;
+  ColumnFactory factory(0, id_string_pool, sequence);
+  SimpleTable table(
+      "tab", {{"colx", types::Int64Type()}, {"coly", types::Int64Type()}});
+
+  ResolvedColumn colx = factory.MakeCol("tab", "colx", types::Int64Type());
+  ResolvedColumn coly = factory.MakeCol("tab", "coly", types::Int64Type());
+  ResolvedColumn colx2 = factory.MakeCol("tab", "colx", types::Int64Type());
+  ResolvedColumn coly2 = factory.MakeCol("tab", "coly", types::Int64Type());
+  std::unique_ptr<ResolvedScan> input =
+      MakeResolvedProjectScan({colx, coly, colx, coly}, {},
+                              MakeResolvedTableScan(
+                                  /*column_list=*/
+                                  {colx, coly},
+                                  /*table=*/&table,
+                                  /*for_system_time_expr=*/nullptr));
+
+  EXPECT_EQ(input->column_list(0).column_id(), 1);
+  EXPECT_EQ(input->column_list(1).column_id(), 2);
+  EXPECT_EQ(input->column_list(2).column_id(), 1);
+  EXPECT_EQ(input->column_list(3).column_id(), 2);
+
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(std::unique_ptr<const ResolvedScan> output,
+                       ReplaceScanColumns(factory, *input, {0, 1, 2, 3},
+                                          {colx, coly, colx2, coly2}));
+
+  EXPECT_EQ(output->column_list(0).column_id(), 1);
+  EXPECT_EQ(output->column_list(1).column_id(), 2);
+  EXPECT_EQ(output->column_list(2).column_id(), 3);
+  EXPECT_EQ(output->column_list(3).column_id(), 4);
+  ASSERT_TRUE(output->Is<ResolvedProjectScan>());
+  const ResolvedProjectScan* project_scan =
+      output->GetAs<ResolvedProjectScan>();
+  ASSERT_EQ(project_scan->expr_list_size(), 2);
+  const ResolvedComputedColumn* computed_column_x = project_scan->expr_list(0);
+  EXPECT_EQ(computed_column_x->column().column_id(), 3);
+  EXPECT_EQ(computed_column_x->column().name(), "colx");
+  EXPECT_EQ(computed_column_x->expr()
+                ->GetAs<ResolvedColumnRef>()
+                ->column()
+                .column_id(),
+            1);
+  const ResolvedComputedColumn* computed_column_y = project_scan->expr_list(1);
+  EXPECT_EQ(computed_column_y->column().column_id(), 4);
+  EXPECT_EQ(computed_column_y->column().name(), "coly");
+  EXPECT_EQ(computed_column_y->expr()
+                ->GetAs<ResolvedColumnRef>()
+                ->column()
+                .column_id(),
+            2);
 }
 
 }  // namespace

@@ -30,8 +30,10 @@
 #include "google/protobuf/wrappers.pb.h"
 #include "google/type/date.pb.h"
 #include "google/type/timeofday.pb.h"
+#include "googlesql/proto/kmeans_options.pb.h"
 #include "googlesql/public/functions/array_find_mode.pb.h"
 #include "googlesql/public/functions/array_zip_mode.pb.h"
+#include "googlesql/public/functions/endianness.pb.h"
 #include "googlesql/public/functions/rounding_mode.pb.h"
 #include "absl/base/no_destructor.h"
 #include "absl/container/btree_map.h"
@@ -70,6 +72,9 @@ GetBuiltinEnumDescriptors() {
             googlesql::functions::RoundingMode_descriptor(),
             googlesql::functions::ArrayFindEnums::ArrayFindMode_descriptor(),
             googlesql::functions::ArrayZipEnums::ArrayZipMode_descriptor(),
+            googlesql::functions::Endianness_descriptor(),
+            googlesql::KMeansOptions::DistanceType_descriptor(),
+            googlesql::KMeansOptions::InitMethod_descriptor(),
         };
         absl::flat_hash_map<absl::string_view, const google::protobuf::EnumDescriptor*>
             descriptor_map;
@@ -100,6 +105,7 @@ GetBuiltinProtoDescriptors() {
             google::protobuf::StringValue::descriptor(),
             google::protobuf::BytesValue::descriptor(),
             google::protobuf::Duration::descriptor(),
+            googlesql::KMeansOptions::descriptor(),
         };
         absl::flat_hash_map<absl::string_view, const google::protobuf::Descriptor*>
             descriptor_map;

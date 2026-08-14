@@ -59,6 +59,7 @@ absl::StatusOr<bool> IsConstantExpression(const ResolvedExpr* expr) {
     case RESOLVED_COLUMN_REF:
     case RESOLVED_AGGREGATE_FUNCTION_CALL:
     case RESOLVED_ANALYTIC_FUNCTION_CALL:
+    case RESOLVED_ESTIMATOR_FUNCTION_CALL:
     case RESOLVED_GET_ROW_FIELD:
 
       // Subqueries are considered non-constant because they may involve
@@ -314,8 +315,13 @@ ExprResolutionInfo::ExprResolutionInfo(
       analytic_name_scope(options.analytic_name_scope
                               ? options.analytic_name_scope
                               : name_scope_in),
+      estimator_name_scope(options.estimator_name_scope
+                               ? options.estimator_name_scope
+                               : name_scope_in),
       allows_aggregation(options.allows_aggregation.value_or(false)),
       allows_analytic(options.allows_analytic.value_or(false)),
+      allows_estimator_function(
+          options.allows_estimator_function.value_or(false)),
       is_graph_measure_expression(options.is_graph_measure_expression),
       clause_name(options.clause_name == nullptr ? "" : options.clause_name),
       query_resolution_info(query_resolution_info_in),
@@ -351,14 +357,12 @@ ExprResolutionInfo::ExprResolutionInfo(ExprResolutionInfo* parent,
                                        ExprResolutionInfoOptions options)
     : parent(parent),
       ARG_UPDATE(name_scope),
-      aggregate_name_scope(options.aggregate_name_scope
-                               ? options.aggregate_name_scope
-                               : parent->aggregate_name_scope),
-      analytic_name_scope(options.analytic_name_scope
-                              ? options.analytic_name_scope
-                              : parent->analytic_name_scope),
+      ARG_UPDATE(aggregate_name_scope),
+      ARG_UPDATE(analytic_name_scope),
+      ARG_UPDATE(estimator_name_scope),
       ARG_UPDATE_OPT(allows_aggregation),
       ARG_UPDATE_OPT(allows_analytic),
+      ARG_UPDATE_OPT(allows_estimator_function),
       ARG_UPDATE(is_graph_measure_expression),
       ARG_UPDATE(clause_name),
       query_resolution_info(parent->query_resolution_info),
@@ -372,11 +376,12 @@ ExprResolutionInfo::ExprResolutionInfo(ExprResolutionInfo* parent,
       ARG_UPDATE_OPT(in_match_recognize_define),
       ARG_UPDATE(nearest_enclosing_physical_nav_op) {
   // This constructor can only be used to switch the name scope to the parent's
-  // aggregate or analytic scope, not to introduce a new scope,
+  // aggregate, analytic, or estimator scope, not to introduce a new scope,
   // unless allow_new_scopes is set.
   ABSL_DCHECK(options.allow_new_scopes ||
          name_scope == parent->aggregate_name_scope ||
          name_scope == parent->analytic_name_scope ||
+         name_scope == parent->estimator_name_scope ||
          name_scope == parent->name_scope)
       << "Setting new NameScape in child ExprResolutionInfo not allowed "
          "by default";
@@ -388,14 +393,12 @@ ExprResolutionInfo::ExprResolutionInfo(
     ExprResolutionInfoOptions options)
     : parent(parent),
       ARG_UPDATE(name_scope),
-      aggregate_name_scope(options.aggregate_name_scope
-                               ? options.aggregate_name_scope
-                               : parent->aggregate_name_scope),
-      analytic_name_scope(options.analytic_name_scope
-                              ? options.analytic_name_scope
-                              : parent->analytic_name_scope),
+      ARG_UPDATE(aggregate_name_scope),
+      ARG_UPDATE(analytic_name_scope),
+      ARG_UPDATE(estimator_name_scope),
       ARG_UPDATE_OPT(allows_aggregation),
       ARG_UPDATE_OPT(allows_analytic),
+      ARG_UPDATE_OPT(allows_estimator_function),
       ARG_UPDATE(is_graph_measure_expression),
       ARG_UPDATE(clause_name),
       query_resolution_info(new_query_resolution_info),
@@ -409,11 +412,12 @@ ExprResolutionInfo::ExprResolutionInfo(
       ARG_UPDATE_OPT(in_match_recognize_define),
       ARG_UPDATE(nearest_enclosing_physical_nav_op) {
   // This constructor can only be used to switch the name scope to the parent's
-  // aggregate or analytic scope, not to introduce a new scope,
+  // aggregate, analytic, or estimator scope, not to introduce a new scope,
   // unless allow_new_scopes is set.
   ABSL_DCHECK(options.allow_new_scopes ||
          name_scope == parent->aggregate_name_scope ||
          name_scope == parent->analytic_name_scope ||
+         name_scope == parent->estimator_name_scope ||
          name_scope == parent->name_scope)
       << "Setting new NameScape in child ExprResolutionInfo not allowed "
          "by default";
@@ -447,8 +451,10 @@ ExprResolutionInfo::ExprResolutionInfo(ExprResolutionInfo* parent)
       name_scope(parent->name_scope),
       aggregate_name_scope(parent->aggregate_name_scope),
       analytic_name_scope(parent->analytic_name_scope),
+      estimator_name_scope(parent->estimator_name_scope),
       allows_aggregation(parent->allows_aggregation),
       allows_analytic(parent->allows_analytic),
+      allows_estimator_function(parent->allows_estimator_function),
       is_graph_measure_expression(parent->is_graph_measure_expression),
       clause_name(parent->clause_name),
       query_resolution_info(parent->query_resolution_info),
@@ -470,6 +476,7 @@ ExprResolutionInfo::ExprResolutionInfo(const NameScope* name_scope_in,
     : name_scope(name_scope_in),
       aggregate_name_scope(name_scope_in),
       analytic_name_scope(name_scope_in),
+      estimator_name_scope(name_scope_in),
       clause_name(clause_name_in) {
   ABSL_DCHECK(clause_name != nullptr);
   Subscribe(name_scope);
@@ -488,6 +495,9 @@ ExprResolutionInfo::~ExprResolutionInfo() {
     }
     if (findings.has_volatile) {
       parent->findings.has_volatile = true;
+    }
+    if (findings.has_estimator) {
+      parent->findings.has_estimator = true;
     }
     if (allows_horizontal_aggregation) {
       parent->horizontal_aggregation_info = horizontal_aggregation_info;
@@ -520,11 +530,22 @@ std::string ExprResolutionInfo::DebugString() const {
       &debugstring, "\naggregate_name_scope: ",
       (aggregate_name_scope != nullptr ? aggregate_name_scope->DebugString()
                                        : "NULL"));
+  absl::StrAppend(
+      &debugstring, "\nanalytic_name_scope: ",
+      (analytic_name_scope != nullptr ? analytic_name_scope->DebugString()
+                                      : "NULL"));
+  absl::StrAppend(
+      &debugstring, "\nestimator_name_scope: ",
+      (estimator_name_scope != nullptr ? estimator_name_scope->DebugString()
+                                       : "NULL"));
   absl::StrAppend(&debugstring, "\nallows_aggregation: ", allows_aggregation);
   absl::StrAppend(&debugstring,
                   "\nhas_aggregation: ", findings.has_aggregation);
   absl::StrAppend(&debugstring, "\nallows_analytic: ", allows_analytic);
   absl::StrAppend(&debugstring, "\nhas_analytic: ", findings.has_analytic);
+  absl::StrAppend(&debugstring,
+                  "\nallows_estimator_function: ", allows_estimator_function);
+  absl::StrAppend(&debugstring, "\nhas_estimator: ", findings.has_estimator);
   absl::StrAppend(&debugstring, "\nhas_volatile: ", findings.has_volatile);
   absl::StrAppend(&debugstring, "\nclause_name: ", clause_name);
   absl::StrAppend(&debugstring,

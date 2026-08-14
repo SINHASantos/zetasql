@@ -62,7 +62,7 @@ class ValueContent {
 
   template <class T>
   static constexpr bool IsTypeSupported() {
-    return std::is_trivially_copyable<T>::value &&
+    return std::is_trivially_copyable_v<T> &&
            sizeof(Storage<T>) == sizeof(content_);
   }
 

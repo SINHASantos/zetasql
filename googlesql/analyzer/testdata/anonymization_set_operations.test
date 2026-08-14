@@ -47,6 +47,7 @@ QueryStmt
               +-parse_location=26-36
               +-Literal(parse_location=55-56, type=INT64, value=0)
               +-Literal(parse_location=61-64, type=INT64, value=100)
+
 [REPLACED_LITERALS]
 select with anonymization anon_count(* CLAMPED BETWEEN @_p0_INT64 AND @_p1_INT64)
 from (select @_p2_INT64 union all select @_p3_INT64);
@@ -102,6 +103,7 @@ QueryStmt
               +-parse_location=26-36
               +-Literal(parse_location=55-56, type=INT64, value=0)
               +-Literal(parse_location=61-64, type=INT64, value=100)
+
 [REPLACED_LITERALS]
 select with anonymization anon_count(* CLAMPED BETWEEN @_p0_INT64 AND @_p1_INT64)
 from (select * from SimpleTypesWithAnonymizationUid
@@ -197,6 +199,7 @@ QueryStmt
               +-parse_location=26-36
               +-Literal(parse_location=55-56, type=INT64, value=0)
               +-Literal(parse_location=61-64, type=INT64, value=100)
+
 [REPLACED_LITERALS]
 select with anonymization anon_count(* CLAMPED BETWEEN @_p0_INT64 AND @_p1_INT64)
 from (select * from SimpleTypesWithAnonymizationUid
@@ -292,6 +295,7 @@ QueryStmt
               +-parse_location=26-36
               +-Literal(parse_location=55-56, type=INT64, value=0)
               +-Literal(parse_location=61-64, type=INT64, value=100)
+
 [REPLACED_LITERALS]
 select with anonymization anon_count(* CLAMPED BETWEEN @_p0_INT64 AND @_p1_INT64)
 from (select * from SimpleTypesWithAnonymizationUid
@@ -387,6 +391,7 @@ QueryStmt
               +-parse_location=26-36
               +-Literal(parse_location=55-56, type=INT64, value=0)
               +-Literal(parse_location=61-64, type=INT64, value=100)
+
 [REPLACED_LITERALS]
 select with anonymization anon_count(* CLAMPED BETWEEN @_p0_INT64 AND @_p1_INT64)
 from (select * from SimpleTypesWithAnonymizationUid
@@ -482,6 +487,7 @@ QueryStmt
               +-parse_location=26-36
               +-Literal(parse_location=55-56, type=INT64, value=0)
               +-Literal(parse_location=61-64, type=INT64, value=100)
+
 [REPLACED_LITERALS]
 select with anonymization anon_count(* CLAMPED BETWEEN @_p0_INT64 AND @_p1_INT64)
 from (select * from SimpleTypesWithAnonymizationUid
@@ -577,6 +583,7 @@ QueryStmt
               +-parse_location=26-36
               +-Literal(parse_location=55-56, type=INT64, value=0)
               +-Literal(parse_location=61-64, type=INT64, value=100)
+
 [REPLACED_LITERALS]
 select with anonymization anon_count(* CLAMPED BETWEEN @_p0_INT64 AND @_p1_INT64)
 from (select * from SimpleTypesWithAnonymizationUid
@@ -709,6 +716,7 @@ QueryStmt
               +-parse_location=26-36
               +-Literal(parse_location=55-56, type=INT64, value=0)
               +-Literal(parse_location=61-64, type=INT64, value=100)
+
 [REPLACED_LITERALS]
 select with anonymization anon_count(* CLAMPED BETWEEN @_p0_INT64 AND @_p1_INT64)
 from (select * from SimpleTypesWithAnonymizationUid
@@ -785,6 +793,7 @@ QueryStmt
               +-parse_location=26-36
               +-Literal(parse_location=55-56, type=INT64, value=0)
               +-Literal(parse_location=61-64, type=INT64, value=100)
+
 [REPLACED_LITERALS]
 select with anonymization anon_count(* CLAMPED BETWEEN @_p0_INT64 AND @_p1_INT64)
 from (select * from SimpleTypesWithAnonymizationUid
@@ -861,6 +870,7 @@ QueryStmt
               +-parse_location=26-36
               +-Literal(parse_location=55-56, type=INT64, value=0)
               +-Literal(parse_location=61-64, type=INT64, value=100)
+
 [REPLACED_LITERALS]
 select with anonymization anon_count(* CLAMPED BETWEEN @_p0_INT64 AND @_p1_INT64)
 from (select * from SimpleTypesWithAnonymizationUid
@@ -937,6 +947,7 @@ QueryStmt
               +-parse_location=26-36
               +-Literal(parse_location=55-56, type=INT64, value=0)
               +-Literal(parse_location=61-64, type=INT64, value=100)
+
 [REPLACED_LITERALS]
 select with anonymization anon_count(* CLAMPED BETWEEN @_p0_INT64 AND @_p1_INT64)
 from (select * from SimpleTypesWithAnonymizationUid
@@ -1013,6 +1024,7 @@ QueryStmt
               +-parse_location=26-36
               +-Literal(parse_location=55-56, type=INT64, value=0)
               +-Literal(parse_location=61-64, type=INT64, value=100)
+
 [REPLACED_LITERALS]
 select with anonymization anon_count(* CLAMPED BETWEEN @_p0_INT64 AND @_p1_INT64)
 from (select * from SimpleTypesWithAnonymizationUid
@@ -1089,6 +1101,7 @@ QueryStmt
               +-parse_location=26-36
               +-Literal(parse_location=55-56, type=INT64, value=0)
               +-Literal(parse_location=61-64, type=INT64, value=100)
+
 [REPLACED_LITERALS]
 select with anonymization anon_count(* CLAMPED BETWEEN @_p0_INT64 AND @_p1_INT64)
 from (select * from SimpleTypesWithAnonymizationUid
@@ -1163,6 +1176,7 @@ QueryStmt
               +-parse_location=26-36
               +-Literal(parse_location=55-56, type=INT64, value=0)
               +-Literal(parse_location=61-64, type=INT64, value=100)
+
 [REPLACED_LITERALS]
 select with anonymization anon_count(* CLAMPED BETWEEN @_p0_INT64 AND @_p1_INT64)
 from (select * from T1StringAnonymizationUid
@@ -1223,6 +1237,7 @@ QueryStmt
               +-parse_location=26-36
               +-Literal(parse_location=55-56, type=INT64, value=0)
               +-Literal(parse_location=61-64, type=INT64, value=100)
+
 [REPLACED_LITERALS]
 select with anonymization anon_count(* CLAMPED BETWEEN @_p0_INT64 AND @_p1_INT64)
 from (select * from T1StringAnonymizationUid
@@ -1272,6 +1287,7 @@ QueryStmt
               +-parse_location=26-36
               +-Literal(parse_location=55-56, type=INT64, value=0)
               +-Literal(parse_location=61-64, type=INT64, value=100)
+
 [REPLACED_LITERALS]
 select with anonymization anon_count(* CLAMPED BETWEEN @_p0_INT64 AND @_p1_INT64)
 from (select * from T1StringAnonymizationUid
@@ -1321,6 +1337,7 @@ QueryStmt
               +-parse_location=26-36
               +-Literal(parse_location=55-56, type=INT64, value=0)
               +-Literal(parse_location=61-64, type=INT64, value=100)
+
 [REPLACED_LITERALS]
 select with anonymization anon_count(* CLAMPED BETWEEN @_p0_INT64 AND @_p1_INT64)
 from (select * from T1StringAnonymizationUid
@@ -1370,6 +1387,7 @@ QueryStmt
               +-parse_location=26-36
               +-Literal(parse_location=55-56, type=INT64, value=0)
               +-Literal(parse_location=61-64, type=INT64, value=100)
+
 [REPLACED_LITERALS]
 select with anonymization anon_count(* CLAMPED BETWEEN @_p0_INT64 AND @_p1_INT64)
 from (select * from T1StringAnonymizationUid
@@ -1419,6 +1437,7 @@ QueryStmt
               +-parse_location=26-36
               +-Literal(parse_location=55-56, type=INT64, value=0)
               +-Literal(parse_location=61-64, type=INT64, value=100)
+
 [REPLACED_LITERALS]
 select with anonymization anon_count(* CLAMPED BETWEEN @_p0_INT64 AND @_p1_INT64)
 from (select * from T1StringAnonymizationUid
@@ -1468,6 +1487,7 @@ QueryStmt
               +-parse_location=26-36
               +-Literal(parse_location=55-56, type=INT64, value=0)
               +-Literal(parse_location=61-64, type=INT64, value=100)
+
 [REPLACED_LITERALS]
 select with anonymization anon_count(* CLAMPED BETWEEN @_p0_INT64 AND @_p1_INT64)
 from (select * from T1StringAnonymizationUid
@@ -1533,6 +1553,7 @@ QueryStmt
               +-parse_location=26-36
               +-Literal(parse_location=55-56, type=INT64, value=0)
               +-Literal(parse_location=61-64, type=INT64, value=100)
+
 [REPLACED_LITERALS]
 select with anonymization anon_count(* CLAMPED BETWEEN @_p0_INT64 AND @_p1_INT64)
 from (select * from T1StringAnonymizationUid
@@ -1611,6 +1632,7 @@ QueryStmt
               +-parse_location=26-36
               +-Literal(parse_location=55-56, type=INT64, value=0)
               +-Literal(parse_location=61-64, type=INT64, value=100)
+
 [REPLACED_LITERALS]
 select with anonymization anon_count(* CLAMPED BETWEEN @_p0_INT64 AND @_p1_INT64)
 from (select * from T1StringAnonymizationUid
@@ -1766,6 +1788,7 @@ QueryStmt
               +-parse_location=26-36
               +-Literal(parse_location=55-56, type=INT64, value=0)
               +-Literal(parse_location=61-64, type=INT64, value=100)
+
 [REPLACED_LITERALS]
 select with anonymization anon_count(* CLAMPED BETWEEN @_p0_INT64 AND @_p1_INT64)
 from (select * from T1StringAnonymizationUid
@@ -1903,6 +1926,7 @@ QueryStmt
               +-parse_location=26-36
               +-Literal(parse_location=55-56, type=INT64, value=0)
               +-Literal(parse_location=61-62, type=INT64, value=1)
+
 [REPLACED_LITERALS]
 select with anonymization anon_count(* CLAMPED BETWEEN @_p0_INT64 AND @_p1_INT64)
 from (select * from SimpleTypesWithAnonymizationUid

@@ -20,7 +20,6 @@ FROM KeyValueFindOnly
 # TODO: Enable more rewrites in some tests to test interactions.
 [default language_features=MAXIMUM,+ROW_TYPE]
 [default no_run_deserializer]
-[default no_run_sqlbuilder]
 [default enabled_ast_rewrites=NONE,+ROW_TYPE]
 FROM KeyValue{{Lazy|FindOnly}}
 |> STATIC_DESCRIBE
@@ -50,7 +49,6 @@ QueryStmt
         |   """
         +-input_scan=
           +-TableScan(table=KeyValueLazy, read_as_row_type=TRUE)
-
 
 [REWRITTEN AST]
 QueryStmt
@@ -101,7 +99,6 @@ QueryStmt
         +-input_scan=
           +-TableScan(table=KeyValueFindOnly, read_as_row_type=TRUE)
 
-
 [REWRITTEN AST]
 QueryStmt
 +-output_column_list=
@@ -144,7 +141,6 @@ QueryStmt
     +-aggregate_list=
       +-$agg1#2 := AggregateFunctionCall(GoogleSQL:$count_star() -> INT64)
 
-
 [REWRITTEN AST]
 QueryStmt
 +-output_column_list=
@@ -169,7 +165,6 @@ QueryStmt
     | +-TableScan(table=KeyValueFindOnly, read_as_row_type=TRUE)
     +-aggregate_list=
       +-$agg1#2 := AggregateFunctionCall(GoogleSQL:$count_star() -> INT64)
-
 
 [REWRITTEN AST]
 QueryStmt
@@ -216,7 +211,6 @@ QueryStmt
     +-limit=
       +-Literal(type=INT64, value=2)
 
-
 [REWRITTEN AST]
 QueryStmt
 +-output_column_list=
@@ -258,6 +252,8 @@ QueryStmt
 
 # This shows we get the same output for Lazy or FindOnly tables.
 # Later tests just use one or the other where output would be the same.
+# TODO: Fix SQL Builder and enable for this test case.
+[no_run_sqlbuilder]
 FROM KeyValue{{Lazy|FindOnly}} kv
 |> WHERE kv.value is not null
 |> SELECT kv.key
@@ -290,7 +286,6 @@ QueryStmt
                 +-expr=
                 | +-ColumnRef(type=ROW<KeyValueLazy>, column=KeyValueLazy.$row#1)
                 +-column=KeyValueLazy.Value
-
 
 [REWRITTEN AST]
 QueryStmt
@@ -359,7 +354,6 @@ QueryStmt
                 | +-ColumnRef(type=ROW<KeyValueFindOnly>, column=KeyValueFindOnly.$row#1)
                 +-column=KeyValueFindOnly.Value
 
-
 [REWRITTEN AST]
 QueryStmt
 +-output_column_list=
@@ -401,6 +395,8 @@ QueryStmt
 
 # Test deduplication of columns in the rewrite struct for columns referenced
 # multiple times.
+# TODO: Fix SQL Builder and enable for this test case.
+[no_run_sqlbuilder]
 FROM KeyValueLazy kv
 |> WHERE kv.value IS NOT NULL
 |> WHERE kv.key * kv.key > 100
@@ -456,7 +452,6 @@ QueryStmt
             |   | +-ColumnRef(type=ROW<KeyValueLazy>, column=KeyValueLazy.$row#1)
             |   +-column=KeyValueLazy.Key
             +-Literal(type=INT64, value=100)
-
 
 [REWRITTEN AST]
 QueryStmt
@@ -542,7 +537,6 @@ QueryStmt
     +-input_scan=
       +-TableScan(column_list=[KeyValueLazy.$row#1], table=KeyValueLazy, read_as_row_type=TRUE)
 
-
 [REWRITTEN AST]
 QueryStmt
 +-output_column_list=
@@ -605,7 +599,6 @@ QueryStmt
     |     +-column=KeyValueLazy.Key
     +-input_scan=
       +-TableScan(column_list=[KeyValueLazy.$row#1], table=KeyValueLazy, alias="kv", read_as_row_type=TRUE)
-
 
 [REWRITTEN AST]
 QueryStmt
@@ -697,7 +690,6 @@ QueryStmt
         +-right_scan=
           +-TableScan(column_list=[EnumTable.Filename#5], table=EnumTable, column_index_list=[3], alias="et")
 
-
 [REWRITTEN AST]
 QueryStmt
 +-output_column_list=
@@ -769,7 +761,6 @@ QueryStmt
         | +-TableScan(column_list=[KeyValueFindOnly.$row#1], table=KeyValueFindOnly, alias="kv1", read_as_row_type=TRUE)
         +-right_scan=
           +-TableScan(column_list=[EnumTable.Filename#5], table=EnumTable, column_index_list=[3], alias="et")
-
 
 [REWRITTEN AST]
 QueryStmt
@@ -846,7 +837,6 @@ QueryStmt
         | +-TableScan(column_list=[KeyValueFindOnly.$row#2], table=KeyValueFindOnly, alias="kv2", read_as_row_type=TRUE)
         +-join_expr=
           +-Literal(type=BOOL, value=true)
-
 
 [REWRITTEN AST]
 QueryStmt
@@ -959,7 +949,6 @@ QueryStmt
         |   +-ColumnRef(type=INT64, column=$join_right.key#4)
         +-has_using=TRUE
 
-
 [REWRITTEN AST]
 QueryStmt
 +-output_column_list=
@@ -1064,7 +1053,6 @@ QueryStmt
     +-input_scan=
       +-TableScan(column_list=[KeyValueLazy.$row#1], table=KeyValueLazy, alias="kv", read_as_row_type=TRUE)
 
-
 [REWRITTEN AST]
 QueryStmt
 +-output_column_list=
@@ -1134,7 +1122,6 @@ QueryStmt
     +-input_scan=
       +-TableScan(column_list=[KeyValueLazy.$row#1], table=KeyValueLazy, alias="kv", read_as_row_type=TRUE)
 
-
 [REWRITTEN AST]
 QueryStmt
 +-output_column_list=
@@ -1196,7 +1183,6 @@ QueryStmt
     |     +-column=KeyValueLazy.Value
     +-input_scan=
       +-TableScan(column_list=[KeyValueLazy.$row#1], table=KeyValueLazy, alias="kv", read_as_row_type=TRUE)
-
 
 [REWRITTEN AST]
 QueryStmt
@@ -1268,7 +1254,6 @@ QueryStmt
     +-input_scan=
       +-TableScan(column_list=[KeyValueLazy.$row#1], table=KeyValueLazy, alias="kv", read_as_row_type=TRUE)
 
-
 [REWRITTEN AST]
 QueryStmt
 +-output_column_list=
@@ -1329,7 +1314,7 @@ ALTERNATION GROUPS:
     <empty>
     Lazy
 --
-ERROR: SELECT * expands to zero columns after applying EXCEPT [at 2:11]
+ERROR: SELECT .* expands to zero columns after applying EXCEPT [at 2:11]
 |> SELECT kv.* EXCEPT (key, value)
           ^
 --
@@ -1435,7 +1420,6 @@ QueryStmt
         |   +-ColumnRef(type=INT64, column=$join_right.key#3)
         +-has_using=TRUE
 
-
 [REWRITTEN AST]
 QueryStmt
 +-output_column_list=
@@ -1532,7 +1516,6 @@ QueryStmt
         |   +-ColumnRef(type=INT64, column=$query.key#1)
         |   +-ColumnRef(type=INT64, column=$join_right.key#3)
         +-has_using=TRUE
-
 
 [REWRITTEN AST]
 QueryStmt
@@ -1631,7 +1614,6 @@ QueryStmt
             | +-column=KeyValueLazy.Key
             +-Literal(type=INT64, value=10)
 
-
 [REWRITTEN AST]
 QueryStmt
 +-output_column_list=
@@ -1724,7 +1706,6 @@ QueryStmt
     +-input_scan=
       +-TableScan(column_list=[KeyValueLazy.$row#1], table=KeyValueLazy, alias="kv1", read_as_row_type=TRUE)
 
-
 [REWRITTEN AST]
 QueryStmt
 +-output_column_list=
@@ -1784,8 +1765,7 @@ QueryStmt
     |     | +-ColumnRef(type=ROW<tvf_returning_row_type.row_type_col>, column=tvf_returning_row_type.row_type_col#2)
     |     +-column=KeyValueFindOnly.Key
     +-input_scan=
-      +-TVFScan(column_list=tvf_returning_row_type.[normal_col_1#1, row_type_col#2, normal_col_2#3], tvf=RowTypeTest:tvf_returning_row_type(() -> ANY TABLE), signature=() -> TABLE<normal_col_1 STRING, row_type_col ROW<tvf_returning_row_type.row_type_col>, normal_col_2 INT64>, column_index_list=[0, 1, 2], function_call_signature=() -> ANY TABLE)
-
+      +-TVFScan(column_list=tvf_returning_row_type.[normal_col_1#1, row_type_col#2, normal_col_2#3], tvf=RowTypeTest:tvf_returning_row_type, signature=() -> TABLE<normal_col_1 STRING, row_type_col ROW<tvf_returning_row_type.row_type_col>, normal_col_2 INT64>, column_index_list=[0, 1, 2], function_call_signature=() -> ANY TABLE)
 
 [REWRITTEN AST]
 QueryStmt
@@ -1804,7 +1784,7 @@ QueryStmt
     |     | +-ColumnRef(type=STRUCT<Key INT64>, column=tvf_returning_row_type.$row_type_col$scanrow#5)
     |     +-field_idx=0
     +-input_scan=
-      +-TVFScan(column_list=tvf_returning_row_type.[normal_col_1#1, $row_type_col$scanrow#5, normal_col_2#3], tvf=RowTypeTest:tvf_returning_row_type(() -> ANY TABLE), signature=() -> TABLE<normal_col_1 STRING, row_type_col STRUCT<Key INT64>, normal_col_2 INT64>, column_index_list=[0, 1, 2], function_call_signature=() -> ANY TABLE)
+      +-TVFScan(column_list=tvf_returning_row_type.[normal_col_1#1, $row_type_col$scanrow#5, normal_col_2#3], tvf=RowTypeTest:tvf_returning_row_type, signature=() -> TABLE<normal_col_1 STRING, row_type_col STRUCT<Key INT64>, normal_col_2 INT64>, column_index_list=[0, 1, 2], function_call_signature=() -> ANY TABLE)
 ==
 
 # TVF result schema with a ROW type value table.
@@ -1825,8 +1805,7 @@ QueryStmt
     |     | +-ColumnRef(type=ROW<tvf_returning_row_type_value_table>, column=tvf_returning_row_type_value_table.$col0#1)
     |     +-column=KeyValueFindOnly.Key
     +-input_scan=
-      +-TVFScan(column_list=[tvf_returning_row_type_value_table.$col0#1], tvf=RowTypeTest:tvf_returning_row_type_value_table(() -> ANY TABLE), signature=() -> TABLE<ROW<tvf_returning_row_type_value_table>>, column_index_list=[0], function_call_signature=() -> ANY TABLE)
-
+      +-TVFScan(column_list=[tvf_returning_row_type_value_table.$col0#1], tvf=RowTypeTest:tvf_returning_row_type_value_table, signature=() -> TABLE<ROW<tvf_returning_row_type_value_table>>, column_index_list=[0], function_call_signature=() -> ANY TABLE)
 
 [REWRITTEN AST]
 QueryStmt
@@ -1843,7 +1822,7 @@ QueryStmt
     |     | +-ColumnRef(type=STRUCT<Key INT64>, column=tvf_returning_row_type_value_table.$col0$scanrow#3)
     |     +-field_idx=0
     +-input_scan=
-      +-TVFScan(column_list=[tvf_returning_row_type_value_table.$col0$scanrow#3], tvf=RowTypeTest:tvf_returning_row_type_value_table(() -> ANY TABLE), signature=() -> TABLE<STRUCT<Key INT64>>, column_index_list=[0], function_call_signature=() -> ANY TABLE)
+      +-TVFScan(column_list=[tvf_returning_row_type_value_table.$col0$scanrow#3], tvf=RowTypeTest:tvf_returning_row_type_value_table, signature=() -> TABLE<STRUCT<Key INT64>>, column_index_list=[0], function_call_signature=() -> ANY TABLE)
 ==
 
 # TVF result schema with an unreferenced ROW type, should be rewritten to an
@@ -1858,8 +1837,7 @@ QueryStmt
   +-ProjectScan
     +-column_list=[tvf_returning_row_type.normal_col_1#1]
     +-input_scan=
-      +-TVFScan(column_list=[tvf_returning_row_type.normal_col_1#1], tvf=RowTypeTest:tvf_returning_row_type(() -> ANY TABLE), signature=() -> TABLE<normal_col_1 STRING, row_type_col ROW<tvf_returning_row_type.row_type_col>, normal_col_2 INT64>, column_index_list=[0], function_call_signature=() -> ANY TABLE)
-
+      +-TVFScan(column_list=[tvf_returning_row_type.normal_col_1#1], tvf=RowTypeTest:tvf_returning_row_type, signature=() -> TABLE<normal_col_1 STRING, row_type_col ROW<tvf_returning_row_type.row_type_col>, normal_col_2 INT64>, column_index_list=[0], function_call_signature=() -> ANY TABLE)
 
 [REWRITTEN AST]
 QueryStmt
@@ -1869,7 +1847,7 @@ QueryStmt
   +-ProjectScan
     +-column_list=[tvf_returning_row_type.normal_col_1#1]
     +-input_scan=
-      +-TVFScan(column_list=[tvf_returning_row_type.normal_col_1#1], tvf=RowTypeTest:tvf_returning_row_type(() -> ANY TABLE), signature=() -> TABLE<normal_col_1 STRING, row_type_col STRUCT<>, normal_col_2 INT64>, column_index_list=[0], function_call_signature=() -> ANY TABLE)
+      +-TVFScan(column_list=[tvf_returning_row_type.normal_col_1#1], tvf=RowTypeTest:tvf_returning_row_type, signature=() -> TABLE<normal_col_1 STRING, row_type_col STRUCT<>, normal_col_2 INT64>, column_index_list=[0], function_call_signature=() -> ANY TABLE)
 ==
 
 # TVF result schema with an unreferenced ROW-type value table, should be
@@ -1886,8 +1864,7 @@ QueryStmt
     +-expr_list=
     | +-$col1#2 := Literal(type=INT64, value=1)
     +-input_scan=
-      +-TVFScan(tvf=RowTypeTest:tvf_returning_row_type_value_table(() -> ANY TABLE), signature=() -> TABLE<ROW<tvf_returning_row_type_value_table>>, function_call_signature=() -> ANY TABLE)
-
+      +-TVFScan(tvf=RowTypeTest:tvf_returning_row_type_value_table, signature=() -> TABLE<ROW<tvf_returning_row_type_value_table>>, function_call_signature=() -> ANY TABLE)
 
 [REWRITTEN AST]
 QueryStmt
@@ -1899,7 +1876,7 @@ QueryStmt
     +-expr_list=
     | +-$col1#2 := Literal(type=INT64, value=1)
     +-input_scan=
-      +-TVFScan(tvf=RowTypeTest:tvf_returning_row_type_value_table(() -> ANY TABLE), signature=() -> TABLE<STRUCT<>>, function_call_signature=() -> ANY TABLE)
+      +-TVFScan(tvf=RowTypeTest:tvf_returning_row_type_value_table, signature=() -> TABLE<STRUCT<>>, function_call_signature=() -> ANY TABLE)
 ==
 
 # TVF result schema with multiple ROW columns and pseudo-columns.
@@ -1945,8 +1922,7 @@ QueryStmt
     |     | +-ColumnRef(type=ROW<tvf_returning_multiple_row_type.pseudo_row_2>, column=tvf_returning_multiple_row_type.pseudo_row_2#8)
     |     +-column=KeyValueFindOnly.Value
     +-input_scan=
-      +-TVFScan(column_list=tvf_returning_multiple_row_type.[row_col_1#2, row_col_2#4, pseudo_row_1#6, pseudo_row_2#8], tvf=RowTypeTest:tvf_returning_multiple_row_type(() -> ANY TABLE), signature=() -> TABLE<normal_col_1 STRING, row_col_1 ROW<tvf_returning_multiple_row_type.row_col_1>, normal_col_2 INT64, row_col_2 ROW<tvf_returning_multiple_row_type.row_col_2>, pseudo_normal_1 STRING, pseudo_row_1 ROW<tvf_returning_multiple_row_type.pseudo_row_1>, pseudo_normal_2 INT64, pseudo_row_2 ROW<tvf_returning_multiple_row_type.pseudo_row_2>>, column_index_list=[1, 3, 5, 7], function_call_signature=() -> ANY TABLE)
-
+      +-TVFScan(column_list=tvf_returning_multiple_row_type.[row_col_1#2, row_col_2#4, pseudo_row_1#6, pseudo_row_2#8], tvf=RowTypeTest:tvf_returning_multiple_row_type, signature=() -> TABLE<normal_col_1 STRING, row_col_1 ROW<tvf_returning_multiple_row_type.row_col_1>, normal_col_2 INT64, row_col_2 ROW<tvf_returning_multiple_row_type.row_col_2>, pseudo_normal_1 STRING, pseudo_row_1 ROW<tvf_returning_multiple_row_type.pseudo_row_1>, pseudo_normal_2 INT64, pseudo_row_2 ROW<tvf_returning_multiple_row_type.pseudo_row_2>>, column_index_list=[1, 3, 5, 7], function_call_signature=() -> ANY TABLE)
 
 [REWRITTEN AST]
 QueryStmt
@@ -1984,7 +1960,7 @@ QueryStmt
     |     | +-ColumnRef(type=STRUCT<Value STRING>, column=tvf_returning_multiple_row_type.$pseudo_row_2$scanrow#16)
     |     +-field_idx=0
     +-input_scan=
-      +-TVFScan(column_list=tvf_returning_multiple_row_type.[$row_col_1$scanrow#13, $row_col_2$scanrow#14, $pseudo_row_1$scanrow#15, $pseudo_row_2$scanrow#16], tvf=RowTypeTest:tvf_returning_multiple_row_type(() -> ANY TABLE), signature=() -> TABLE<normal_col_1 STRING, row_col_1 STRUCT<Key INT64>, normal_col_2 INT64, row_col_2 STRUCT<Value STRING>, pseudo_normal_1 STRING, pseudo_row_1 STRUCT<Key INT64>, pseudo_normal_2 INT64, pseudo_row_2 STRUCT<Value STRING>>, column_index_list=[1, 3, 5, 7], function_call_signature=() -> ANY TABLE)
+      +-TVFScan(column_list=tvf_returning_multiple_row_type.[$row_col_1$scanrow#13, $row_col_2$scanrow#14, $pseudo_row_1$scanrow#15, $pseudo_row_2$scanrow#16], tvf=RowTypeTest:tvf_returning_multiple_row_type, signature=() -> TABLE<normal_col_1 STRING, row_col_1 STRUCT<Key INT64>, normal_col_2 INT64, row_col_2 STRUCT<Value STRING>, pseudo_normal_1 STRING, pseudo_row_1 STRUCT<Key INT64>, pseudo_normal_2 INT64, pseudo_row_2 STRUCT<Value STRING>>, column_index_list=[1, 3, 5, 7], function_call_signature=() -> ANY TABLE)
 ==
 
 # TVF result schema with ROW-type value table and pseudo-columns.
@@ -2043,8 +2019,7 @@ QueryStmt
     |     | +-ColumnRef(type=ROW<tvf_returning_row_type_value_table_with_pseudo.type_pseudo_row_2>, column=tvf_returning_row_type_value_table_with_pseudo.pseudo_row_2#5)
     |     +-column=KeyValueFindOnly.Value
     +-input_scan=
-      +-TVFScan(column_list=tvf_returning_row_type_value_table_with_pseudo.[$col0#1, pseudo_row_1#3, pseudo_row_2#5], tvf=RowTypeTest:tvf_returning_row_type_value_table_with_pseudo(() -> ANY TABLE), signature=() -> TABLE<ROW<tvf_returning_row_type_value_table_with_pseudo>, pseudo_normal_1 STRING, pseudo_row_1 ROW<tvf_returning_row_type_value_table_with_pseudo.type_pseudo_row_1>, pseudo_normal_2 INT64, pseudo_row_2 ROW<tvf_returning_row_type_value_table_with_pseudo.type_pseudo_row_2>>, column_index_list=[0, 2, 4], alias="T", function_call_signature=() -> ANY TABLE)
-
+      +-TVFScan(column_list=tvf_returning_row_type_value_table_with_pseudo.[$col0#1, pseudo_row_1#3, pseudo_row_2#5], tvf=RowTypeTest:tvf_returning_row_type_value_table_with_pseudo, signature=() -> TABLE<ROW<tvf_returning_row_type_value_table_with_pseudo>, pseudo_normal_1 STRING, pseudo_row_1 ROW<tvf_returning_row_type_value_table_with_pseudo.type_pseudo_row_1>, pseudo_normal_2 INT64, pseudo_row_2 ROW<tvf_returning_row_type_value_table_with_pseudo.type_pseudo_row_2>>, column_index_list=[0, 2, 4], alias="T", function_call_signature=() -> ANY TABLE)
 
 [REWRITTEN AST]
 QueryStmt
@@ -2096,7 +2071,7 @@ QueryStmt
     |     | +-ColumnRef(type=STRUCT<Value STRING>, column=tvf_returning_row_type_value_table_with_pseudo.$pseudo_row_2$scanrow#14)
     |     +-field_idx=0
     +-input_scan=
-      +-TVFScan(column_list=tvf_returning_row_type_value_table_with_pseudo.[$col0$scanrow#12, $pseudo_row_1$scanrow#13, $pseudo_row_2$scanrow#14], tvf=RowTypeTest:tvf_returning_row_type_value_table_with_pseudo(() -> ANY TABLE), signature=() -> TABLE<STRUCT<Key INT64, Value STRING>, pseudo_normal_1 STRING, pseudo_row_1 STRUCT<Key INT64>, pseudo_normal_2 INT64, pseudo_row_2 STRUCT<Value STRING>>, column_index_list=[0, 2, 4], alias="T", function_call_signature=() -> ANY TABLE)
+      +-TVFScan(column_list=tvf_returning_row_type_value_table_with_pseudo.[$col0$scanrow#12, $pseudo_row_1$scanrow#13, $pseudo_row_2$scanrow#14], tvf=RowTypeTest:tvf_returning_row_type_value_table_with_pseudo, signature=() -> TABLE<STRUCT<Key INT64, Value STRING>, pseudo_normal_1 STRING, pseudo_row_1 STRUCT<Key INT64>, pseudo_normal_2 INT64, pseudo_row_2 STRUCT<Value STRING>>, column_index_list=[0, 2, 4], alias="T", function_call_signature=() -> ANY TABLE)
 ==
 
 # Expression matching between ROW field access in SELECT list and GROUP BY, with
@@ -2167,3 +2142,1361 @@ QueryStmt
                 +-expr=
                 | +-ColumnRef(type=ROW<KeyValueFindOnly>, column=KeyValueFindOnly.$row#1)
                 +-column=KeyValueFindOnly.Value
+==
+
+# General expression path matching for ROW field access.
+[enabled_ast_rewrites=NONE]
+SELECT
+    # `T.key` in a complex expr should match the GROUP BY.
+    1 = T.key
+FROM
+    KeyValueFindOnly AS T
+GROUP BY
+    T.key
+--
+QueryStmt
++-output_column_list=
+| +-$query.$col1#3 AS `$col1` [BOOL]
++-query=
+  +-ProjectScan
+    +-column_list=[$query.$col1#3]
+    +-expr_list=
+    | +-$col1#3 :=
+    |   +-FunctionCall(GoogleSQL:$equal(INT64, INT64) -> BOOL)
+    |     +-Literal(type=INT64, value=1)
+    |     +-ColumnRef(type=INT64, column=$groupby.key#2)
+    +-input_scan=
+      +-AggregateScan
+        +-column_list=[$groupby.key#2]
+        +-input_scan=
+        | +-TableScan(column_list=[KeyValueFindOnly.$row#1], table=KeyValueFindOnly, alias="T", read_as_row_type=TRUE)
+        +-group_by_list=
+          +-key#2 :=
+            +-GetRowField
+              +-type=INT64
+              +-expr=
+              | +-ColumnRef(type=ROW<KeyValueFindOnly>, column=KeyValueFindOnly.$row#1)
+              +-column=KeyValueFindOnly.Key
+==
+
+# Access a scalar field from a table with a nested ROW type column. This is not
+# an analysis-time error (due to nested ROW type from a TableScan) because the
+# nested ROW is not referenced, so the analyzer never sees it.
+FROM RowTypeSingleNested t
+|> SELECT t.key
+--
+QueryStmt
++-output_column_list=
+| +-$pipe_select.key#2 AS key [STRING]
++-query=
+  +-ProjectScan
+    +-column_list=[$pipe_select.key#2]
+    +-expr_list=
+    | +-key#2 :=
+    |   +-GetRowField
+    |     +-type=STRING
+    |     +-expr=
+    |     | +-ColumnRef(type=ROW<RowTypeSingleNested>, column=RowTypeSingleNested.$row#1)
+    |     +-column=RowTypeSingleNested.key
+    +-input_scan=
+      +-TableScan(column_list=[RowTypeSingleNested.$row#1], table=RowTypeSingleNested, alias="t", read_as_row_type=TRUE)
+
+[REWRITTEN AST]
+QueryStmt
++-output_column_list=
+| +-$pipe_select.key#2 AS key [STRING]
++-query=
+  +-ProjectScan
+    +-column_list=[$pipe_select.key#2]
+    +-expr_list=
+    | +-key#2 :=
+    |   +-GetStructField
+    |     +-type=STRING
+    |     +-expr=
+    |     | +-ColumnRef(type=STRUCT<key STRING>, column=RowTypeSingleNested.$row$scanrow#3)
+    |     +-field_idx=0
+    +-input_scan=
+      +-ProjectScan
+        +-column_list=[RowTypeSingleNested.$row$scanrow#3]
+        +-expr_list=
+        | +-$row$scanrow#3 :=
+        |   +-MakeStruct
+        |     +-type=STRUCT<key STRING>
+        |     +-field_list=
+        |       +-ColumnRef(type=STRING, column=RowTypeSingleNested.key#4)
+        +-input_scan=
+          +-TableScan(column_list=[RowTypeSingleNested.key#4], table=RowTypeSingleNested, alias="t", table_column_list=[RowTypeSingleNested.key])
+==
+
+# Nested ROW in TVF: Access a scalar field from ROW.
+FROM tvf_returning_row_type_single_nested()
+|> SELECT row_col.key
+--
+QueryStmt
++-output_column_list=
+| +-$pipe_select.key#4 AS key [STRING]
++-query=
+  +-ProjectScan
+    +-column_list=[$pipe_select.key#4]
+    +-expr_list=
+    | +-key#4 :=
+    |   +-GetRowField
+    |     +-type=STRING
+    |     +-expr=
+    |     | +-ColumnRef(type=ROW<tvf_returning_row_type_single_nested.row_col>, column=tvf_returning_row_type_single_nested.row_col#2)
+    |     +-column=RowTypeSingleNested.key
+    +-input_scan=
+      +-TVFScan(column_list=[tvf_returning_row_type_single_nested.row_col#2], tvf=RowTypeTest:tvf_returning_row_type_single_nested, signature=() -> TABLE<normal_col_1 STRING, row_col ROW<tvf_returning_row_type_single_nested.row_col>, normal_col_2 INT64>, column_index_list=[1], function_call_signature=() -> ANY TABLE)
+
+[REWRITTEN AST]
+QueryStmt
++-output_column_list=
+| +-$pipe_select.key#4 AS key [STRING]
++-query=
+  +-ProjectScan
+    +-column_list=[$pipe_select.key#4]
+    +-expr_list=
+    | +-key#4 :=
+    |   +-GetStructField
+    |     +-type=STRING
+    |     +-expr=
+    |     | +-ColumnRef(type=STRUCT<key STRING>, column=tvf_returning_row_type_single_nested.$row_col$scanrow#5)
+    |     +-field_idx=0
+    +-input_scan=
+      +-TVFScan(column_list=[tvf_returning_row_type_single_nested.$row_col$scanrow#5], tvf=RowTypeTest:tvf_returning_row_type_single_nested, signature=() -> TABLE<normal_col_1 STRING, row_col STRUCT<key STRING>, normal_col_2 INT64>, column_index_list=[1], function_call_signature=() -> ANY TABLE)
+==
+
+# Nested ROW in TVF: Access a field within a nested ROW.
+FROM tvf_returning_row_type_single_nested()
+|> SELECT row_col.nested_row.nested_field
+--
+QueryStmt
++-output_column_list=
+| +-$pipe_select.nested_field#4 AS nested_field [STRING]
++-query=
+  +-ProjectScan
+    +-column_list=[$pipe_select.nested_field#4]
+    +-expr_list=
+    | +-nested_field#4 :=
+    |   +-GetRowField
+    |     +-type=STRING
+    |     +-expr=
+    |     | +-GetRowField
+    |     |   +-type=ROW<InnerRowTypeTable>
+    |     |   +-expr=
+    |     |   | +-ColumnRef(type=ROW<tvf_returning_row_type_single_nested.row_col>, column=tvf_returning_row_type_single_nested.row_col#2)
+    |     |   +-column=RowTypeSingleNested.nested_row
+    |     +-column=InnerRowTypeTable.nested_field
+    +-input_scan=
+      +-TVFScan(column_list=[tvf_returning_row_type_single_nested.row_col#2], tvf=RowTypeTest:tvf_returning_row_type_single_nested, signature=() -> TABLE<normal_col_1 STRING, row_col ROW<tvf_returning_row_type_single_nested.row_col>, normal_col_2 INT64>, column_index_list=[1], function_call_signature=() -> ANY TABLE)
+
+[REWRITTEN AST]
+QueryStmt
++-output_column_list=
+| +-$pipe_select.nested_field#4 AS nested_field [STRING]
++-query=
+  +-ProjectScan
+    +-column_list=[$pipe_select.nested_field#4]
+    +-expr_list=
+    | +-nested_field#4 :=
+    |   +-GetStructField
+    |     +-type=STRING
+    |     +-expr=
+    |     | +-GetStructField
+    |     |   +-type=STRUCT<nested_field STRING>
+    |     |   +-expr=
+    |     |   | +-ColumnRef(type=STRUCT<nested_row STRUCT<nested_field STRING>>, column=tvf_returning_row_type_single_nested.$row_col$scanrow#5)
+    |     |   +-field_idx=0
+    |     +-field_idx=0
+    +-input_scan=
+      +-TVFScan(column_list=[tvf_returning_row_type_single_nested.$row_col$scanrow#5], tvf=RowTypeTest:tvf_returning_row_type_single_nested, signature=() -> TABLE<normal_col_1 STRING, row_col STRUCT<nested_row STRUCT<nested_field STRING>>, normal_col_2 INT64>, column_index_list=[1], function_call_signature=() -> ANY TABLE)
+==
+
+# Nested ROW in TVF: Access multiple fields from a nested ROW.
+FROM tvf_returning_row_type_single_nested()
+|> SELECT row_col.key, row_col.nested_row.nested_field, row_col.nested_row.other_field
+--
+QueryStmt
++-output_column_list=
+| +-$pipe_select.key#4 AS key [STRING]
+| +-$pipe_select.nested_field#5 AS nested_field [STRING]
+| +-$pipe_select.other_field#6 AS other_field [STRING]
++-query=
+  +-ProjectScan
+    +-column_list=$pipe_select.[key#4, nested_field#5, other_field#6]
+    +-expr_list=
+    | +-key#4 :=
+    | | +-GetRowField
+    | |   +-type=STRING
+    | |   +-expr=
+    | |   | +-ColumnRef(type=ROW<tvf_returning_row_type_single_nested.row_col>, column=tvf_returning_row_type_single_nested.row_col#2)
+    | |   +-column=RowTypeSingleNested.key
+    | +-nested_field#5 :=
+    | | +-GetRowField
+    | |   +-type=STRING
+    | |   +-expr=
+    | |   | +-GetRowField
+    | |   |   +-type=ROW<InnerRowTypeTable>
+    | |   |   +-expr=
+    | |   |   | +-ColumnRef(type=ROW<tvf_returning_row_type_single_nested.row_col>, column=tvf_returning_row_type_single_nested.row_col#2)
+    | |   |   +-column=RowTypeSingleNested.nested_row
+    | |   +-column=InnerRowTypeTable.nested_field
+    | +-other_field#6 :=
+    |   +-GetRowField
+    |     +-type=STRING
+    |     +-expr=
+    |     | +-GetRowField
+    |     |   +-type=ROW<InnerRowTypeTable>
+    |     |   +-expr=
+    |     |   | +-ColumnRef(type=ROW<tvf_returning_row_type_single_nested.row_col>, column=tvf_returning_row_type_single_nested.row_col#2)
+    |     |   +-column=RowTypeSingleNested.nested_row
+    |     +-column=InnerRowTypeTable.other_field
+    +-input_scan=
+      +-TVFScan(column_list=[tvf_returning_row_type_single_nested.row_col#2], tvf=RowTypeTest:tvf_returning_row_type_single_nested, signature=() -> TABLE<normal_col_1 STRING, row_col ROW<tvf_returning_row_type_single_nested.row_col>, normal_col_2 INT64>, column_index_list=[1], function_call_signature=() -> ANY TABLE)
+
+[REWRITTEN AST]
+QueryStmt
++-output_column_list=
+| +-$pipe_select.key#4 AS key [STRING]
+| +-$pipe_select.nested_field#5 AS nested_field [STRING]
+| +-$pipe_select.other_field#6 AS other_field [STRING]
++-query=
+  +-ProjectScan
+    +-column_list=$pipe_select.[key#4, nested_field#5, other_field#6]
+    +-expr_list=
+    | +-key#4 :=
+    | | +-GetStructField
+    | |   +-type=STRING
+    | |   +-expr=
+    | |   | +-ColumnRef(type=STRUCT<key STRING, nested_row STRUCT<nested_field STRING, other_field STRING>>, column=tvf_returning_row_type_single_nested.$row_col$scanrow#7)
+    | |   +-field_idx=0
+    | +-nested_field#5 :=
+    | | +-GetStructField
+    | |   +-type=STRING
+    | |   +-expr=
+    | |   | +-GetStructField
+    | |   |   +-type=STRUCT<nested_field STRING, other_field STRING>
+    | |   |   +-expr=
+    | |   |   | +-ColumnRef(type=STRUCT<key STRING, nested_row STRUCT<nested_field STRING, other_field STRING>>, column=tvf_returning_row_type_single_nested.$row_col$scanrow#7)
+    | |   |   +-field_idx=1
+    | |   +-field_idx=0
+    | +-other_field#6 :=
+    |   +-GetStructField
+    |     +-type=STRING
+    |     +-expr=
+    |     | +-GetStructField
+    |     |   +-type=STRUCT<nested_field STRING, other_field STRING>
+    |     |   +-expr=
+    |     |   | +-ColumnRef(type=STRUCT<key STRING, nested_row STRUCT<nested_field STRING, other_field STRING>>, column=tvf_returning_row_type_single_nested.$row_col$scanrow#7)
+    |     |   +-field_idx=1
+    |     +-field_idx=1
+    +-input_scan=
+      +-TVFScan(column_list=[tvf_returning_row_type_single_nested.$row_col$scanrow#7], tvf=RowTypeTest:tvf_returning_row_type_single_nested, signature=() -> TABLE<normal_col_1 STRING, row_col STRUCT<key STRING, nested_row STRUCT<nested_field STRING, other_field STRING>>, normal_col_2 INT64>, column_index_list=[1], function_call_signature=() -> ANY TABLE)
+==
+
+# Nested ROW in TVF: Access a field that doesn't exist in the nested ROW.
+FROM tvf_returning_row_type_single_nested()
+|> SELECT row_col.nested_row.bad_field
+--
+ERROR: Table InnerRowTypeTable does not have a column bad_field [at 2:30]
+|> SELECT row_col.nested_row.bad_field
+                             ^
+==
+
+# Recursively-nested ROW in TVF: Access a field through the middle ROW type.
+FROM tvf_returning_row_type_recursive_nested()
+|> SELECT row_col.middle.key
+--
+QueryStmt
++-output_column_list=
+| +-$pipe_select.key#4 AS key [STRING]
++-query=
+  +-ProjectScan
+    +-column_list=[$pipe_select.key#4]
+    +-expr_list=
+    | +-key#4 :=
+    |   +-GetRowField
+    |     +-type=STRING
+    |     +-expr=
+    |     | +-GetRowField
+    |     |   +-type=ROW<RowTypeRecursiveNested>
+    |     |   +-expr=
+    |     |   | +-ColumnRef(type=ROW<tvf_returning_row_type_recursive_nested.row_col>, column=tvf_returning_row_type_recursive_nested.row_col#2)
+    |     |   +-column=RowTypeRecursiveNested.middle
+    |     +-column=RowTypeRecursiveNested.key
+    +-input_scan=
+      +-TVFScan(column_list=[tvf_returning_row_type_recursive_nested.row_col#2], tvf=RowTypeTest:tvf_returning_row_type_recursive_nested, signature=() -> TABLE<normal_col_1 STRING, row_col ROW<tvf_returning_row_type_recursive_nested.row_col>, normal_col_2 INT64>, column_index_list=[1], function_call_signature=() -> ANY TABLE)
+
+[REWRITTEN AST]
+QueryStmt
++-output_column_list=
+| +-$pipe_select.key#4 AS key [STRING]
++-query=
+  +-ProjectScan
+    +-column_list=[$pipe_select.key#4]
+    +-expr_list=
+    | +-key#4 :=
+    |   +-GetStructField
+    |     +-type=STRING
+    |     +-expr=
+    |     | +-GetStructField
+    |     |   +-type=STRUCT<key STRING>
+    |     |   +-expr=
+    |     |   | +-ColumnRef(type=STRUCT<middle STRUCT<key STRING>>, column=tvf_returning_row_type_recursive_nested.$row_col$scanrow#5)
+    |     |   +-field_idx=0
+    |     +-field_idx=0
+    +-input_scan=
+      +-TVFScan(column_list=[tvf_returning_row_type_recursive_nested.$row_col$scanrow#5], tvf=RowTypeTest:tvf_returning_row_type_recursive_nested, signature=() -> TABLE<normal_col_1 STRING, row_col STRUCT<middle STRUCT<key STRING>>, normal_col_2 INT64>, column_index_list=[1], function_call_signature=() -> ANY TABLE)
+==
+
+# Recursively-nested ROW in TVF: Access a field through two levels of nesting.
+FROM tvf_returning_row_type_recursive_nested()
+|> SELECT row_col.middle.middle.key
+--
+QueryStmt
++-output_column_list=
+| +-$pipe_select.key#4 AS key [STRING]
++-query=
+  +-ProjectScan
+    +-column_list=[$pipe_select.key#4]
+    +-expr_list=
+    | +-key#4 :=
+    |   +-GetRowField
+    |     +-type=STRING
+    |     +-expr=
+    |     | +-GetRowField
+    |     |   +-type=ROW<RowTypeRecursiveNested>
+    |     |   +-expr=
+    |     |   | +-GetRowField
+    |     |   |   +-type=ROW<RowTypeRecursiveNested>
+    |     |   |   +-expr=
+    |     |   |   | +-ColumnRef(type=ROW<tvf_returning_row_type_recursive_nested.row_col>, column=tvf_returning_row_type_recursive_nested.row_col#2)
+    |     |   |   +-column=RowTypeRecursiveNested.middle
+    |     |   +-column=RowTypeRecursiveNested.middle
+    |     +-column=RowTypeRecursiveNested.key
+    +-input_scan=
+      +-TVFScan(column_list=[tvf_returning_row_type_recursive_nested.row_col#2], tvf=RowTypeTest:tvf_returning_row_type_recursive_nested, signature=() -> TABLE<normal_col_1 STRING, row_col ROW<tvf_returning_row_type_recursive_nested.row_col>, normal_col_2 INT64>, column_index_list=[1], function_call_signature=() -> ANY TABLE)
+
+[REWRITTEN AST]
+QueryStmt
++-output_column_list=
+| +-$pipe_select.key#4 AS key [STRING]
++-query=
+  +-ProjectScan
+    +-column_list=[$pipe_select.key#4]
+    +-expr_list=
+    | +-key#4 :=
+    |   +-GetStructField
+    |     +-type=STRING
+    |     +-expr=
+    |     | +-GetStructField
+    |     |   +-type=STRUCT<key STRING>
+    |     |   +-expr=
+    |     |   | +-GetStructField
+    |     |   |   +-type=STRUCT<middle STRUCT<key STRING>>
+    |     |   |   +-expr=
+    |     |   |   | +-ColumnRef(type=STRUCT<middle STRUCT<middle STRUCT<key STRING>>>, column=tvf_returning_row_type_recursive_nested.$row_col$scanrow#5)
+    |     |   |   +-field_idx=0
+    |     |   +-field_idx=0
+    |     +-field_idx=0
+    +-input_scan=
+      +-TVFScan(column_list=[tvf_returning_row_type_recursive_nested.$row_col$scanrow#5], tvf=RowTypeTest:tvf_returning_row_type_recursive_nested, signature=() -> TABLE<normal_col_1 STRING, row_col STRUCT<middle STRUCT<middle STRUCT<key STRING>>>, normal_col_2 INT64>, column_index_list=[1], function_call_signature=() -> ANY TABLE)
+==
+
+# Recursively-nested ROW in TVF: Access a field through three levels of nesting.
+FROM tvf_returning_row_type_recursive_nested()
+|> SELECT row_col.middle.middle.middle.key
+--
+QueryStmt
++-output_column_list=
+| +-$pipe_select.key#4 AS key [STRING]
++-query=
+  +-ProjectScan
+    +-column_list=[$pipe_select.key#4]
+    +-expr_list=
+    | +-key#4 :=
+    |   +-GetRowField
+    |     +-type=STRING
+    |     +-expr=
+    |     | +-GetRowField
+    |     |   +-type=ROW<RowTypeRecursiveNested>
+    |     |   +-expr=
+    |     |   | +-GetRowField
+    |     |   |   +-type=ROW<RowTypeRecursiveNested>
+    |     |   |   +-expr=
+    |     |   |   | +-GetRowField
+    |     |   |   |   +-type=ROW<RowTypeRecursiveNested>
+    |     |   |   |   +-expr=
+    |     |   |   |   | +-ColumnRef(type=ROW<tvf_returning_row_type_recursive_nested.row_col>, column=tvf_returning_row_type_recursive_nested.row_col#2)
+    |     |   |   |   +-column=RowTypeRecursiveNested.middle
+    |     |   |   +-column=RowTypeRecursiveNested.middle
+    |     |   +-column=RowTypeRecursiveNested.middle
+    |     +-column=RowTypeRecursiveNested.key
+    +-input_scan=
+      +-TVFScan(column_list=[tvf_returning_row_type_recursive_nested.row_col#2], tvf=RowTypeTest:tvf_returning_row_type_recursive_nested, signature=() -> TABLE<normal_col_1 STRING, row_col ROW<tvf_returning_row_type_recursive_nested.row_col>, normal_col_2 INT64>, column_index_list=[1], function_call_signature=() -> ANY TABLE)
+
+[REWRITTEN AST]
+QueryStmt
++-output_column_list=
+| +-$pipe_select.key#4 AS key [STRING]
++-query=
+  +-ProjectScan
+    +-column_list=[$pipe_select.key#4]
+    +-expr_list=
+    | +-key#4 :=
+    |   +-GetStructField
+    |     +-type=STRING
+    |     +-expr=
+    |     | +-GetStructField
+    |     |   +-type=STRUCT<key STRING>
+    |     |   +-expr=
+    |     |   | +-GetStructField
+    |     |   |   +-type=STRUCT<middle STRUCT<key STRING>>
+    |     |   |   +-expr=
+    |     |   |   | +-GetStructField
+    |     |   |   |   +-type=STRUCT<middle STRUCT<middle STRUCT<key STRING>>>
+    |     |   |   |   +-expr=
+    |     |   |   |   | +-ColumnRef(type=STRUCT<middle STRUCT<middle STRUCT<middle STRUCT<key STRING>>>>, column=tvf_returning_row_type_recursive_nested.$row_col$scanrow#5)
+    |     |   |   |   +-field_idx=0
+    |     |   |   +-field_idx=0
+    |     |   +-field_idx=0
+    |     +-field_idx=0
+    +-input_scan=
+      +-TVFScan(column_list=[tvf_returning_row_type_recursive_nested.$row_col$scanrow#5], tvf=RowTypeTest:tvf_returning_row_type_recursive_nested, signature=() -> TABLE<normal_col_1 STRING, row_col STRUCT<middle STRUCT<middle STRUCT<middle STRUCT<key STRING>>>>, normal_col_2 INT64>, column_index_list=[1], function_call_signature=() -> ANY TABLE)
+==
+
+# Recursively-nested ROW in TVF: Access a field at multiple nesting levels.
+FROM tvf_returning_row_type_recursive_nested()
+|> SELECT row_col.key, row_col.middle.key, row_col.middle.middle.key, row_col.middle.middle.middle.key
+--
+QueryStmt
++-output_column_list=
+| +-$pipe_select.key#4 AS key [STRING]
+| +-$pipe_select.key#5 AS key [STRING]
+| +-$pipe_select.key#6 AS key [STRING]
+| +-$pipe_select.key#7 AS key [STRING]
++-query=
+  +-ProjectScan
+    +-column_list=$pipe_select.[key#4, key#5, key#6, key#7]
+    +-expr_list=
+    | +-key#4 :=
+    | | +-GetRowField
+    | |   +-type=STRING
+    | |   +-expr=
+    | |   | +-ColumnRef(type=ROW<tvf_returning_row_type_recursive_nested.row_col>, column=tvf_returning_row_type_recursive_nested.row_col#2)
+    | |   +-column=RowTypeRecursiveNested.key
+    | +-key#5 :=
+    | | +-GetRowField
+    | |   +-type=STRING
+    | |   +-expr=
+    | |   | +-GetRowField
+    | |   |   +-type=ROW<RowTypeRecursiveNested>
+    | |   |   +-expr=
+    | |   |   | +-ColumnRef(type=ROW<tvf_returning_row_type_recursive_nested.row_col>, column=tvf_returning_row_type_recursive_nested.row_col#2)
+    | |   |   +-column=RowTypeRecursiveNested.middle
+    | |   +-column=RowTypeRecursiveNested.key
+    | +-key#6 :=
+    | | +-GetRowField
+    | |   +-type=STRING
+    | |   +-expr=
+    | |   | +-GetRowField
+    | |   |   +-type=ROW<RowTypeRecursiveNested>
+    | |   |   +-expr=
+    | |   |   | +-GetRowField
+    | |   |   |   +-type=ROW<RowTypeRecursiveNested>
+    | |   |   |   +-expr=
+    | |   |   |   | +-ColumnRef(type=ROW<tvf_returning_row_type_recursive_nested.row_col>, column=tvf_returning_row_type_recursive_nested.row_col#2)
+    | |   |   |   +-column=RowTypeRecursiveNested.middle
+    | |   |   +-column=RowTypeRecursiveNested.middle
+    | |   +-column=RowTypeRecursiveNested.key
+    | +-key#7 :=
+    |   +-GetRowField
+    |     +-type=STRING
+    |     +-expr=
+    |     | +-GetRowField
+    |     |   +-type=ROW<RowTypeRecursiveNested>
+    |     |   +-expr=
+    |     |   | +-GetRowField
+    |     |   |   +-type=ROW<RowTypeRecursiveNested>
+    |     |   |   +-expr=
+    |     |   |   | +-GetRowField
+    |     |   |   |   +-type=ROW<RowTypeRecursiveNested>
+    |     |   |   |   +-expr=
+    |     |   |   |   | +-ColumnRef(type=ROW<tvf_returning_row_type_recursive_nested.row_col>, column=tvf_returning_row_type_recursive_nested.row_col#2)
+    |     |   |   |   +-column=RowTypeRecursiveNested.middle
+    |     |   |   +-column=RowTypeRecursiveNested.middle
+    |     |   +-column=RowTypeRecursiveNested.middle
+    |     +-column=RowTypeRecursiveNested.key
+    +-input_scan=
+      +-TVFScan(column_list=[tvf_returning_row_type_recursive_nested.row_col#2], tvf=RowTypeTest:tvf_returning_row_type_recursive_nested, signature=() -> TABLE<normal_col_1 STRING, row_col ROW<tvf_returning_row_type_recursive_nested.row_col>, normal_col_2 INT64>, column_index_list=[1], function_call_signature=() -> ANY TABLE)
+
+[REWRITTEN AST]
+QueryStmt
++-output_column_list=
+| +-$pipe_select.key#4 AS key [STRING]
+| +-$pipe_select.key#5 AS key [STRING]
+| +-$pipe_select.key#6 AS key [STRING]
+| +-$pipe_select.key#7 AS key [STRING]
++-query=
+  +-ProjectScan
+    +-column_list=$pipe_select.[key#4, key#5, key#6, key#7]
+    +-expr_list=
+    | +-key#4 :=
+    | | +-GetStructField
+    | |   +-type=STRING
+    | |   +-expr=
+    | |   | +-ColumnRef(type=STRUCT<key STRING, middle STRUCT<key STRING, middle STRUCT<key STRING, middle STRUCT<key STRING>>>>, column=tvf_returning_row_type_recursive_nested.$row_col$scanrow#8)
+    | |   +-field_idx=0
+    | +-key#5 :=
+    | | +-GetStructField
+    | |   +-type=STRING
+    | |   +-expr=
+    | |   | +-GetStructField
+    | |   |   +-type=STRUCT<key STRING, middle STRUCT<key STRING, middle STRUCT<key STRING>>>
+    | |   |   +-expr=
+    | |   |   | +-ColumnRef(type=STRUCT<key STRING, middle STRUCT<key STRING, middle STRUCT<key STRING, middle STRUCT<key STRING>>>>, column=tvf_returning_row_type_recursive_nested.$row_col$scanrow#8)
+    | |   |   +-field_idx=1
+    | |   +-field_idx=0
+    | +-key#6 :=
+    | | +-GetStructField
+    | |   +-type=STRING
+    | |   +-expr=
+    | |   | +-GetStructField
+    | |   |   +-type=STRUCT<key STRING, middle STRUCT<key STRING>>
+    | |   |   +-expr=
+    | |   |   | +-GetStructField
+    | |   |   |   +-type=STRUCT<key STRING, middle STRUCT<key STRING, middle STRUCT<key STRING>>>
+    | |   |   |   +-expr=
+    | |   |   |   | +-ColumnRef(type=STRUCT<key STRING, middle STRUCT<key STRING, middle STRUCT<key STRING, middle STRUCT<key STRING>>>>, column=tvf_returning_row_type_recursive_nested.$row_col$scanrow#8)
+    | |   |   |   +-field_idx=1
+    | |   |   +-field_idx=1
+    | |   +-field_idx=0
+    | +-key#7 :=
+    |   +-GetStructField
+    |     +-type=STRING
+    |     +-expr=
+    |     | +-GetStructField
+    |     |   +-type=STRUCT<key STRING>
+    |     |   +-expr=
+    |     |   | +-GetStructField
+    |     |   |   +-type=STRUCT<key STRING, middle STRUCT<key STRING>>
+    |     |   |   +-expr=
+    |     |   |   | +-GetStructField
+    |     |   |   |   +-type=STRUCT<key STRING, middle STRUCT<key STRING, middle STRUCT<key STRING>>>
+    |     |   |   |   +-expr=
+    |     |   |   |   | +-ColumnRef(type=STRUCT<key STRING, middle STRUCT<key STRING, middle STRUCT<key STRING, middle STRUCT<key STRING>>>>, column=tvf_returning_row_type_recursive_nested.$row_col$scanrow#8)
+    |     |   |   |   +-field_idx=1
+    |     |   |   +-field_idx=1
+    |     |   +-field_idx=1
+    |     +-field_idx=0
+    +-input_scan=
+      +-TVFScan(column_list=[tvf_returning_row_type_recursive_nested.$row_col$scanrow#8], tvf=RowTypeTest:tvf_returning_row_type_recursive_nested, signature=() -> TABLE<normal_col_1 STRING, row_col STRUCT<key STRING, middle STRUCT<key STRING, middle STRUCT<key STRING, middle STRUCT<key STRING>>>>, normal_col_2 INT64>, column_index_list=[1], function_call_signature=() -> ANY TABLE)
+==
+
+# Recursively-nested ROW in TVF: Access various fields at various nesting
+# levels.
+FROM tvf_returning_row_type_recursive_nested()
+|> SELECT
+    row_col.key,
+    row_col.middle.col2,
+    row_col.middle.middle.col3,
+    row_col.middle.middle.middle.key
+--
+QueryStmt
++-output_column_list=
+| +-$pipe_select.key#4 AS key [STRING]
+| +-$pipe_select.col2#5 AS col2 [STRING]
+| +-$pipe_select.col3#6 AS col3 [INT64]
+| +-$pipe_select.key#7 AS key [STRING]
++-query=
+  +-ProjectScan
+    +-column_list=$pipe_select.[key#4, col2#5, col3#6, key#7]
+    +-expr_list=
+    | +-key#4 :=
+    | | +-GetRowField
+    | |   +-type=STRING
+    | |   +-expr=
+    | |   | +-ColumnRef(type=ROW<tvf_returning_row_type_recursive_nested.row_col>, column=tvf_returning_row_type_recursive_nested.row_col#2)
+    | |   +-column=RowTypeRecursiveNested.key
+    | +-col2#5 :=
+    | | +-GetRowField
+    | |   +-type=STRING
+    | |   +-expr=
+    | |   | +-GetRowField
+    | |   |   +-type=ROW<RowTypeRecursiveNested>
+    | |   |   +-expr=
+    | |   |   | +-ColumnRef(type=ROW<tvf_returning_row_type_recursive_nested.row_col>, column=tvf_returning_row_type_recursive_nested.row_col#2)
+    | |   |   +-column=RowTypeRecursiveNested.middle
+    | |   +-column=RowTypeRecursiveNested.col2
+    | +-col3#6 :=
+    | | +-GetRowField
+    | |   +-type=INT64
+    | |   +-expr=
+    | |   | +-GetRowField
+    | |   |   +-type=ROW<RowTypeRecursiveNested>
+    | |   |   +-expr=
+    | |   |   | +-GetRowField
+    | |   |   |   +-type=ROW<RowTypeRecursiveNested>
+    | |   |   |   +-expr=
+    | |   |   |   | +-ColumnRef(type=ROW<tvf_returning_row_type_recursive_nested.row_col>, column=tvf_returning_row_type_recursive_nested.row_col#2)
+    | |   |   |   +-column=RowTypeRecursiveNested.middle
+    | |   |   +-column=RowTypeRecursiveNested.middle
+    | |   +-column=RowTypeRecursiveNested.col3
+    | +-key#7 :=
+    |   +-GetRowField
+    |     +-type=STRING
+    |     +-expr=
+    |     | +-GetRowField
+    |     |   +-type=ROW<RowTypeRecursiveNested>
+    |     |   +-expr=
+    |     |   | +-GetRowField
+    |     |   |   +-type=ROW<RowTypeRecursiveNested>
+    |     |   |   +-expr=
+    |     |   |   | +-GetRowField
+    |     |   |   |   +-type=ROW<RowTypeRecursiveNested>
+    |     |   |   |   +-expr=
+    |     |   |   |   | +-ColumnRef(type=ROW<tvf_returning_row_type_recursive_nested.row_col>, column=tvf_returning_row_type_recursive_nested.row_col#2)
+    |     |   |   |   +-column=RowTypeRecursiveNested.middle
+    |     |   |   +-column=RowTypeRecursiveNested.middle
+    |     |   +-column=RowTypeRecursiveNested.middle
+    |     +-column=RowTypeRecursiveNested.key
+    +-input_scan=
+      +-TVFScan(column_list=[tvf_returning_row_type_recursive_nested.row_col#2], tvf=RowTypeTest:tvf_returning_row_type_recursive_nested, signature=() -> TABLE<normal_col_1 STRING, row_col ROW<tvf_returning_row_type_recursive_nested.row_col>, normal_col_2 INT64>, column_index_list=[1], function_call_signature=() -> ANY TABLE)
+
+[REWRITTEN AST]
+QueryStmt
++-output_column_list=
+| +-$pipe_select.key#4 AS key [STRING]
+| +-$pipe_select.col2#5 AS col2 [STRING]
+| +-$pipe_select.col3#6 AS col3 [INT64]
+| +-$pipe_select.key#7 AS key [STRING]
++-query=
+  +-ProjectScan
+    +-column_list=$pipe_select.[key#4, col2#5, col3#6, key#7]
+    +-expr_list=
+    | +-key#4 :=
+    | | +-GetStructField
+    | |   +-type=STRING
+    | |   +-expr=
+    | |   | +-ColumnRef(type=STRUCT<key STRING, middle STRUCT<col2 STRING, middle STRUCT<col3 INT64, middle STRUCT<key STRING>>>>, column=tvf_returning_row_type_recursive_nested.$row_col$scanrow#8)
+    | |   +-field_idx=0
+    | +-col2#5 :=
+    | | +-GetStructField
+    | |   +-type=STRING
+    | |   +-expr=
+    | |   | +-GetStructField
+    | |   |   +-type=STRUCT<col2 STRING, middle STRUCT<col3 INT64, middle STRUCT<key STRING>>>
+    | |   |   +-expr=
+    | |   |   | +-ColumnRef(type=STRUCT<key STRING, middle STRUCT<col2 STRING, middle STRUCT<col3 INT64, middle STRUCT<key STRING>>>>, column=tvf_returning_row_type_recursive_nested.$row_col$scanrow#8)
+    | |   |   +-field_idx=1
+    | |   +-field_idx=0
+    | +-col3#6 :=
+    | | +-GetStructField
+    | |   +-type=INT64
+    | |   +-expr=
+    | |   | +-GetStructField
+    | |   |   +-type=STRUCT<col3 INT64, middle STRUCT<key STRING>>
+    | |   |   +-expr=
+    | |   |   | +-GetStructField
+    | |   |   |   +-type=STRUCT<col2 STRING, middle STRUCT<col3 INT64, middle STRUCT<key STRING>>>
+    | |   |   |   +-expr=
+    | |   |   |   | +-ColumnRef(type=STRUCT<key STRING, middle STRUCT<col2 STRING, middle STRUCT<col3 INT64, middle STRUCT<key STRING>>>>, column=tvf_returning_row_type_recursive_nested.$row_col$scanrow#8)
+    | |   |   |   +-field_idx=1
+    | |   |   +-field_idx=1
+    | |   +-field_idx=0
+    | +-key#7 :=
+    |   +-GetStructField
+    |     +-type=STRING
+    |     +-expr=
+    |     | +-GetStructField
+    |     |   +-type=STRUCT<key STRING>
+    |     |   +-expr=
+    |     |   | +-GetStructField
+    |     |   |   +-type=STRUCT<col3 INT64, middle STRUCT<key STRING>>
+    |     |   |   +-expr=
+    |     |   |   | +-GetStructField
+    |     |   |   |   +-type=STRUCT<col2 STRING, middle STRUCT<col3 INT64, middle STRUCT<key STRING>>>
+    |     |   |   |   +-expr=
+    |     |   |   |   | +-ColumnRef(type=STRUCT<key STRING, middle STRUCT<col2 STRING, middle STRUCT<col3 INT64, middle STRUCT<key STRING>>>>, column=tvf_returning_row_type_recursive_nested.$row_col$scanrow#8)
+    |     |   |   |   +-field_idx=1
+    |     |   |   +-field_idx=1
+    |     |   +-field_idx=1
+    |     +-field_idx=0
+    +-input_scan=
+      +-TVFScan(column_list=[tvf_returning_row_type_recursive_nested.$row_col$scanrow#8], tvf=RowTypeTest:tvf_returning_row_type_recursive_nested, signature=() -> TABLE<normal_col_1 STRING, row_col STRUCT<key STRING, middle STRUCT<col2 STRING, middle STRUCT<col3 INT64, middle STRUCT<key STRING>>>>, normal_col_2 INT64>, column_index_list=[1], function_call_signature=() -> ANY TABLE)
+==
+
+# Recursively-nested ROW in TVF: Access fields in two different TvfScans.
+SELECT *
+FROM (
+  SELECT
+    row_col.key,
+    row_col.middle.col2,
+    row_col.middle.middle.col3,
+    row_col.middle.middle.middle.key
+  FROM tvf_returning_row_type_recursive_nested()
+)
+CROSS JOIN (
+  SELECT
+    row_col.key,
+    row_col.middle.col3,
+    row_col.middle.middle.col3,
+    row_col.middle.middle.middle.col2
+  FROM tvf_returning_row_type_recursive_nested()
+)
+--
+QueryStmt
++-output_column_list=
+| +-$subquery1.key#4 AS key [STRING]
+| +-$subquery1.col2#5 AS col2 [STRING]
+| +-$subquery1.col3#6 AS col3 [INT64]
+| +-$subquery1.key#7 AS key [STRING]
+| +-$subquery2.key#11 AS key [STRING]
+| +-$subquery2.col3#12 AS col3 [INT64]
+| +-$subquery2.col3#13 AS col3 [INT64]
+| +-$subquery2.col2#14 AS col2 [STRING]
++-query=
+  +-ProjectScan
+    +-column_list=[$subquery1.key#4, $subquery1.col2#5, $subquery1.col3#6, $subquery1.key#7, $subquery2.key#11, $subquery2.col3#12, $subquery2.col3#13, $subquery2.col2#14]
+    +-input_scan=
+      +-JoinScan
+        +-column_list=[$subquery1.key#4, $subquery1.col2#5, $subquery1.col3#6, $subquery1.key#7, $subquery2.key#11, $subquery2.col3#12, $subquery2.col3#13, $subquery2.col2#14]
+        +-left_scan=
+        | +-ProjectScan
+        |   +-column_list=$subquery1.[key#4, col2#5, col3#6, key#7]
+        |   +-expr_list=
+        |   | +-key#4 :=
+        |   | | +-GetRowField
+        |   | |   +-type=STRING
+        |   | |   +-expr=
+        |   | |   | +-ColumnRef(type=ROW<tvf_returning_row_type_recursive_nested.row_col>, column=tvf_returning_row_type_recursive_nested.row_col#2)
+        |   | |   +-column=RowTypeRecursiveNested.key
+        |   | +-col2#5 :=
+        |   | | +-GetRowField
+        |   | |   +-type=STRING
+        |   | |   +-expr=
+        |   | |   | +-GetRowField
+        |   | |   |   +-type=ROW<RowTypeRecursiveNested>
+        |   | |   |   +-expr=
+        |   | |   |   | +-ColumnRef(type=ROW<tvf_returning_row_type_recursive_nested.row_col>, column=tvf_returning_row_type_recursive_nested.row_col#2)
+        |   | |   |   +-column=RowTypeRecursiveNested.middle
+        |   | |   +-column=RowTypeRecursiveNested.col2
+        |   | +-col3#6 :=
+        |   | | +-GetRowField
+        |   | |   +-type=INT64
+        |   | |   +-expr=
+        |   | |   | +-GetRowField
+        |   | |   |   +-type=ROW<RowTypeRecursiveNested>
+        |   | |   |   +-expr=
+        |   | |   |   | +-GetRowField
+        |   | |   |   |   +-type=ROW<RowTypeRecursiveNested>
+        |   | |   |   |   +-expr=
+        |   | |   |   |   | +-ColumnRef(type=ROW<tvf_returning_row_type_recursive_nested.row_col>, column=tvf_returning_row_type_recursive_nested.row_col#2)
+        |   | |   |   |   +-column=RowTypeRecursiveNested.middle
+        |   | |   |   +-column=RowTypeRecursiveNested.middle
+        |   | |   +-column=RowTypeRecursiveNested.col3
+        |   | +-key#7 :=
+        |   |   +-GetRowField
+        |   |     +-type=STRING
+        |   |     +-expr=
+        |   |     | +-GetRowField
+        |   |     |   +-type=ROW<RowTypeRecursiveNested>
+        |   |     |   +-expr=
+        |   |     |   | +-GetRowField
+        |   |     |   |   +-type=ROW<RowTypeRecursiveNested>
+        |   |     |   |   +-expr=
+        |   |     |   |   | +-GetRowField
+        |   |     |   |   |   +-type=ROW<RowTypeRecursiveNested>
+        |   |     |   |   |   +-expr=
+        |   |     |   |   |   | +-ColumnRef(type=ROW<tvf_returning_row_type_recursive_nested.row_col>, column=tvf_returning_row_type_recursive_nested.row_col#2)
+        |   |     |   |   |   +-column=RowTypeRecursiveNested.middle
+        |   |     |   |   +-column=RowTypeRecursiveNested.middle
+        |   |     |   +-column=RowTypeRecursiveNested.middle
+        |   |     +-column=RowTypeRecursiveNested.key
+        |   +-input_scan=
+        |     +-TVFScan(column_list=[tvf_returning_row_type_recursive_nested.row_col#2], tvf=RowTypeTest:tvf_returning_row_type_recursive_nested, signature=() -> TABLE<normal_col_1 STRING, row_col ROW<tvf_returning_row_type_recursive_nested.row_col>, normal_col_2 INT64>, column_index_list=[1], function_call_signature=() -> ANY TABLE)
+        +-right_scan=
+          +-ProjectScan
+            +-column_list=$subquery2.[key#11, col3#12, col3#13, col2#14]
+            +-expr_list=
+            | +-key#11 :=
+            | | +-GetRowField
+            | |   +-type=STRING
+            | |   +-expr=
+            | |   | +-ColumnRef(type=ROW<tvf_returning_row_type_recursive_nested.row_col>, column=tvf_returning_row_type_recursive_nested.row_col#9)
+            | |   +-column=RowTypeRecursiveNested.key
+            | +-col3#12 :=
+            | | +-GetRowField
+            | |   +-type=INT64
+            | |   +-expr=
+            | |   | +-GetRowField
+            | |   |   +-type=ROW<RowTypeRecursiveNested>
+            | |   |   +-expr=
+            | |   |   | +-ColumnRef(type=ROW<tvf_returning_row_type_recursive_nested.row_col>, column=tvf_returning_row_type_recursive_nested.row_col#9)
+            | |   |   +-column=RowTypeRecursiveNested.middle
+            | |   +-column=RowTypeRecursiveNested.col3
+            | +-col3#13 :=
+            | | +-GetRowField
+            | |   +-type=INT64
+            | |   +-expr=
+            | |   | +-GetRowField
+            | |   |   +-type=ROW<RowTypeRecursiveNested>
+            | |   |   +-expr=
+            | |   |   | +-GetRowField
+            | |   |   |   +-type=ROW<RowTypeRecursiveNested>
+            | |   |   |   +-expr=
+            | |   |   |   | +-ColumnRef(type=ROW<tvf_returning_row_type_recursive_nested.row_col>, column=tvf_returning_row_type_recursive_nested.row_col#9)
+            | |   |   |   +-column=RowTypeRecursiveNested.middle
+            | |   |   +-column=RowTypeRecursiveNested.middle
+            | |   +-column=RowTypeRecursiveNested.col3
+            | +-col2#14 :=
+            |   +-GetRowField
+            |     +-type=STRING
+            |     +-expr=
+            |     | +-GetRowField
+            |     |   +-type=ROW<RowTypeRecursiveNested>
+            |     |   +-expr=
+            |     |   | +-GetRowField
+            |     |   |   +-type=ROW<RowTypeRecursiveNested>
+            |     |   |   +-expr=
+            |     |   |   | +-GetRowField
+            |     |   |   |   +-type=ROW<RowTypeRecursiveNested>
+            |     |   |   |   +-expr=
+            |     |   |   |   | +-ColumnRef(type=ROW<tvf_returning_row_type_recursive_nested.row_col>, column=tvf_returning_row_type_recursive_nested.row_col#9)
+            |     |   |   |   +-column=RowTypeRecursiveNested.middle
+            |     |   |   +-column=RowTypeRecursiveNested.middle
+            |     |   +-column=RowTypeRecursiveNested.middle
+            |     +-column=RowTypeRecursiveNested.col2
+            +-input_scan=
+              +-TVFScan(column_list=[tvf_returning_row_type_recursive_nested.row_col#9], tvf=RowTypeTest:tvf_returning_row_type_recursive_nested, signature=() -> TABLE<normal_col_1 STRING, row_col ROW<tvf_returning_row_type_recursive_nested.row_col>, normal_col_2 INT64>, column_index_list=[1], function_call_signature=() -> ANY TABLE)
+
+[REWRITTEN AST]
+QueryStmt
++-output_column_list=
+| +-$subquery1.key#4 AS key [STRING]
+| +-$subquery1.col2#5 AS col2 [STRING]
+| +-$subquery1.col3#6 AS col3 [INT64]
+| +-$subquery1.key#7 AS key [STRING]
+| +-$subquery2.key#11 AS key [STRING]
+| +-$subquery2.col3#12 AS col3 [INT64]
+| +-$subquery2.col3#13 AS col3 [INT64]
+| +-$subquery2.col2#14 AS col2 [STRING]
++-query=
+  +-ProjectScan
+    +-column_list=[$subquery1.key#4, $subquery1.col2#5, $subquery1.col3#6, $subquery1.key#7, $subquery2.key#11, $subquery2.col3#12, $subquery2.col3#13, $subquery2.col2#14]
+    +-input_scan=
+      +-JoinScan
+        +-column_list=[$subquery1.key#4, $subquery1.col2#5, $subquery1.col3#6, $subquery1.key#7, $subquery2.key#11, $subquery2.col3#12, $subquery2.col3#13, $subquery2.col2#14]
+        +-left_scan=
+        | +-ProjectScan
+        |   +-column_list=$subquery1.[key#4, col2#5, col3#6, key#7]
+        |   +-expr_list=
+        |   | +-key#4 :=
+        |   | | +-GetStructField
+        |   | |   +-type=STRING
+        |   | |   +-expr=
+        |   | |   | +-ColumnRef(type=STRUCT<key STRING, middle STRUCT<col2 STRING, middle STRUCT<col3 INT64, middle STRUCT<key STRING>>>>, column=tvf_returning_row_type_recursive_nested.$row_col$scanrow#15)
+        |   | |   +-field_idx=0
+        |   | +-col2#5 :=
+        |   | | +-GetStructField
+        |   | |   +-type=STRING
+        |   | |   +-expr=
+        |   | |   | +-GetStructField
+        |   | |   |   +-type=STRUCT<col2 STRING, middle STRUCT<col3 INT64, middle STRUCT<key STRING>>>
+        |   | |   |   +-expr=
+        |   | |   |   | +-ColumnRef(type=STRUCT<key STRING, middle STRUCT<col2 STRING, middle STRUCT<col3 INT64, middle STRUCT<key STRING>>>>, column=tvf_returning_row_type_recursive_nested.$row_col$scanrow#15)
+        |   | |   |   +-field_idx=1
+        |   | |   +-field_idx=0
+        |   | +-col3#6 :=
+        |   | | +-GetStructField
+        |   | |   +-type=INT64
+        |   | |   +-expr=
+        |   | |   | +-GetStructField
+        |   | |   |   +-type=STRUCT<col3 INT64, middle STRUCT<key STRING>>
+        |   | |   |   +-expr=
+        |   | |   |   | +-GetStructField
+        |   | |   |   |   +-type=STRUCT<col2 STRING, middle STRUCT<col3 INT64, middle STRUCT<key STRING>>>
+        |   | |   |   |   +-expr=
+        |   | |   |   |   | +-ColumnRef(type=STRUCT<key STRING, middle STRUCT<col2 STRING, middle STRUCT<col3 INT64, middle STRUCT<key STRING>>>>, column=tvf_returning_row_type_recursive_nested.$row_col$scanrow#15)
+        |   | |   |   |   +-field_idx=1
+        |   | |   |   +-field_idx=1
+        |   | |   +-field_idx=0
+        |   | +-key#7 :=
+        |   |   +-GetStructField
+        |   |     +-type=STRING
+        |   |     +-expr=
+        |   |     | +-GetStructField
+        |   |     |   +-type=STRUCT<key STRING>
+        |   |     |   +-expr=
+        |   |     |   | +-GetStructField
+        |   |     |   |   +-type=STRUCT<col3 INT64, middle STRUCT<key STRING>>
+        |   |     |   |   +-expr=
+        |   |     |   |   | +-GetStructField
+        |   |     |   |   |   +-type=STRUCT<col2 STRING, middle STRUCT<col3 INT64, middle STRUCT<key STRING>>>
+        |   |     |   |   |   +-expr=
+        |   |     |   |   |   | +-ColumnRef(type=STRUCT<key STRING, middle STRUCT<col2 STRING, middle STRUCT<col3 INT64, middle STRUCT<key STRING>>>>, column=tvf_returning_row_type_recursive_nested.$row_col$scanrow#15)
+        |   |     |   |   |   +-field_idx=1
+        |   |     |   |   +-field_idx=1
+        |   |     |   +-field_idx=1
+        |   |     +-field_idx=0
+        |   +-input_scan=
+        |     +-TVFScan(column_list=[tvf_returning_row_type_recursive_nested.$row_col$scanrow#15], tvf=RowTypeTest:tvf_returning_row_type_recursive_nested, signature=() -> TABLE<normal_col_1 STRING, row_col STRUCT<key STRING, middle STRUCT<col2 STRING, middle STRUCT<col3 INT64, middle STRUCT<key STRING>>>>, normal_col_2 INT64>, column_index_list=[1], function_call_signature=() -> ANY TABLE)
+        +-right_scan=
+          +-ProjectScan
+            +-column_list=$subquery2.[key#11, col3#12, col3#13, col2#14]
+            +-expr_list=
+            | +-key#11 :=
+            | | +-GetStructField
+            | |   +-type=STRING
+            | |   +-expr=
+            | |   | +-ColumnRef(type=STRUCT<key STRING, middle STRUCT<col3 INT64, middle STRUCT<col3 INT64, middle STRUCT<col2 STRING>>>>, column=tvf_returning_row_type_recursive_nested.$row_col$scanrow#16)
+            | |   +-field_idx=0
+            | +-col3#12 :=
+            | | +-GetStructField
+            | |   +-type=INT64
+            | |   +-expr=
+            | |   | +-GetStructField
+            | |   |   +-type=STRUCT<col3 INT64, middle STRUCT<col3 INT64, middle STRUCT<col2 STRING>>>
+            | |   |   +-expr=
+            | |   |   | +-ColumnRef(type=STRUCT<key STRING, middle STRUCT<col3 INT64, middle STRUCT<col3 INT64, middle STRUCT<col2 STRING>>>>, column=tvf_returning_row_type_recursive_nested.$row_col$scanrow#16)
+            | |   |   +-field_idx=1
+            | |   +-field_idx=0
+            | +-col3#13 :=
+            | | +-GetStructField
+            | |   +-type=INT64
+            | |   +-expr=
+            | |   | +-GetStructField
+            | |   |   +-type=STRUCT<col3 INT64, middle STRUCT<col2 STRING>>
+            | |   |   +-expr=
+            | |   |   | +-GetStructField
+            | |   |   |   +-type=STRUCT<col3 INT64, middle STRUCT<col3 INT64, middle STRUCT<col2 STRING>>>
+            | |   |   |   +-expr=
+            | |   |   |   | +-ColumnRef(type=STRUCT<key STRING, middle STRUCT<col3 INT64, middle STRUCT<col3 INT64, middle STRUCT<col2 STRING>>>>, column=tvf_returning_row_type_recursive_nested.$row_col$scanrow#16)
+            | |   |   |   +-field_idx=1
+            | |   |   +-field_idx=1
+            | |   +-field_idx=0
+            | +-col2#14 :=
+            |   +-GetStructField
+            |     +-type=STRING
+            |     +-expr=
+            |     | +-GetStructField
+            |     |   +-type=STRUCT<col2 STRING>
+            |     |   +-expr=
+            |     |   | +-GetStructField
+            |     |   |   +-type=STRUCT<col3 INT64, middle STRUCT<col2 STRING>>
+            |     |   |   +-expr=
+            |     |   |   | +-GetStructField
+            |     |   |   |   +-type=STRUCT<col3 INT64, middle STRUCT<col3 INT64, middle STRUCT<col2 STRING>>>
+            |     |   |   |   +-expr=
+            |     |   |   |   | +-ColumnRef(type=STRUCT<key STRING, middle STRUCT<col3 INT64, middle STRUCT<col3 INT64, middle STRUCT<col2 STRING>>>>, column=tvf_returning_row_type_recursive_nested.$row_col$scanrow#16)
+            |     |   |   |   +-field_idx=1
+            |     |   |   +-field_idx=1
+            |     |   +-field_idx=1
+            |     +-field_idx=0
+            +-input_scan=
+              +-TVFScan(column_list=[tvf_returning_row_type_recursive_nested.$row_col$scanrow#16], tvf=RowTypeTest:tvf_returning_row_type_recursive_nested, signature=() -> TABLE<normal_col_1 STRING, row_col STRUCT<key STRING, middle STRUCT<col3 INT64, middle STRUCT<col3 INT64, middle STRUCT<col2 STRING>>>>, normal_col_2 INT64>, column_index_list=[1], function_call_signature=() -> ANY TABLE)
+==
+
+# Nested ROW in TVF: Intermediate projections (`AS my_row`).
+FROM tvf_returning_row_type_recursive_nested()
+|> SELECT row_col.middle AS my_row
+|> SELECT my_row.middle.key
+--
+QueryStmt
++-output_column_list=
+| +-$pipe_select.key#5 AS key [STRING]
++-query=
+  +-ProjectScan
+    +-column_list=[$pipe_select.key#5]
+    +-expr_list=
+    | +-key#5 :=
+    |   +-GetRowField
+    |     +-type=STRING
+    |     +-expr=
+    |     | +-GetRowField
+    |     |   +-type=ROW<RowTypeRecursiveNested>
+    |     |   +-expr=
+    |     |   | +-ColumnRef(type=ROW<RowTypeRecursiveNested>, column=$pipe_select.my_row#4)
+    |     |   +-column=RowTypeRecursiveNested.middle
+    |     +-column=RowTypeRecursiveNested.key
+    +-input_scan=
+      +-ProjectScan
+        +-column_list=[$pipe_select.my_row#4]
+        +-expr_list=
+        | +-my_row#4 :=
+        |   +-GetRowField
+        |     +-type=ROW<RowTypeRecursiveNested>
+        |     +-expr=
+        |     | +-ColumnRef(type=ROW<tvf_returning_row_type_recursive_nested.row_col>, column=tvf_returning_row_type_recursive_nested.row_col#2)
+        |     +-column=RowTypeRecursiveNested.middle
+        +-input_scan=
+          +-TVFScan(column_list=[tvf_returning_row_type_recursive_nested.row_col#2], tvf=RowTypeTest:tvf_returning_row_type_recursive_nested, signature=() -> TABLE<normal_col_1 STRING, row_col ROW<tvf_returning_row_type_recursive_nested.row_col>, normal_col_2 INT64>, column_index_list=[1], function_call_signature=() -> ANY TABLE)
+
+[REWRITTEN AST]
+QueryStmt
++-output_column_list=
+| +-$pipe_select.key#5 AS key [STRING]
++-query=
+  +-ProjectScan
+    +-column_list=[$pipe_select.key#5]
+    +-expr_list=
+    | +-key#5 :=
+    |   +-GetStructField
+    |     +-type=STRING
+    |     +-expr=
+    |     | +-GetStructField
+    |     |   +-type=STRUCT<key STRING>
+    |     |   +-expr=
+    |     |   | +-ColumnRef(type=STRUCT<middle STRUCT<key STRING>>, column=$pipe_select.$my_row$scanrow#6)
+    |     |   +-field_idx=0
+    |     +-field_idx=0
+    +-input_scan=
+      +-ProjectScan
+        +-column_list=[$pipe_select.$my_row$scanrow#6]
+        +-expr_list=
+        | +-$my_row$scanrow#6 :=
+        |   +-GetStructField
+        |     +-type=STRUCT<middle STRUCT<key STRING>>
+        |     +-expr=
+        |     | +-ColumnRef(type=STRUCT<middle STRUCT<middle STRUCT<key STRING>>>, column=tvf_returning_row_type_recursive_nested.$row_col$scanrow#7)
+        |     +-field_idx=0
+        +-input_scan=
+          +-TVFScan(column_list=[tvf_returning_row_type_recursive_nested.$row_col$scanrow#7], tvf=RowTypeTest:tvf_returning_row_type_recursive_nested, signature=() -> TABLE<normal_col_1 STRING, row_col STRUCT<middle STRUCT<middle STRUCT<key STRING>>>, normal_col_2 INT64>, column_index_list=[1], function_call_signature=() -> ANY TABLE)
+==
+
+# Nested ROW in TVF: Propagation through CTEs.
+WITH cte AS (
+  FROM tvf_returning_row_type_recursive_nested()
+  |> SELECT row_col.middle AS my_row
+)
+FROM cte
+|> SELECT my_row.middle.key
+--
+QueryStmt
++-output_column_list=
+| +-$pipe_select.key#6 AS key [STRING]
++-query=
+  +-WithScan
+    +-column_list=[$pipe_select.key#6]
+    +-with_entry_list=
+    | +-WithEntry
+    |   +-with_query_name="cte"
+    |   +-with_subquery=
+    |     +-ProjectScan
+    |       +-column_list=[$pipe_select.my_row#4]
+    |       +-expr_list=
+    |       | +-my_row#4 :=
+    |       |   +-GetRowField
+    |       |     +-type=ROW<RowTypeRecursiveNested>
+    |       |     +-expr=
+    |       |     | +-ColumnRef(type=ROW<tvf_returning_row_type_recursive_nested.row_col>, column=tvf_returning_row_type_recursive_nested.row_col#2)
+    |       |     +-column=RowTypeRecursiveNested.middle
+    |       +-input_scan=
+    |         +-TVFScan(column_list=[tvf_returning_row_type_recursive_nested.row_col#2], tvf=RowTypeTest:tvf_returning_row_type_recursive_nested, signature=() -> TABLE<normal_col_1 STRING, row_col ROW<tvf_returning_row_type_recursive_nested.row_col>, normal_col_2 INT64>, column_index_list=[1], function_call_signature=() -> ANY TABLE)
+    +-query=
+      +-ProjectScan
+        +-column_list=[$pipe_select.key#6]
+        +-expr_list=
+        | +-key#6 :=
+        |   +-GetRowField
+        |     +-type=STRING
+        |     +-expr=
+        |     | +-GetRowField
+        |     |   +-type=ROW<RowTypeRecursiveNested>
+        |     |   +-expr=
+        |     |   | +-ColumnRef(type=ROW<RowTypeRecursiveNested>, column=cte.my_row#5)
+        |     |   +-column=RowTypeRecursiveNested.middle
+        |     +-column=RowTypeRecursiveNested.key
+        +-input_scan=
+          +-WithRefScan(column_list=[cte.my_row#5], with_query_name="cte")
+
+[REWRITTEN AST]
+QueryStmt
++-output_column_list=
+| +-$pipe_select.key#6 AS key [STRING]
++-query=
+  +-WithScan
+    +-column_list=[$pipe_select.key#6]
+    +-with_entry_list=
+    | +-WithEntry
+    |   +-with_query_name="cte"
+    |   +-with_subquery=
+    |     +-ProjectScan
+    |       +-column_list=[$pipe_select.$my_row$scanrow#9]
+    |       +-expr_list=
+    |       | +-$my_row$scanrow#9 :=
+    |       |   +-GetStructField
+    |       |     +-type=STRUCT<middle STRUCT<key STRING>>
+    |       |     +-expr=
+    |       |     | +-ColumnRef(type=STRUCT<middle STRUCT<middle STRUCT<key STRING>>>, column=tvf_returning_row_type_recursive_nested.$row_col$scanrow#7)
+    |       |     +-field_idx=0
+    |       +-input_scan=
+    |         +-TVFScan(column_list=[tvf_returning_row_type_recursive_nested.$row_col$scanrow#7], tvf=RowTypeTest:tvf_returning_row_type_recursive_nested, signature=() -> TABLE<normal_col_1 STRING, row_col STRUCT<middle STRUCT<middle STRUCT<key STRING>>>, normal_col_2 INT64>, column_index_list=[1], function_call_signature=() -> ANY TABLE)
+    +-query=
+      +-ProjectScan
+        +-column_list=[$pipe_select.key#6]
+        +-expr_list=
+        | +-key#6 :=
+        |   +-GetStructField
+        |     +-type=STRING
+        |     +-expr=
+        |     | +-GetStructField
+        |     |   +-type=STRUCT<key STRING>
+        |     |   +-expr=
+        |     |   | +-ColumnRef(type=STRUCT<middle STRUCT<key STRING>>, column=cte.$my_row$scanrow#8)
+        |     |   +-field_idx=0
+        |     +-field_idx=0
+        +-input_scan=
+          +-WithRefScan(column_list=[cte.$my_row$scanrow#8], with_query_name="cte")
+==
+
+# Nested ROW in TVF: Propagation through CTEs, multiple CTE references.
+WITH cte AS (
+  FROM tvf_returning_row_type_recursive_nested()
+  |> SELECT row_col.middle AS my_row
+)
+FROM cte |> SELECT my_row.middle.key AS k1
+|> CROSS JOIN (FROM cte |> SELECT my_row.middle.key AS k2)
+|> EXTEND (FROM cte |> SELECT my_row.middle.key) AS k3
+--
+QueryStmt
++-output_column_list=
+| +-$pipe_select.k1#6 AS k1 [STRING]
+| +-$pipe_select.k2#8 AS k2 [STRING]
+| +-$pipe_extend.k3#11 AS k3 [STRING]
++-query=
+  +-WithScan
+    +-column_list=[$pipe_select.k1#6, $pipe_select.k2#8, $pipe_extend.k3#11]
+    +-with_entry_list=
+    | +-WithEntry
+    |   +-with_query_name="cte"
+    |   +-with_subquery=
+    |     +-ProjectScan
+    |       +-column_list=[$pipe_select.my_row#4]
+    |       +-expr_list=
+    |       | +-my_row#4 :=
+    |       |   +-GetRowField
+    |       |     +-type=ROW<RowTypeRecursiveNested>
+    |       |     +-expr=
+    |       |     | +-ColumnRef(type=ROW<tvf_returning_row_type_recursive_nested.row_col>, column=tvf_returning_row_type_recursive_nested.row_col#2)
+    |       |     +-column=RowTypeRecursiveNested.middle
+    |       +-input_scan=
+    |         +-TVFScan(column_list=[tvf_returning_row_type_recursive_nested.row_col#2], tvf=RowTypeTest:tvf_returning_row_type_recursive_nested, signature=() -> TABLE<normal_col_1 STRING, row_col ROW<tvf_returning_row_type_recursive_nested.row_col>, normal_col_2 INT64>, column_index_list=[1], function_call_signature=() -> ANY TABLE)
+    +-query=
+      +-ProjectScan
+        +-column_list=[$pipe_select.k1#6, $pipe_select.k2#8, $pipe_extend.k3#11]
+        +-expr_list=
+        | +-k3#11 :=
+        |   +-SubqueryExpr
+        |     +-type=STRING
+        |     +-subquery_type=SCALAR
+        |     +-subquery=
+        |       +-ProjectScan
+        |         +-column_list=[$pipe_select.key#10]
+        |         +-expr_list=
+        |         | +-key#10 :=
+        |         |   +-GetRowField
+        |         |     +-type=STRING
+        |         |     +-expr=
+        |         |     | +-GetRowField
+        |         |     |   +-type=ROW<RowTypeRecursiveNested>
+        |         |     |   +-expr=
+        |         |     |   | +-ColumnRef(type=ROW<RowTypeRecursiveNested>, column=cte.my_row#9)
+        |         |     |   +-column=RowTypeRecursiveNested.middle
+        |         |     +-column=RowTypeRecursiveNested.key
+        |         +-input_scan=
+        |           +-WithRefScan(column_list=[cte.my_row#9], with_query_name="cte")
+        +-input_scan=
+          +-JoinScan
+            +-column_list=$pipe_select.[k1#6, k2#8]
+            +-left_scan=
+            | +-ProjectScan
+            |   +-column_list=[$pipe_select.k1#6]
+            |   +-expr_list=
+            |   | +-k1#6 :=
+            |   |   +-GetRowField
+            |   |     +-type=STRING
+            |   |     +-expr=
+            |   |     | +-GetRowField
+            |   |     |   +-type=ROW<RowTypeRecursiveNested>
+            |   |     |   +-expr=
+            |   |     |   | +-ColumnRef(type=ROW<RowTypeRecursiveNested>, column=cte.my_row#5)
+            |   |     |   +-column=RowTypeRecursiveNested.middle
+            |   |     +-column=RowTypeRecursiveNested.key
+            |   +-input_scan=
+            |     +-WithRefScan(column_list=[cte.my_row#5], with_query_name="cte")
+            +-right_scan=
+              +-ProjectScan
+                +-column_list=[$pipe_select.k2#8]
+                +-expr_list=
+                | +-k2#8 :=
+                |   +-GetRowField
+                |     +-type=STRING
+                |     +-expr=
+                |     | +-GetRowField
+                |     |   +-type=ROW<RowTypeRecursiveNested>
+                |     |   +-expr=
+                |     |   | +-ColumnRef(type=ROW<RowTypeRecursiveNested>, column=cte.my_row#7)
+                |     |   +-column=RowTypeRecursiveNested.middle
+                |     +-column=RowTypeRecursiveNested.key
+                +-input_scan=
+                  +-WithRefScan(column_list=[cte.my_row#7], with_query_name="cte")
+
+[REWRITTEN AST]
+QueryStmt
++-output_column_list=
+| +-$pipe_select.k1#6 AS k1 [STRING]
+| +-$pipe_select.k2#8 AS k2 [STRING]
+| +-$pipe_extend.k3#11 AS k3 [STRING]
++-query=
+  +-WithScan
+    +-column_list=[$pipe_select.k1#6, $pipe_select.k2#8, $pipe_extend.k3#11]
+    +-with_entry_list=
+    | +-WithEntry
+    |   +-with_query_name="cte"
+    |   +-with_subquery=
+    |     +-ProjectScan
+    |       +-column_list=[$pipe_select.$my_row$scanrow#16]
+    |       +-expr_list=
+    |       | +-$my_row$scanrow#16 :=
+    |       |   +-GetStructField
+    |       |     +-type=STRUCT<middle STRUCT<key STRING>>
+    |       |     +-expr=
+    |       |     | +-ColumnRef(type=STRUCT<middle STRUCT<middle STRUCT<key STRING>>>, column=tvf_returning_row_type_recursive_nested.$row_col$scanrow#12)
+    |       |     +-field_idx=0
+    |       +-input_scan=
+    |         +-TVFScan(column_list=[tvf_returning_row_type_recursive_nested.$row_col$scanrow#12], tvf=RowTypeTest:tvf_returning_row_type_recursive_nested, signature=() -> TABLE<normal_col_1 STRING, row_col STRUCT<middle STRUCT<middle STRUCT<key STRING>>>, normal_col_2 INT64>, column_index_list=[1], function_call_signature=() -> ANY TABLE)
+    +-query=
+      +-ProjectScan
+        +-column_list=[$pipe_select.k1#6, $pipe_select.k2#8, $pipe_extend.k3#11]
+        +-expr_list=
+        | +-k3#11 :=
+        |   +-SubqueryExpr
+        |     +-type=STRING
+        |     +-subquery_type=SCALAR
+        |     +-subquery=
+        |       +-ProjectScan
+        |         +-column_list=[$pipe_select.key#10]
+        |         +-expr_list=
+        |         | +-key#10 :=
+        |         |   +-GetStructField
+        |         |     +-type=STRING
+        |         |     +-expr=
+        |         |     | +-GetStructField
+        |         |     |   +-type=STRUCT<key STRING>
+        |         |     |   +-expr=
+        |         |     |   | +-ColumnRef(type=STRUCT<middle STRUCT<key STRING>>, column=cte.$my_row$scanrow#13)
+        |         |     |   +-field_idx=0
+        |         |     +-field_idx=0
+        |         +-input_scan=
+        |           +-WithRefScan(column_list=[cte.$my_row$scanrow#13], with_query_name="cte")
+        +-input_scan=
+          +-JoinScan
+            +-column_list=$pipe_select.[k1#6, k2#8]
+            +-left_scan=
+            | +-ProjectScan
+            |   +-column_list=[$pipe_select.k1#6]
+            |   +-expr_list=
+            |   | +-k1#6 :=
+            |   |   +-GetStructField
+            |   |     +-type=STRING
+            |   |     +-expr=
+            |   |     | +-GetStructField
+            |   |     |   +-type=STRUCT<key STRING>
+            |   |     |   +-expr=
+            |   |     |   | +-ColumnRef(type=STRUCT<middle STRUCT<key STRING>>, column=cte.$my_row$scanrow#14)
+            |   |     |   +-field_idx=0
+            |   |     +-field_idx=0
+            |   +-input_scan=
+            |     +-WithRefScan(column_list=[cte.$my_row$scanrow#14], with_query_name="cte")
+            +-right_scan=
+              +-ProjectScan
+                +-column_list=[$pipe_select.k2#8]
+                +-expr_list=
+                | +-k2#8 :=
+                |   +-GetStructField
+                |     +-type=STRING
+                |     +-expr=
+                |     | +-GetStructField
+                |     |   +-type=STRUCT<key STRING>
+                |     |   +-expr=
+                |     |   | +-ColumnRef(type=STRUCT<middle STRUCT<key STRING>>, column=cte.$my_row$scanrow#15)
+                |     |   +-field_idx=0
+                |     +-field_idx=0
+                +-input_scan=
+                  +-WithRefScan(column_list=[cte.$my_row$scanrow#15], with_query_name="cte")
+==
+
+# Collated STRING from RowType.
+# TODO: Fix to produce the correct AST, preserving annotations.
+# TODO: Update the RowType rewriter to handle annotations.
+[language_features=MAXIMUM,+ROW_TYPE,+ANNOTATION_FRAMEWORK,+COLLATION_SUPPORT]
+[enabled_ast_rewrites=NONE]
+FROM CollatedTableLazy
+|> SELECT string_ci
+--
+QueryStmt
++-output_column_list=
+| +-$pipe_select.string_ci#2 AS string_ci [STRING]
++-query=
+  +-ProjectScan
+    +-column_list=[$pipe_select.string_ci#2]
+    +-expr_list=
+    | +-string_ci#2 :=
+    |   +-GetRowField
+    |     +-type=STRING
+    |     +-expr=
+    |     | +-ColumnRef(type=ROW<CollatedTableLazy>, column=CollatedTableLazy.$row#1)
+    |     +-column=CollatedTable.string_ci
+    +-input_scan=
+      +-TableScan(column_list=[CollatedTableLazy.$row#1], table=CollatedTableLazy, read_as_row_type=TRUE)
+==
+
+# STRUCT with collated STRING from RowType.
+# TODO: Fix to produce the correct result, preserving annotations.
+# TODO: Update the RowType rewriter to handle annotations.
+[language_features=MAXIMUM,+ROW_TYPE,+ANNOTATION_FRAMEWORK,+COLLATION_SUPPORT]
+[enabled_ast_rewrites=NONE]
+FROM CollatedTableLazy
+|> SELECT struct_with_string_ci
+--
+QueryStmt
++-output_column_list=
+| +-$pipe_select.struct_with_string_ci#2 AS struct_with_string_ci [STRUCT<a INT32, b STRING>]
++-query=
+  +-ProjectScan
+    +-column_list=[$pipe_select.struct_with_string_ci#2]
+    +-expr_list=
+    | +-struct_with_string_ci#2 :=
+    |   +-GetRowField
+    |     +-type=STRUCT<a INT32, b STRING>
+    |     +-expr=
+    |     | +-ColumnRef(type=ROW<CollatedTableLazy>, column=CollatedTableLazy.$row#1)
+    |     +-column=CollatedTable.struct_with_string_ci
+    +-input_scan=
+      +-TableScan(column_list=[CollatedTableLazy.$row#1], table=CollatedTableLazy, read_as_row_type=TRUE)
+==
+
+# ARRAY with collated STRING from RowType.
+# TODO: Fix to produce the correct result, preserving annotations.
+# TODO: Update the RowType rewriter to handle annotations.
+[language_features=MAXIMUM,+ROW_TYPE,+ANNOTATION_FRAMEWORK,+COLLATION_SUPPORT]
+[enabled_ast_rewrites=NONE]
+FROM CollatedTableLazy
+|> SELECT array_with_string_ci
+--
+QueryStmt
++-output_column_list=
+| +-$pipe_select.array_with_string_ci#2 AS array_with_string_ci [ARRAY<STRING>]
++-query=
+  +-ProjectScan
+    +-column_list=[$pipe_select.array_with_string_ci#2]
+    +-expr_list=
+    | +-array_with_string_ci#2 :=
+    |   +-GetRowField
+    |     +-type=ARRAY<STRING>
+    |     +-expr=
+    |     | +-ColumnRef(type=ROW<CollatedTableLazy>, column=CollatedTableLazy.$row#1)
+    |     +-column=CollatedTable.array_with_string_ci
+    +-input_scan=
+      +-TableScan(column_list=[CollatedTableLazy.$row#1], table=CollatedTableLazy, read_as_row_type=TRUE)

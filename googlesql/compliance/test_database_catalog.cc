@@ -38,6 +38,7 @@
 #include "googlesql/public/simple_catalog_util.h"
 #include "googlesql/public/type.h"
 #include "googlesql/public/types/struct_type.h"
+#include "googlesql/public/types/type_factory.h"
 #include "googlesql/testdata/test_schema.pb.h"
 #include "absl/algorithm/container.h"
 #include "absl/container/flat_hash_map.h"
@@ -72,6 +73,15 @@ absl::Status UpdateBuiltinFunctionOptionsWithSuppliedArguments(
       &options_proto_type));
   builtin_function_options->argument_types[{
       googlesql::FN_BATCH_VECTOR_SEARCH_TVF_WITH_PROTO_OPTIONS, 4}] =
+      options_proto_type;
+  builtin_function_options->argument_types[{
+      googlesql::FN_SINGLE_VECTOR_SEARCH_TVF_FLOAT_ARRAY_WITH_PROTO_OPTIONS,
+      3}] = options_proto_type;
+  builtin_function_options->argument_types[{
+      googlesql::FN_SINGLE_VECTOR_SEARCH_TVF_DOUBLE_ARRAY_WITH_PROTO_OPTIONS,
+      3}] = options_proto_type;
+  builtin_function_options->argument_types[{
+      googlesql::FN_SINGLE_VECTOR_SEARCH_TVF_STRING_WITH_PROTO_OPTIONS, 3}] =
       options_proto_type;
   return absl::OkStatus();
 }
@@ -148,11 +158,14 @@ void TestDatabaseCatalog::BuiltinFunctionCache::DumpStats() {
             << "%) size: " << builtins_cache_.size();
 }
 
-static absl::Status LoadStaticEnum(
+// Loads a built-in enum type into the catalog from a proto enum descriptor.
+// Opaque enum types are used to differentiate from user-defined enums.
+static absl::Status LoadBuiltinEnum(
     const google::protobuf::EnumDescriptor* enum_descriptor, SimpleCatalog* catalog) {
-  const Type* enum_type;
-  GOOGLESQL_RETURN_IF_ERROR(
-      catalog->type_factory()->MakeEnumType(enum_descriptor, &enum_type));
+  const EnumType* enum_type;
+  GOOGLESQL_RETURN_IF_ERROR(internal::TypeFactoryHelper::MakeOpaqueEnumType(
+      catalog->type_factory(), enum_descriptor, &enum_type,
+      /*catalog_name_path=*/{}));
   catalog->AddTypeIfNotPresent(enum_descriptor->full_name(), enum_type);
   return absl::OkStatus();
 }
@@ -174,7 +187,7 @@ absl::Status TestDatabaseCatalog::LoadProtoEnumTypes(
     GOOGLESQL_RETURN_IF_ERROR(importer_->Import(filename));
   }
   for (const auto& [name, enum_descriptor] : GetBuiltinEnumDescriptors()) {
-    GOOGLESQL_RETURN_IF_ERROR(LoadStaticEnum(enum_descriptor, catalog_.get()));
+    GOOGLESQL_RETURN_IF_ERROR(LoadBuiltinEnum(enum_descriptor, catalog_.get()));
   }
   for (const auto& [name, proto_descriptor] : GetBuiltinProtoDescriptors()) {
     GOOGLESQL_RETURN_IF_ERROR(LoadStaticProto(proto_descriptor, catalog_.get()));
@@ -215,7 +228,7 @@ absl::Status TestDatabaseCatalog::LoadProtoEnumTypes(
     auto it = builtin_enum_descriptors.find(enum_name);
     if (it != builtin_enum_descriptors.end()) {
       // Builtin enums should only use the global descriptor.
-      GOOGLESQL_RETURN_IF_ERROR(LoadStaticEnum(it->second, catalog_.get()));
+      GOOGLESQL_RETURN_IF_ERROR(LoadBuiltinEnum(it->second, catalog_.get()));
     } else {
       const google::protobuf::EnumDescriptor* enum_descriptor =
           descriptor_pool()->FindEnumTypeByName(enum_name);

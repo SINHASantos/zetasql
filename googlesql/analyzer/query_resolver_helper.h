@@ -30,6 +30,7 @@
 #include <utility>
 #include <vector>
 
+#include "googlesql/analyzer/estimator_function_resolver.h"
 #include "googlesql/analyzer/expr_matching_helpers.h"
 #include "googlesql/analyzer/name_scope.h"
 #include "googlesql/parser/parse_tree.h"
@@ -109,6 +110,9 @@ struct ExprFindings {
   // subquery that is rewritten as a scalar subquery) that uses GROUP ROWS.
   // Such subqueries are considered to be aggregations.
   bool has_group_rows = false;
+
+  // True if this expression contains an estimator function.
+  bool has_estimator = false;
 };
 
 struct GroupingSetInfo {
@@ -1075,6 +1079,10 @@ class QueryResolutionInfo {
     return analytic_resolver_.get();
   }
 
+  EstimatorFunctionResolver* estimator_resolver() {
+    return estimator_resolver_.get();
+  }
+
   SelectColumnStateList* select_column_state_list() {
     return select_column_state_list_.get();
   }
@@ -1425,6 +1433,11 @@ class QueryResolutionInfo {
   // for analytic functions while resolving expressions.
   // Always non-NULL.
   std::unique_ptr<AnalyticFunctionResolver> analytic_resolver_;
+
+  // The estimator function resolver to use for this query. It stores info
+  // for estimator functions while resolving expressions.
+  // Always non-NULL.
+  std::unique_ptr<EstimatorFunctionResolver> estimator_resolver_;
 
   // The output NameList of the FROM clause of this query.  Currently used for
   // WITH GROUP ROWS aggregate processing, as the GROUP_ROWS() TVF within the

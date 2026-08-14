@@ -235,6 +235,16 @@ ERROR: STRUCT type cannot contain ROW-type values [at 2:11]
 ==
 
 FROM KeyValue{{Lazy|FindOnly}} kv
+|> SELECT kv, 1 AS a
+|> AS RangeVar
+|> SELECT RangeVar
+--
+ERROR: Range variable contains a ROW-typed value, cannot be converted to a STRUCT [at 4:11]
+|> SELECT RangeVar
+          ^
+==
+
+FROM KeyValue{{Lazy|FindOnly}} kv
 |> SELECT AS STRUCT 1,kv,2
 --
 ERROR: SELECT AS STRUCT cannot contain ROW-typed values [at 2:11]
@@ -245,21 +255,7 @@ ERROR: SELECT AS STRUCT cannot contain ROW-typed values [at 2:11]
 FROM KeyValue{{Lazy|FindOnly}} kv
 |> SELECT [kv]
 --
-ALTERNATION GROUP: Lazy
---
-ERROR: No matching signature for operator ARRAY[...]
-  Argument types: ROW<KeyValueLazy>
-  Signature: [T1, ...][]
-    Argument 1: expected T1, found ROW<KeyValueLazy>: which is not allowed for ANY arguments [at 2:11]
-|> SELECT [kv]
-          ^
---
-ALTERNATION GROUP: FindOnly
---
-ERROR: No matching signature for operator ARRAY[...]
-  Argument types: ROW<KeyValueFindOnly>
-  Signature: [T1, ...][]
-    Argument 1: expected T1, found ROW<KeyValueFindOnly>: which is not allowed for ANY arguments [at 2:11]
+ERROR: Arrays cannot contain ROW-typed elements [at 2:11]
 |> SELECT [kv]
           ^
 ==

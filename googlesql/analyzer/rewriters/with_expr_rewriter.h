@@ -21,7 +21,7 @@
 
 namespace googlesql {
 
-// Gets a pointer to the let expr rewriter.
+// Gets a pointer to the WITH expression rewriter.
 const Rewriter* GetWithExprRewriter();
 
 }  // namespace googlesql

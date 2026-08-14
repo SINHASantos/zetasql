@@ -29,6 +29,7 @@
 #include "googlesql/public/types/type_parameters.h"
 #include "googlesql/resolved_ast/resolved_ast_visitor.h"
 #include "googlesql/common/thread_stack.h"
+#include "absl/flags/flag.h"
 #include "absl/memory/memory.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_join.h"
@@ -324,9 +325,11 @@ static std::string ToStringImpl(const Connection* connection) {
   return connection->FullName();
 }
 static std::string ToStringImpl(const TableValuedFunction* tvf) {
-  return tvf == nullptr
-    ? "<null>"
-    : absl::StrCat(tvf->FullName(/*include_group=*/true), "(",
+  if (tvf == nullptr) return "<null>";
+  if (absl::GetFlag(FLAGS_googlesql_omit_tvf_signatures_in_resolved_ast_debug_string)) {
+    return tvf->FullName(/*include_group=*/true);
+  }
+  return absl::StrCat(tvf->FullName(/*include_group=*/true), "(",
                    FunctionSignature::SignaturesToString(
                        tvf->signatures(), /*verbose=*/true, /*prefix=*/"",
                        /*separator=*/"; "),

@@ -415,7 +415,8 @@ public class TypeFactoryTest {
     DeclarativeType type =
         factory.createDeclarativeType(
             DeclarativeTypeDescriptor.builder()
-                .setTypeId(new DeclarativeTypeDescriptor.TypeId("namespace", "my_id", 0))
+                .setTypeId(
+                    new DeclarativeTypeDescriptor.TypeId("namespace", "my_id", /* versionId= */ ""))
                 .setDisplayName("My Dec Type")
                 .setBackingType(backingType)
                 .setCoercionFromBackingType(
@@ -445,7 +446,9 @@ public class TypeFactoryTest {
     DeclarativeType baseType =
         factory.createDeclarativeType(
             DeclarativeTypeDescriptor.builder()
-                .setTypeId(new DeclarativeTypeDescriptor.TypeId("namespace", "base_id", 0))
+                .setTypeId(
+                    new DeclarativeTypeDescriptor.TypeId(
+                        "namespace", "base_id", /* versionId= */ ""))
                 .setDisplayName("Base")
                 .setBackingType(enumArrayType)
                 .setCoercionFromBackingType(
@@ -459,7 +462,9 @@ public class TypeFactoryTest {
     DeclarativeType transitiveType =
         factory.createDeclarativeType(
             DeclarativeTypeDescriptor.builder()
-                .setTypeId(new DeclarativeTypeDescriptor.TypeId("namespace", "transitive_id", 0))
+                .setTypeId(
+                    new DeclarativeTypeDescriptor.TypeId(
+                        "namespace", "transitive_id", /* versionId= */ ""))
                 .setDisplayName("Transitive")
                 .setBackingType(baseType)
                 .setCoercionFromBackingType(
@@ -485,7 +490,9 @@ public class TypeFactoryTest {
         DeclarativeTypeDescriptor.builder()
             .setTypeId(
                 new DeclarativeTypeDescriptor.TypeId(
-                    DeclarativeTypeDescriptor.TypeId.GOOGLE_SQL_NAMESPACE, "MY_BUILTIN_TYPE", 0))
+                    DeclarativeTypeDescriptor.TypeId.GOOGLE_SQL_NAMESPACE,
+                    "MY_BUILTIN_TYPE",
+                    /* versionId= */ ""))
             .setDisplayName("my_builtin")
             .setBackingType(TypeFactory.createSimpleType(TypeKind.TYPE_INT32));
 
@@ -493,7 +500,7 @@ public class TypeFactoryTest {
     assertThat(builtinType.isGoogleSqlBuiltin()).isTrue();
 
     descriptorBuilder.setTypeId(
-        new DeclarativeTypeDescriptor.TypeId("CustomNamespace", "MY_CUSTOM", 0));
+        new DeclarativeTypeDescriptor.TypeId("CustomNamespace", "MY_CUSTOM", /* versionId= */ ""));
     DeclarativeType nonBuiltinType = factory.createDeclarativeType(descriptorBuilder.build());
     assertThat(nonBuiltinType.isGoogleSqlBuiltin()).isFalse();
   }
@@ -506,7 +513,7 @@ public class TypeFactoryTest {
                 new DeclarativeTypeDescriptor.TypeId(
                     DeclarativeTypeDescriptor.TypeId.GOOGLE_SQL_NAMESPACE,
                     "T1_StaticFactoryTest",
-                    0))
+                    /* versionId= */ ""))
             .setDisplayName("t1")
             .setBackingType(TypeFactory.createSimpleType(TypeKind.TYPE_INT64));
 
@@ -523,7 +530,9 @@ public class TypeFactoryTest {
     descriptorBuilder
         .setTypeId(
             new DeclarativeTypeDescriptor.TypeId(
-                DeclarativeTypeDescriptor.TypeId.GOOGLE_SQL_NAMESPACE, "T2_StaticFactoryTest", 0))
+                DeclarativeTypeDescriptor.TypeId.GOOGLE_SQL_NAMESPACE,
+                "T2_StaticFactoryTest",
+                /* versionId= */ ""))
         .setDisplayName("t2")
         .setBackingType(t1);
     DeclarativeType t3 = factory1.createDeclarativeType(descriptorBuilder.build());
@@ -539,7 +548,7 @@ public class TypeFactoryTest {
                 new DeclarativeTypeDescriptor.TypeId(
                     DeclarativeTypeDescriptor.TypeId.GOOGLE_SQL_NAMESPACE,
                     "T1_NotInStaticFactory",
-                    0))
+                    /* versionId= */ ""))
             .setDisplayName("t1");
 
     // Enums are built into distinct pools and not cached globally.
@@ -562,7 +571,7 @@ public class TypeFactoryTest {
   public void testDoesNotUseStaticFactoryForNonBuiltinTypes() {
     DeclarativeTypeDescriptor descriptor =
         DeclarativeTypeDescriptor.builder()
-            .setTypeId(new DeclarativeTypeDescriptor.TypeId("NS", "T1", 0))
+            .setTypeId(new DeclarativeTypeDescriptor.TypeId("NS", "T1", /* versionId= */ ""))
             .setDisplayName("t1")
             .setBackingType(TypeFactory.createSimpleType(TypeKind.TYPE_INT64))
             .build();
@@ -584,7 +593,7 @@ public class TypeFactoryTest {
 
     DeclarativeTypeDescriptor.Builder descriptorBuilder =
         DeclarativeTypeDescriptor.builder()
-            .setTypeId(new DeclarativeTypeDescriptor.TypeId("NS", "T1", 0))
+            .setTypeId(new DeclarativeTypeDescriptor.TypeId("NS", "T1", /* versionId= */ ""))
             .setDisplayName("t1")
             .setBackingType(TypeFactory.createSimpleType(TypeKind.TYPE_STRING));
 

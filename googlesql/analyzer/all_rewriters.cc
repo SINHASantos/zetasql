@@ -87,8 +87,7 @@ void RegisterBuiltinRewriters() {
 
     r.Register(ResolvedASTRewrite::REWRITE_FLATTEN, GetFlattenRewriter());
     // REWRITE_ROW_TYPE depends on REWRITE_FLATTEN happening first.
-    r.Register(ResolvedASTRewrite::REWRITE_ROW_TYPE,
-               GetRowTypeTableScanRewriter());
+    r.Register(ResolvedASTRewrite::REWRITE_ROW_TYPE, GetRowTypeRewriter());
     r.Register(ResolvedASTRewrite::REWRITE_ANONYMIZATION,
                GetAnonymizationRewriter());
     r.Register(ResolvedASTRewrite::REWRITE_AGGREGATION_THRESHOLD,

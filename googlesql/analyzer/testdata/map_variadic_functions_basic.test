@@ -47,6 +47,7 @@ QueryStmt
     |     +-Literal(type=STRING, value="b")
     +-input_scan=
       +-SingleRowScan
+
 [SQLBUILDER_OUTPUT]
 SELECT
   MAP_INSERT(MAP_FROM_ARRAY(ARRAY< STRUCT< INT64, STRING > >[]), 1, "a", 2, "b") AS a_1;
@@ -236,6 +237,7 @@ QueryStmt
     |               +-SingleRowScan
     +-input_scan=
       +-SingleRowScan
+
 [SQLBUILDER_OUTPUT]
 SELECT
   (
@@ -354,6 +356,7 @@ QueryStmt
     |     +-Literal(type=STRING, value="d")
     +-input_scan=
       +-SingleRowScan
+
 [SQLBUILDER_OUTPUT]
 SELECT
   MAP_INSERT(MAP_FROM_ARRAY(ARRAY< STRUCT< INT64, STRING > >[]), 1, "a", 2, "b", 3, "c", 4, "d") AS a_1;
@@ -575,6 +578,7 @@ QueryStmt
     |               +-SingleRowScan
     +-input_scan=
       +-SingleRowScan
+
 [SQLBUILDER_OUTPUT]
 SELECT
   (
@@ -697,6 +701,7 @@ QueryStmt
     |     +-Literal(type=STRING, value="b")
     +-input_scan=
       +-SingleRowScan
+
 [SQLBUILDER_OUTPUT]
 SELECT
   MAP_INSERT_OR_REPLACE(MAP_FROM_ARRAY(ARRAY< STRUCT< INT64, STRING > >[STRUCT< INT64, STRING > (1, "x")]),
@@ -872,6 +877,7 @@ QueryStmt
     |               +-SingleRowScan
     +-input_scan=
       +-SingleRowScan
+
 [SQLBUILDER_OUTPUT]
 SELECT
   (
@@ -986,6 +992,7 @@ QueryStmt
     |     +-Literal(type=STRING, value="d")
     +-input_scan=
       +-SingleRowScan
+
 [SQLBUILDER_OUTPUT]
 SELECT
   MAP_INSERT_OR_REPLACE(MAP_FROM_ARRAY(ARRAY< STRUCT< INT64, STRING > >[STRUCT< INT64, STRING > (1, "x"),
@@ -1193,6 +1200,7 @@ QueryStmt
     |               +-SingleRowScan
     +-input_scan=
       +-SingleRowScan
+
 [SQLBUILDER_OUTPUT]
 SELECT
   (
@@ -1312,6 +1320,7 @@ QueryStmt
     |     +-Literal(type=STRING, value="b")
     +-input_scan=
       +-SingleRowScan
+
 [SQLBUILDER_OUTPUT]
 SELECT
   MAP_REPLACE(MAP_FROM_ARRAY(ARRAY< STRUCT< INT64, STRING > >[STRUCT< INT64, STRING > (1, "x"), STRUCT<
@@ -1498,6 +1507,7 @@ QueryStmt
     |               +-SingleRowScan
     +-input_scan=
       +-SingleRowScan
+
 [SQLBUILDER_OUTPUT]
 SELECT
   (
@@ -1613,6 +1623,7 @@ QueryStmt
     |     +-Literal(type=STRING, value="e")
     +-input_scan=
       +-SingleRowScan
+
 [SQLBUILDER_OUTPUT]
 SELECT
   MAP_REPLACE(MAP_FROM_ARRAY(ARRAY< STRUCT< INT64, STRING > >[STRUCT< INT64, STRING > (1, "x"), STRUCT<
@@ -1817,6 +1828,7 @@ QueryStmt
     |               +-SingleRowScan
     +-input_scan=
       +-SingleRowScan
+
 [SQLBUILDER_OUTPUT]
 SELECT
   (
@@ -1956,6 +1968,7 @@ QueryStmt
     |               +-ColumnRef(type=STRING, column=$lambda_arg.v#1)
     +-input_scan=
       +-SingleRowScan
+
 [SQLBUILDER_OUTPUT]
 SELECT
   MAP_REPLACE(MAP_FROM_ARRAY(ARRAY< STRUCT< INT64, STRING > >[STRUCT< INT64, STRING > (1, "x"), STRUCT<
@@ -2165,6 +2178,7 @@ QueryStmt
     |               +-SingleRowScan
     +-input_scan=
       +-SingleRowScan
+
 [SQLBUILDER_OUTPUT]
 SELECT
   (
@@ -2310,6 +2324,7 @@ QueryStmt
     |               +-ColumnRef(type=STRING, column=$lambda_arg.v#1)
     +-input_scan=
       +-SingleRowScan
+
 [SQLBUILDER_OUTPUT]
 SELECT
   MAP_REPLACE(MAP_FROM_ARRAY(ARRAY< STRUCT< INT64, STRING > >[STRUCT< INT64, STRING > (1, "x"), STRUCT<
@@ -2535,6 +2550,7 @@ QueryStmt
     |               +-SingleRowScan
     +-input_scan=
       +-SingleRowScan
+
 [SQLBUILDER_OUTPUT]
 SELECT
   (
@@ -2652,6 +2668,7 @@ QueryStmt
     |     +-Literal(type=INT64, value=3)
     +-input_scan=
       +-SingleRowScan
+
 [SQLBUILDER_OUTPUT]
 SELECT
   MAP_DELETE(MAP_FROM_ARRAY(ARRAY< STRUCT< INT64, STRING > >[STRUCT< INT64, STRING > (1, "a"), STRUCT<
@@ -2821,6 +2838,7 @@ QueryStmt
     |               +-SingleRowScan
     +-input_scan=
       +-SingleRowScan
+
 [SQLBUILDER_OUTPUT]
 SELECT
   (
@@ -2937,6 +2955,7 @@ QueryStmt
     |     +-Literal(type=INT64, value=4)
     +-input_scan=
       +-SingleRowScan
+
 [SQLBUILDER_OUTPUT]
 SELECT
   MAP_DELETE(MAP_FROM_ARRAY(ARRAY< STRUCT< INT64, STRING > >[STRUCT< INT64, STRING > (1, "a"), STRUCT<
@@ -3132,6 +3151,7 @@ QueryStmt
     |               +-SingleRowScan
     +-input_scan=
       +-SingleRowScan
+
 [SQLBUILDER_OUTPUT]
 SELECT
   (

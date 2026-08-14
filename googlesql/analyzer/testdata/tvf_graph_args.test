@@ -1,0 +1,63 @@
+# Tests for resolving table-valued functions with graph arguments.
+
+[default language_features=MAXIMUM,+TABLE_VALUED_FUNCTIONS,+SQL_GRAPH]
+
+# Positive test case: tvf_graph with valid graph
+SELECT * FROM tvf_graph(GRAPH aml)
+--
+QueryStmt
++-output_column_list=
+| +-tvf_graph.column_bool#1 AS column_bool [BOOL]
+| +-tvf_graph.column_bytes#2 AS column_bytes [BYTES]
++-query=
+  +-ProjectScan
+    +-column_list=tvf_graph.[column_bool#1, column_bytes#2]
+    +-input_scan=
+      +-TVFScan
+        +-column_list=tvf_graph.[column_bool#1, column_bytes#2]
+        +-tvf=tvf_graph
+        +-signature=(ANY GRAPH) -> TABLE<column_bool BOOL, column_bytes BYTES>
+        +-argument_list=
+        | +-FunctionArgument(graph=aml)
+        +-column_index_list=[0, 1]
+        +-function_call_signature=(ANY GRAPH) -> TABLE<column_bool BOOL, column_bytes BYTES>
+==
+
+# Positive test case: tvf_graph_with_named_arg
+SELECT * FROM tvf_graph_with_named_arg(GRAPH aml, name => "test")
+--
+QueryStmt
++-output_column_list=
+| +-tvf_graph_with_named_arg.column_bool#1 AS column_bool [BOOL]
+| +-tvf_graph_with_named_arg.column_bytes#2 AS column_bytes [BYTES]
++-query=
+  +-ProjectScan
+    +-column_list=tvf_graph_with_named_arg.[column_bool#1, column_bytes#2]
+    +-input_scan=
+      +-TVFScan
+        +-column_list=tvf_graph_with_named_arg.[column_bool#1, column_bytes#2]
+        +-tvf=tvf_graph_with_named_arg
+        +-signature=(ANY GRAPH, literal STRING) -> TABLE<column_bool BOOL, column_bytes BYTES>
+        +-argument_list=
+        | +-FunctionArgument(graph=aml)
+        | +-FunctionArgument
+        |   +-expr=
+        |     +-Literal(type=STRING, value="test")
+        +-column_index_list=[0, 1]
+        +-function_call_signature=(ANY GRAPH, STRING name) -> TABLE<column_bool BOOL, column_bytes BYTES>
+==
+
+# Negative test case: non-existent graph
+SELECT * FROM tvf_graph(GRAPH non_existent_graph)
+--
+ERROR: Property graph not found: non_existent_graph [at 1:31]
+SELECT * FROM tvf_graph(GRAPH non_existent_graph)
+                              ^
+==
+
+# Negative test case: missing GRAPH keyword (should fail)
+SELECT * FROM tvf_graph(aml)
+--
+ERROR: Table-valued function TVF_GRAPH argument 1 must be a GRAPH [at 1:25]
+SELECT * FROM tvf_graph(aml)
+                        ^

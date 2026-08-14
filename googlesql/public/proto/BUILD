@@ -40,11 +40,6 @@ cc_proto_library(
     deps = [":logging_proto"],
 )
 
-java_proto_library(
-    name = "logging_java_proto",
-    deps = ["logging_proto"],
-)
-
 proto_library(
     name = "type_annotation_proto",
     srcs = [
@@ -63,6 +58,21 @@ cc_proto_library(
 java_proto_library(
     name = "type_annotation_java_proto",
     deps = [":type_annotation_proto"],
+)
+
+proto_library(
+    name = "vector_encoding_id_proto",
+    srcs = ["vector_encoding_id.proto"],
+)
+
+cc_proto_library(
+    name = "vector_encoding_id_cc_proto",
+    deps = [":vector_encoding_id_proto"],
+)
+
+java_proto_library(
+    name = "vector_encoding_id_java_proto",
+    deps = [":vector_encoding_id_proto"],
 )
 
 exports_files([

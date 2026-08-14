@@ -2398,7 +2398,6 @@ QueryStmt
         +-input_scan=
           +-SingleRowScan
 
-
 DEPRECATION WARNING:
 Lateral column alias will shadow original target: STRUCT<z1 INT32, z2 STRING> (t.x#1) [at 2:25]
   SELECT AS STRUCT t.x, x.z2
@@ -2455,7 +2454,6 @@ QueryStmt
         | +-y#2 := Literal(type=ARRAY<INT64>, value=[2])
         +-input_scan=
           +-SingleRowScan
-
 
 DEPRECATION WARNING:
 Lateral column alias will shadow original target: STRUCT<z1 INT32, z2 STRING> (t.x#1) [at 2:23]

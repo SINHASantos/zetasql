@@ -34,7 +34,6 @@ QueryStmt
         | +-Literal(type=ARRAY<INT64>, value=[1, 2])
         +-element_column_list=[$array.Value#2]
 
-
 DEPRECATION WARNING:
 PIVOT is not allowed with array scans. This will become an error [at 2:63]
 ...UNNEST(['a', 'b']) AS k, UNNEST([1,2]) AS Value PIVOT(COUNT(Value) FOR Key...
@@ -70,7 +69,6 @@ QueryStmt
         +-array_expr_list=
         | +-Literal(type=ARRAY<INT64>, value=[1, 2])
         +-element_column_list=[$array.Value#3]
-
 
 DEPRECATION WARNING:
 PIVOT is not allowed with array scans. This will become an error [at 2:48]
@@ -114,7 +112,6 @@ QueryStmt
         +-array_expr_list=
         | +-Literal(type=ARRAY<INT64>, value=[1, 2])
         +-element_column_list=[$array.Value#4]
-
 
 DEPRECATION WARNING:
 PIVOT is not allowed with array scans. This will become an error [at 2:73]
@@ -373,7 +370,7 @@ QueryStmt
     +-input_scan=
       +-PivotScan
         +-input_scan=
-        | +-TVFScan(column_list=tvf_no_args.[column_bool#1, column_bytes#2], tvf=tvf_no_args(() -> TABLE<column_bool BOOL, column_bytes BYTES>), signature=() -> TABLE<column_bool BOOL, column_bytes BYTES>, column_index_list=[0, 1], function_call_signature=() -> TABLE<column_bool BOOL, column_bytes BYTES>)
+        | +-TVFScan(column_list=tvf_no_args.[column_bool#1, column_bytes#2], tvf=tvf_no_args, signature=() -> TABLE<column_bool BOOL, column_bytes BYTES>, column_index_list=[0, 1], function_call_signature=() -> TABLE<column_bool BOOL, column_bytes BYTES>)
         +-pivot_expr_list=
         | +-AggregateFunctionCall(GoogleSQL:count(BYTES) -> INT64)
         |   +-parse_location=34-53
@@ -408,7 +405,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=tvf_one_relation_arg_with_fixed_output.[column_bool#8, column_bytes#9]
-        +-tvf=tvf_one_relation_arg_with_fixed_output((ANY TABLE) -> TABLE<column_bool BOOL, column_bytes BYTES>)
+        +-tvf=tvf_one_relation_arg_with_fixed_output
         +-signature=(TABLE<zero INT64, one INT64>) -> TABLE<column_bool BOOL, column_bytes BYTES>
         +-argument_list=
         | +-FunctionArgument
@@ -7833,7 +7830,6 @@ QueryStmt
             |     +-Literal(type=STRING, value="und:ci", preserve_in_literal_remover=TRUE)
             +-pivot_column_list=
               +-PivotColumn(column=$pivot.a#6, pivot_expr_index=0, pivot_value_index=0)
-
 
 DEPRECATION WARNING:
 PIVOT IN list item has collation which will be ignored [at 6:31]

@@ -146,7 +146,7 @@ MATCH (m) -[e2]-> (k:Person)
 LET score2 = score + e2.val
 FILTER score2 > 100
 --
-ERROR: Syntax error: Expected keyword INSERT or keyword RETURN but got end of statement [at 9:20]
+ERROR: Syntax error: Expected keyword INSERT or keyword REMOVE or keyword RETURN or keyword SET but got end of statement [at 9:20]
 FILTER score2 > 100
                    ^
 

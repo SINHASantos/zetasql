@@ -18,6 +18,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <iterator>
 #include <string>
 #include <vector>
 
@@ -111,7 +112,7 @@ constexpr int64_t kAscendingNanoseconds[] = {
 };
 
 TEST_F(TimestampPicosTest, ComparisonOps) {
-  size_t n = sizeof(kAscendingNanoseconds) / sizeof(kAscendingNanoseconds[0]);
+  size_t n = std::size(kAscendingNanoseconds);
   std::vector<TimestampPicosValue> values;
   values.resize(n);
   for (size_t i = 0; i < n; ++i) {

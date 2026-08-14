@@ -1098,7 +1098,6 @@ QueryStmt
         | +-Literal(type=ARRAY<ARRAY<INT64>>, value=[[1, 2], [], [3, 4]])
         +-element_column_list=[$array.arr#1]
 
-
 [REWRITTEN AST]
 QueryStmt
 +-output_column_list=

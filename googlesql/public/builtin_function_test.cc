@@ -645,6 +645,29 @@ TEST(SimpleBuiltinFunctionTests, LanguageOptions) {
   EXPECT_FALSE(functions.contains(FunctionSignatureIdToName(FN_LEAD)));
 }
 
+TEST(SimpleBuiltinFunctionTests, EndiannessEnumTypeInExternalProductMode) {
+  TypeFactory type_factory;
+  NameToFunctionMap functions;
+  NameToTypeMap types;
+  NameToTableValuedFunctionMap table_valued_functions;
+  GoogleSQLBuiltinFunctionOptions options;
+  options.language_options.set_product_mode(PRODUCT_EXTERNAL);
+  options.language_options.EnableLanguageFeature(
+      FEATURE_BIT_CAST_BYTES_FUNCTIONS);
+
+  GOOGLESQL_EXPECT_OK(GetBuiltinFunctionsAndTypes(options, type_factory, functions, types,
+                                        table_valued_functions));
+  EXPECT_FALSE(types.contains("ENDIANNESS"));
+
+  options.language_options.set_product_mode(PRODUCT_INTERNAL);
+  functions.clear();
+  types.clear();
+  table_valued_functions.clear();
+  GOOGLESQL_EXPECT_OK(GetBuiltinFunctionsAndTypes(options, type_factory, functions, types,
+                                        table_valued_functions));
+  EXPECT_TRUE(types.contains("ENDIANNESS"));
+}
+
 TEST(SimpleBuiltinFunctionTests, NumericFunctions) {
   TypeFactory type_factory;
   NameToFunctionMap functions;

@@ -102,6 +102,7 @@
 #include "googlesql/public/pico_time.h"
 #include "googlesql/public/property_graph.h"
 #include "googlesql/public/proto/type_annotation.pb.h"
+#include "googlesql/public/proto/vector_encoding_id.pb.h"
 #include "googlesql/public/proto_util.h"
 #include "googlesql/public/signature_match_result.h"
 #include "googlesql/public/simple_catalog.h"
@@ -123,6 +124,7 @@
 #include "googlesql/public/types/type_factory.h"
 #include "googlesql/public/types/type_modifiers.h"
 #include "googlesql/public/types/type_parameters.h"
+#include "googlesql/public/types/vector_type_util.h"
 #include "googlesql/public/value.h"
 #include "googlesql/public/with_modifier_mode.h"
 #include "googlesql/resolved_ast/resolved_ast.h"
@@ -1070,7 +1072,7 @@ absl::StatusOr<std::unique_ptr<const ResolvedLiteral>> Resolver::ParseRange(
   GOOGLESQL_RETURN_IF_ERROR(function_resolver_->ResolveGeneralFunctionCall(
       range_literal, {range_literal, range_literal},
       /*match_internal_signatures=*/false, "range",
-      /*is_analytic=*/false, std::move(resolved_arguments),
+      FunctionResolver::ClauseRequirement::kNone, std::move(resolved_arguments),
       /*named_arguments=*/{}, /*expected_result_type=*/range_type,
       &resolved_function_call));
 
@@ -1355,6 +1357,12 @@ absl::Status Resolver::ResolveExpr(
       }
       GOOGLESQL_RETURN_IF_ERROR(ResolveAnalyticFunctionCall(
           ast_expr->GetAsOrDie<ASTAnalyticFunctionCall>(),
+          expr_resolution_info.get(), resolved_expr_out));
+      break;
+
+    case AST_ESTIMATOR_FUNCTION_CALL:
+      GOOGLESQL_RETURN_IF_ERROR(ResolveEstimatorFunctionCall(
+          ast_expr->GetAsOrDie<ASTEstimatorFunctionCall>(),
           expr_resolution_info.get(), resolved_expr_out));
       break;
 
@@ -1998,6 +2006,15 @@ absl::Status Resolver::ResolvePathExpressionAsExpression(
           // here to avoid unintentional performance regression in the future.
           GOOGLESQL_RET_CHECK_EQ(1, path_expr.num_names());
           std::unique_ptr<ResolvedComputedColumn> make_struct_computed_column;
+          if (absl::c_any_of(
+                  target.scan_columns()->columns(),
+                  [](const NamedColumn& named_column) {
+                    return named_column.column().type()->IsRowOrTable();
+                  })) {
+            return MakeSqlErrorAtPoint(path_parse_location.start())
+                   << "Range variable contains a ROW-typed value, cannot be "
+                      "converted to a STRUCT";
+          }
           GOOGLESQL_RETURN_IF_ERROR(CreateStructFromNameList(
               target.scan_columns().get(), correlated_columns_sets,
               &make_struct_computed_column));
@@ -2795,8 +2812,15 @@ absl::Status Resolver::ResolveGetRowField(
            << ToIdentifierLiteral(identifier->GetAsIdString());
   }
 
-  *resolved_expr_out = MakeResolvedGetRowField(column->GetType(),
-                                               std::move(resolved_lhs), column);
+  const Type* type = column->GetType();
+  if (type->IsRow()) {
+    // Each GetRowField::type is unique within the resolved ast, so we
+    // we create a new RowType with the same underlying table.
+    GOOGLESQL_RETURN_IF_ERROR(type_factory()->MakeRowType(
+        type->AsRowType()->table(), type->AsRowType()->table_name(), &type));
+  }
+  *resolved_expr_out =
+      MakeResolvedGetRowField(type, std::move(resolved_lhs), column);
   return absl::OkStatus();
 }
 
@@ -2892,6 +2916,70 @@ absl::Status Resolver::ResolvePropertyNameArgument(
                         ->last_name()
                         ->GetAsStringView())));
   ast_arguments_out.push_back(property_name_identifier);
+  return absl::OkStatus();
+}
+
+absl::Status Resolver::ResolveElementDefinitionNameArgument(
+    const ASTExpression* identifier,
+    std::vector<std::unique_ptr<const ResolvedExpr>>& resolved_arguments_out,
+    std::vector<const ASTNode*>& ast_arguments_out) {
+  GOOGLESQL_RET_CHECK(!resolved_arguments_out.empty());
+  GOOGLESQL_RET_CHECK_EQ(resolved_arguments_out.size(), ast_arguments_out.size());
+
+  GOOGLESQL_RET_CHECK(resolved_arguments_out.back() != nullptr);
+  if (!resolved_arguments_out.back()->type()->IsGraphElement()) {
+    return MakeSqlErrorAt(ast_arguments_out.back())
+           << "First argument of ELEMENT_DEFINITION_NAME_IS must be "
+              "of graph element type";
+  }
+  if (identifier->node_kind() != AST_PATH_EXPRESSION ||
+      identifier->GetAsOrDie<ASTPathExpression>()->num_names() != 1) {
+    return MakeSqlErrorAt(identifier)
+           << "Second argument of ELEMENT_DEFINITION_NAME_IS must be an "
+              "identifier";
+  }
+  const GraphElementType* graph_element_type =
+      resolved_arguments_out.back()->type()->AsGraphElement();
+  GOOGLESQL_ASSIGN_OR_RETURN(
+      const PropertyGraph* graph,
+      FindPropertyGraph(catalog_, graph_element_type->graph_reference(),
+                        analyzer_options_.find_options()));
+  absl::string_view element_table_name =
+      identifier->GetAsOrDie<ASTPathExpression>()
+          ->last_name()
+          ->GetAsStringView();
+  const GraphElementTable* element_table;
+  const absl::Status status =
+      graph->FindElementTableByName(element_table_name, element_table);
+  if (absl::IsNotFound(status)) {
+    return MakeSqlErrorAt(identifier)
+           << "Element table " << ToIdentifierLiteral(element_table_name)
+           << " is not defined in PropertyGraph " << graph->FullName();
+  }
+  GOOGLESQL_RETURN_IF_ERROR(status).With(LocationOverride(identifier));
+
+  if (graph_element_type->IsNode() &&
+      element_table->kind() != GraphElementTable::Kind::kNode) {
+    return MakeSqlErrorAt(identifier)
+           << "ELEMENT_DEFINITION_NAME_IS expects a node element table, but "
+           << ToIdentifierLiteral(element_table_name)
+           << " is an edge element table";
+  }
+  if (graph_element_type->IsEdge() &&
+      element_table->kind() != GraphElementTable::Kind::kEdge) {
+    return MakeSqlErrorAt(identifier)
+           << "ELEMENT_DEFINITION_NAME_IS expects an edge element table, but "
+           << ToIdentifierLiteral(element_table_name)
+           << " is a node element table";
+  }
+
+  // Make this string literal without AST location so it won't be used as
+  // candidate for literal replacement.
+  resolved_arguments_out.push_back(
+      MakeResolvedLiteral(identifier, Value::String(element_table_name),
+                          /*set_has_explicit_type=*/true,
+                          /*preserve_in_literal_remover=*/true));
+  ast_arguments_out.push_back(identifier);
   return absl::OkStatus();
 }
 
@@ -3831,6 +3919,33 @@ absl::Status Resolver::ResolveUnaryExpr(
       } else {
         return MakeSqlErrorAt(unary_expr)
                << "Invalid floating point literal: -" << literal->image();
+      }
+    } else if (unary_expr->child(0)->node_kind() == AST_CAST_EXPRESSION) {
+      const ASTCastExpression* cast =
+          unary_expr->child(0)->GetAsOrDie<ASTCastExpression>();
+      // A cast operator has higher precedence than unary minus, so `-5::INT64`
+      // parses as `-` applied to `5::INT64`. If this is resolved as a cast
+      // followed by negation, it fails for boundary values like
+      // `-9223372036854775808::INT64` because the positive literal exceeds the
+      // maximum positive value of the target type.
+      // Prepend `-` to the literal's image and change the start location so
+      // that we resolve it as a cast of the negative literal, i.e.,
+      // `CAST(-5 AS INT64)`.
+      if (cast->is_cast_operator() && !cast->expr()->parenthesized() &&
+          (cast->expr()->node_kind() == AST_INT_LITERAL ||
+           cast->expr()->node_kind() == AST_FLOAT_LITERAL)) {
+        {
+          std::string negative_image = absl::StrCat(
+              "-", cast->expr()->GetAsOrDie<ASTPrintableLeaf>()->image());
+          const_cast<ASTPrintableLeaf*>(
+              cast->expr()->GetAsOrDie<ASTPrintableLeaf>())
+              ->set_image(negative_image);
+          const_cast<ASTNode*>(cast->expr()->GetAsOrDie<ASTNode>())
+              ->set_start_location(unary_expr->start_location());
+          return ResolveExplicitCast(
+              unary_expr->child(0)->GetAsOrDie<ASTCastExpression>(),
+              expr_resolution_info, resolved_expr_out);
+        }
       }
     }
   } else if (unary_expr->op() == ASTUnaryExpression::PLUS) {
@@ -5582,7 +5697,7 @@ enum SpecialFunctionFamily {
   FAMILY_GENERATE_CHRONO_ARRAY,
   FAMILY_BINARY_STATS,
   FAMILY_DIFFERENTIAL_PRIVACY,
-  FAMILY_PROPERTY_EXISTS,
+  FAMILY_GRAPH_ELEMENT_WITH_IDENTIFIER,
 };
 
 static constexpr absl::string_view kDifferentialPrivacyFunctionNames[] = {
@@ -5669,7 +5784,9 @@ InitSpecialFunctionFamilyMap() {
   }
 
   googlesql_base::InsertOrDie(out, IdString::MakeGlobal("property_exists"),
-                   FAMILY_PROPERTY_EXISTS);
+                   FAMILY_GRAPH_ELEMENT_WITH_IDENTIFIER);
+  googlesql_base::InsertOrDie(out, IdString::MakeGlobal("element_definition_name_is"),
+                   FAMILY_GRAPH_ELEMENT_WITH_IDENTIFIER);
 
   return out;
 }
@@ -6048,14 +6165,24 @@ absl::Status Resolver::GetFunctionNameAndArguments(
       }
 
       break;
-    case FAMILY_PROPERTY_EXISTS:
+    case FAMILY_GRAPH_ELEMENT_WITH_IDENTIFIER: {
+      // Functions that takes a graph element and an identifier to
+      // a graph schema object.
+      const std::string function_last_name_upper = absl::AsciiStrToUpper(
+          function->last_name()->GetAsIdString().ToStringView());
       if (function_arguments->size() != 2) {
         return MakeSqlErrorAt(function_call)
-               << "PROPERTY_EXISTS should have exactly two arguments";
+               << function_last_name_upper
+               << " should have exactly two arguments";
       }
-      googlesql_base::InsertOrDie(argument_option_map, 1,
-                       SpecialArgumentType::PROPERTY_NAME);
-      break;
+      if (function_last_name_upper == "PROPERTY_EXISTS") {
+        googlesql_base::InsertOrDie(argument_option_map, 1,
+                         SpecialArgumentType::PROPERTY_NAME);
+      } else if (function_last_name_upper == "ELEMENT_DEFINITION_NAME_IS") {
+        googlesql_base::InsertOrDie(argument_option_map, 1,
+                         SpecialArgumentType::ELEMENT_DEFINITION_NAME);
+      }
+    }
   }
 
   return absl::OkStatus();
@@ -6994,6 +7121,49 @@ static absl::Status ValidateNamedLambdas(
   }
 }
 
+absl::Status Resolver::ResolveFunctionNameAndArguments(
+    const ASTFunctionCall* ast_function,
+    ExprResolutionInfo* expr_resolution_info,
+    ExprResolutionInfo* argument_resolution_info, const Function*& function,
+    std::vector<std::string>& function_name_path,
+    std::vector<NamedArgumentInfo>& named_arguments,
+    std::vector<const ASTNode*>& ast_arguments,
+    std::vector<std::unique_ptr<const ResolvedExpr>>& resolved_arguments) {
+  std::vector<const ASTExpression*> function_arguments;
+  std::map<int, SpecialArgumentType> argument_option_map;
+
+  // Get the catalog function name and arguments that may be different from
+  // what are specified in the input query.
+  GOOGLESQL_RETURN_IF_ERROR(GetFunctionNameAndArguments(
+      ast_function, &function_name_path, &function_arguments,
+      &argument_option_map, expr_resolution_info->query_resolution_info));
+
+  // We want to report errors on invalid function names before errors on invalid
+  // arguments, so pre-emptively lookup the function in the catalog.
+  ResolvedFunctionCallBase::ErrorMode error_mode;
+  GOOGLESQL_RET_CHECK(ast_function != nullptr);
+  GOOGLESQL_RETURN_IF_ERROR(LookupFunctionWithChainedCallErrors(
+      ast_function, function_name_path,
+      FunctionNotFoundHandleMode::kReturnError, expr_resolution_info, &function,
+      &error_mode));
+
+  for (int i = 0; i < function_arguments.size(); ++i) {
+    const ASTExpression* arg = function_arguments[i];
+    if (arg->node_kind() == AST_NAMED_ARGUMENT) {
+      const ASTNamedArgument* named_arg = arg->GetAs<ASTNamedArgument>();
+      named_arguments.emplace_back(named_arg->name()->GetAsIdString(), i,
+                                   named_arg);
+    }
+  }
+  GOOGLESQL_RETURN_IF_ERROR(ValidateNamedLambdas(function, function_arguments));
+
+  GOOGLESQL_RETURN_IF_ERROR(ResolveExpressionArguments(
+      argument_resolution_info, function_arguments, argument_option_map,
+      &resolved_arguments, &ast_arguments, ast_function));
+
+  return absl::OkStatus();
+}
+
 // TODO: The noinline attribute is to prevent the stack usage
 // being added to its caller "Resolver::ResolveExpr" which is a recursive
 // function. Now the attribute has to be added for all callees. Hopefully
@@ -7038,47 +7208,12 @@ absl::Status Resolver::ResolveAnalyticFunctionCall(
       analytic_function_call->function()->clamped_between_modifier()))
       << "CLAMPED BETWEEN is not supported on analytic functions";
 
+  const Function* function = nullptr;
   std::vector<std::string> function_name_path;
-  std::vector<const ASTExpression*> function_arguments;
-  std::map<int, SpecialArgumentType> argument_option_map;
-
-  // Get the catalog function name and arguments that may be different from
-  // what are specified in the input query.
-  GOOGLESQL_RETURN_IF_ERROR(GetFunctionNameAndArguments(
-      analytic_function_call->function(), &function_name_path,
-      &function_arguments, &argument_option_map,
-      expr_resolution_info->query_resolution_info));
-
-  // We want to report errors on invalid function names before errors on invalid
-  // arguments, so pre-emptively lookup the function in the catalog.
-  const Function* function;
-  ResolvedFunctionCallBase::ErrorMode error_mode;
-  GOOGLESQL_RET_CHECK(analytic_function_call->function() != nullptr);
-  GOOGLESQL_RETURN_IF_ERROR(LookupFunctionWithChainedCallErrors(
-      analytic_function_call->function(), function_name_path,
-      FunctionNotFoundHandleMode::kReturnError, expr_resolution_info, &function,
-      &error_mode));
-
-  if (IsMeasureAggFunction(function)) {
-    return MakeSqlErrorAt(analytic_function_call)
-           << function->Name()
-           << " function cannot be used as an analytic function";
-  }
-
+  std::vector<NamedArgumentInfo> named_arguments;
+  std::vector<const ASTNode*> ast_arguments;
   std::vector<std::unique_ptr<const ResolvedExpr>> resolved_arguments;
 
-  std::vector<NamedArgumentInfo> named_arguments;
-  for (int i = 0; i < function_arguments.size(); ++i) {
-    const ASTExpression* arg = function_arguments[i];
-    if (arg->node_kind() == AST_NAMED_ARGUMENT) {
-      const ASTNamedArgument* named_arg = arg->GetAs<ASTNamedArgument>();
-      named_arguments.emplace_back(named_arg->name()->GetAsIdString(), i,
-                                   named_arg);
-    }
-  }
-  GOOGLESQL_RETURN_IF_ERROR(ValidateNamedLambdas(function, function_arguments));
-
-  std::vector<const ASTNode*> ast_arguments;
   {
     auto analytic_arg_resolution_info = std::make_unique<ExprResolutionInfo>(
         expr_resolution_info,
@@ -7086,10 +7221,17 @@ absl::Status Resolver::ResolveAnalyticFunctionCall(
             .name_scope = expr_resolution_info->analytic_name_scope,
             .allows_analytic = expr_resolution_info->allows_analytic,
             .clause_name = expr_resolution_info->clause_name});
-    GOOGLESQL_RETURN_IF_ERROR(ResolveExpressionArguments(
-        analytic_arg_resolution_info.get(), function_arguments,
-        argument_option_map, &resolved_arguments, &ast_arguments,
-        analytic_function_call->function()));
+
+    GOOGLESQL_RETURN_IF_ERROR(ResolveFunctionNameAndArguments(
+        analytic_function_call->function(), expr_resolution_info,
+        analytic_arg_resolution_info.get(), function, function_name_path,
+        named_arguments, ast_arguments, resolved_arguments));
+  }
+
+  if (IsMeasureAggFunction(function)) {
+    return MakeSqlErrorAt(analytic_function_call)
+           << function->Name()
+           << " function cannot be used as an analytic function";
   }
 
   if (expr_resolution_info->findings.has_analytic) {
@@ -7104,7 +7246,7 @@ absl::Status Resolver::ResolveAnalyticFunctionCall(
   GOOGLESQL_RETURN_IF_ERROR(function_resolver_->ResolveGeneralFunctionCall(
       analytic_function_call, ast_arguments,
       /*match_internal_signatures=*/false, function_name_path,
-      /*is_analytic=*/true, std::move(resolved_arguments),
+      FunctionResolver::ClauseRequirement::kOver, std::move(resolved_arguments),
       std::move(named_arguments), /*expected_result_type=*/nullptr,
       &resolved_function_call));
   ABSL_DCHECK(expr_resolution_info->query_resolution_info != nullptr);
@@ -7118,6 +7260,75 @@ absl::Status Resolver::ResolveAnalyticFunctionCall(
   return expr_resolution_info->query_resolution_info->analytic_resolver()
       ->ResolveOverClauseAndCreateAnalyticColumn(
           analytic_function_call, std::move(resolved_function_call),
+          expr_resolution_info, resolved_expr_out);
+}
+
+absl::Status Resolver::ResolveEstimatorFunctionCall(
+    const ASTEstimatorFunctionCall* estimator_function_call,
+    ExprResolutionInfo* expr_resolution_info,
+    std::unique_ptr<const ResolvedExpr>* resolved_expr_out) {
+  RETURN_ERROR_IF_OUT_OF_STACK_SPACE();
+
+  if (!expr_resolution_info->allows_estimator_function) {
+    return MakeSqlErrorAt(estimator_function_call)
+           << "Estimator functions are not allowed in "
+           << expr_resolution_info->clause_name;
+  }
+
+  if (estimator_function_call->function()->HasModifiers(
+          /*ignore_is_chained_call=*/true)) {
+    return MakeSqlErrorAt(estimator_function_call->function())
+           << "Modifiers are not allowed in estimator functions";
+  }
+
+  const Function* function = nullptr;
+  std::vector<std::string> function_name_path;
+  std::vector<NamedArgumentInfo> named_arguments;
+  std::vector<const ASTNode*> ast_arguments;
+  std::vector<std::unique_ptr<const ResolvedExpr>> resolved_arguments;
+
+  auto estimator_resolution_info = std::make_unique<ExprResolutionInfo>(
+      expr_resolution_info,
+      ExprResolutionInfoOptions{
+          .name_scope = expr_resolution_info->estimator_name_scope,
+          .clause_name = expr_resolution_info->clause_name});
+
+  GOOGLESQL_RETURN_IF_ERROR(ResolveFunctionNameAndArguments(
+      estimator_function_call->function(), expr_resolution_info,
+      estimator_resolution_info.get(), function, function_name_path,
+      named_arguments, ast_arguments, resolved_arguments));
+
+  if (IsMeasureAggFunction(function) || IsGroupingFunction(function)) {
+    return MakeSqlErrorAt(estimator_function_call)
+           << function->SQLName()
+           << " function cannot be used as an estimator function";
+  }
+
+  if (estimator_resolution_info->findings.has_estimator) {
+    return MakeSqlErrorAt(estimator_function_call)
+           << "Estimator function cannot be an argument of another estimator "
+              "function";
+  }
+  expr_resolution_info->findings.has_estimator = true;
+
+  std::unique_ptr<ResolvedFunctionCall> resolved_function_call;
+  GOOGLESQL_RETURN_IF_ERROR(function_resolver_->ResolveGeneralFunctionCall(
+      estimator_function_call, ast_arguments,
+      /*match_internal_signatures=*/false, function_name_path,
+      FunctionResolver::ClauseRequirement::kWithin,
+      std::move(resolved_arguments), std::move(named_arguments),
+      /*expected_result_type=*/nullptr, &resolved_function_call));
+
+  if (side_effect_scope_depth_ > 0 &&
+      language().LanguageFeatureEnabled(
+          FEATURE_ENFORCE_CONDITIONAL_EVALUATION)) {
+    return MakeSqlErrorAt(estimator_function_call)
+           << "Estimator functions in side effect scopes are not yet "
+              "implemented";
+  }
+  return expr_resolution_info->query_resolution_info->estimator_resolver()
+      ->ResolveWithinBoundsAndCreateEstimatorColumn(
+          estimator_function_call, std::move(resolved_function_call),
           expr_resolution_info, resolved_expr_out);
 }
 
@@ -7286,6 +7497,31 @@ Resolver::CreateAnnotationMapFromTypeWithModifiers(
   return type_factory_->TakeOwnership(std::move(annotation_map));
 }
 
+absl::StatusOr<bool> Resolver::FunctionCallHasDifferentArgumentAnnotations(
+    absl::Span<const std::unique_ptr<const ResolvedExpr>> arg_list,
+    const FunctionSignature& concrete_signature) const {
+  for (int i = 0; i < arg_list.size(); ++i) {
+    const std::unique_ptr<const ResolvedExpr>& arg = arg_list[i];
+    const AnnotationMap* concrete_body_annotation_map = nullptr;
+    if (concrete_signature.HasConcreteArguments() &&
+        i < concrete_signature.NumConcreteArguments()) {
+      const FunctionArgumentType& concrete_arg =
+          concrete_signature.ConcreteArgument(i);
+      if (concrete_arg.type_modifiers().has_value()) {
+        GOOGLESQL_ASSIGN_OR_RETURN(
+            concrete_body_annotation_map,
+            CreateAnnotationMapFromTypeWithModifiers(
+                concrete_arg.type(), *concrete_arg.type_modifiers()));
+      }
+    }
+    if (!AnnotationMap::Equals(arg->type_annotation_map(),
+                               concrete_body_annotation_map)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 absl::Status Resolver::CheckTypeModifiersFeaturesEnabled(
     const TypeModifiers& type_modifiers) const {
   if (!type_modifiers.IsEmpty()) {
@@ -7306,6 +7542,10 @@ ABSL_ATTRIBUTE_NOINLINE
 absl::Status Resolver::ResolveExplicitCast(
     const ASTCastExpression* cast, ExprResolutionInfo* expr_resolution_info,
     std::unique_ptr<const ResolvedExpr>* resolved_expr_out) {
+  if (cast->is_cast_operator() &&
+      !language().LanguageFeatureEnabled(FEATURE_CAST_OPERATORS)) {
+    return MakeSqlErrorAt(cast) << "CAST operators are not supported";
+  }
   const Type* resolved_cast_type;
   TypeModifiers resolved_type_modifiers;
   std::unique_ptr<const ResolvedExpr> resolved_argument;
@@ -7477,8 +7717,7 @@ absl::StatusOr<TypeParameters> Resolver::ResolveTypeParameters(
 
   // Validate type parameters and get the resolved TypeParameters class.
   absl::StatusOr<TypeParameters> type_params_or_status;
-  if (resolved_type.AsDeclarativeType() != nullptr &&
-      resolved_type.AsDeclarativeType()->IsGoogleSQLBuiltin("VECTOR")) {
+  if (IsVectorType(&resolved_type)) {
     // TODO: Design a generalized and declarative approach to
     // resolve type parameters on declarative types.
     type_params_or_status = ResolveVectorTypeParameters(
@@ -9340,6 +9579,12 @@ absl::Status Resolver::ResolveArrayConstructor(
         }
         super_type = type_factory_->get_uint64();
       }
+
+      if (super_type->IsRow()) {
+        return MakeSqlErrorAt(ast_array_constructor)
+               << "Arrays cannot contain ROW-typed elements";
+      }
+
       GOOGLESQL_ASSIGN_OR_RETURN(array_type,
                        type_factory_->MakeArrayType(super_type, language()));
     }
@@ -9449,7 +9694,8 @@ absl::Status Resolver::ResolveArrayConstructor(
     GOOGLESQL_RETURN_IF_ERROR(function_resolver_->ResolveGeneralFunctionCall(
         ast_array_constructor, ast_element_locations,
         /*match_internal_signatures=*/false, "$make_array",
-        /*is_analytic=*/false, std::move(resolved_elements),
+        FunctionResolver::ClauseRequirement::kNone,
+        std::move(resolved_elements),
         /*named_arguments=*/{}, array_type, &resolved_function_call));
     *resolved_expr_out = std::move(resolved_function_call);
 
@@ -9864,6 +10110,13 @@ absl::Status Resolver::ResolveStructConstructorImpl(
 
   if (struct_type == nullptr) {
     GOOGLESQL_RET_CHECK_EQ(struct_fields.size(), ast_field_expressions.size());
+
+    if (absl::c_any_of(struct_fields, [&](const StructField& field) {
+          return field.type->IsRowOrTable();
+        })) {
+      return MakeSqlErrorAt(ast_location)
+             << "STRUCT type cannot contain ROW-type values";
+    }
     GOOGLESQL_RETURN_IF_ERROR(type_factory_->MakeStructType(struct_fields, &struct_type));
   }
 
@@ -9874,13 +10127,6 @@ absl::Status Resolver::ResolveStructConstructorImpl(
       return MakeSqlErrorAt(ast_location)
              << "STRUCT type cannot contain MEASURE";
     }
-  }
-
-  if (absl::c_any_of(struct_type->fields(), [&](const StructField& field) {
-        return field.type->IsRowOrTable();
-      })) {
-    return MakeSqlErrorAt(ast_location)
-           << "STRUCT type cannot contain ROW-type values";
   }
 
   // Resolve struct as a MakeStruct node first to calculate annotations for the
@@ -10671,8 +10917,13 @@ absl::Status Resolver::FinishResolvingAggregateFunction(
     }
   }
 
+  GOOGLESQL_ASSIGN_OR_RETURN(bool args_annotations_differ_from_signature,
+                   FunctionCallHasDifferentArgumentAnnotations(
+                       arg_list, (*resolved_function_call)->signature()));
+
   auto compute_input_argument_types =
       [&](absl::Span<const std::unique_ptr<const ResolvedExpr>> args)
+
       -> absl::StatusOr<std::vector<InputArgumentType>> {
     std::vector<InputArgumentType> input_arguments;
     input_arguments.reserve(args.size());
@@ -10696,50 +10947,15 @@ absl::Status Resolver::FinishResolvingAggregateFunction(
     GOOGLESQL_RET_CHECK((*resolved_function_call)->generic_argument_list().empty())
         << "Should not have generic arguments";
 
-    // TODO: The core of this block is in common with code
-    // in function_resolver.cc for handling templated scalar functions.
-    // Refactor the common code into common helper functions.
     function_call_info.reset(new ResolvedFunctionCallInfo());
-    const TemplatedSQLFunction* sql_function =
-        function->GetAs<TemplatedSQLFunction>();
+    const auto* sql_function = function->GetAs<TemplatedSQLFunction>();
     GOOGLESQL_ASSIGN_OR_RETURN(std::vector<InputArgumentType> input_arguments,
                      compute_input_argument_types(
                          (*resolved_function_call)->argument_list()));
 
-    // Call the TemplatedSQLFunction::Resolve() method to get the output type.
-    // Use a new empty cycle detector, or the cycle detector from this
-    // Resolver if we are analyzing one or more templated function calls.
-    CycleDetector owned_cycle_detector;
-    AnalyzerOptions analyzer_options = analyzer_options_;
-    if (analyzer_options.find_options().cycle_detector() == nullptr) {
-      analyzer_options.mutable_find_options()->set_cycle_detector(
-          &owned_cycle_detector);
-    }
-
-    const absl::Status resolve_status =
-        function_resolver_->ResolveTemplatedSQLFunctionCall(
-            ast_function_call, *sql_function, analyzer_options, input_arguments,
-            arg_list, (*resolved_function_call)->signature(),
-            &function_call_info);
-
-    if (!resolve_status.ok()) {
-      // TODO:  This code matches the code from
-      // ResolveGeneralFunctionCall() in function_resolver.cc for handling
-      // templated scalar SQL functions.  There is similar, but not
-      // equivalent code for handling templated TVFs.  We should look
-      // at making them all consistent, and maybe implementing the
-      // common code through a helper function.
-      //
-      // The Resolve method returned an error status that is already updated
-      // based on the <analyzer_options> ErrorMessageMode.  Make a new
-      // ErrorSource based on the <resolve_status>, and return a new error
-      // status that indicates that the function call is invalid, while
-      // indicating the function call location for the error.
-      return WrapNestedErrorStatus(
-          ast_function_call,
-          absl::StrCat("Invalid function ", sql_function->Name()),
-          resolve_status, analyzer_options_.error_message_mode());
-    }
+    GOOGLESQL_RETURN_IF_ERROR(function_resolver_->ResolveTemplatedSQLFunctionCall(
+        ast_function_call, *sql_function, analyzer_options_, input_arguments,
+        arg_list, (*resolved_function_call)->signature(), &function_call_info));
 
     std::unique_ptr<FunctionSignature> new_signature =
         std::make_unique<FunctionSignature>(
@@ -10752,6 +10968,16 @@ absl::Status Resolver::FinishResolvingAggregateFunction(
     GOOGLESQL_RET_CHECK((*resolved_function_call)->signature().IsConcrete())
         << "result_signature: '"
         << (*resolved_function_call)->signature().DebugString() << "'";
+  } else if (function->Is<SQLFunction>() &&
+             args_annotations_differ_from_signature) {
+    GOOGLESQL_ASSIGN_OR_RETURN(std::vector<InputArgumentType> input_arguments,
+                     compute_input_argument_types(arg_list));
+
+    GOOGLESQL_RETURN_IF_ERROR(function_resolver_->ReResolveAnnotatedSQLFunctionCall(
+        ast_function_call, *function->GetAs<SQLFunction>(), analyzer_options_,
+        input_arguments, arg_list, (*resolved_function_call)->signature(),
+        &function_call_info));
+    (*resolved_function_call)->set_function_call_info(function_call_info);
   }
 
   // Propagate back any scoping information discovered while resolving the
@@ -11048,6 +11274,11 @@ absl::Status Resolver::ResolveExpressionArguments(
         }
         case SpecialArgumentType::PROPERTY_NAME: {
           GOOGLESQL_RETURN_IF_ERROR(ResolvePropertyNameArgument(
+              arg, *resolved_arguments_out, *ast_arguments_out));
+          break;
+        }
+        case SpecialArgumentType::ELEMENT_DEFINITION_NAME: {
+          GOOGLESQL_RETURN_IF_ERROR(ResolveElementDefinitionNameArgument(
               arg, *resolved_arguments_out, *ast_arguments_out));
           break;
         }
@@ -11618,10 +11849,10 @@ absl::Status Resolver::ResolveFunctionCallWithResolvedArguments(
 
   GOOGLESQL_RETURN_IF_ERROR(function_resolver_->ResolveGeneralFunctionCall(
       ast_location, arg_locations, match_internal_signatures, function,
-      error_mode,
-      /*is_analytic=*/false, std::move(resolved_arguments),
-      std::move(named_arguments), /*expected_result_type=*/nullptr,
-      expr_resolution_info->name_scope, &resolved_function_call));
+      error_mode, FunctionResolver::ClauseRequirement::kNone,
+      std::move(resolved_arguments), std::move(named_arguments),
+      /*expected_result_type=*/nullptr, expr_resolution_info->name_scope,
+      &resolved_function_call));
 
   GOOGLESQL_RET_CHECK_NE(
       resolved_function_call->signature().result_type().original_kind(),
@@ -12876,14 +13107,15 @@ absl::Status Resolver::ResolveWithExpr(
   // expression. This requires copying the name scope for each computed column
   // in the WITH expr.
   const IdString with_expr_table_name = id_string_pool_->Make("$with_expr");
-  std::vector<std::unique_ptr<ResolvedComputedColumn>> computed_columns;
+  std::vector<std::unique_ptr<const ResolvedComputedColumn>> computed_columns;
   for (int i = 0; i < with_expr->variables()->columns().size(); ++i) {
     const ASTSelectColumn& ast_column = *with_expr->variables()->columns(i);
     std::unique_ptr<const ResolvedExpr> expr;
     GOOGLESQL_RETURN_IF_ERROR(
         resolve_expr_with_visible_names(ast_column.expression(), &expr));
     ResolvedColumn column(AllocateColumnId(), with_expr_table_name,
-                          ast_column.alias()->GetAsIdString(), expr->type());
+                          ast_column.alias()->GetAsIdString(),
+                          expr->annotated_type());
     computed_columns.push_back(
         MakeResolvedComputedColumn(column, std::move(expr)));
 
@@ -12921,9 +13153,8 @@ absl::Status Resolver::ResolveWithExpr(
         resolve_expr_with_visible_names(with_expr->expression(), &output_expr));
   }
 
-  const Type* const output_expr_type = output_expr->type();
-  *resolved_expr_out = MakeResolvedWithExpr(
-      output_expr_type, std::move(computed_columns), std::move(output_expr));
+  *resolved_expr_out =
+      MakeResolvedWithExpr(std::move(computed_columns), std::move(output_expr));
   parent_expr_resolution_info->findings.has_analytic =
       parent_expr_resolution_info->findings.has_analytic || child_has_analytic;
   parent_expr_resolution_info->findings.has_aggregation =
@@ -12940,13 +13171,33 @@ Resolver::ResolveWithinBounds(
 
   auto ast_within_lower_bound = ast_within_clause->lower_bound();
   auto ast_within_upper_bound = ast_within_clause->upper_bound();
+
+  if (ast_within_lower_bound != nullptr && ast_within_upper_bound != nullptr) {
+    // Parser rules are more lenient, but if both bounds are explicitly given
+    // and one of the bounds is a TIMESTAMP, the other bound must be a TIMESTAMP
+    // too. That is, mixing TIMESTAMP bounds with other bounds is not allowed.
+    if ((ast_within_lower_bound->bound_type() ==
+         ASTAlignWithinBoundExpr::TIMESTAMP) !=
+        (ast_within_upper_bound->bound_type() ==
+         ASTAlignWithinBoundExpr::TIMESTAMP)) {
+      return MakeSqlErrorAt(ast_within_clause)
+             << "A WITHIN clause cannot mix TIMESTAMP bound with other bounds";
+    }
+  }
   std::unique_ptr<const ResolvedWithinBoundExpr> lower_bound;
   if (ast_within_lower_bound != nullptr) {
     GOOGLESQL_ASSIGN_OR_RETURN(lower_bound, ResolveWithinBoundExpr(ast_within_lower_bound,
                                                          name_scope));
   } else {
-    lower_bound = MakeResolvedWithinBoundExpr(
-        ResolvedWithinBoundExpr::UNBOUNDED_PRECEDING, /*expr=*/nullptr);
+    // If lower bound is absent, it is aligned_timestamp (anchor timestamp) for
+    // estimator function whereas it is unbounded preceding for output within.
+    if (ast_within_clause->parent()->Is<ASTEstimatorFunctionCall>()) {
+      lower_bound = MakeResolvedWithinBoundExpr(
+          ResolvedWithinBoundExpr::ANCHOR_TIMESTAMP, /*expr=*/nullptr);
+    } else {
+      lower_bound = MakeResolvedWithinBoundExpr(
+          ResolvedWithinBoundExpr::UNBOUNDED_PRECEDING, /*expr=*/nullptr);
+    }
   }
   std::unique_ptr<const ResolvedWithinBoundExpr> upper_bound;
   if (ast_within_upper_bound != nullptr) {
@@ -12963,49 +13214,6 @@ Resolver::ResolveWithinBounds(
       ValidateWithinBounds(ast_within_clause, resolved_within_bounds.get()));
 
   return resolved_within_bounds;
-}
-
-static bool IsFiniteRelativeResolvedWithinBound(
-    const ResolvedWithinBoundExpr* bound) {
-  switch (bound->bound_kind()) {
-    case ResolvedWithinBoundExpr::INTERVAL_PRECEDING:
-    case ResolvedWithinBoundExpr::INTERVAL_FOLLOWING:
-    case ResolvedWithinBoundExpr::PERIOD_PRECEDING:
-    case ResolvedWithinBoundExpr::PERIOD_FOLLOWING:
-      return true;
-    case ResolvedWithinBoundExpr::NOT_SET:
-    case ResolvedWithinBoundExpr::UNBOUNDED_PRECEDING:
-    case ResolvedWithinBoundExpr::UNBOUNDED_FOLLOWING:
-    case ResolvedWithinBoundExpr::ANCHOR_TIMESTAMP:
-    case ResolvedWithinBoundExpr::TIMESTAMP:
-      return false;
-  }
-}
-
-static bool IsFiniteAbsoluteResolvedWithinBound(
-    const ResolvedWithinBoundExpr* bound) {
-  switch (bound->bound_kind()) {
-    case ResolvedWithinBoundExpr::TIMESTAMP:
-      return true;
-    case ResolvedWithinBoundExpr::NOT_SET:
-    case ResolvedWithinBoundExpr::UNBOUNDED_PRECEDING:
-    case ResolvedWithinBoundExpr::UNBOUNDED_FOLLOWING:
-    case ResolvedWithinBoundExpr::PERIOD_PRECEDING:
-    case ResolvedWithinBoundExpr::PERIOD_FOLLOWING:
-    case ResolvedWithinBoundExpr::INTERVAL_PRECEDING:
-    case ResolvedWithinBoundExpr::INTERVAL_FOLLOWING:
-    case ResolvedWithinBoundExpr::ANCHOR_TIMESTAMP:
-      return false;
-  }
-}
-
-static bool IsInvalidBoundCombination(
-    const ResolvedWithinBoundExpr* lower_bound,
-    const ResolvedWithinBoundExpr* upper_bound) {
-  return (IsFiniteAbsoluteResolvedWithinBound(lower_bound) &&
-          IsFiniteRelativeResolvedWithinBound(upper_bound)) ||
-         (IsFiniteAbsoluteResolvedWithinBound(upper_bound) &&
-          IsFiniteRelativeResolvedWithinBound(lower_bound));
 }
 
 static absl::StatusOr<ResolvedWithinBoundExpr::BoundKind> GetBoundKind(
@@ -13036,11 +13244,6 @@ absl::Status Resolver::ValidateWithinBounds(
   const ResolvedWithinBoundExpr* lower_bound = node->lower_bound();
   const ResolvedWithinBoundExpr* upper_bound = node->upper_bound();
 
-  if (IsInvalidBoundCombination(lower_bound, upper_bound)) {
-    return MakeSqlErrorAt(ast_within_clause)
-           << "A WITHIN clause cannot mix absolute (TIMESTAMP) and relative "
-              "(INTERVAL or PERIOD) bounds";
-  }
   if (upper_bound->bound_kind() ==
       ResolvedWithinBoundExpr::UNBOUNDED_PRECEDING) {
     return MakeSqlErrorAt(ast_within_clause)
@@ -13299,9 +13502,10 @@ Resolver::ResolveMapBracedConstructorEntries(
 absl::StatusOr<TypeParameters> Resolver::ResolveVectorTypeParameters(
     const ASTTypeParameterList* type_parameters,
     const std::vector<TypeParameterValue>& resolved_type_parameter_list) {
-  if (resolved_type_parameter_list.size() != 1) {
+  GOOGLESQL_RET_CHECK(!resolved_type_parameter_list.empty());
+  if (resolved_type_parameter_list.size() > 2) {
     return MakeSqlErrorAt(type_parameters)
-           << "VECTOR type can only have one parameter. Found "
+           << "VECTOR type has too many type parameters. Found "
            << resolved_type_parameter_list.size() << " parameters";
   }
   const TypeParameterValue& param = resolved_type_parameter_list[0];
@@ -13316,6 +13520,32 @@ absl::StatusOr<TypeParameters> Resolver::ResolveVectorTypeParameters(
   }
   VectorTypeParametersProto proto;
   proto.set_length(length);
+
+  // Try parsing the encoding parameter.
+  if (resolved_type_parameter_list.size() > 1) {
+    const TypeParameterValue& encoding_param = resolved_type_parameter_list[1];
+    // TODO: Support NULL as length type parameter.
+    // It checks special literals first since we do not support passing NULL
+    // as a type parameter for now.
+    if (encoding_param.IsSpecialLiteral() ||
+        !encoding_param.GetValue().has_string_value()) {
+      return MakeSqlErrorAt(type_parameters)
+             << "VECTOR encoding parameter must be a string literal";
+    }
+    // The encoding string is case-insensitive, so we convert it to uppercase
+    // before parsing.
+    std::string encoding_str = encoding_param.GetValue().string_value();
+    absl::AsciiStrToUpper(&encoding_str);
+    googlesql::VectorEncodingId::Id encoding_enum;
+    if (!googlesql::VectorEncodingId_Id_Parse(encoding_str, &encoding_enum) ||
+        encoding_enum == googlesql::VectorEncodingId::UNKNOWN_VECTOR_ENCODING) {
+      return MakeSqlErrorAt(type_parameters)
+             << R"(Unrecognized VECTOR encoding: ")"
+             << encoding_param.GetValue().string_value() << R"(")";
+    }
+    proto.set_encoding(encoding_enum);
+  }
+
   return TypeParameters::MakeVectorTypeParameters(proto);
 }
 

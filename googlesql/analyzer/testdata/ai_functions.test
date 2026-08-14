@@ -1,65 +1,43 @@
 # AI.IF function tests.
-[language_features=MAXIMUM]
-# AI.IF is disabled by default under a language feature marked with
-# in_development=true, due to naming conflicts with other engines that have their
-# own version of AI.IF.
-SELECT product
-FROM
-    KeyValue
-WHERE
-    AI.IF(CONCAT("Is this product environmentally friendly? Product:", product));
+
+# AI.IF is disabled when DISABLE_AI_IF feature flag is enabled.
+[language_features=MAXIMUM,+DISABLE_AI_IF]
+SELECT AI.IF("prompt", "payload");
 --
-ERROR: Function not found: AI.`IF`; Chained function calls require parentheses on input paths; Did you mean (AI).`IF`(...)? [at 8:5]
-    AI.IF(CONCAT("Is this product environmentally friendly? Product:", produc...
-    ^
+ERROR: Function not found: AI.`IF`; Chained function calls require parentheses on input paths; Did you mean (AI).`IF`(...)? [at 1:8]
+SELECT AI.IF("prompt", "payload");
+       ^
 ==
 
-[language_features=NONE]
-# Different error message if the feature gating chained function calls is not
-# enabled and AI.IF is still disabled.
-SELECT Value
+[default language_features=MAXIMUM]
+# Ensure that a local column named AI does not cause the resolver to
+# incorrectly attempt a chained function call instead of the builtin AI.IF.
+
+SELECT
+  AI.IF("string1", "string2")
 FROM
-    KeyValue
-WHERE
-    AI.IF(CONCAT("Is this product environmentally friendly? Product:", product));
+  (SELECT true AS AI);
 --
-ERROR: Function not found: AI.`IF` [at 7:5]
-    AI.IF(CONCAT("Is this product environmentally friendly? Product:", produc...
-    ^
+QueryStmt
++-output_column_list=
+| +-$query.$col1#2 AS `$col1` [BOOL]
++-query=
+  +-ProjectScan
+    +-column_list=[$query.$col1#2]
+    +-expr_list=
+    | +-$col1#2 :=
+    |   +-FunctionCall(GoogleSQL:ai.if(STRING prompt, STRING payload) -> BOOL)
+    |     +-Literal(type=STRING, value="string1")
+    |     +-Literal(type=STRING, value="string2")
+    +-input_scan=
+      +-ProjectScan
+        +-column_list=[$subquery1.AI#1]
+        +-expr_list=
+        | +-AI#1 := Literal(type=BOOL, value=true)
+        +-input_scan=
+          +-SingleRowScan
 ==
 
-[language_features=NONE,+AI_IF,+JSON_TYPE]
-# Error if named arguments are not enabled.
-SELECT product
-FROM
-    KeyValue
-WHERE
-    AI.IF(CONCAT("Is this product environmentally friendly? Product:", Value),
-    model => "gemini");
---
-ERROR: Named arguments are not supported [at 7:5]
-    model => "gemini");
-    ^
-==
-
-[language_features=NONE,+AI_IF,+NAMED_ARGUMENTS]
-# Error if JSON_TYPE is not enabled.
-SELECT product
-FROM
-    KeyValue
-WHERE
-    AI.IF(CONCAT("Is this product environmentally friendly? Product:", Value),
-    JSON '{"product_description":"This product is made from recyclable materials."}',
-    model => "gemini");
---
-ERROR: JSON literals are not supported [at 7:5]
-    JSON '{"product_description":"This product is made from recyclable materi...
-    ^
-==
-
-# The following tests run with AI.IF, JSON_TYPE, NAMED_ARGUMENTS, and MODEL_ARG
-# enabled.
-[default language_features=NONE,+AI_IF,+JSON_TYPE,+NAMED_ARGUMENTS,+MODEL_ARG]
 # Basic test that a ResolvedAST is produced with all arguments specified.
 SELECT *
 FROM

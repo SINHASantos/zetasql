@@ -46,12 +46,17 @@ message ASTNodeProto {
 # if node.comment
 {{node.comment}}
  # endif
- # if node.is_abstract
+ # if node.is_abstract or node.allow_non_final_concrete_class_for_legacy_migration
 message {{node.proto_field_type}} {
   oneof node {
     # for tag_id, subclass in node.subclasses|dictsort
     {{subclass.proto_field_type}} {{subclass.member_name}}_node = {{subclass.tag_id}};
     # endfor
+    {# For non-final concrete classes, we must include the base class itself #}
+    {# so that instances of the base class can be serialized.                #}
+    # if node.allow_non_final_concrete_class_for_legacy_migration
+    {{node.proto_type}} {{node.member_name}}_node = {{node.tag_id}};
+    # endif
   }
 }
  # endif

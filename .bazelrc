@@ -63,3 +63,7 @@ build --cxxopt=-std=c++20 --host_cxxopt=-std=c++20 --config=clang --java_runtime
 # Force Go to build in PIE mode to avoid "relocation R_X86_64_64" errors on
 # modern Linux environments where the LLVM toolchain enforces PIE.
 build --@io_bazel_rules_go//go/config:linkmode=pie
+
+# Default pom_version for java_export rules when not explicitly specified on the command line
+build --define=pom_version=LOCAL-SNAPSHOT
+

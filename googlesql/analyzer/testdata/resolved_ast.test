@@ -1,0 +1,1010 @@
+# This file contains tests for resolved AST behavior, including DebugString
+# formatting options.
+
+[default language_features=MAXIMUM]
+[default no_show_sqlbuilder_output]
+[default debug_string_linear_mode]
+[default debug_string_use_box_glyphs]
+
+[{{no_debug_string_linear_mode|debug_string_linear_mode}}]
+[{{no_debug_string_use_box_glyphs|debug_string_use_box_glyphs}}]
+[{{debug_string_omit_pipe_input_scan_field|no_debug_string_omit_pipe_input_scan_field}}]
+# Show DebugString output with different combinations of box glyphs
+# and linear output modes.
+SELECT key, value FROM KeyValue WHERE key > 0 ORDER BY key;
+--
+ALTERNATION GROUPS:
+    no_debug_string_linear_mode,no_debug_string_use_box_glyphs,debug_string_omit_pipe_input_scan_field
+    no_debug_string_linear_mode,no_debug_string_use_box_glyphs,no_debug_string_omit_pipe_input_scan_field
+--
+QueryStmt
++-output_column_list=
+| +-KeyValue.Key#1 AS key [INT64]
+| +-KeyValue.Value#2 AS value [STRING]
++-query=
+  +-OrderByScan
+    +-column_list=KeyValue.[Key#1, Value#2]
+    +-is_ordered=TRUE
+    +-input_scan=
+    | +-FilterScan
+    |   +-column_list=KeyValue.[Key#1, Value#2]
+    |   +-input_scan=
+    |   | +-TableScan(column_list=KeyValue.[Key#1, Value#2], table=KeyValue, column_index_list=[0, 1])
+    |   +-filter_expr=
+    |     +-FunctionCall(GoogleSQL:$greater(INT64, INT64) -> BOOL)
+    |       +-ColumnRef(type=INT64, column=KeyValue.Key#1)
+    |       +-Literal(type=INT64, value=0)
+    +-order_by_item_list=
+      +-OrderByItem
+        +-column_ref=
+          +-ColumnRef(type=INT64, column=KeyValue.Key#1)
+--
+ALTERNATION GROUPS:
+    no_debug_string_linear_mode,debug_string_use_box_glyphs,debug_string_omit_pipe_input_scan_field
+    no_debug_string_linear_mode,debug_string_use_box_glyphs,no_debug_string_omit_pipe_input_scan_field
+--
+QueryStmt
+├─output_column_list=
+│ ├─KeyValue.Key#1 AS key [INT64]
+│ └─KeyValue.Value#2 AS value [STRING]
+└─query=
+  └─OrderByScan
+    ├─column_list=KeyValue.[Key#1, Value#2]
+    ├─is_ordered=TRUE
+    ├─input_scan=
+    │ └─FilterScan
+    │   ├─column_list=KeyValue.[Key#1, Value#2]
+    │   ├─input_scan=
+    │   │ └─TableScan(column_list=KeyValue.[Key#1, Value#2], table=KeyValue, column_index_list=[0, 1])
+    │   └─filter_expr=
+    │     └─FunctionCall(GoogleSQL:$greater(INT64, INT64) -> BOOL)
+    │       ├─ColumnRef(type=INT64, column=KeyValue.Key#1)
+    │       └─Literal(type=INT64, value=0)
+    └─order_by_item_list=
+      └─OrderByItem
+        └─column_ref=
+          └─ColumnRef(type=INT64, column=KeyValue.Key#1)
+--
+ALTERNATION GROUP: debug_string_linear_mode,no_debug_string_use_box_glyphs,debug_string_omit_pipe_input_scan_field
+--
+QueryStmt
++-output_column_list=
+| +-KeyValue.Key#1 AS key [INT64]
+| +-KeyValue.Value#2 AS value [STRING]
++-query=
+  +--TableScan(column_list=KeyValue.[Key#1, Value#2], table=KeyValue, column_index_list=[0, 1])
+  |> FilterScan
+  .  +-column_list=KeyValue.[Key#1, Value#2]
+  .  +-filter_expr=
+  .    +-FunctionCall(GoogleSQL:$greater(INT64, INT64) -> BOOL)
+  .      +-ColumnRef(type=INT64, column=KeyValue.Key#1)
+  .      +-Literal(type=INT64, value=0)
+  |> OrderByScan
+     +-column_list=KeyValue.[Key#1, Value#2]
+     +-is_ordered=TRUE
+     +-order_by_item_list=
+       +-OrderByItem
+         +-column_ref=
+           +-ColumnRef(type=INT64, column=KeyValue.Key#1)
+--
+ALTERNATION GROUP: debug_string_linear_mode,no_debug_string_use_box_glyphs,no_debug_string_omit_pipe_input_scan_field
+--
+QueryStmt
++-output_column_list=
+| +-KeyValue.Key#1 AS key [INT64]
+| +-KeyValue.Value#2 AS value [STRING]
++-query=
+  +--TableScan(column_list=KeyValue.[Key#1, Value#2], table=KeyValue, column_index_list=[0, 1])
+  |> FilterScan
+  .  +-column_list=KeyValue.[Key#1, Value#2]
+  .  +-input_scan=<pipe_input>
+  .  +-filter_expr=
+  .    +-FunctionCall(GoogleSQL:$greater(INT64, INT64) -> BOOL)
+  .      +-ColumnRef(type=INT64, column=KeyValue.Key#1)
+  .      +-Literal(type=INT64, value=0)
+  |> OrderByScan
+     +-column_list=KeyValue.[Key#1, Value#2]
+     +-is_ordered=TRUE
+     +-input_scan=<pipe_input>
+     +-order_by_item_list=
+       +-OrderByItem
+         +-column_ref=
+           +-ColumnRef(type=INT64, column=KeyValue.Key#1)
+--
+ALTERNATION GROUP: debug_string_linear_mode,debug_string_use_box_glyphs,debug_string_omit_pipe_input_scan_field
+--
+QueryStmt
+├─output_column_list=
+│ ├─KeyValue.Key#1 AS key [INT64]
+│ └─KeyValue.Value#2 AS value [STRING]
+└─query=
+  ├──TableScan(column_list=KeyValue.[Key#1, Value#2], table=KeyValue, column_index_list=[0, 1])
+  |> FilterScan
+  ·  ├─column_list=KeyValue.[Key#1, Value#2]
+  ·  └─filter_expr=
+  ·    └─FunctionCall(GoogleSQL:$greater(INT64, INT64) -> BOOL)
+  ·      ├─ColumnRef(type=INT64, column=KeyValue.Key#1)
+  ·      └─Literal(type=INT64, value=0)
+  |> OrderByScan
+     ├─column_list=KeyValue.[Key#1, Value#2]
+     ├─is_ordered=TRUE
+     └─order_by_item_list=
+       └─OrderByItem
+         └─column_ref=
+           └─ColumnRef(type=INT64, column=KeyValue.Key#1)
+--
+ALTERNATION GROUP: debug_string_linear_mode,debug_string_use_box_glyphs,no_debug_string_omit_pipe_input_scan_field
+--
+QueryStmt
+├─output_column_list=
+│ ├─KeyValue.Key#1 AS key [INT64]
+│ └─KeyValue.Value#2 AS value [STRING]
+└─query=
+  ├──TableScan(column_list=KeyValue.[Key#1, Value#2], table=KeyValue, column_index_list=[0, 1])
+  |> FilterScan
+  ·  ├─column_list=KeyValue.[Key#1, Value#2]
+  ·  ├─input_scan=<pipe_input>
+  ·  └─filter_expr=
+  ·    └─FunctionCall(GoogleSQL:$greater(INT64, INT64) -> BOOL)
+  ·      ├─ColumnRef(type=INT64, column=KeyValue.Key#1)
+  ·      └─Literal(type=INT64, value=0)
+  |> OrderByScan
+     ├─column_list=KeyValue.[Key#1, Value#2]
+     ├─is_ordered=TRUE
+     ├─input_scan=<pipe_input>
+     └─order_by_item_list=
+       └─OrderByItem
+         └─column_ref=
+           └─ColumnRef(type=INT64, column=KeyValue.Key#1)
+==
+
+# Show linear mode output with and without placeholder input fields for JOINs.
+# Note `left_scan` is present in the second output.
+[{{debug_string_omit_pipe_input_scan_field|no_debug_string_omit_pipe_input_scan_field}}]
+FROM KeyValue
+|> JOIN KeyValue k2 USING (key)
+|> JOIN KeyValue k3 on k2.value = k3.value
+--
+ALTERNATION GROUP: debug_string_omit_pipe_input_scan_field
+--
+QueryStmt
+├─output_column_list=
+│ ├─KeyValue.Key#1 AS key [INT64]
+│ ├─KeyValue.Value#2 AS Value [STRING]
+│ ├─KeyValue.Value#4 AS Value [STRING]
+│ ├─KeyValue.Key#5 AS Key [INT64]
+│ └─KeyValue.Value#6 AS Value [STRING]
+└─query=
+  ├──TableScan(column_list=KeyValue.[Key#1, Value#2], table=KeyValue, column_index_list=[0, 1])
+  |> JoinScan
+  ·  ├─column_list=KeyValue.[Key#1, Value#2, Key#3, Value#4]
+  ·  ├─right_scan=
+  ·  │ └─TableScan(column_list=KeyValue.[Key#3, Value#4], table=KeyValue, column_index_list=[0, 1], alias="k2")
+  ·  ├─join_expr=
+  ·  │ └─FunctionCall(GoogleSQL:$equal(INT64, INT64) -> BOOL)
+  ·  │   ├─ColumnRef(type=INT64, column=KeyValue.Key#1)
+  ·  │   └─ColumnRef(type=INT64, column=KeyValue.Key#3)
+  ·  └─has_using=TRUE
+  |> JoinScan
+     ├─column_list=KeyValue.[Key#1, Value#2, Key#3, Value#4, Key#5, Value#6]
+     ├─right_scan=
+     │ └─TableScan(column_list=KeyValue.[Key#5, Value#6], table=KeyValue, column_index_list=[0, 1], alias="k3")
+     └─join_expr=
+       └─FunctionCall(GoogleSQL:$equal(STRING, STRING) -> BOOL)
+         ├─ColumnRef(type=STRING, column=KeyValue.Value#4)
+         └─ColumnRef(type=STRING, column=KeyValue.Value#6)
+--
+ALTERNATION GROUP: no_debug_string_omit_pipe_input_scan_field
+--
+QueryStmt
+├─output_column_list=
+│ ├─KeyValue.Key#1 AS key [INT64]
+│ ├─KeyValue.Value#2 AS Value [STRING]
+│ ├─KeyValue.Value#4 AS Value [STRING]
+│ ├─KeyValue.Key#5 AS Key [INT64]
+│ └─KeyValue.Value#6 AS Value [STRING]
+└─query=
+  ├──TableScan(column_list=KeyValue.[Key#1, Value#2], table=KeyValue, column_index_list=[0, 1])
+  |> JoinScan
+  ·  ├─column_list=KeyValue.[Key#1, Value#2, Key#3, Value#4]
+  ·  ├─left_scan=<pipe_input>
+  ·  ├─right_scan=
+  ·  │ └─TableScan(column_list=KeyValue.[Key#3, Value#4], table=KeyValue, column_index_list=[0, 1], alias="k2")
+  ·  ├─join_expr=
+  ·  │ └─FunctionCall(GoogleSQL:$equal(INT64, INT64) -> BOOL)
+  ·  │   ├─ColumnRef(type=INT64, column=KeyValue.Key#1)
+  ·  │   └─ColumnRef(type=INT64, column=KeyValue.Key#3)
+  ·  └─has_using=TRUE
+  |> JoinScan
+     ├─column_list=KeyValue.[Key#1, Value#2, Key#3, Value#4, Key#5, Value#6]
+     ├─left_scan=<pipe_input>
+     ├─right_scan=
+     │ └─TableScan(column_list=KeyValue.[Key#5, Value#6], table=KeyValue, column_index_list=[0, 1], alias="k3")
+     └─join_expr=
+       └─FunctionCall(GoogleSQL:$equal(STRING, STRING) -> BOOL)
+         ├─ColumnRef(type=STRING, column=KeyValue.Value#4)
+         └─ColumnRef(type=STRING, column=KeyValue.Value#6)
+==
+
+# Show linear mode output for UNION.
+# Note `scan=<pipe_input>` is always shown in the SetOperationItem.
+[{{debug_string_omit_pipe_input_scan_field|no_debug_string_omit_pipe_input_scan_field}}]
+FROM KeyValue
+|> UNION ALL (FROM KeyValue),
+             (SELECT 5, "abc")
+--
+ALTERNATION GROUP: debug_string_omit_pipe_input_scan_field
+--
+QueryStmt
+├─output_column_list=
+│ ├─$union_all.Key#7 AS Key [INT64]
+│ └─$union_all.Value#8 AS Value [STRING]
+└─query=
+  ├──TableScan(column_list=KeyValue.[Key#1, Value#2], table=KeyValue, column_index_list=[0, 1])
+  |> SetOperationScan
+     ├─column_list=$union_all.[Key#7, Value#8]
+     ├─op_type=UNION_ALL
+     └─input_item_list=
+       ├─SetOperationItem(scan=<pipe_input>, output_column_list=KeyValue.[Key#1, Value#2])
+       ├─SetOperationItem
+       │ ├─scan=
+       │ │ └─TableScan(column_list=KeyValue.[Key#3, Value#4], table=KeyValue, column_index_list=[0, 1])
+       │ └─output_column_list=KeyValue.[Key#3, Value#4]
+       └─SetOperationItem
+         ├─scan=
+         │ ├──SingleRowScan
+         │ |> ProjectScan
+         │    ├─column_list=$union_all2.[$col1#5, $col2#6]
+         │    └─expr_list=
+         │      ├─$col1#5 := Literal(type=INT64, value=5)
+         │      └─$col2#6 := Literal(type=STRING, value="abc")
+         └─output_column_list=$union_all2.[$col1#5, $col2#6]
+--
+ALTERNATION GROUP: no_debug_string_omit_pipe_input_scan_field
+--
+QueryStmt
+├─output_column_list=
+│ ├─$union_all.Key#7 AS Key [INT64]
+│ └─$union_all.Value#8 AS Value [STRING]
+└─query=
+  ├──TableScan(column_list=KeyValue.[Key#1, Value#2], table=KeyValue, column_index_list=[0, 1])
+  |> SetOperationScan
+     ├─column_list=$union_all.[Key#7, Value#8]
+     ├─op_type=UNION_ALL
+     └─input_item_list=
+       ├─SetOperationItem(scan=<pipe_input>, output_column_list=KeyValue.[Key#1, Value#2])
+       ├─SetOperationItem
+       │ ├─scan=
+       │ │ └─TableScan(column_list=KeyValue.[Key#3, Value#4], table=KeyValue, column_index_list=[0, 1])
+       │ └─output_column_list=KeyValue.[Key#3, Value#4]
+       └─SetOperationItem
+         ├─scan=
+         │ ├──SingleRowScan
+         │ |> ProjectScan
+         │    ├─column_list=$union_all2.[$col1#5, $col2#6]
+         │    ├─expr_list=
+         │    │ ├─$col1#5 := Literal(type=INT64, value=5)
+         │    │ └─$col2#6 := Literal(type=STRING, value="abc")
+         │    └─input_scan=<pipe_input>
+         └─output_column_list=$union_all2.[$col1#5, $col2#6]
+==
+
+# Show linear mode output for WITH.
+# The WithScan is not linearized. (It would show up at the end instead
+# of on the outside.)
+WITH kv AS (FROM KeyValue
+            |> WHERE true
+            |> ORDER BY value)
+FROM kv
+|> WHERE false
+|> ORDER BY key
+--
+QueryStmt
+├─output_column_list=
+│ ├─kv.Key#3 AS Key [INT64]
+│ └─kv.Value#4 AS Value [STRING]
+└─query=
+  └─WithScan
+    ├─column_list=kv.[Key#3, Value#4]
+    ├─is_ordered=TRUE
+    ├─with_entry_list=
+    │ └─WithEntry
+    │   ├─with_query_name="kv"
+    │   └─with_subquery=
+    │     ├──TableScan(column_list=KeyValue.[Key#1, Value#2], table=KeyValue, column_index_list=[0, 1])
+    │     |> FilterScan
+    │     ·  ├─column_list=KeyValue.[Key#1, Value#2]
+    │     ·  └─filter_expr=
+    │     ·    └─Literal(type=BOOL, value=true)
+    │     |> OrderByScan
+    │        ├─column_list=KeyValue.[Key#1, Value#2]
+    │        ├─is_ordered=TRUE
+    │        └─order_by_item_list=
+    │          └─OrderByItem
+    │            └─column_ref=
+    │              └─ColumnRef(type=STRING, column=KeyValue.Value#2)
+    └─query=
+      ├──WithRefScan(column_list=kv.[Key#3, Value#4], with_query_name="kv")
+      |> FilterScan
+      ·  ├─column_list=kv.[Key#3, Value#4]
+      ·  └─filter_expr=
+      ·    └─Literal(type=BOOL, value=false)
+      |> OrderByScan
+         ├─column_list=kv.[Key#3, Value#4]
+         ├─is_ordered=TRUE
+         └─order_by_item_list=
+           └─OrderByItem
+             └─column_ref=
+               └─ColumnRef(type=INT64, column=kv.Key#3)
+==
+
+# Show linear mode output for pipe WITH.
+# The WithScans get pulled to the outside of the query rather than showing up
+# as linear operators because that's how the resolver constructs a Resolved AST
+# for these currently.
+FROM KeyValue
+|> WITH t2 AS (SELECT 1 key
+               |> EXTEND "xxx" value2)
+|> WHERE true
+|> WITH t3 AS (SELECT 1 key)
+|> JOIN t2 USING (key)
+|> JOIN t3 USING (key)
+--
+QueryStmt
+├─output_column_list=
+│ ├─KeyValue.Key#1 AS key [INT64]
+│ ├─KeyValue.Value#2 AS Value [STRING]
+│ └─t2.value2#7 AS value2 [STRING]
+└─query=
+  └─WithScan
+    ├─column_list=[KeyValue.Key#1, KeyValue.Value#2, t2.key#6, t2.value2#7, t3.key#8]
+    ├─with_entry_list=
+    │ └─WithEntry
+    │   ├─with_query_name="t2"
+    │   └─with_subquery=
+    │     ├──SingleRowScan
+    │     |> ProjectScan
+    │     ·  ├─column_list=[t2.key#3]
+    │     ·  └─expr_list=
+    │     ·    └─key#3 := Literal(type=INT64, value=1)
+    │     |> ProjectScan
+    │        ├─column_list=[t2.key#3, $pipe_extend.value2#4]
+    │        └─expr_list=
+    │          └─value2#4 := Literal(type=STRING, value="xxx")
+    └─query=
+      └─WithScan
+        ├─column_list=[KeyValue.Key#1, KeyValue.Value#2, t2.key#6, t2.value2#7, t3.key#8]
+        ├─with_entry_list=
+        │ └─WithEntry
+        │   ├─with_query_name="t3"
+        │   └─with_subquery=
+        │     ├──SingleRowScan
+        │     |> ProjectScan
+        │        ├─column_list=[t3.key#5]
+        │        └─expr_list=
+        │          └─key#5 := Literal(type=INT64, value=1)
+        └─query=
+          ├──TableScan(column_list=KeyValue.[Key#1, Value#2], table=KeyValue, column_index_list=[0, 1])
+          |> FilterScan
+          ·  ├─column_list=KeyValue.[Key#1, Value#2]
+          ·  └─filter_expr=
+          ·    └─Literal(type=BOOL, value=true)
+          |> JoinScan
+          ·  ├─column_list=[KeyValue.Key#1, KeyValue.Value#2, t2.key#6, t2.value2#7]
+          ·  ├─right_scan=
+          ·  │ └─WithRefScan(column_list=t2.[key#6, value2#7], with_query_name="t2")
+          ·  ├─join_expr=
+          ·  │ └─FunctionCall(GoogleSQL:$equal(INT64, INT64) -> BOOL)
+          ·  │   ├─ColumnRef(type=INT64, column=KeyValue.Key#1)
+          ·  │   └─ColumnRef(type=INT64, column=t2.key#6)
+          ·  └─has_using=TRUE
+          |> JoinScan
+             ├─column_list=[KeyValue.Key#1, KeyValue.Value#2, t2.key#6, t2.value2#7, t3.key#8]
+             ├─right_scan=
+             │ └─WithRefScan(column_list=[t3.key#8], with_query_name="t3")
+             ├─join_expr=
+             │ └─FunctionCall(GoogleSQL:$equal(INT64, INT64) -> BOOL)
+             │   ├─ColumnRef(type=INT64, column=KeyValue.Key#1)
+             │   └─ColumnRef(type=INT64, column=t3.key#8)
+             └─has_using=TRUE
+==
+
+# Show linear mode output for pipe RECURSIVE UNION.
+[{{debug_string_omit_pipe_input_scan_field|no_debug_string_omit_pipe_input_scan_field}}]
+FROM KeyValue
+|> WHERE true
+|> RECURSIVE UNION ALL ( |> WHERE false )
+|> ORDER BY 1
+--
+ALTERNATION GROUP: debug_string_omit_pipe_input_scan_field
+--
+QueryStmt
+├─output_column_list=
+│ ├─$union_all.Key#3 AS Key [INT64]
+│ └─$union_all.Value#4 AS Value [STRING]
+└─query=
+  ├──TableScan(column_list=KeyValue.[Key#1, Value#2], table=KeyValue, column_index_list=[0, 1])
+  |> FilterScan
+  ·  ├─column_list=KeyValue.[Key#1, Value#2]
+  ·  └─filter_expr=
+  ·    └─Literal(type=BOOL, value=true)
+  |> RecursiveScan
+  ·  ├─column_list=$union_all.[Key#3, Value#4]
+  ·  ├─op_type=UNION_ALL
+  ·  ├─non_recursive_term=
+  ·  │ └─SetOperationItem(scan=<pipe_input>, output_column_list=KeyValue.[Key#1, Value#2])
+  ·  └─recursive_term=
+  ·    └─SetOperationItem
+  ·      ├─scan=
+  ·      │ ├──RecursiveRefScan(column_list=$pipe_recursive_union.[Key#5, Value#6])
+  ·      │ |> FilterScan
+  ·      │    ├─column_list=$pipe_recursive_union.[Key#5, Value#6]
+  ·      │    └─filter_expr=
+  ·      │      └─Literal(type=BOOL, value=false)
+  ·      └─output_column_list=$pipe_recursive_union.[Key#5, Value#6]
+  |> OrderByScan
+     ├─column_list=$union_all.[Key#3, Value#4]
+     ├─is_ordered=TRUE
+     └─order_by_item_list=
+       └─OrderByItem
+         └─column_ref=
+           └─ColumnRef(type=INT64, column=$union_all.Key#3)
+--
+ALTERNATION GROUP: no_debug_string_omit_pipe_input_scan_field
+--
+QueryStmt
+├─output_column_list=
+│ ├─$union_all.Key#3 AS Key [INT64]
+│ └─$union_all.Value#4 AS Value [STRING]
+└─query=
+  ├──TableScan(column_list=KeyValue.[Key#1, Value#2], table=KeyValue, column_index_list=[0, 1])
+  |> FilterScan
+  ·  ├─column_list=KeyValue.[Key#1, Value#2]
+  ·  ├─input_scan=<pipe_input>
+  ·  └─filter_expr=
+  ·    └─Literal(type=BOOL, value=true)
+  |> RecursiveScan
+  ·  ├─column_list=$union_all.[Key#3, Value#4]
+  ·  ├─op_type=UNION_ALL
+  ·  ├─non_recursive_term=
+  ·  │ └─SetOperationItem(scan=<pipe_input>, output_column_list=KeyValue.[Key#1, Value#2])
+  ·  └─recursive_term=
+  ·    └─SetOperationItem
+  ·      ├─scan=
+  ·      │ ├──RecursiveRefScan(column_list=$pipe_recursive_union.[Key#5, Value#6])
+  ·      │ |> FilterScan
+  ·      │    ├─column_list=$pipe_recursive_union.[Key#5, Value#6]
+  ·      │    ├─input_scan=<pipe_input>
+  ·      │    └─filter_expr=
+  ·      │      └─Literal(type=BOOL, value=false)
+  ·      └─output_column_list=$pipe_recursive_union.[Key#5, Value#6]
+  |> OrderByScan
+     ├─column_list=$union_all.[Key#3, Value#4]
+     ├─is_ordered=TRUE
+     ├─input_scan=<pipe_input>
+     └─order_by_item_list=
+       └─OrderByItem
+         └─column_ref=
+           └─ColumnRef(type=INT64, column=$union_all.Key#3)
+==
+
+# The next several examples show linear mode output for TVF scans, for both
+# input scans (with no pipe input) and pipe CALL.
+# The FunctionArgument `scan=<pipe_input>` is always shown.
+[prepare_database=db]
+CREATE TABLE FUNCTION tvf_input(x int64, y int64)
+AS (
+  SELECT x,y
+);
+--
+CreateTableFunctionStmt
+├─name_path=tvf_input
+├─argument_name_list=[x, y]
+├─signature=(INT64 x, INT64 y) -> TABLE<x INT64, y INT64>
+├─language="SQL"
+├─code="SELECT x,y"
+├─query=
+│ ├──SingleRowScan
+│ |> ProjectScan
+│    ├─column_list=$query.[x#1, y#2]
+│    └─expr_list=
+│      ├─x#1 := ArgumentRef(type=INT64, name="x")
+│      └─y#2 := ArgumentRef(type=INT64, name="y")
+└─output_column_list=
+  ├─$query.x#1 AS x [INT64]
+  └─$query.y#2 AS y [INT64]
+==
+
+[prepare_database=db]
+CREATE TABLE FUNCTION tvf(t1 TABLE<key int64, value string>, x int64)
+AS (
+  FROM t1
+  |> EXTEND x
+);
+--
+CreateTableFunctionStmt
+├─name_path=tvf
+├─argument_name_list=[t1, x]
+├─signature=(TABLE<key INT64, value STRING> t1, INT64 x) -> TABLE<key INT64, value STRING, x INT64>
+├─language="SQL"
+├─code="FROM t1\n  |> EXTEND x"
+├─query=
+│ ├──RelationArgumentScan(column_list=t1.[key#1, value#2], name="t1")
+│ |> ProjectScan
+│    ├─column_list=[t1.key#1, t1.value#2, $pipe_extend.x#3]
+│    └─expr_list=
+│      └─x#3 := ArgumentRef(type=INT64, name="x")
+└─output_column_list=
+  ├─t1.key#1 AS key [INT64]
+  ├─t1.value#2 AS value [STRING]
+  └─$pipe_extend.x#3 AS x [INT64]
+==
+
+[default use_database=db]
+FROM tvf_input(10, 20)
+--
+QueryStmt
+├─output_column_list=
+│ ├─tvf_input.x#1 AS x [INT64]
+│ └─tvf_input.y#2 AS y [INT64]
+└─query=
+  └─TVFScan
+    ├─column_list=tvf_input.[x#1, y#2]
+    ├─tvf=tvf_input
+    ├─signature=(literal INT64, literal INT64) -> TABLE<x INT64, y INT64>
+    ├─argument_list=
+    │ ├─FunctionArgument
+    │ │ └─expr=
+    │ │   └─Literal(type=INT64, value=10)
+    │ └─FunctionArgument
+    │   └─expr=
+    │     └─Literal(type=INT64, value=20)
+    ├─column_index_list=[0, 1]
+    └─function_call_signature=(INT64 x, INT64 y) -> TABLE<x INT64, y INT64>
+==
+
+FROM tvf(TABLE keyValue, 10)
+|> ORDER BY key
+--
+QueryStmt
+├─output_column_list=
+│ ├─tvf.key#3 AS key [INT64]
+│ ├─tvf.value#4 AS value [STRING]
+│ └─tvf.x#5 AS x [INT64]
+└─query=
+  ├──TableScan(column_list=KeyValue.[Key#1, Value#2], node_source="table_clause", table=KeyValue, column_index_list=[0, 1])
+  |> TVFScan
+  ·  ├─column_list=tvf.[key#3, value#4, x#5]
+  ·  ├─tvf=tvf
+  ·  ├─signature=(TABLE<Key INT64, Value STRING>, literal INT64) -> TABLE<key INT64, value STRING, x INT64>
+  ·  ├─argument_list=
+  ·  │ ├─FunctionArgument(scan=<pipe_input>, argument_column_list=KeyValue.[Key#1, Value#2])
+  ·  │ └─FunctionArgument
+  ·  │   └─expr=
+  ·  │     └─Literal(type=INT64, value=10)
+  ·  ├─column_index_list=[0, 1, 2]
+  ·  └─function_call_signature=(TABLE<key INT64, value STRING> t1, INT64 x) -> TABLE<key INT64, value STRING, x INT64>
+  |> OrderByScan
+     ├─column_list=tvf.[key#3, value#4, x#5]
+     ├─is_ordered=TRUE
+     └─order_by_item_list=
+       └─OrderByItem
+         └─column_ref=
+           └─ColumnRef(type=INT64, column=tvf.key#3)
+==
+
+FROM tvf_input(1,2)
+|> EXTEND x+y AS key, "abc" as value
+|> CALL tvf(20)
+|> DROP x
+|> CALL tvf(30)
+|> LIMIT 10
+--
+QueryStmt
+├─output_column_list=
+│ ├─tvf.key#8 AS key [INT64]
+│ ├─tvf.value#9 AS value [STRING]
+│ └─tvf.x#10 AS x [INT64]
+└─query=
+  ├──TVFScan
+  ·  ├─column_list=tvf_input.[x#1, y#2]
+  ·  ├─tvf=tvf_input
+  ·  ├─signature=(literal INT64, literal INT64) -> TABLE<x INT64, y INT64>
+  ·  ├─argument_list=
+  ·  │ ├─FunctionArgument
+  ·  │ │ └─expr=
+  ·  │ │   └─Literal(type=INT64, value=1)
+  ·  │ └─FunctionArgument
+  ·  │   └─expr=
+  ·  │     └─Literal(type=INT64, value=2)
+  ·  ├─column_index_list=[0, 1]
+  ·  └─function_call_signature=(INT64 x, INT64 y) -> TABLE<x INT64, y INT64>
+  |> ProjectScan
+  ·  ├─column_list=[tvf_input.x#1, tvf_input.y#2, $pipe_extend.key#3, $pipe_extend.value#4]
+  ·  └─expr_list=
+  ·    ├─key#3 :=
+  ·    │ └─FunctionCall(GoogleSQL:$add(INT64, INT64) -> INT64)
+  ·    │   ├─ColumnRef(type=INT64, column=tvf_input.x#1)
+  ·    │   └─ColumnRef(type=INT64, column=tvf_input.y#2)
+  ·    └─value#4 := Literal(type=STRING, value="abc")
+  |> ProjectScan(column_list=$pipe_extend.[key#3, value#4])
+  |> TVFScan
+  ·  ├─column_list=tvf.[key#5, value#6]
+  ·  ├─tvf=tvf
+  ·  ├─signature=(TABLE<key INT64, value STRING>, literal INT64) -> TABLE<key INT64, value STRING, x INT64>
+  ·  ├─argument_list=
+  ·  │ ├─FunctionArgument(scan=<pipe_input>, argument_column_list=$pipe_extend.[key#3, value#4])
+  ·  │ └─FunctionArgument
+  ·  │   └─expr=
+  ·  │     └─Literal(type=INT64, value=20)
+  ·  ├─column_index_list=[0, 1]
+  ·  └─function_call_signature=(TABLE<key INT64, value STRING> t1, INT64 x) -> TABLE<key INT64, value STRING, x INT64>
+  |> TVFScan
+  ·  ├─column_list=tvf.[key#8, value#9, x#10]
+  ·  ├─tvf=tvf
+  ·  ├─signature=(TABLE<key INT64, value STRING>, literal INT64) -> TABLE<key INT64, value STRING, x INT64>
+  ·  ├─argument_list=
+  ·  │ ├─FunctionArgument(scan=<pipe_input>, argument_column_list=tvf.[key#5, value#6])
+  ·  │ └─FunctionArgument
+  ·  │   └─expr=
+  ·  │     └─Literal(type=INT64, value=30)
+  ·  ├─column_index_list=[0, 1, 2]
+  ·  └─function_call_signature=(TABLE<key INT64, value STRING> t1, INT64 x) -> TABLE<key INT64, value STRING, x INT64>
+  |> LimitOffsetScan
+     ├─column_list=tvf.[key#8, value#9, x#10]
+     └─limit=
+       └─Literal(type=INT64, value=10)
+==
+
+[prepare_database=db]
+CREATE TABLE FUNCTION tvf_two(x int64, t1 ANY TABLE, t2 ANY TABLE)
+AS (
+  SELECT x
+  |> CROSS JOIN t1
+  |> CROSS JOIN t2
+);
+--
+CreateTableFunctionStmt(name_path=tvf_two, argument_name_list=[x, t1, t2], signature=(INT64 x, ANY TABLE t1, ANY TABLE t2) -> ANY TABLE, language="SQL", code="SELECT x\n  |> CROSS JOIN t1\n  |> CROSS JOIN t2")
+==
+
+# Linear mode for a two-table TVF treats the first table arg as the pipe input.
+FROM KeyValue
+|> LIMIT 10
+|> CALL tvf_two(123, (SELECT 456 z))
+|> LIMIT 20
+--
+QueryStmt
+├─output_column_list=
+│ ├─tvf_two.x#4 AS x [INT64]
+│ ├─tvf_two.Key#5 AS Key [INT64]
+│ ├─tvf_two.Value#6 AS Value [STRING]
+│ └─tvf_two.z#7 AS z [INT64]
+└─query=
+  ├──TableScan(column_list=KeyValue.[Key#1, Value#2], table=KeyValue, column_index_list=[0, 1])
+  |> LimitOffsetScan
+  ·  ├─column_list=KeyValue.[Key#1, Value#2]
+  ·  └─limit=
+  ·    └─Literal(type=INT64, value=10)
+  |> TVFScan
+  ·  ├─column_list=tvf_two.[x#4, Key#5, Value#6, z#7]
+  ·  ├─tvf=tvf_two
+  ·  ├─signature=(literal INT64, TABLE<Key INT64, Value STRING>, TABLE<z INT64>) -> TABLE<x INT64, Key INT64, Value STRING, z INT64>
+  ·  ├─argument_list=
+  ·  │ ├─FunctionArgument
+  ·  │ │ └─expr=
+  ·  │ │   └─Literal(type=INT64, value=123)
+  ·  │ ├─FunctionArgument(scan=<pipe_input>, argument_column_list=KeyValue.[Key#1, Value#2])
+  ·  │ └─FunctionArgument
+  ·  │   ├─scan=
+  ·  │   │ ├──SingleRowScan
+  ·  │   │ |> ProjectScan
+  ·  │   │    ├─column_list=[$subquery1.z#3]
+  ·  │   │    └─expr_list=
+  ·  │   │      └─z#3 := Literal(type=INT64, value=456)
+  ·  │   └─argument_column_list=[$subquery1.z#3]
+  ·  ├─column_index_list=[0, 1, 2, 3]
+  ·  └─function_call_signature=(INT64 x, ANY TABLE t1, ANY TABLE t2) -> ANY TABLE
+  |> LimitOffsetScan
+     ├─column_list=tvf_two.[x#4, Key#5, Value#6, z#7]
+     └─limit=
+       └─Literal(type=INT64, value=20)
+
+With Templated SQL TVF signature:
+  tvf_two(literal INT64, TABLE<Key INT64, Value STRING>, TABLE<z INT64>) -> TABLE<x INT64, Key INT64, Value STRING, z INT64>
+containing resolved templated query:
+QueryStmt
++-output_column_list=
+| +-$query.x#1 AS x [INT64]
+| +-t1.Key#2 AS Key [INT64]
+| +-t1.Value#3 AS Value [STRING]
+| +-t2.z#4 AS z [INT64]
++-query=
+  +-JoinScan
+    +-column_list=[$query.x#1, t1.Key#2, t1.Value#3, t2.z#4]
+    +-left_scan=
+    | +-JoinScan
+    |   +-column_list=[$query.x#1, t1.Key#2, t1.Value#3]
+    |   +-left_scan=
+    |   | +-ProjectScan
+    |   |   +-column_list=[$query.x#1]
+    |   |   +-expr_list=
+    |   |   | +-x#1 := ArgumentRef(type=INT64, name="x")
+    |   |   +-input_scan=
+    |   |     +-SingleRowScan
+    |   +-right_scan=
+    |     +-RelationArgumentScan(column_list=t1.[Key#2, Value#3], name="t1")
+    +-right_scan=
+      +-RelationArgumentScan(column_list=[t2.z#4], name="t2")
+==
+
+# In linear mode for STATIC_DESCRIBE, we always use multi-line mode so the
+# string formats properly, even though there are no node-typed child fields.
+[{{no_debug_string_linear_mode|debug_string_linear_mode}}]
+FROM KeyValue
+|> EXTEND key+1
+|> STATIC_DESCRIBE
+|> WHERE true
+--
+ALTERNATION GROUP: no_debug_string_linear_mode
+--
+QueryStmt
+├─output_column_list=
+│ ├─KeyValue.Key#1 AS Key [INT64]
+│ ├─KeyValue.Value#2 AS Value [STRING]
+│ └─$pipe_extend.$col1#3 AS `$col1` [INT64]
+└─query=
+  └─FilterScan
+    ├─column_list=[KeyValue.Key#1, KeyValue.Value#2, $pipe_extend.$col1#3]
+    ├─input_scan=
+    │ └─StaticDescribeScan
+    │   ├─column_list=[KeyValue.Key#1, KeyValue.Value#2, $pipe_extend.$col1#3]
+    │   ├─describe_text=
+    │   │   """
+    │   │   NameList:
+    │   │     Key INT64 KeyValue.Key#1
+    │   │     Value STRING KeyValue.Value#2
+    │   │     <unnamed> INT64 $pipe_extend.$col1#3
+    │   │   NameScope:
+    │   │     Names:
+    │   │       Key -> INT64 (KeyValue.Key#1) (implicit)
+    │   │       Value -> STRING (KeyValue.Value#2) (implicit)
+    │   │     Range variables:
+    │   │       KeyValue -> RANGE_VARIABLE<Key#1,Value#2>
+    │   │   """
+    │   └─input_scan=
+    │     └─ProjectScan
+    │       ├─column_list=[KeyValue.Key#1, KeyValue.Value#2, $pipe_extend.$col1#3]
+    │       ├─expr_list=
+    │       │ └─$col1#3 :=
+    │       │   └─FunctionCall(GoogleSQL:$add(INT64, INT64) -> INT64)
+    │       │     ├─ColumnRef(type=INT64, column=KeyValue.Key#1)
+    │       │     └─Literal(type=INT64, value=1)
+    │       └─input_scan=
+    │         └─TableScan(column_list=KeyValue.[Key#1, Value#2], table=KeyValue, column_index_list=[0, 1])
+    └─filter_expr=
+      └─Literal(type=BOOL, value=true)
+--
+ALTERNATION GROUP: debug_string_linear_mode
+--
+QueryStmt
+├─output_column_list=
+│ ├─KeyValue.Key#1 AS Key [INT64]
+│ ├─KeyValue.Value#2 AS Value [STRING]
+│ └─$pipe_extend.$col1#3 AS `$col1` [INT64]
+└─query=
+  ├──TableScan(column_list=KeyValue.[Key#1, Value#2], table=KeyValue, column_index_list=[0, 1])
+  |> ProjectScan
+  ·  ├─column_list=[KeyValue.Key#1, KeyValue.Value#2, $pipe_extend.$col1#3]
+  ·  └─expr_list=
+  ·    └─$col1#3 :=
+  ·      └─FunctionCall(GoogleSQL:$add(INT64, INT64) -> INT64)
+  ·        ├─ColumnRef(type=INT64, column=KeyValue.Key#1)
+  ·        └─Literal(type=INT64, value=1)
+  |> StaticDescribeScan
+  ·  ├─column_list=[KeyValue.Key#1, KeyValue.Value#2, $pipe_extend.$col1#3]
+  ·  └─describe_text=
+  ·      """
+  ·      NameList:
+  ·        Key INT64 KeyValue.Key#1
+  ·        Value STRING KeyValue.Value#2
+  ·        <unnamed> INT64 $pipe_extend.$col1#3
+  ·      NameScope:
+  ·        Names:
+  ·          Key -> INT64 (KeyValue.Key#1) (implicit)
+  ·          Value -> STRING (KeyValue.Value#2) (implicit)
+  ·        Range variables:
+  ·          KeyValue -> RANGE_VARIABLE<Key#1,Value#2>
+  ·      """
+  |> FilterScan
+     ├─column_list=[KeyValue.Key#1, KeyValue.Value#2, $pipe_extend.$col1#3]
+     └─filter_expr=
+       └─Literal(type=BOOL, value=true)
+==
+
+
+# DebugString options are used in rewritten output too.
+[enabled_ast_rewrites=DEFAULTS]
+[{{no_debug_string_linear_mode|debug_string_linear_mode}}]
+SELECT WITH(x AS 2, x*x)
+|> WHERE true
+--
+ALTERNATION GROUP: no_debug_string_linear_mode
+--
+QueryStmt
+├─output_column_list=
+│ └─$query.$col1#2 AS `$col1` [INT64]
+└─query=
+  └─FilterScan
+    ├─column_list=[$query.$col1#2]
+    ├─input_scan=
+    │ └─ProjectScan
+    │   ├─column_list=[$query.$col1#2]
+    │   ├─expr_list=
+    │   │ └─$col1#2 :=
+    │   │   └─WithExpr
+    │   │     ├─type=INT64
+    │   │     ├─assignment_list=
+    │   │     │ └─x#1 := Literal(type=INT64, value=2)
+    │   │     └─expr=
+    │   │       └─FunctionCall(GoogleSQL:$multiply(INT64, INT64) -> INT64)
+    │   │         ├─ColumnRef(type=INT64, column=$with_expr.x#1)
+    │   │         └─ColumnRef(type=INT64, column=$with_expr.x#1)
+    │   └─input_scan=
+    │     └─SingleRowScan
+    └─filter_expr=
+      └─Literal(type=BOOL, value=true)
+
+[REWRITTEN AST]
+QueryStmt
+├─output_column_list=
+│ └─$query.$col1#2 AS `$col1` [INT64]
+└─query=
+  └─FilterScan
+    ├─column_list=[$query.$col1#2]
+    ├─input_scan=
+    │ └─ProjectScan
+    │   ├─column_list=[$query.$col1#2]
+    │   ├─expr_list=
+    │   │ └─$col1#2 :=
+    │   │   └─SubqueryExpr
+    │   │     ├─type=INT64
+    │   │     ├─subquery_type=SCALAR
+    │   │     └─subquery=
+    │   │       └─ProjectScan
+    │   │         ├─column_list=[$with_expr.injected#3]
+    │   │         ├─expr_list=
+    │   │         │ └─injected#3 :=
+    │   │         │   └─FunctionCall(GoogleSQL:$multiply(INT64, INT64) -> INT64)
+    │   │         │     ├─ColumnRef(type=INT64, column=$with_expr.x#1)
+    │   │         │     └─ColumnRef(type=INT64, column=$with_expr.x#1)
+    │   │         └─input_scan=
+    │   │           └─ProjectScan
+    │   │             ├─column_list=[$with_expr.x#1]
+    │   │             ├─expr_list=
+    │   │             │ └─x#1 := Literal(type=INT64, value=2)
+    │   │             └─input_scan=
+    │   │               └─SingleRowScan
+    │   └─input_scan=
+    │     └─SingleRowScan
+    └─filter_expr=
+      └─Literal(type=BOOL, value=true)
+--
+ALTERNATION GROUP: debug_string_linear_mode
+--
+QueryStmt
+├─output_column_list=
+│ └─$query.$col1#2 AS `$col1` [INT64]
+└─query=
+  ├──SingleRowScan
+  |> ProjectScan
+  ·  ├─column_list=[$query.$col1#2]
+  ·  └─expr_list=
+  ·    └─$col1#2 :=
+  ·      └─WithExpr
+  ·        ├─type=INT64
+  ·        ├─assignment_list=
+  ·        │ └─x#1 := Literal(type=INT64, value=2)
+  ·        └─expr=
+  ·          └─FunctionCall(GoogleSQL:$multiply(INT64, INT64) -> INT64)
+  ·            ├─ColumnRef(type=INT64, column=$with_expr.x#1)
+  ·            └─ColumnRef(type=INT64, column=$with_expr.x#1)
+  |> FilterScan
+     ├─column_list=[$query.$col1#2]
+     └─filter_expr=
+       └─Literal(type=BOOL, value=true)
+
+[REWRITTEN AST]
+QueryStmt
+├─output_column_list=
+│ └─$query.$col1#2 AS `$col1` [INT64]
+└─query=
+  ├──SingleRowScan
+  |> ProjectScan
+  ·  ├─column_list=[$query.$col1#2]
+  ·  └─expr_list=
+  ·    └─$col1#2 :=
+  ·      └─SubqueryExpr
+  ·        ├─type=INT64
+  ·        ├─subquery_type=SCALAR
+  ·        └─subquery=
+  ·          ├──SingleRowScan
+  ·          |> ProjectScan
+  ·          ·  ├─column_list=[$with_expr.x#1]
+  ·          ·  └─expr_list=
+  ·          ·    └─x#1 := Literal(type=INT64, value=2)
+  ·          |> ProjectScan
+  ·             ├─column_list=[$with_expr.injected#3]
+  ·             └─expr_list=
+  ·               └─injected#3 :=
+  ·                 └─FunctionCall(GoogleSQL:$multiply(INT64, INT64) -> INT64)
+  ·                   ├─ColumnRef(type=INT64, column=$with_expr.x#1)
+  ·                   └─ColumnRef(type=INT64, column=$with_expr.x#1)
+  |> FilterScan
+     ├─column_list=[$query.$col1#2]
+     └─filter_expr=
+       └─Literal(type=BOOL, value=true)
+==
+
+# DebugString options work in expression mode too.
+[enabled_ast_rewrites=DEFAULTS]
+[mode=expression]
+[{{no_debug_string_use_box_glyphs|debug_string_use_box_glyphs}}]
+WITH(x AS 2, x*x)
+--
+ALTERNATION GROUP: no_debug_string_use_box_glyphs
+--
+WithExpr
++-type=INT64
++-assignment_list=
+| +-x#1 := Literal(type=INT64, value=2)
++-expr=
+  +-FunctionCall(GoogleSQL:$multiply(INT64, INT64) -> INT64)
+    +-ColumnRef(type=INT64, column=$with_expr.x#1)
+    +-ColumnRef(type=INT64, column=$with_expr.x#1)
+
+[REWRITTEN AST]
+SubqueryExpr
++-type=INT64
++-subquery_type=SCALAR
++-subquery=
+  +--SingleRowScan
+  |> ProjectScan
+  .  +-column_list=[$with_expr.x#1]
+  .  +-expr_list=
+  .    +-x#1 := Literal(type=INT64, value=2)
+  |> ProjectScan
+     +-column_list=[$with_expr.injected#2]
+     +-expr_list=
+       +-injected#2 :=
+         +-FunctionCall(GoogleSQL:$multiply(INT64, INT64) -> INT64)
+           +-ColumnRef(type=INT64, column=$with_expr.x#1)
+           +-ColumnRef(type=INT64, column=$with_expr.x#1)
+--
+ALTERNATION GROUP: debug_string_use_box_glyphs
+--
+WithExpr
+├─type=INT64
+├─assignment_list=
+│ └─x#1 := Literal(type=INT64, value=2)
+└─expr=
+  └─FunctionCall(GoogleSQL:$multiply(INT64, INT64) -> INT64)
+    ├─ColumnRef(type=INT64, column=$with_expr.x#1)
+    └─ColumnRef(type=INT64, column=$with_expr.x#1)
+
+[REWRITTEN AST]
+SubqueryExpr
+├─type=INT64
+├─subquery_type=SCALAR
+└─subquery=
+  ├──SingleRowScan
+  |> ProjectScan
+  ·  ├─column_list=[$with_expr.x#1]
+  ·  └─expr_list=
+  ·    └─x#1 := Literal(type=INT64, value=2)
+  |> ProjectScan
+     ├─column_list=[$with_expr.injected#2]
+     └─expr_list=
+       └─injected#2 :=
+         └─FunctionCall(GoogleSQL:$multiply(INT64, INT64) -> INT64)
+           ├─ColumnRef(type=INT64, column=$with_expr.x#1)
+           └─ColumnRef(type=INT64, column=$with_expr.x#1)

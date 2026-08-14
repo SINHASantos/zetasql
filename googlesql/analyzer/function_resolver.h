@@ -36,7 +36,9 @@
 #include "googlesql/public/id_string.h"
 #include "googlesql/public/input_argument_type.h"
 #include "googlesql/public/options.pb.h"
+#include "googlesql/public/parse_resume_location.h"
 #include "googlesql/public/signature_match_result.h"
+#include "googlesql/public/sql_function.h"
 #include "googlesql/public/templated_sql_function.h"
 #include "googlesql/public/type.h"
 #include "googlesql/public/types/annotation.h"
@@ -67,13 +69,22 @@ class FunctionResolver {
   FunctionResolver(const FunctionResolver&) = delete;
   FunctionResolver& operator=(const FunctionResolver&) = delete;
 
+  // Specifies whether a function call must support a specific SQL
+  // clause (such as OVER or WITHIN).
+  enum class ClauseRequirement {
+    kNone = 0,
+    kOver = 1,
+    kWithin = 2,
+  };
+
   // Resolves the function call given the `function`, `arguments` expressions,
   // `expected_result_type` and creates a ResolvedFunctionCall.  No special
   // handling is done for aggregate functions - they are resolved exactly like
   // scalar functions.
   // `match_internal_signatures` indicates whether attempts to match an internal
   // signature will be made.
-  // `is_analytic` indicates whether an OVER clause follows this function call.
+  // `clause_requirement` specifies whether the function must support
+  // a specific SQL clause (such as OVER or WITHIN).
   // Lambda arguments should have a nullptr placeholder in `arguments` and are
   // resolved during signature matching.
   // * Takes ownership of the ResolvedExprs in `arguments`.
@@ -90,7 +101,8 @@ class FunctionResolver {
       const ASTNode* ast_location,
       const std::vector<const ASTNode*>& arg_locations,
       bool match_internal_signatures, const Function* function,
-      ResolvedFunctionCallBase::ErrorMode error_mode, bool is_analytic,
+      ResolvedFunctionCallBase::ErrorMode error_mode,
+      ClauseRequirement clause_requirement,
       std::vector<std::unique_ptr<const ResolvedExpr>> arguments,
       std::vector<NamedArgumentInfo> named_arguments,
       const Type* expected_result_type, const NameScope* name_scope,
@@ -103,7 +115,7 @@ class FunctionResolver {
       const ASTNode* ast_location,
       const std::vector<const ASTNode*>& arg_locations,
       bool match_internal_signatures, absl::string_view function_name,
-      bool is_analytic,
+      ClauseRequirement clause_requirement,
       std::vector<std::unique_ptr<const ResolvedExpr>> arguments,
       std::vector<NamedArgumentInfo> named_arguments,
       const Type* expected_result_type,
@@ -112,7 +124,8 @@ class FunctionResolver {
       const ASTNode* ast_location,
       const std::vector<const ASTNode*>& arg_locations,
       bool match_internal_signatures,
-      absl::Span<const std::string> function_name_path, bool is_analytic,
+      absl::Span<const std::string> function_name_path,
+      ClauseRequirement clause_requirement,
       std::vector<std::unique_ptr<const ResolvedExpr>> arguments,
       std::vector<NamedArgumentInfo> named_arguments,
       const Type* expected_result_type,
@@ -143,12 +156,22 @@ class FunctionResolver {
       const FunctionSignature& concrete_signature,
       std::shared_ptr<ResolvedFunctionCallInfo>* function_call_info_out);
 
+  // Re-resolves a SQL function call whose arguments have annotations.
+  absl::Status ReResolveAnnotatedSQLFunctionCall(
+      const ASTNode* ast_location, const SQLFunction& function,
+      const AnalyzerOptions& analyzer_options,
+      absl::Span<const InputArgumentType> actual_arguments,
+      absl::Span<const std::unique_ptr<const ResolvedExpr>> argument_list,
+      const FunctionSignature& concrete_signature,
+      std::shared_ptr<ResolvedFunctionCallInfo>* function_call_info_out);
+
   // This is a helper method when parsing or analyzing the function's SQL
   // expression.  If 'status' is OK, also returns OK. Otherwise, returns a
   // new error forwarding any nested errors in 'status' obtained from the
   // nested parsing or analysis.
   static absl::Status ForwardNestedResolutionAnalysisError(
-      const TemplatedSQLFunction& function, const absl::Status& status,
+      const Function& function, const absl::Status& status,
+      const ParseResumeLocation& parse_resume_location,
       ErrorMessageOptions options);
 
   // Adjusts the type modifiers from the source type to the target type for a
@@ -492,6 +515,32 @@ class FunctionResolver {
       const absl::flat_hash_map<const ResolvedInlineLambda*, const ASTLambda*>&
           lambda_ast_nodes,
       ResolvedFunctionCall* resolved_expr_out) const;
+
+  // Shared implementation to resolve a SQL function call given the resolved
+  // arguments. The function may be templated or not. Non-templated functions
+  // still require re-resolution when their arguments are annotated.
+  absl::Status ResolveTemplatedOrAnnotatedSQLFunctionCall(
+      const ASTNode* ast_location, const Function& function,
+      absl::Span<const std::string> argument_names,
+      const ParseResumeLocation& parse_resume_location,
+      Catalog* resolution_catalog, const AnalyzerOptions& analyzer_options,
+      absl::Span<const InputArgumentType> actual_arguments,
+      absl::Span<const std::unique_ptr<const ResolvedExpr>> argument_list,
+      const FunctionSignature& concrete_signature,
+      std::shared_ptr<ResolvedFunctionCallInfo>* function_call_info_out);
+
+  // IMPORTANT: Do not call this method directly. Instead, call
+  // ResolveTemplatedOrAnnotatedSQLFunctionCall(), which also handles wrapping
+  // the status and error locations.
+  absl::Status ResolveTemplatedOrAnnotatedSQLFunctionCallInternal(
+      const ASTNode* ast_location, const Function& function,
+      absl::Span<const std::string> argument_names,
+      const ParseResumeLocation& parse_resume_location,
+      Catalog* resolution_catalog, const AnalyzerOptions& analyzer_options,
+      absl::Span<const InputArgumentType> actual_arguments,
+      absl::Span<const std::unique_ptr<const ResolvedExpr>> argument_list,
+      const FunctionSignature& concrete_signature,
+      std::shared_ptr<ResolvedFunctionCallInfo>* function_call_info_out);
 
   friend class FunctionResolverTest;
 };

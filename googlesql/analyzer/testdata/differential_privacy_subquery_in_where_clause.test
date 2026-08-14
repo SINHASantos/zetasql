@@ -38,6 +38,7 @@ QueryStmt
             +-AggregateFunctionCall(GoogleSQL:$differential_privacy_count_star(optional(1) STRUCT<INT64, INT64> contribution_bounds_per_group) -> INT64)
               +-parse_location=33-38
               +-Literal(type=STRUCT<INT64, INT64>, value=NULL)
+
 [REPLACED_LITERALS]
 SELECT WITH DIFFERENTIAL_PRIVACY COUNT(*) as aggregation_count
 FROM SimpleTypesWithAnonymizationUid
@@ -86,12 +87,13 @@ QueryStmt
         |           +-expr_list=
         |           | +-uid#24 := ColumnRef(parse_location=120-123, type=INT64, column=SimpleTypesWithAnonymizationUid.uid#11, is_correlated=TRUE)
         |           +-input_scan=
-        |             +-TVFScan(parse_location=129-163, tvf=tvf_no_args_with_anonymization_uid(() -> TABLE<column_bool BOOL, column_bytes BYTES, column_date DATE, column_double DOUBLE, column_float FLOAT, column_int32 INT32, column_int64 INT64, column_string STRING, column_time TIME, column_uint32 UINT32, column_uint64 UINT64>), signature=() -> TABLE<column_bool BOOL, column_bytes BYTES, column_date DATE, column_double DOUBLE, column_float FLOAT, column_int32 INT32, column_int64 INT64, column_string STRING, column_time TIME, column_uint32 UINT32, column_uint64 UINT64>, function_call_signature=() -> TABLE<column_bool BOOL, column_bytes BYTES, column_date DATE, column_double DOUBLE, column_float FLOAT, column_int32 INT32, column_int64 INT64, column_string STRING, column_time TIME, column_uint32 UINT32, column_uint64 UINT64>)
+        |             +-TVFScan(parse_location=129-163, tvf=tvf_no_args_with_anonymization_uid, signature=() -> TABLE<column_bool BOOL, column_bytes BYTES, column_date DATE, column_double DOUBLE, column_float FLOAT, column_int32 INT32, column_int64 INT64, column_string STRING, column_time TIME, column_uint32 UINT32, column_uint64 UINT64>, function_call_signature=() -> TABLE<column_bool BOOL, column_bytes BYTES, column_date DATE, column_double DOUBLE, column_float FLOAT, column_int32 INT32, column_int64 INT64, column_string STRING, column_time TIME, column_uint32 UINT32, column_uint64 UINT64>)
         +-aggregate_list=
           +-aggregation_count#25 :=
             +-AggregateFunctionCall(GoogleSQL:$differential_privacy_count_star(optional(1) STRUCT<INT64, INT64> contribution_bounds_per_group) -> INT64)
               +-parse_location=33-38
               +-Literal(type=STRUCT<INT64, INT64>, value=NULL)
+
 [REPLACED_LITERALS]
 SELECT WITH DIFFERENTIAL_PRIVACY COUNT(*) as aggregation_count
 FROM SimpleTypesWithAnonymizationUid
@@ -137,12 +139,13 @@ QueryStmt
                   +-DifferentialPrivacyAggregateScan
                     +-column_list=[$aggregate.$agg1#31]
                     +-input_scan=
-                    | +-TVFScan(parse_location=99-133, tvf=tvf_no_args_with_anonymization_uid(() -> TABLE<column_bool BOOL, column_bytes BYTES, column_date DATE, column_double DOUBLE, column_float FLOAT, column_int32 INT32, column_int64 INT64, column_string STRING, column_time TIME, column_uint32 UINT32, column_uint64 UINT64>), signature=() -> TABLE<column_bool BOOL, column_bytes BYTES, column_date DATE, column_double DOUBLE, column_float FLOAT, column_int32 INT32, column_int64 INT64, column_string STRING, column_time TIME, column_uint32 UINT32, column_uint64 UINT64>, function_call_signature=() -> TABLE<column_bool BOOL, column_bytes BYTES, column_date DATE, column_double DOUBLE, column_float FLOAT, column_int32 INT32, column_int64 INT64, column_string STRING, column_time TIME, column_uint32 UINT32, column_uint64 UINT64>)
+                    | +-TVFScan(parse_location=99-133, tvf=tvf_no_args_with_anonymization_uid, signature=() -> TABLE<column_bool BOOL, column_bytes BYTES, column_date DATE, column_double DOUBLE, column_float FLOAT, column_int32 INT32, column_int64 INT64, column_string STRING, column_time TIME, column_uint32 UINT32, column_uint64 UINT64>, function_call_signature=() -> TABLE<column_bool BOOL, column_bytes BYTES, column_date DATE, column_double DOUBLE, column_float FLOAT, column_int32 INT32, column_int64 INT64, column_string STRING, column_time TIME, column_uint32 UINT32, column_uint64 UINT64>)
                     +-aggregate_list=
                       +-$agg1#31 :=
                         +-AggregateFunctionCall(GoogleSQL:$differential_privacy_count_star(optional(1) STRUCT<INT64, INT64> contribution_bounds_per_group) -> INT64)
                           +-parse_location=72-77
                           +-Literal(type=STRUCT<INT64, INT64>, value=NULL)
+
 [REPLACED_LITERALS]
 SELECT @_p0_INT64
 FROM SimpleTypes
@@ -179,7 +182,7 @@ QueryStmt
                     | +-AggregateScan
                     |   +-column_list=[$aggregate.$agg1_partial#35, $group_by.$uid#36]
                     |   +-input_scan=
-                    |   | +-TVFScan(parse_location=99-133, column_list=[tvf_no_args_with_anonymization_uid.column_int64#33], tvf=tvf_no_args_with_anonymization_uid(() -> TABLE<column_bool BOOL, column_bytes BYTES, column_date DATE, column_double DOUBLE, column_float FLOAT, column_int32 INT32, column_int64 INT64, column_string STRING, column_time TIME, column_uint32 UINT32, column_uint64 UINT64>), signature=() -> TABLE<column_bool BOOL, column_bytes BYTES, column_date DATE, column_double DOUBLE, column_float FLOAT, column_int32 INT32, column_int64 INT64, column_string STRING, column_time TIME, column_uint32 UINT32, column_uint64 UINT64>, column_index_list=[6], function_call_signature=() -> TABLE<column_bool BOOL, column_bytes BYTES, column_date DATE, column_double DOUBLE, column_float FLOAT, column_int32 INT32, column_int64 INT64, column_string STRING, column_time TIME, column_uint32 UINT32, column_uint64 UINT64>)
+                    |   | +-TVFScan(parse_location=99-133, column_list=[tvf_no_args_with_anonymization_uid.column_int64#33], tvf=tvf_no_args_with_anonymization_uid, signature=() -> TABLE<column_bool BOOL, column_bytes BYTES, column_date DATE, column_double DOUBLE, column_float FLOAT, column_int32 INT32, column_int64 INT64, column_string STRING, column_time TIME, column_uint32 UINT32, column_uint64 UINT64>, column_index_list=[6], function_call_signature=() -> TABLE<column_bool BOOL, column_bytes BYTES, column_date DATE, column_double DOUBLE, column_float FLOAT, column_int32 INT32, column_int64 INT64, column_string STRING, column_time TIME, column_uint32 UINT32, column_uint64 UINT64>)
                     |   +-group_by_list=
                     |   | +-$uid#36 := ColumnRef(type=INT64, column=tvf_no_args_with_anonymization_uid.column_int64#33)
                     |   +-aggregate_list=
@@ -232,6 +235,7 @@ QueryStmt
                 +-column_list=SimpleTypesWithAnonymizationUid.[int32#20, int64#21, uint32#22, uint64#23, string#24, bytes#25, bool#26, float#27, double#28, date#29, uid#30, numeric#31]
                 +-input_scan=
                   +-TableScan(parse_location=53-84, column_list=SimpleTypesWithAnonymizationUid.[int32#20, int64#21, uint32#22, uint64#23, string#24, bytes#25, bool#26, float#27, double#28, date#29, uid#30, numeric#31], table=SimpleTypesWithAnonymizationUid, column_index_list=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11])
+
 [REPLACED_LITERALS]
 SELECT @_p0_INT64
 FROM SimpleTypes
@@ -272,7 +276,8 @@ QueryStmt
                 +-parse_location=39-89
                 +-column_list=tvf_no_args_with_anonymization_uid.[column_bool#20, column_bytes#21, column_date#22, column_double#23, column_float#24, column_int32#25, column_int64#26, column_string#27, column_time#28, column_uint32#29, column_uint64#30]
                 +-input_scan=
-                  +-TVFScan(parse_location=53-87, column_list=tvf_no_args_with_anonymization_uid.[column_bool#20, column_bytes#21, column_date#22, column_double#23, column_float#24, column_int32#25, column_int64#26, column_string#27, column_time#28, column_uint32#29, column_uint64#30], tvf=tvf_no_args_with_anonymization_uid(() -> TABLE<column_bool BOOL, column_bytes BYTES, column_date DATE, column_double DOUBLE, column_float FLOAT, column_int32 INT32, column_int64 INT64, column_string STRING, column_time TIME, column_uint32 UINT32, column_uint64 UINT64>), signature=() -> TABLE<column_bool BOOL, column_bytes BYTES, column_date DATE, column_double DOUBLE, column_float FLOAT, column_int32 INT32, column_int64 INT64, column_string STRING, column_time TIME, column_uint32 UINT32, column_uint64 UINT64>, column_index_list=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10], function_call_signature=() -> TABLE<column_bool BOOL, column_bytes BYTES, column_date DATE, column_double DOUBLE, column_float FLOAT, column_int32 INT32, column_int64 INT64, column_string STRING, column_time TIME, column_uint32 UINT32, column_uint64 UINT64>)
+                  +-TVFScan(parse_location=53-87, column_list=tvf_no_args_with_anonymization_uid.[column_bool#20, column_bytes#21, column_date#22, column_double#23, column_float#24, column_int32#25, column_int64#26, column_string#27, column_time#28, column_uint32#29, column_uint64#30], tvf=tvf_no_args_with_anonymization_uid, signature=() -> TABLE<column_bool BOOL, column_bytes BYTES, column_date DATE, column_double DOUBLE, column_float FLOAT, column_int32 INT32, column_int64 INT64, column_string STRING, column_time TIME, column_uint32 UINT32, column_uint64 UINT64>, column_index_list=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10], function_call_signature=() -> TABLE<column_bool BOOL, column_bytes BYTES, column_date DATE, column_double DOUBLE, column_float FLOAT, column_int32 INT32, column_int64 INT64, column_string STRING, column_time TIME, column_uint32 UINT32, column_uint64 UINT64>)
+
 [REPLACED_LITERALS]
 SELECT @_p0_INT64
 FROM SimpleTypes
@@ -386,7 +391,7 @@ QueryStmt
         |         +-ProjectScan
         |           +-column_list=tvf_no_args.[column_bool#13, column_bytes#14]
         |           +-input_scan=
-        |             +-TVFScan(column_list=tvf_no_args.[column_bool#13, column_bytes#14], tvf=tvf_no_args(() -> TABLE<column_bool BOOL, column_bytes BYTES>), signature=() -> TABLE<column_bool BOOL, column_bytes BYTES>, column_index_list=[0, 1], function_call_signature=() -> TABLE<column_bool BOOL, column_bytes BYTES>)
+        |             +-TVFScan(column_list=tvf_no_args.[column_bool#13, column_bytes#14], tvf=tvf_no_args, signature=() -> TABLE<column_bool BOOL, column_bytes BYTES>, column_index_list=[0, 1], function_call_signature=() -> TABLE<column_bool BOOL, column_bytes BYTES>)
         +-aggregate_list=
           +-aggregation_count#15 :=
             +-AggregateFunctionCall(GoogleSQL:$differential_privacy_count_star(optional(1) STRUCT<INT64, INT64> contribution_bounds_per_group) -> INT64)
@@ -418,7 +423,7 @@ QueryStmt
         |   |         +-ProjectScan
         |   |           +-column_list=tvf_no_args.[column_bool#13, column_bytes#14]
         |   |           +-input_scan=
-        |   |             +-TVFScan(column_list=tvf_no_args.[column_bool#13, column_bytes#14], tvf=tvf_no_args(() -> TABLE<column_bool BOOL, column_bytes BYTES>), signature=() -> TABLE<column_bool BOOL, column_bytes BYTES>, column_index_list=[0, 1], function_call_signature=() -> TABLE<column_bool BOOL, column_bytes BYTES>)
+        |   |             +-TVFScan(column_list=tvf_no_args.[column_bool#13, column_bytes#14], tvf=tvf_no_args, signature=() -> TABLE<column_bool BOOL, column_bytes BYTES>, column_index_list=[0, 1], function_call_signature=() -> TABLE<column_bool BOOL, column_bytes BYTES>)
         |   +-group_by_list=
         |   | +-$uid#19 := ColumnRef(type=INT64, column=SimpleTypesWithAnonymizationUid.uid#16)
         |   +-aggregate_list=
@@ -517,7 +522,6 @@ QueryStmt
         +-column_ref=
         | +-ColumnRef(type=INT64, column=$aggregate.weight#6)
         +-is_descending=TRUE
-
 
 [REWRITTEN AST]
 QueryStmt
@@ -648,6 +652,7 @@ QueryStmt
             +-AggregateFunctionCall(GoogleSQL:$differential_privacy_count_star(optional(1) STRUCT<INT64, INT64> contribution_bounds_per_group) -> INT64)
               +-parse_location=33-38
               +-Literal(type=STRUCT<INT64, INT64>, value=NULL)
+
 [REPLACED_LITERALS]
 SELECT WITH DIFFERENTIAL_PRIVACY COUNT(*) as aggregation_count
 FROM SimpleTypesWithAnonymizationUid
@@ -729,6 +734,7 @@ QueryStmt
             +-AggregateFunctionCall(GoogleSQL:$differential_privacy_count_star(optional(1) STRUCT<INT64, INT64> contribution_bounds_per_group) -> INT64)
               +-parse_location=33-38
               +-Literal(type=STRUCT<INT64, INT64>, value=NULL)
+
 [REPLACED_LITERALS]
 SELECT WITH DIFFERENTIAL_PRIVACY COUNT(*) as aggregation_count
 FROM SimpleTypesWithAnonymizationUid
@@ -799,6 +805,7 @@ QueryStmt
             +-AggregateFunctionCall(GoogleSQL:$differential_privacy_count_star(optional(1) STRUCT<INT64, INT64> contribution_bounds_per_group) -> INT64)
               +-parse_location=33-38
               +-Literal(type=STRUCT<INT64, INT64>, value=NULL)
+
 [REPLACED_LITERALS]
 SELECT WITH DIFFERENTIAL_PRIVACY COUNT(*) as aggregation_count
 FROM SimpleTypesWithAnonymizationUid
@@ -866,6 +873,7 @@ QueryStmt
             +-AggregateFunctionCall(GoogleSQL:$differential_privacy_count_star(optional(1) STRUCT<INT64, INT64> contribution_bounds_per_group) -> INT64)
               +-parse_location=33-38
               +-Literal(type=STRUCT<INT64, INT64>, value=NULL)
+
 [REPLACED_LITERALS]
 SELECT WITH DIFFERENTIAL_PRIVACY COUNT(*) as aggregation_count
 FROM SimpleTypesWithAnonymizationUid
@@ -992,6 +1000,7 @@ QueryStmt
             +-AggregateFunctionCall(GoogleSQL:$differential_privacy_count_star(optional(1) STRUCT<INT64, INT64> contribution_bounds_per_group) -> INT64)
               +-parse_location=33-38
               +-Literal(type=STRUCT<INT64, INT64>, value=NULL)
+
 [REPLACED_LITERALS]
 SELECT WITH DIFFERENTIAL_PRIVACY COUNT(*) as aggregation_count
 FROM SimpleTypesWithAnonymizationUid
@@ -1048,6 +1057,7 @@ QueryStmt
                           +-parse_location=82-85
                           +-ColumnRef(parse_location=86-91, type=INT64, column=SimpleTypesWithAnonymizationUid.int64#21)
                           +-Literal(type=STRUCT<INT64, INT64>, value=NULL)
+
 [REPLACED_LITERALS]
 SELECT int64
 FROM SimpleTypes
@@ -1155,6 +1165,7 @@ QueryStmt
             +-AggregateFunctionCall(GoogleSQL:$differential_privacy_count_star(optional(1) STRUCT<INT64, INT64> contribution_bounds_per_group) -> INT64)
               +-parse_location=33-38
               +-Literal(type=STRUCT<INT64, INT64>, value=NULL)
+
 [REPLACED_LITERALS]
 SELECT WITH DIFFERENTIAL_PRIVACY COUNT(*) as aggregation_count
 FROM ArrayWithAnonymizationUid
@@ -1234,6 +1245,7 @@ QueryStmt
             +-AggregateFunctionCall(GoogleSQL:$differential_privacy_count_star(optional(1) STRUCT<INT64, INT64> contribution_bounds_per_group) -> INT64)
               +-parse_location=33-38
               +-Literal(type=STRUCT<INT64, INT64>, value=NULL)
+
 [REPLACED_LITERALS]
 SELECT WITH DIFFERENTIAL_PRIVACY COUNT(*) as aggregation_count
 FROM ArrayWithAnonymizationUid

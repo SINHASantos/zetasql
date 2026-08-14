@@ -16,12 +16,14 @@
 
 #include "googlesql/analyzer/rewriters/hop_function_rewriter.h"
 
+#include <cstddef>
 #include <memory>
 #include <string>
 #include <utility>
 #include <vector>
 
 #include "googlesql/analyzer/substitute.h"
+#include "googlesql/common/errors.h"
 #include "googlesql/public/analyzer_options.h"
 #include "googlesql/public/analyzer_output_properties.h"
 #include "googlesql/public/builtin_function.pb.h"
@@ -30,12 +32,14 @@
 #include "googlesql/public/options.pb.h"
 #include "googlesql/public/rewriter_interface.h"
 #include "googlesql/public/table_valued_function.h"
+#include "googlesql/public/time_series_tvf_util.h"
 #include "googlesql/public/types/type.h"
 #include "googlesql/public/types/type_factory.h"
 #include "googlesql/public/value.h"
 #include "googlesql/resolved_ast/column_factory.h"
 #include "googlesql/resolved_ast/resolved_ast.h"
-#include "googlesql/resolved_ast/resolved_ast_deep_copy_visitor.h"
+#include "googlesql/resolved_ast/resolved_ast_builder.h"
+#include "googlesql/resolved_ast/resolved_ast_rewrite_visitor.h"
 #include "googlesql/resolved_ast/resolved_column.h"
 #include "googlesql/resolved_ast/resolved_node.h"
 #include "googlesql/resolved_ast/rewrite_utils.h"
@@ -50,94 +54,98 @@ namespace googlesql {
 namespace {
 
 struct HopFunctionArguments {
-  const ResolvedTVFScan* original_node = nullptr;
-  std::unique_ptr<ResolvedScan> input_relation;
-  const ResolvedColumn* timestamp_column = nullptr;
-  const ResolvedExpr* window_size_expr = nullptr;
-  const ResolvedExpr* step_size_expr = nullptr;
-  const ResolvedExpr* origin_expr = nullptr;
+  std::vector<ResolvedColumn> tvf_column_list;
+  std::vector<int> column_index_list;
+  std::vector<ResolvedColumn> argument_column_list;
+  std::unique_ptr<const ResolvedScan> input_relation;
+  ResolvedTimestampColumnPath timestamp_column;
+  std::unique_ptr<const ResolvedExpr> window_size_expr;
+  std::unique_ptr<const ResolvedExpr> step_size_expr;
+  std::unique_ptr<const ResolvedExpr> origin_expr;
 };
 
-// TODO: Migrate from ResolvedASTDeepCopyVisitor to
-// ResolvedASTRewriteVisitor.
-class HopRewriteVisitor : public ResolvedASTDeepCopyVisitor {
+class HopRewriteVisitor : public ResolvedASTRewriteVisitor {
  public:
   HopRewriteVisitor(const AnalyzerOptions& analyzer_options, Catalog& catalog,
-                    TypeFactory& type_factory, ColumnFactory& column_factory)
+                    TypeFactory& type_factory, ColumnFactory& column_factory,
+                    CteQueryNameGenerator& cte_name_generator)
       : analyzer_options_(analyzer_options),
         catalog_(catalog),
         type_factory_(type_factory),
         column_factory_(column_factory),
+        cte_name_generator_(cte_name_generator),
         fn_builder_(analyzer_options, catalog, type_factory),
         product_mode_(analyzer_options.language().product_mode()) {}
 
  private:
-  absl::Status VisitResolvedTVFScan(const ResolvedTVFScan* node) override {
+  absl::StatusOr<std::unique_ptr<const ResolvedNode>> PostVisitResolvedTVFScan(
+      std::unique_ptr<const ResolvedTVFScan> node) override {
     if (node->tvf()->IsGoogleSQLBuiltin() &&
         node->function_call_signature() != nullptr &&
         node->function_call_signature()->context_id() == googlesql::FN_HOP) {
-      return RewriteHop(node);
+      return RewriteHop(std::move(node));
     }
-    return ResolvedASTDeepCopyVisitor::VisitResolvedTVFScan(node);
+    return std::move(node);
   }
 
   // ==========================================================================
   // HOP HELPERS
   // ==========================================================================
 
-  absl::Status RewriteHop(const ResolvedTVFScan* node) {
-    // Step 1: Validate that it's the specific function we're looking for.
+  absl::StatusOr<std::unique_ptr<const ResolvedNode>> RewriteHop(
+      std::unique_ptr<const ResolvedTVFScan> node) {
+    // Step 1: Validate input.
     GOOGLESQL_RETURN_IF_ERROR(
-        ValidateTvfIsBuiltinAndSignatureMatches(node, "HOP", FN_HOP));
+        ValidateTvfIsBuiltinAndSignatureMatches(node.get(), "HOP", FN_HOP));
 
     // Step 2: Extract and validate arguments.
-    GOOGLESQL_ASSIGN_OR_RETURN(auto args, ExtractHopArguments(node));
+    GOOGLESQL_ASSIGN_OR_RETURN(auto args, ExtractHopArguments(std::move(node)));
 
     // Step 3: Build the parameters CTE.
-    GOOGLESQL_ASSIGN_OR_RETURN(
-        auto params_cte,
-        BuildHopParametersCTE(args->window_size_expr, args->step_size_expr,
-                              args->origin_expr));
+    GOOGLESQL_ASSIGN_OR_RETURN(auto params_cte,
+                     BuildHopParametersCTE(std::move(args->window_size_expr),
+                                           std::move(args->step_size_expr),
+                                           std::move(args->origin_expr)));
 
     absl::string_view cte_name = params_cte->with_query_name();
     const ResolvedColumnList& cte_cols =
         params_cte->with_subquery()->column_list();
     // Step 4: Build the main query to project the final output.
-    GOOGLESQL_ASSIGN_OR_RETURN(std::unique_ptr<ResolvedScan> main_scan,
+    GOOGLESQL_ASSIGN_OR_RETURN(std::unique_ptr<const ResolvedScan> main_scan,
                      BuildHopFinalProjection(*args, cte_cols, cte_name,
                                              std::move(args->input_relation)));
 
-    GOOGLESQL_ASSIGN_OR_RETURN(auto final_plan,
-                     ResolvedWithScanBuilder()
-                         .set_column_list(node->column_list())
-                         .add_with_entry_list(std::move(params_cte))
-                         .set_query(std::move(main_scan))
-                         .set_recursive(false)
-                         .BuildMutable());
-
-    PushNodeToStack(std::move(final_plan));
-    return absl::OkStatus();
+    return ResolvedWithScanBuilder()
+        .set_column_list(args->tvf_column_list)
+        .add_with_entry_list(std::move(params_cte))
+        .set_query(std::move(main_scan))
+        .set_recursive(false)
+        .Build();
   }
 
   absl::StatusOr<std::unique_ptr<HopFunctionArguments>> ExtractHopArguments(
-      const ResolvedTVFScan* node) {
+      std::unique_ptr<const ResolvedTVFScan> node) {
+    constexpr int kInputRelationArgIndex = 0;
+    constexpr int kTimestampColArgIndex = 1;
+    constexpr int kWindowSizeArgIndex = 2;
+    constexpr int kStepSizeArgIndex = 3;
+    constexpr int kOriginArgIndex = 4;
+
     // The HOP signature handled by this rewriter requires exactly 5 arguments:
     // input table, timestamp column, window_size, step_size, and origin
     // (analyzer injects default origin if omitted).
     GOOGLESQL_RET_CHECK_EQ(node->argument_list_size(), 5);
 
-    auto args = std::make_unique<HopFunctionArguments>();
-    args->original_node = node;
-
     // Argument 0: Input relation.
-    const ResolvedTVFArgument* input_arg = node->argument_list(0);
+    const ResolvedTVFArgument* input_arg =
+        node->argument_list(kInputRelationArgIndex);
     GOOGLESQL_RET_CHECK(input_arg != nullptr);
-    GOOGLESQL_RET_CHECK(input_arg->scan() != nullptr);
-    GOOGLESQL_ASSIGN_OR_RETURN(args->input_relation,
-                     ProcessNode<ResolvedScan>(input_arg->scan()));
+    const ResolvedScan* input_scan = input_arg->scan();
+    GOOGLESQL_RET_CHECK(input_scan != nullptr);
 
     // Argument 1: Timestamp Column.
-    const ResolvedTVFArgument* ts_arg = node->argument_list(1);
+    const ResolvedTVFArgument* ts_arg =
+        node->argument_list(kTimestampColArgIndex);
     GOOGLESQL_RET_CHECK(ts_arg != nullptr);
     const ResolvedExpr* ts_col_expr = ts_arg->expr();
     GOOGLESQL_RET_CHECK(ts_col_expr != nullptr);
@@ -149,37 +157,70 @@ class HopRewriteVisitor : public ResolvedASTDeepCopyVisitor {
     GOOGLESQL_RET_CHECK(ts_col_val.type()->IsString());
     const std::string ts_col_name = ts_col_val.string_value();
 
-    // FindAndValidateTimestampColumnInScan performs user-facing SQL validation.
-    GOOGLESQL_ASSIGN_OR_RETURN(
-        args->timestamp_column,
-        FindAndValidateTimestampColumnInScan(
-            *ts_arg, ts_col_name, *args->input_relation, "HOP", product_mode_));
+    // Resolve and validate the timestamp column path.
+    const TVFRelation& input_relation =
+        node->signature()->argument(0).relation();
+    absl::StatusOr<ResolvedTimestampColumnPath> timestamp_column =
+        ResolveTimestampColumnPath(input_relation, ts_col_name, &type_factory_);
+    if (!timestamp_column.ok()) {
+      GOOGLESQL_RET_CHECK_EQ(timestamp_column.status().code(),
+                   absl::StatusCode::kInvalidArgument)
+          << timestamp_column.status();
+      return MakeSqlErrorAtStart(ts_arg->GetParseLocationRangeOrNULL())
+             << timestamp_column.status().message();
+    }
 
     // Argument 2: Window size.
-    const ResolvedTVFArgument* window_arg = node->argument_list(2);
+    const ResolvedTVFArgument* window_arg =
+        node->argument_list(kWindowSizeArgIndex);
     GOOGLESQL_RET_CHECK(window_arg != nullptr);
-    args->window_size_expr = window_arg->expr();
-    GOOGLESQL_RET_CHECK(args->window_size_expr != nullptr);
+    const ResolvedExpr* window_size_expr = window_arg->expr();
+    GOOGLESQL_RET_CHECK(window_size_expr != nullptr);
 
     // Argument 3: Step size.
-    const ResolvedTVFArgument* step_arg = node->argument_list(3);
+    const ResolvedTVFArgument* step_arg =
+        node->argument_list(kStepSizeArgIndex);
     GOOGLESQL_RET_CHECK(step_arg != nullptr);
-    args->step_size_expr = step_arg->expr();
-    GOOGLESQL_RET_CHECK(args->step_size_expr != nullptr);
+    const ResolvedExpr* step_size_expr = step_arg->expr();
+    GOOGLESQL_RET_CHECK(step_size_expr != nullptr);
 
     // Argument 4: Origin.
-    const ResolvedTVFArgument* origin_arg = node->argument_list(4);
+    const ResolvedTVFArgument* origin_arg =
+        node->argument_list(kOriginArgIndex);
     GOOGLESQL_RET_CHECK(origin_arg != nullptr);
-    args->origin_expr = origin_arg->expr();
-    GOOGLESQL_RET_CHECK(args->origin_expr != nullptr);
+    const ResolvedExpr* origin_expr = origin_arg->expr();
+    GOOGLESQL_RET_CHECK(origin_expr != nullptr);
 
     // Ensure arguments don't contain correlations to outer scopes. The rewriter
     // puts the argument expressions into a CTE, and GoogleSQL currently does
     // not support correlated references in a CTE. See b/244184304 and
     // (broken link).
     GOOGLESQL_RETURN_IF_ERROR(ValidateArgumentsDoNotContainCorrelation(
-        node, "HOP",
-        {args->window_size_expr, args->step_size_expr, args->origin_expr}));
+        node.get(), "HOP", {window_size_expr, step_size_expr, origin_expr}));
+
+    std::vector<ResolvedColumn> argument_column_list =
+        input_arg->argument_column_list();
+    std::vector<int> column_index_list = node->column_index_list();
+    ResolvedTVFScanBuilder builder = ToBuilder(std::move(node));
+    auto args = std::make_unique<HopFunctionArguments>();
+    args->tvf_column_list = builder.release_column_list();
+    args->column_index_list = std::move(column_index_list);
+    args->argument_column_list = std::move(argument_column_list);
+    args->timestamp_column = *std::move(timestamp_column);
+
+    std::vector<std::unique_ptr<const ResolvedTVFArgument>> argument_list =
+        builder.release_argument_list();
+    GOOGLESQL_RET_CHECK_EQ(argument_list.size(), 5);
+
+    args->input_relation =
+        ToBuilder(std::move(argument_list[kInputRelationArgIndex]))
+            .release_scan();
+    args->window_size_expr =
+        ToBuilder(std::move(argument_list[kWindowSizeArgIndex])).release_expr();
+    args->step_size_expr =
+        ToBuilder(std::move(argument_list[kStepSizeArgIndex])).release_expr();
+    args->origin_expr =
+        ToBuilder(std::move(argument_list[kOriginArgIndex])).release_expr();
 
     return args;
   }
@@ -223,9 +264,9 @@ class HopRewriteVisitor : public ResolvedASTDeepCopyVisitor {
   //
   // See (broken link) for more details.
   absl::StatusOr<std::unique_ptr<const ResolvedWithEntry>>
-  BuildHopParametersCTE(const ResolvedExpr* window_size_expr,
-                        const ResolvedExpr* step_size_expr,
-                        const ResolvedExpr* origin_expr) {
+  BuildHopParametersCTE(std::unique_ptr<const ResolvedExpr> window_size_expr,
+                        std::unique_ptr<const ResolvedExpr> step_size_expr,
+                        std::unique_ptr<const ResolvedExpr> origin_expr) {
     // -- Part 1: Construct the raw parameters:
     // SELECT
     //   <window_size_expr> AS window_size,
@@ -235,37 +276,35 @@ class HopRewriteVisitor : public ResolvedASTDeepCopyVisitor {
     std::vector<std::unique_ptr<const ResolvedComputedColumn>> compute_exprs;
     ResolvedColumnList compute_cols;
 
+    const Type* window_size_type = window_size_expr->type();
     ResolvedColumn raw_window_col = column_factory_.MakeCol(
-        "$precomputed_raw", "window_size", window_size_expr->type());
+        "$precomputed_raw", "window_size", window_size_type);
     compute_cols.push_back(raw_window_col);
-    GOOGLESQL_ASSIGN_OR_RETURN(auto window_expr_copy,
-                     ProcessNode<ResolvedExpr>(window_size_expr));
     compute_exprs.push_back(MakeResolvedComputedColumn(
-        raw_window_col, std::move(window_expr_copy)));
+        raw_window_col, std::move(window_size_expr)));
 
+    const Type* step_size_type = step_size_expr->type();
     ResolvedColumn raw_step_col = column_factory_.MakeCol(
-        "$precomputed_raw", "step_size", step_size_expr->type());
+        "$precomputed_raw", "step_size", step_size_type);
     compute_cols.push_back(raw_step_col);
-    GOOGLESQL_ASSIGN_OR_RETURN(auto step_expr_copy,
-                     ProcessNode<ResolvedExpr>(step_size_expr));
     compute_exprs.push_back(
-        MakeResolvedComputedColumn(raw_step_col, std::move(step_expr_copy)));
+        MakeResolvedComputedColumn(raw_step_col, std::move(step_size_expr)));
 
-    ResolvedColumn raw_origin_col = column_factory_.MakeCol(
-        "$precomputed_raw", "origin", origin_expr->type());
+    const Type* origin_type = origin_expr->type();
+    ResolvedColumn raw_origin_col =
+        column_factory_.MakeCol("$precomputed_raw", "origin", origin_type);
     compute_cols.push_back(raw_origin_col);
-    GOOGLESQL_ASSIGN_OR_RETURN(auto origin_expr_copy,
-                     ProcessNode<ResolvedExpr>(origin_expr));
-    compute_exprs.push_back(MakeResolvedComputedColumn(
-        raw_origin_col, std::move(origin_expr_copy)));
+    compute_exprs.push_back(
+        MakeResolvedComputedColumn(raw_origin_col, std::move(origin_expr)));
 
     // -- Part 2: Validate arguments and project final output.
+    std::string cte_name = cte_name_generator_.MakeUniqueCteName("_hop_params");
     std::vector<std::unique_ptr<const ResolvedComputedColumn>> final_exprs;
     ResolvedColumnList final_cols;
 
     // window_size (Validation).
-    ResolvedColumn hop_window_col = column_factory_.MakeCol(
-        "$hop_params", "window_size", raw_window_col.type());
+    ResolvedColumn hop_window_col =
+        column_factory_.MakeCol(cte_name, "window_size", raw_window_col.type());
     final_cols.push_back(hop_window_col);
     {
       auto raw_ws_ref =
@@ -285,8 +324,8 @@ class HopRewriteVisitor : public ResolvedASTDeepCopyVisitor {
     }
 
     // step_size (Validation chain).
-    ResolvedColumn hop_step_col = column_factory_.MakeCol(
-        "$hop_params", "step_size", raw_step_col.type());
+    ResolvedColumn hop_step_col =
+        column_factory_.MakeCol(cte_name, "step_size", raw_step_col.type());
     final_cols.push_back(hop_step_col);
     {
       auto raw_ss_ref =
@@ -315,8 +354,8 @@ class HopRewriteVisitor : public ResolvedASTDeepCopyVisitor {
     }
 
     // Calculate step_nanos unconditionally.
-    ResolvedColumn hop_step_nanos_col = column_factory_.MakeCol(
-        "$hop_params", "step_nanos", types::Int64Type());
+    ResolvedColumn hop_step_nanos_col =
+        column_factory_.MakeCol(cte_name, "step_nanos", types::Int64Type());
     final_cols.push_back(hop_step_nanos_col);
     {
       auto step_col_ref_for_nanos =
@@ -330,7 +369,7 @@ class HopRewriteVisitor : public ResolvedASTDeepCopyVisitor {
 
     // origin (Validation).
     ResolvedColumn hop_origin_col =
-        column_factory_.MakeCol("$hop_params", "origin", raw_origin_col.type());
+        column_factory_.MakeCol(cte_name, "origin", raw_origin_col.type());
     final_cols.push_back(hop_origin_col);
     {
       auto raw_origin_ref =
@@ -350,10 +389,7 @@ class HopRewriteVisitor : public ResolvedASTDeepCopyVisitor {
     }
 
     return ResolvedWithEntryBuilder()
-        // TODO: b/535152130 - The injected CTE name "_hop_params" can collide
-        // with user-defined CTEs. CTE names in a ResolvedAST must be globally
-        // unique.
-        .set_with_query_name("_hop_params")
+        .set_with_query_name(cte_name)
         .set_with_subquery(
             ResolvedProjectScanBuilder()
                 .set_column_list(final_cols)
@@ -412,10 +448,10 @@ class HopRewriteVisitor : public ResolvedASTDeepCopyVisitor {
   // single-row _hop_params CTE values as scalar expressions without
   // having to join the CTE.
   // See (broken link) for more details.
-  absl::StatusOr<std::unique_ptr<ResolvedScan>> BuildHopFinalProjection(
+  absl::StatusOr<std::unique_ptr<const ResolvedScan>> BuildHopFinalProjection(
       const HopFunctionArguments& args, const ResolvedColumnList& cte_cols,
       absl::string_view cte_name,
-      std::unique_ptr<ResolvedScan> input_relation) {
+      std::unique_ptr<const ResolvedScan> input_relation) {
     auto get_window_interval_expr = [&]() {
       return CreateCteColumnSubquery(column_factory_, cte_name, cte_cols, 0);
     };
@@ -440,8 +476,12 @@ class HopRewriteVisitor : public ResolvedASTDeepCopyVisitor {
     // )
     auto make_start_gen_array_expr =
         [&]() -> absl::StatusOr<std::unique_ptr<const ResolvedExpr>> {
-      auto ts_col_ref = MakeResolvedColumnRef(args.timestamp_column->type(),
-                                              *args.timestamp_column, false);
+      GOOGLESQL_ASSIGN_OR_RETURN(
+          auto ts_col_ref,
+          BuildTimestampColumnExpression(
+              args.timestamp_column,
+              args.argument_column_list[args.timestamp_column.column_index],
+              fn_builder_));
       GOOGLESQL_ASSIGN_OR_RETURN(auto window_interval_expr, get_window_interval_expr());
       GOOGLESQL_ASSIGN_OR_RETURN(auto ts_minus_window,
                        fn_builder_.Subtract(std::move(ts_col_ref),
@@ -468,8 +508,12 @@ class HopRewriteVisitor : public ResolvedASTDeepCopyVisitor {
     // )
     auto make_end_gen_array_expr =
         [&]() -> absl::StatusOr<std::unique_ptr<const ResolvedExpr>> {
-      auto ts_col_ref = MakeResolvedColumnRef(args.timestamp_column->type(),
-                                              *args.timestamp_column, false);
+      GOOGLESQL_ASSIGN_OR_RETURN(
+          auto ts_col_ref,
+          BuildTimestampColumnExpression(
+              args.timestamp_column,
+              args.argument_column_list[args.timestamp_column.column_index],
+              fn_builder_));
       std::vector<std::unique_ptr<const ResolvedExpr>> bucket_args;
       bucket_args.push_back(std::move(ts_col_ref));
       GOOGLESQL_ASSIGN_OR_RETURN(auto step_interval_expr, get_step_interval_expr());
@@ -515,53 +559,59 @@ class HopRewriteVisitor : public ResolvedASTDeepCopyVisitor {
         /*array_offset_column=*/nullptr, /*join_expr=*/nullptr,
         /*is_outer=*/true);
 
-    const ResolvedColumnList& output_column_list =
-        args.original_node->column_list();
+    const ResolvedColumnList& output_column_list = args.tvf_column_list;
     std::vector<std::unique_ptr<const ResolvedComputedColumn>> output_expr_list;
+    const std::vector<ResolvedColumn>& argument_column_list =
+        args.argument_column_list;
+    const size_t num_input_columns = argument_column_list.size();
 
-    // 1. Copy all input columns, excluding any existing "window_start" or
-    // "window_end" because HOP overwrites them. HOP adds its computed
-    // WINDOW_START and WINDOW_END at the end of the output_column_list.
-    // TODO: b/525546845 - Delete this logic. Matching on ResolvedColumn::name()
-    // is fragile as it is primarily an alias/hint. This filtering will become
-    // obsolete once HOP is implemented as a passthrough TVF (where columns
-    // are not dropped).
-    int out_index = 0;
-    for (int i = 0; i < input_columns.size(); ++i) {
-      if (googlesql_base::CaseEqual(input_columns[i].name(), "WINDOW_START") ||
-          googlesql_base::CaseEqual(input_columns[i].name(), "WINDOW_END")) {
-        continue;
+    GOOGLESQL_RET_CHECK_EQ(output_column_list.size(), args.column_index_list.size());
+
+    // Map each output column by looking up its index in the TVF's
+    // argument_column_list. Since we are looping over output_column_list,
+    // columns pruned due to column pruning (i.e., not referenced in the
+    // query) are already excluded from the output_column_list and will be
+    // excluded from the rewritten output.
+    // Indices greater than num_input_columns correspond to new columns created
+    // by the TVF - WINDOW_START and WINDOW_END.
+    for (int i = 0; i < output_column_list.size(); ++i) {
+      const int idx = args.column_index_list[i];
+      if (idx < num_input_columns) {
+        // Passing input columns through to the output.
+        const ResolvedColumn& input_col = argument_column_list[idx];
+        output_expr_list.push_back(MakeResolvedComputedColumn(
+            output_column_list[i],
+            MakeResolvedColumnRef(input_col.type(), input_col,
+                                  /*is_correlated=*/false)));
+      } else if (idx == num_input_columns) {
+        // WINDOW_START column.
+        const ResolvedColumn& final_ws_col = output_column_list[i];
+        GOOGLESQL_RET_CHECK(googlesql_base::CaseEqual(final_ws_col.name(), "WINDOW_START"));
+        output_expr_list.push_back(MakeResolvedComputedColumn(
+            final_ws_col, MakeResolvedColumnRef(window_start_col.type(),
+                                                window_start_col, false)));
+      } else if (idx == num_input_columns + 1) {
+        // WINDOW_END column.
+        const ResolvedColumn& final_we_col = output_column_list[i];
+        GOOGLESQL_RET_CHECK(googlesql_base::CaseEqual(final_we_col.name(), "WINDOW_END"));
+        auto window_start_ref = MakeResolvedColumnRef(window_start_col.type(),
+                                                      window_start_col, false);
+        GOOGLESQL_ASSIGN_OR_RETURN(auto window_interval_expr, get_window_interval_expr());
+        GOOGLESQL_ASSIGN_OR_RETURN(auto window_end_expr,
+                         fn_builder_.Add(std::move(window_start_ref),
+                                         std::move(window_interval_expr)));
+        output_expr_list.push_back(MakeResolvedComputedColumn(
+            final_we_col, std::move(window_end_expr)));
+      } else {
+        GOOGLESQL_RET_CHECK_FAIL() << "Invalid column index: " << idx;
       }
-      output_expr_list.push_back(MakeResolvedComputedColumn(
-          output_column_list[out_index++],
-          MakeResolvedColumnRef(input_columns[i].type(), input_columns[i],
-                                false)));
     }
 
-    // 2. Compute the inserted time window columns (appended at the end).
-    const ResolvedColumn& final_ws_col = output_column_list[out_index++];
-    GOOGLESQL_RET_CHECK(googlesql_base::CaseEqual(final_ws_col.name(), "WINDOW_START"));
-    output_expr_list.push_back(MakeResolvedComputedColumn(
-        final_ws_col, MakeResolvedColumnRef(window_start_col.type(),
-                                            window_start_col, false)));
-
-    const ResolvedColumn& final_we_col = output_column_list[out_index++];
-    GOOGLESQL_RET_CHECK(googlesql_base::CaseEqual(final_we_col.name(), "WINDOW_END"));
-    auto window_start_ref =
-        MakeResolvedColumnRef(window_start_col.type(), window_start_col, false);
-    GOOGLESQL_ASSIGN_OR_RETURN(auto window_interval_expr, get_window_interval_expr());
-    GOOGLESQL_ASSIGN_OR_RETURN(auto window_end_expr,
-                     fn_builder_.Add(std::move(window_start_ref),
-                                     std::move(window_interval_expr)));
-    output_expr_list.push_back(
-        MakeResolvedComputedColumn(final_we_col, std::move(window_end_expr)));
-
-    GOOGLESQL_RET_CHECK_EQ(out_index, output_column_list.size());
     return ResolvedProjectScanBuilder()
         .set_column_list(output_column_list)
         .set_expr_list(std::move(output_expr_list))
         .set_input_scan(std::move(array_scan))
-        .BuildMutable();
+        .Build();
   }
 
   // ==========================================================================
@@ -572,6 +622,7 @@ class HopRewriteVisitor : public ResolvedASTDeepCopyVisitor {
   Catalog& catalog_;
   TypeFactory& type_factory_;
   ColumnFactory& column_factory_;
+  CteQueryNameGenerator& cte_name_generator_;
   FunctionCallBuilder fn_builder_;
   ProductMode product_mode_;
 };
@@ -581,7 +632,7 @@ class HopRewriteVisitor : public ResolvedASTDeepCopyVisitor {
 class HopFunctionRewriter : public Rewriter {
  public:
   absl::StatusOr<std::unique_ptr<const ResolvedNode>> Rewrite(
-      const AnalyzerOptions& options, const ResolvedNode& input,
+      const AnalyzerOptions& options, std::unique_ptr<const ResolvedNode> input,
       Catalog& catalog, TypeFactory& type_factory,
       AnalyzerOutputProperties& output_properties) const override {
     GOOGLESQL_RET_CHECK(options.id_string_pool() != nullptr);
@@ -589,9 +640,14 @@ class HopFunctionRewriter : public Rewriter {
     ColumnFactory column_factory(0, options.id_string_pool().get(),
                                  options.column_id_sequence_number());
 
-    HopRewriteVisitor rewriter(options, catalog, type_factory, column_factory);
-    GOOGLESQL_RETURN_IF_ERROR(input.Accept(&rewriter));
-    return rewriter.ConsumeRootNode<ResolvedNode>();
+    CteQueryNameGenerator cte_name_generator;
+    if (input != nullptr) {
+      GOOGLESQL_RETURN_IF_ERROR(input->Accept(&cte_name_generator));
+    }
+
+    HopRewriteVisitor rewriter(options, catalog, type_factory, column_factory,
+                               cte_name_generator);
+    return rewriter.VisitAll(std::move(input));
   }
 
   std::string Name() const override { return "HopFunctionRewriter"; }

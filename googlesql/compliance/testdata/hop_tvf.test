@@ -1,3 +1,6 @@
+[load_proto_files=googlesql/testdata/test_hop_tumble.proto]
+[load_proto_names=googlesql_test.TestHopAndTumblePB, google.protobuf.Timestamp]
+
 [prepare_database]
 CREATE TABLE TableWithTimestampColumn AS (
   SELECT TIMESTAMP '2025-01-01 00:00:00' AS ts_col
@@ -14,6 +17,71 @@ ARRAY<STRUCT<ts_col TIMESTAMP>>[
   {2025-01-02 08:00:00+00},
   {2025-01-03 08:00:00+00},
   {2025-01-04 08:00:00+00}
+]
+==
+[prepare_database]
+CREATE TABLE TableWithStructAndProto AS (
+  SELECT
+    1 AS key,
+    STRUCT(
+      1 AS ambiguous_field,
+      'abc' AS other_field,
+      NEW googlesql_test.TestHopAndTumblePB(
+        100 AS int32_val,
+        TO_PROTO(TIMESTAMP '2025-01-01 00:00:00 UTC') AS timestamp_val,
+        TIMESTAMP '2025-01-01 00:00:00 UTC' AS annotated_timestamp_val
+      ) AS proto_field
+    ) AS StructWithProto,
+    NEW googlesql_test.TestHopAndTumblePB(
+      200 AS int32_val,
+      TO_PROTO(TIMESTAMP '2025-01-01 00:00:00 UTC') AS timestamp_val,
+      TIMESTAMP '2025-01-01 00:00:00 UTC' AS annotated_timestamp_val
+    ) AS ProtoColumn
+);
+--
+ARRAY<STRUCT<
+        key INT64,
+        StructWithProto STRUCT<
+               ambiguous_field INT64,
+               other_field STRING,
+               proto_field PROTO<googlesql_test.TestHopAndTumblePB>
+             >,
+        ProtoColumn PROTO<googlesql_test.TestHopAndTumblePB>
+      >>
+[{1,
+  {1,
+   "abc",
+   {
+     int32_val: 100
+     timestamp_val {
+       seconds: 1735689600
+     }
+     annotated_timestamp_val: 1735689600000
+   }},
+  {
+    int32_val: 200
+    timestamp_val {
+      seconds: 1735689600
+    }
+    annotated_timestamp_val: 1735689600000
+  }}]
+==
+[prepare_database]
+CREATE TABLE TableWithNestedFields AS (
+  SELECT STRUCT(TIMESTAMP '2025-01-01 00:00:00' AS ts) AS struct_col
+  UNION ALL
+  SELECT STRUCT(TIMESTAMP '2025-01-02 00:00:00' AS ts) AS struct_col
+  UNION ALL
+  SELECT STRUCT(TIMESTAMP '2025-01-03 00:00:00' AS ts) AS struct_col
+  UNION ALL
+  SELECT STRUCT(TIMESTAMP '2025-01-04 00:00:00' AS ts) AS struct_col
+);
+--
+ARRAY<STRUCT<struct_col STRUCT<ts TIMESTAMP>>>[
+  {{2025-01-01 08:00:00+00}},
+  {{2025-01-02 08:00:00+00}},
+  {{2025-01-03 08:00:00+00}},
+  {{2025-01-04 08:00:00+00}}
 ]
 ==
 [required_features=INTERVAL_TYPE,TABLE_VALUED_FUNCTIONS,TUMBLE_HOP_TVFS]
@@ -466,3 +534,258 @@ FROM (
 )
 --
 ARRAY<STRUCT<STRING>>[{"Correct"}]
+==
+[required_features=INTERVAL_TYPE,TABLE_VALUED_FUNCTIONS,TUMBLE_HOP_TVFS,PIPES]
+[name=hop_passthrough_namelist_and_rv]
+WITH InputTable AS (
+  SELECT TIMESTAMP '2025-01-01 10:00:00+00' AS ts, 'a' AS window_start, 10 AS window_end
+  UNION ALL
+  SELECT TIMESTAMP '2025-01-02 15:00:00+00' AS ts, 'b' AS window_start, 20 AS window_end
+)
+FROM InputTable AS RV
+|> CALL hop("ts", INTERVAL 1 DAY, INTERVAL 1 DAY)
+|> SELECT RV.window_start, RV.window_end, WINDOW_START, WINDOW_END;
+--
+ARRAY<STRUCT<
+        window_start STRING,
+        window_end INT64,
+        WINDOW_START TIMESTAMP,
+        WINDOW_END TIMESTAMP
+      >>
+[unknown order:{
+                 "a",
+                 10,
+                 2025-01-01 00:00:00+00,
+                 2025-01-02 00:00:00+00
+               },
+               {
+                 "b",
+                 20,
+                 2025-01-02 00:00:00+00,
+                 2025-01-03 00:00:00+00
+               }]
+==
+[required_features=INTERVAL_TYPE,TABLE_VALUED_FUNCTIONS,TUMBLE_HOP_TVFS]
+[name=hop_sql_table_nested_struct_fields]
+SELECT * FROM hop(TABLE TableWithNestedFields, "struct_col.ts", INTERVAL 1 DAY, INTERVAL 1 DAY);
+--
+ARRAY<STRUCT<
+        struct_col STRUCT<ts TIMESTAMP>,
+        WINDOW_START TIMESTAMP,
+        WINDOW_END TIMESTAMP
+      >>
+[unknown order:{
+                 {2025-01-02 08:00:00+00},
+                 2025-01-02 00:00:00+00,
+                 2025-01-03 00:00:00+00
+               },
+               {
+                 {2025-01-04 08:00:00+00},
+                 2025-01-04 00:00:00+00,
+                 2025-01-05 00:00:00+00
+               },
+               {
+                 {2025-01-01 08:00:00+00},
+                 2025-01-01 00:00:00+00,
+                 2025-01-02 00:00:00+00
+               },
+               {
+                 {2025-01-03 08:00:00+00},
+                 2025-01-03 00:00:00+00,
+                 2025-01-04 00:00:00+00
+               }]
+==
+[required_features=INTERVAL_TYPE,TABLE_VALUED_FUNCTIONS,TUMBLE_HOP_TVFS]
+[name=hop_value_table_struct_field]
+WITH ValueTable AS (
+  SELECT AS STRUCT TIMESTAMP '2025-01-01 00:00:00+00' AS ts, 'a' AS val
+  UNION ALL
+  SELECT AS STRUCT TIMESTAMP '2025-01-02 00:00:00+00' AS ts, 'b' AS val
+)
+SELECT * FROM hop(TABLE ValueTable, "ts", INTERVAL 1 DAY, INTERVAL 1 DAY);
+--
+ARRAY<STRUCT<
+        ts TIMESTAMP,
+        val STRING,
+        WINDOW_START TIMESTAMP,
+        WINDOW_END TIMESTAMP
+      >>
+[unknown order:{
+                 2025-01-02 00:00:00+00,
+                 "b",
+                 2025-01-02 00:00:00+00,
+                 2025-01-03 00:00:00+00
+               },
+               {
+                 2025-01-01 00:00:00+00,
+                 "a",
+                 2025-01-01 00:00:00+00,
+                 2025-01-02 00:00:00+00
+               }]
+==
+[required_features=INTERVAL_TYPE,TABLE_VALUED_FUNCTIONS,TUMBLE_HOP_TVFS]
+[name=hop_null_value_table_and_field]
+WITH ValueTable AS (
+  SELECT AS STRUCT TIMESTAMP '2025-01-01 00:00:00+00' AS ts, 'a' AS val
+  UNION ALL
+  SELECT CAST(NULL AS STRUCT<ts TIMESTAMP, val STRING>)
+  UNION ALL
+  SELECT AS STRUCT CAST(NULL AS TIMESTAMP) AS ts, 'c' AS val
+)
+SELECT * FROM hop(TABLE ValueTable, "ts", INTERVAL 1 DAY, INTERVAL 1 DAY);
+--
+ARRAY<STRUCT<
+        ts TIMESTAMP,
+        val STRING,
+        WINDOW_START TIMESTAMP,
+        WINDOW_END TIMESTAMP
+      >>
+[unknown order:{NULL, NULL, NULL, NULL},
+               {
+                 2025-01-01 00:00:00+00,
+                 "a",
+                 2025-01-01 00:00:00+00,
+                 2025-01-02 00:00:00+00
+               },
+               {NULL, "c", NULL, NULL}]
+==
+[required_features=INTERVAL_TYPE,TABLE_VALUED_FUNCTIONS,TUMBLE_HOP_TVFS]
+[name=hop_proto_annotated_timestamp_val]
+SELECT * FROM hop(TABLE TableWithStructAndProto, "ProtoColumn.annotated_timestamp_val", INTERVAL 1 DAY, INTERVAL 1 DAY);
+--
+ARRAY<STRUCT<
+        key INT64,
+        StructWithProto STRUCT<
+               ambiguous_field INT64,
+               other_field STRING,
+               proto_field PROTO<googlesql_test.TestHopAndTumblePB>
+             >,
+        ProtoColumn PROTO<googlesql_test.TestHopAndTumblePB>,
+        WINDOW_START TIMESTAMP,
+        WINDOW_END TIMESTAMP
+      >>
+[{1,
+  {1,
+   "abc",
+   {
+     int32_val: 100
+     timestamp_val {
+       seconds: 1735689600
+     }
+     annotated_timestamp_val: 1735689600000
+   }},
+  {
+    int32_val: 200
+    timestamp_val {
+      seconds: 1735689600
+    }
+    annotated_timestamp_val: 1735689600000
+  },
+  2025-01-01 00:00:00+00,
+  2025-01-02 00:00:00+00}]
+==
+[required_features=INTERVAL_TYPE,TABLE_VALUED_FUNCTIONS,TUMBLE_HOP_TVFS]
+[name=hop_proto_timestamp_val]
+SELECT * FROM hop(TABLE TableWithStructAndProto, "ProtoColumn.timestamp_val", INTERVAL 1 DAY, INTERVAL 1 DAY);
+--
+ARRAY<STRUCT<
+        key INT64,
+        StructWithProto STRUCT<
+               ambiguous_field INT64,
+               other_field STRING,
+               proto_field PROTO<googlesql_test.TestHopAndTumblePB>
+             >,
+        ProtoColumn PROTO<googlesql_test.TestHopAndTumblePB>,
+        WINDOW_START TIMESTAMP,
+        WINDOW_END TIMESTAMP
+      >>
+[{1,
+  {1,
+   "abc",
+   {
+     int32_val: 100
+     timestamp_val {
+       seconds: 1735689600
+     }
+     annotated_timestamp_val: 1735689600000
+   }},
+  {
+    int32_val: 200
+    timestamp_val {
+      seconds: 1735689600
+    }
+    annotated_timestamp_val: 1735689600000
+  },
+  2025-01-01 00:00:00+00,
+  2025-01-02 00:00:00+00}]
+==
+[required_features=INTERVAL_TYPE,TABLE_VALUED_FUNCTIONS,TUMBLE_HOP_TVFS]
+[name=hop_struct_proto_timestamp_val]
+SELECT * FROM hop(TABLE TableWithStructAndProto, "StructWithProto.proto_field.timestamp_val", INTERVAL 1 DAY, INTERVAL 1 DAY);
+--
+ARRAY<STRUCT<
+        key INT64,
+        StructWithProto STRUCT<
+               ambiguous_field INT64,
+               other_field STRING,
+               proto_field PROTO<googlesql_test.TestHopAndTumblePB>
+             >,
+        ProtoColumn PROTO<googlesql_test.TestHopAndTumblePB>,
+        WINDOW_START TIMESTAMP,
+        WINDOW_END TIMESTAMP
+      >>
+[{1,
+  {1,
+   "abc",
+   {
+     int32_val: 100
+     timestamp_val {
+       seconds: 1735689600
+     }
+     annotated_timestamp_val: 1735689600000
+   }},
+  {
+    int32_val: 200
+    timestamp_val {
+      seconds: 1735689600
+    }
+    annotated_timestamp_val: 1735689600000
+  },
+  2025-01-01 00:00:00+00,
+  2025-01-02 00:00:00+00}]
+==
+[required_features=INTERVAL_TYPE,TABLE_VALUED_FUNCTIONS,TUMBLE_HOP_TVFS]
+[name=hop_proto_null_timestamp_val]
+WITH TableWithNullProtoTimestamp AS (
+  SELECT
+    1 AS key,
+    NEW googlesql_test.TestHopAndTumblePB(
+      100 AS int32_val,
+      TO_PROTO(TIMESTAMP '2025-01-01 00:00:00 UTC') AS timestamp_val
+    ) AS ProtoColumn
+  UNION ALL
+  SELECT
+    2 AS key,
+    NEW googlesql_test.TestHopAndTumblePB(
+      200 AS int32_val
+    ) AS ProtoColumn
+)
+SELECT * FROM hop(TABLE TableWithNullProtoTimestamp, "ProtoColumn.timestamp_val", INTERVAL 1 DAY, INTERVAL 1 DAY);
+--
+ARRAY<STRUCT<
+        key INT64,
+        ProtoColumn PROTO<googlesql_test.TestHopAndTumblePB>,
+        WINDOW_START TIMESTAMP,
+        WINDOW_END TIMESTAMP
+      >>
+[unknown order:{1,
+                {
+                  int32_val: 100
+                  timestamp_val {
+                    seconds: 1735689600
+                  }
+                },
+                2025-01-01 00:00:00+00,
+                2025-01-02 00:00:00+00},
+               {2, {int32_val: 200}, NULL, NULL}]
+

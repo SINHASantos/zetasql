@@ -36,6 +36,7 @@
 #include "googlesql/analyzer/query_resolver_helper.h"
 #include "googlesql/analyzer/resolver.h"
 #include "googlesql/common/errors.h"
+#include "googlesql/public/annotation/is_versioned.h"
 #include "googlesql/public/types/type_modifiers.h"
 #include "googlesql/resolved_ast/resolved_ast_deep_copy_visitor.h"
 #include "googlesql/resolved_ast/resolved_ast_rewrite_visitor.h"
@@ -61,6 +62,8 @@
 #include "googlesql/resolved_ast/resolved_column.h"
 #include "googlesql/resolved_ast/resolved_node.h"
 #include "googlesql/resolved_ast/resolved_node_kind.pb.h"
+#include "absl/algorithm/container.h"
+#include "absl/cleanup/cleanup.h"
 #include "absl/container/flat_hash_map.h"
 #include "absl/container/flat_hash_set.h"
 #include "absl/container/node_hash_map.h"
@@ -83,6 +86,93 @@ namespace googlesql {
 STATIC_IDSTRING(kElementId, "$element");
 STATIC_IDSTRING(kInsertId, "$insert");
 STATIC_IDSTRING(kInsertCastId, "$insert_cast");
+STATIC_IDSTRING(kTimestampId, "timestamp");
+STATIC_IDSTRING(kTimestampPseudoTableId, "$timestamp");
+
+namespace {
+
+// Returns true if the given annotation map has the IsVersionedAnnotation.
+// If `allow_subfields` is true, it checks if any subfield is versioned.
+// Otherwise, it only checks the top-level.
+bool IsVersioned(const AnnotationMap* annotation_map, bool allow_subfields) {
+  if (annotation_map == nullptr) return false;
+  if (allow_subfields) {
+    return annotation_map->Has<IsVersionedAnnotation>();
+  }
+  return annotation_map->GetAnnotation(IsVersionedAnnotation::GetId()) !=
+         nullptr;
+}
+
+const AnnotationMap* GetTargetAnnotationMapForVersionAwareDML(
+    const ResolvedExpr* target) {
+  if (target == nullptr) return nullptr;
+  switch (target->node_kind()) {
+    case RESOLVED_COLUMN_REF:
+      return target->GetAs<ResolvedColumnRef>()->column().type_annotation_map();
+    case RESOLVED_GET_STRUCT_FIELD: {
+      const auto* get_struct = target->GetAs<ResolvedGetStructField>();
+      const AnnotationMap* parent_annot =
+          GetTargetAnnotationMapForVersionAwareDML(get_struct->expr());
+      if (parent_annot != nullptr && parent_annot->IsStructMap()) {
+        return parent_annot->AsStructMap()->field(get_struct->field_idx());
+      }
+      return nullptr;
+    }
+    case RESOLVED_GET_PROTO_FIELD:
+      return GetTargetAnnotationMapForVersionAwareDML(
+          target->GetAs<ResolvedGetProtoField>()->expr());
+    case RESOLVED_GET_JSON_FIELD:
+      return GetTargetAnnotationMapForVersionAwareDML(
+          target->GetAs<ResolvedGetJsonField>()->expr());
+    default:
+      return target->type_annotation_map();
+  }
+}
+
+bool IsVersionAwareDmlStatement(const ASTStatement* ast_statement) {
+  if (ast_statement == nullptr) return false;
+  if (const auto* delete_stmt =
+          ast_statement->GetAsOrNull<ASTDeleteStatement>()) {
+    return delete_stmt->temporal_at() != nullptr ||
+           delete_stmt->timestamp() != nullptr;
+  }
+  if (const auto* update_stmt =
+          ast_statement->GetAsOrNull<ASTUpdateStatement>()) {
+    return update_stmt->temporal_at() != nullptr ||
+           update_stmt->timestamp() != nullptr;
+  }
+  if (const auto* insert_stmt =
+          ast_statement->GetAsOrNull<ASTInsertStatement>()) {
+    return insert_stmt->temporal_at() != nullptr ||
+           insert_stmt->timestamp() != nullptr;
+  }
+  return false;
+}
+
+// Returns true if the column is versioned. If `allow_subfields` is true, this
+// checks recursively at any depth. For value table columns, we always check at
+// least one level deep (their immediate fields).
+bool IsNamedColumnVersioned(const NamedColumn& named_column,
+                            bool allow_subfields) {
+  const AnnotationMap* annotation_map =
+      named_column.column().type_annotation_map();
+  if (annotation_map == nullptr) return false;
+  if (IsVersioned(annotation_map, allow_subfields)) {
+    return true;
+  }
+  if (!allow_subfields && named_column.is_value_table_column() &&
+      annotation_map->IsStructMap()) {
+    const StructAnnotationMap* struct_map = annotation_map->AsStructMap();
+    for (int i = 0; i < struct_map->num_fields(); ++i) {
+      if (IsVersioned(struct_map->field(i), /*allow_subfields=*/false)) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+}  // namespace
 
 absl::Status Resolver::ResolveDMLTargetTable(
     const ASTPathExpression* target_path, const ASTAlias* target_path_alias,
@@ -152,8 +242,53 @@ absl::Status Resolver::ResolveDeleteStatementImpl(
     const NameScope* scope,
     std::unique_ptr<const ResolvedTableScan> resolved_table_scan,
     std::unique_ptr<ResolvedDeleteStmt>* output) {
+  if (ast_statement->temporal_at() != nullptr) {
+    return MakeSqlErrorAt(ast_statement->temporal_at())
+           << "DELETE statement does not support AT clause";
+  }
+
+  const ASTNode* prev_version_aware_node = active_version_aware_node_;
+  const bool is_version_aware = IsVersionAwareDmlStatement(ast_statement);
+  if (is_version_aware) {
+    if (active_version_aware_node_ != nullptr) {
+      return MakeSqlErrorAt(ast_statement)
+             << "Version-aware DML statement is not allowed to be nested under "
+                "another version-aware DML statement";
+    }
+    active_version_aware_node_ = ast_statement;
+  }
+  absl::Cleanup cleanup_version_node = [this, prev_version_aware_node] {
+    active_version_aware_node_ = prev_version_aware_node;
+  };
+
+  if (is_version_aware) {
+    GOOGLESQL_RETURN_IF_ERROR(ValidateVersionAwareDmlTarget(
+        ast_statement, target_name_list.get(), target_alias,
+        /*has_temporal_at=*/ast_statement->temporal_at() != nullptr,
+        /*has_with_timestamp=*/ast_statement->timestamp() != nullptr));
+  }
+
+  std::unique_ptr<const ResolvedColumnHolder> resolved_timestamp_version_column;
+  std::shared_ptr<const NameList> version_aware_name_list;
+
+  if (ast_statement->timestamp() != nullptr) {
+    GOOGLESQL_RETURN_IF_ERROR(ResolveWithTimestampClause(
+        ast_statement->timestamp(), target_alias, scope, target_name_list.get(),
+        &resolved_timestamp_version_column, &version_aware_name_list));
+  }
+
+  // `dml_extras_name_list` contains "extra" names introduced by the DML
+  // statement itself (like the `WITH TIMESTAMP` and `WITH OFFSET` columns)
+  // that should be visible in the DML statement's scope (e.g., in the `WHERE`
+  // clause). We lazily allocate it only if we actually have extras.
+  std::shared_ptr<NameList> dml_extras_name_list;
+  if (version_aware_name_list != nullptr) {
+    dml_extras_name_list = std::make_shared<NameList>();
+    GOOGLESQL_RETURN_IF_ERROR(dml_extras_name_list->MergeFrom(*version_aware_name_list,
+                                                    ast_statement));
+  }
+
   std::unique_ptr<ResolvedColumnHolder> resolved_array_offset_column;
-  std::unique_ptr<NameScope> new_scope_owner;
   if (ast_statement->offset() != nullptr) {
     if (!language().LanguageFeatureEnabled(
             FEATURE_NESTED_UPDATE_DELETE_WITH_OFFSET)) {
@@ -180,17 +315,16 @@ absl::Status Resolver::ResolveDeleteStatementImpl(
                                        types::Int64Type());
     resolved_array_offset_column = MakeResolvedColumnHolder(offset_column);
 
-    // Stack a scope to include the offset column.  Stacking a scope is not
-    // ideal because it makes the error messages worse (no more "Did you mean
-    // ...?"), and we also have to perform the manual check above to handle the
-    // case where 'offset_alias == target_alias'. A possible alternative to
-    // stacking is to have this method create 'scope' in the first place rather
-    // than passing it in and then stacking something on top of it. But that
-    // does not seem worth the complexity.
-    std::shared_ptr<NameList> offset_column_list(new NameList);
-    GOOGLESQL_RETURN_IF_ERROR(offset_column_list->AddColumn(
+    if (dml_extras_name_list == nullptr) {
+      dml_extras_name_list = std::make_shared<NameList>();
+    }
+    GOOGLESQL_RETURN_IF_ERROR(dml_extras_name_list->AddColumn(
         offset_column.name_id(), offset_column, /*is_explicit=*/false));
-    new_scope_owner = std::make_unique<NameScope>(scope, offset_column_list);
+  }
+
+  std::unique_ptr<NameScope> new_scope_owner;
+  if (dml_extras_name_list != nullptr) {
+    new_scope_owner = std::make_unique<NameScope>(scope, dml_extras_name_list);
     scope = new_scope_owner.get();
   }
 
@@ -216,19 +350,29 @@ absl::Status Resolver::ResolveDeleteStatementImpl(
       return MakeSqlErrorAt(ast_statement->returning())
              << "THEN RETURN is not supported";
     }
-    if (target_name_list == nullptr) {
+    if (resolved_table_scan == nullptr) {
       return MakeSqlErrorAt(ast_statement->returning())
              << "THEN RETURN is not allowed in nested DELETE statements";
     }
-    GOOGLESQL_RETURN_IF_ERROR(ResolveReturningClause(ast_statement->returning(),
-                                           target_alias, target_name_list,
-                                           scope, &resolved_returning_clause));
+    std::shared_ptr<const NameList> returning_name_list = target_name_list;
+    if (version_aware_name_list != nullptr) {
+      std::shared_ptr<NameList> merged_name_list = target_name_list->Copy();
+      GOOGLESQL_RETURN_IF_ERROR(
+          merged_name_list->MergeFrom(*version_aware_name_list, ast_statement));
+      returning_name_list = std::move(merged_name_list);
+    }
+    const std::unique_ptr<const NameScope> target_scope(
+        new NameScope(*returning_name_list));
+    GOOGLESQL_RETURN_IF_ERROR(ResolveReturningClause(
+        ast_statement->returning(), target_alias, returning_name_list,
+        target_scope.get(), &resolved_returning_clause));
   }
 
   *output = MakeResolvedDeleteStmt(
       std::move(resolved_table_scan), std::move(resolved_assert_rows_modified),
       std::move(resolved_returning_clause),
-      std::move(resolved_array_offset_column), std::move(resolved_where_expr));
+      std::move(resolved_array_offset_column), std::move(resolved_where_expr),
+      std::move(resolved_timestamp_version_column));
   MaybeRecordResolvedNodeOperatorKeywordLocation(ast_statement, output->get());
   return absl::OkStatus();
 }
@@ -347,10 +491,10 @@ absl::Status Resolver::ResolveInsertQuery(
   GOOGLESQL_RET_CHECK_EQ(pipe_input_name_list != nullptr, pipe_input_scan != nullptr);
   const int num_insert_columns = insert_columns.size();
 
+  const bool is_nested = nested_scope != nullptr;
   std::unique_ptr<CorrelatedColumnsSet> correlated_columns_set;
   std::unique_ptr<NameScope> name_scope_owner;
   const NameScope* name_scope = empty_name_scope_.get();
-  const bool is_nested = (nested_scope != nullptr);
   if (is_nested) {
     correlated_columns_set = std::make_unique<CorrelatedColumnsSet>();
     name_scope_owner =
@@ -513,6 +657,7 @@ absl::Status Resolver::TopologicallySortGeneratedColumns(
 }
 
 namespace {
+
 // Visitor to rewrite ResolvedExpressionColumn to the appropriate
 // ResolvedColumnRef.
 class ResolvedExpressionColumnRewriter : public ResolvedASTRewriteVisitor {
@@ -650,6 +795,14 @@ absl::Status Resolver::ResolveInsertStatement(
   ResolvedColumnList insert_columns;
   IdStringHashSetCase visited_column_names;
 
+  const bool has_timestamp_clause = ast_statement->timestamp() != nullptr;
+  IdString timestamp_alias;
+  if (has_timestamp_clause) {
+    timestamp_alias = ast_statement->timestamp()->alias() != nullptr
+                          ? ast_statement->timestamp()->alias()->GetAsIdString()
+                          : kTimestampId;
+  }
+
   const bool has_column_list = ast_statement->column_list() != nullptr;
   if (has_column_list) {
     for (const ASTIdentifier* column_name :
@@ -658,6 +811,16 @@ absl::Status Resolver::ResolveInsertStatement(
       if (!googlesql_base::InsertIfNotPresent(&visited_column_names, column_name_id)) {
         return MakeSqlErrorAt(column_name)
                << "INSERT has columns with duplicate name: " << column_name_id;
+      }
+
+      // If this matches the timestamp column alias, resolve it as the
+      // timestamp column.
+      if (has_timestamp_clause && column_name_id == timestamp_alias) {
+        ResolvedColumn timestamp_col(
+            AllocateColumnId(), kTimestampPseudoTableId, timestamp_alias,
+            AnnotatedType(type_factory_->get_timestamp()));
+        insert_columns.push_back(timestamp_col);
+        continue;
       }
 
       const ResolvedColumn* column =
@@ -742,6 +905,7 @@ absl::Status Resolver::ResolveInsertStatementImpl(
     ResolvedColumnToCatalogColumnHashMap&
         resolved_columns_to_catalog_columns_for_target_scan,
     std::unique_ptr<ResolvedInsertStmt>* output) {
+  ResolvedColumnList resolved_insert_columns = insert_columns;
   ResolvedInsertStmt::InsertMode insert_mode;
   switch (ast_statement->insert_mode()) {
     case ASTInsertStatement::IGNORE:
@@ -759,6 +923,18 @@ absl::Status Resolver::ResolveInsertStatementImpl(
   }
 
   const bool is_nested = nested_scope != nullptr;
+  const bool is_version_aware = IsVersionAwareDmlStatement(ast_statement);
+
+  if (is_nested &&
+      (is_version_aware || active_version_aware_node_ != nullptr) &&
+      ast_statement->column_list() != nullptr) {
+    // TODO: Determine if/how to handle version-aware
+    // nested INSERTs with column lists.
+    return MakeSqlErrorAt(ast_statement->column_list())
+           << "Version-aware nested INSERT must not provide an explicit column "
+              "list";
+  }
+
   if (is_nested && insert_mode != ResolvedInsertStmt::OR_ERROR) {
     std::string insert_mode_str;
     switch (insert_mode) {
@@ -777,6 +953,59 @@ absl::Status Resolver::ResolveInsertStatementImpl(
     return MakeSqlErrorAt(ast_statement)
            << "Nested INSERTs cannot have insert mode " << insert_mode_str;
   }
+  const ASTNode* prev_version_aware_node = active_version_aware_node_;
+  if (is_version_aware) {
+    if (active_version_aware_node_ != nullptr) {
+      return MakeSqlErrorAt(ast_statement)
+             << "Version-aware DML statement is not allowed to be nested under "
+                "another version-aware DML statement";
+    }
+    active_version_aware_node_ = ast_statement;
+  }
+  absl::Cleanup cleanup_version_node = [this, prev_version_aware_node] {
+    active_version_aware_node_ = prev_version_aware_node;
+  };
+
+  if (is_version_aware) {
+    GOOGLESQL_RETURN_IF_ERROR(ValidateVersionAwareDmlTarget(
+        ast_statement, target_name_list.get(), target_alias,
+        /*has_temporal_at=*/ast_statement->temporal_at() != nullptr,
+        /*has_with_timestamp=*/ast_statement->timestamp() != nullptr));
+  }
+  const NameScope* value_scope =
+      is_nested ? nested_scope : empty_name_scope_.get();
+
+  std::unique_ptr<const ResolvedExpr> resolved_temporal_at;
+  std::unique_ptr<const ResolvedColumnHolder> resolved_timestamp_version_column;
+  std::shared_ptr<const NameList> version_aware_name_list;
+
+  if (ast_statement->temporal_at() != nullptr) {
+    GOOGLESQL_RETURN_IF_ERROR(ResolveTemporalAtClause(ast_statement->temporal_at(),
+                                            /*temporal_at_scope=*/value_scope,
+                                            &resolved_temporal_at));
+  } else if (ast_statement->timestamp() != nullptr) {
+    GOOGLESQL_RETURN_IF_ERROR(ResolveWithTimestampClause(
+        ast_statement->timestamp(), target_alias, value_scope,
+        target_name_list.get(), &resolved_timestamp_version_column,
+        &version_aware_name_list, resolved_insert_columns,
+        ast_statement->column_list() != nullptr));
+    // Ensure that resolved_insert_columns has the pre-allocated column
+    // appended if the column list was omitted.
+    if (ast_statement->column_list() == nullptr) {
+      resolved_insert_columns.push_back(
+          resolved_timestamp_version_column->column());
+    }
+  }
+
+  // TODO: Nested INSERT should validate or disallow explicit
+  // column list.
+  if (is_nested && ast_statement->column_list() != nullptr) {
+    GOOGLESQL_RETURN_IF_ERROR(AddDeprecationWarning(
+        ast_statement->column_list(),
+        DeprecationWarning::NESTED_INSERT_COLUMN_LIST,
+        "Explicit column list in nested INSERT is ignored and will be "
+        "disallowed in a future release"));
+  }
 
   std::vector<std::unique_ptr<const ResolvedInsertRow>> row_list;
   std::unique_ptr<const ResolvedScan> resolved_query;
@@ -786,12 +1015,10 @@ absl::Status Resolver::ResolveInsertStatementImpl(
     GOOGLESQL_RET_CHECK(ast_statement->query() == nullptr);
     GOOGLESQL_RET_CHECK(pipe_input_name_list == nullptr);
     row_list.reserve(ast_statement->rows()->rows().size());
-    const NameScope* value_scope =
-        is_nested ? nested_scope : empty_name_scope_.get();
     for (const ASTInsertValuesRow* row : ast_statement->rows()->rows()) {
       std::unique_ptr<const ResolvedInsertRow> resolved_insert_row;
-      GOOGLESQL_RETURN_IF_ERROR(ResolveInsertValuesRow(row, value_scope, insert_columns,
-                                             &resolved_insert_row));
+      GOOGLESQL_RETURN_IF_ERROR(ResolveInsertValuesRow(
+          row, value_scope, resolved_insert_columns, &resolved_insert_row));
       row_list.push_back(std::move(resolved_insert_row));
     }
   } else {
@@ -803,7 +1030,7 @@ absl::Status Resolver::ResolveInsertStatementImpl(
         ast_statement->query() != nullptr
             ? static_cast<const ASTNode*>(ast_statement->query())
             : ast_statement,
-        ast_statement->query(), nested_scope, insert_columns,
+        ast_statement->query(), nested_scope, resolved_insert_columns,
         pipe_input_name_list, std::move(pipe_input_scan), &resolved_query,
         &query_output_column_list, &query_parameter_list));
   }
@@ -821,14 +1048,21 @@ absl::Status Resolver::ResolveInsertStatementImpl(
       return MakeSqlErrorAt(ast_statement->returning())
              << "THEN RETURN is not supported";
     }
-    if (target_name_list == nullptr) {
+    if (resolved_table_scan == nullptr) {
       return MakeSqlErrorAt(ast_statement->returning())
              << "THEN RETURN is not allowed in nested INSERT statements";
     }
+    std::shared_ptr<const NameList> returning_name_list = target_name_list;
+    if (version_aware_name_list != nullptr) {
+      std::shared_ptr<NameList> merged_name_list = target_name_list->Copy();
+      GOOGLESQL_RETURN_IF_ERROR(
+          merged_name_list->MergeFrom(*version_aware_name_list, ast_statement));
+      returning_name_list = std::move(merged_name_list);
+    }
     const std::unique_ptr<const NameScope> target_scope(
-        new NameScope(*target_name_list));
+        new NameScope(*returning_name_list));
     GOOGLESQL_RETURN_IF_ERROR(ResolveReturningClause(
-        ast_statement->returning(), target_alias, target_name_list,
+        ast_statement->returning(), target_alias, returning_name_list,
         target_scope.get(), &resolved_returning_clause));
   }
 
@@ -854,10 +1088,13 @@ absl::Status Resolver::ResolveInsertStatementImpl(
         target_name_list, &resolved_on_conflict_clause));
   }
 
-  // For nested INSERTs, 'insert_columns' contains a single reference to the
-  // element_column field of the enclosing UPDATE, and
-  // ResolvedInsertStmt.insert_columns is implicit.
-  GOOGLESQL_RET_CHECK(!is_nested || insert_columns.size() == 1);
+  // For nested INSERTs, 'insert_columns' contains a reference to the
+  // element_column field of the enclosing UPDATE, and optionally the timestamp
+  // column if it is version-aware. ResolvedInsertStmt.insert_columns is
+  // implicit.
+  GOOGLESQL_RET_CHECK(!is_nested ||
+            resolved_insert_columns.size() ==
+                (resolved_timestamp_version_column != nullptr ? 2 : 1));
 
   std::vector<int> out_topologically_sorted_generated_column_ids;
   std::vector<std::unique_ptr<const ResolvedExpr>>
@@ -875,12 +1112,14 @@ absl::Status Resolver::ResolveInsertStatementImpl(
       std::move(resolved_table_scan), insert_mode,
       std::move(resolved_assert_rows_modified),
       std::move(resolved_returning_clause),
-      is_nested ? ResolvedColumnList() : insert_columns,
+      is_nested ? ResolvedColumnList() : resolved_insert_columns,
       std::move(query_parameter_list), std::move(resolved_query),
       query_output_column_list, std::move(row_list),
       std::move(resolved_on_conflict_clause),
       out_topologically_sorted_generated_column_ids,
-      std::move(out_generated_column_expr_list));
+      std::move(out_generated_column_expr_list),
+      std::move(resolved_timestamp_version_column),
+      std::move(resolved_temporal_at));
   MaybeRecordResolvedNodeOperatorKeywordLocation(ast_statement, output->get());
   return absl::OkStatus();
 }
@@ -1367,6 +1606,18 @@ absl::Status Resolver::ResolveUpdateItem(
       ast_update_item, is_nested, target_path, target_no_aggregation.get(),
       &update_target_infos));
   GOOGLESQL_RET_CHECK(!update_target_infos.empty());
+
+  for (const auto& info : update_target_infos) {
+    if (info.target->Is<ResolvedColumnRef>() &&
+        IsReadOnlyTimestampColumn(
+            info.target->GetAs<ResolvedColumnRef>()->column())) {
+      return MakeSqlErrorAt(target_path)
+             << "Cannot write to the timestamp column "
+             << ToIdentifierLiteral(
+                    active_timestamp_version_column_->name_id());
+    }
+  }
+
   // Look for an existing ResolvedUpdateItem node to merge with this update,
   // detecting conflicts in the process.
   for (UpdateItemAndLocation& update_item : *update_items) {
@@ -1771,9 +2022,20 @@ bool IsColumnWritableOrCanBeUpdatedToValue(
 
 }  // namespace
 
+bool Resolver::IsReadOnlyTimestampColumn(const ResolvedColumn& column) const {
+  return active_timestamp_version_column_.has_value() &&
+         column.column_id() == active_timestamp_version_column_->column_id();
+}
+
 absl::Status Resolver::VerifyTableScanColumnIsWritable(
     const ASTNode* ast_location, const ResolvedColumn& column,
     const char* statement_type, const ASTExpression* value) {
+  if (IsReadOnlyTimestampColumn(column)) {
+    return MakeSqlErrorAt(ast_location)
+           << "Cannot write to the timestamp column "
+           << ToIdentifierLiteral(active_timestamp_version_column_->name_id());
+  }
+
   bool writable = true;
   std::string name;
   if (column.type()->IsRowOrTable()) {
@@ -2235,6 +2497,15 @@ absl::Status Resolver::MergeWithUpdateItem(
   const bool is_nested_insert =
       ast_input_update_item->insert_statement() != nullptr;
   if (is_nested_delete || is_nested_update || is_nested_insert) {
+    const ASTStatement* nested_stmt = nullptr;
+    if (is_nested_delete) {
+      nested_stmt = ast_input_update_item->delete_statement();
+    } else if (is_nested_update) {
+      nested_stmt = ast_input_update_item->update_statement();
+    } else if (is_nested_insert) {
+      nested_stmt = ast_input_update_item->insert_statement();
+    }
+
     // Sanity check that we don't allow [] in a nested dml target. See
     // PopulateUpdateTargetInfos() for details.
     GOOGLESQL_RET_CHECK_EQ(input_update_target_infos->size(), 1);
@@ -2267,10 +2538,21 @@ absl::Status Resolver::MergeWithUpdateItem(
     GOOGLESQL_RET_CHECK(!target_alias.empty());
 
     if (resolved_update_item.element_column() == nullptr) {
-      resolved_update_item.set_element_column(
-          MakeResolvedColumnHolder(ResolvedColumn(
-              AllocateColumnId(), /*table_name=*/kArrayId,
-              /*name=*/target_alias, target_type->AsArray()->element_type())));
+      const AnnotationMap* array_annotation_map =
+          GetTargetAnnotationMapForVersionAwareDML(
+              resolved_update_item.target());
+
+      const AnnotationMap* element_annotation_map = nullptr;
+      if (array_annotation_map != nullptr &&
+          array_annotation_map->IsStructMap()) {
+        element_annotation_map = array_annotation_map->AsStructMap()->field(0);
+      }
+      AnnotatedType element_annotated_type(
+          target_type->AsArray()->element_type(), element_annotation_map);
+
+      resolved_update_item.set_element_column(MakeResolvedColumnHolder(
+          ResolvedColumn(AllocateColumnId(), /*table_name=*/kArrayId,
+                         /*name=*/target_alias, element_annotated_type)));
     }
 
     // We create a target scope here for nested statements that contains only
@@ -2324,7 +2606,7 @@ absl::Status Resolver::MergeWithUpdateItem(
       std::unique_ptr<ResolvedDeleteStmt> resolved_stmt;
       GOOGLESQL_RETURN_IF_ERROR(ResolveDeleteStatementImpl(
           ast_input_update_item->delete_statement(), target_alias,
-          /*target_name_list=*/nullptr, nested_dml_scope,
+          nested_target_name_list, nested_dml_scope,
           /*table_scan=*/nullptr, &resolved_stmt));
       resolved_update_item.add_delete_list(std::move(resolved_stmt));
     } else if (is_nested_update) {
@@ -2342,8 +2624,9 @@ absl::Status Resolver::MergeWithUpdateItem(
       std::unique_ptr<ResolvedUpdateStmt> resolved_stmt;
       GOOGLESQL_RETURN_IF_ERROR(ResolveUpdateStatementImpl(
           ast_input_update_item->update_statement(), /*is_nested=*/true,
-          target_alias, &nested_target_scope, /*target_name_list=*/nullptr,
-          nested_dml_scope, /*table_scan=*/nullptr, /*from_scan=*/nullptr,
+          target_alias, &nested_target_scope, nested_target_name_list,
+          nested_dml_scope, /*outer_scope=*/update_scope,
+          /*table_scan=*/nullptr, /*from_scan=*/nullptr,
           resolved_columns_from_table_scans_, &resolved_stmt));
       resolved_update_item.add_update_list(std::move(resolved_stmt));
     } else {
@@ -2360,7 +2643,7 @@ absl::Status Resolver::MergeWithUpdateItem(
           resolved_update_item.element_column()->column());
       GOOGLESQL_RETURN_IF_ERROR(ResolveInsertStatementImpl(
           ast_input_update_item->insert_statement(), target_alias,
-          /*target_name_list=*/nullptr, /*table_scan=*/nullptr, insert_columns,
+          nested_target_name_list, /*table_scan=*/nullptr, insert_columns,
           nested_dml_scope,
           /*pipe_input_name_list=*/nullptr,
           /*pipe_input_scan=*/nullptr, resolved_columns_from_table_scans_,
@@ -2439,7 +2722,8 @@ absl::Status Resolver::ResolveUpdateStatement(
       new NameScope(*shared_update_name_list));
   return ResolveUpdateStatementImpl(
       ast_statement, /*is_nested=*/false, target_alias, target_scope.get(),
-      target_name_list, update_scope.get(), std::move(resolved_table_scan),
+      target_name_list, update_scope.get(),
+      /*outer_scope=*/empty_name_scope_.get(), std::move(resolved_table_scan),
       std::move(resolved_from_scan),
       out_resolved_columns_to_catalog_columns_for_target_scan, output);
 }
@@ -2448,7 +2732,7 @@ absl::Status Resolver::ResolveUpdateStatementImpl(
     const ASTUpdateStatement* ast_statement, bool is_nested,
     IdString target_alias, const NameScope* target_scope,
     const std::shared_ptr<const NameList>& target_name_list,
-    const NameScope* update_scope,
+    const NameScope* update_scope, const NameScope* outer_scope,
     std::unique_ptr<const ResolvedTableScan> resolved_table_scan,
     std::unique_ptr<const ResolvedScan> resolved_from_scan,
     ResolvedColumnToCatalogColumnHashMap&
@@ -2456,8 +2740,78 @@ absl::Status Resolver::ResolveUpdateStatementImpl(
     std::unique_ptr<ResolvedUpdateStmt>* output) {
   RETURN_ERROR_IF_OUT_OF_STACK_SPACE();
 
+  const bool is_version_aware = IsVersionAwareDmlStatement(ast_statement);
+  const ASTNode* prev_version_aware_node = active_version_aware_node_;
+  if (is_version_aware) {
+    if (active_version_aware_node_ != nullptr) {
+      return MakeSqlErrorAt(ast_statement)
+             << "Version-aware DML statement is not allowed to be nested under "
+                "another version-aware DML statement";
+    }
+    active_version_aware_node_ = ast_statement;
+  }
+  absl::Cleanup cleanup_version_node = [this, prev_version_aware_node] {
+    active_version_aware_node_ = prev_version_aware_node;
+  };
+
+  if (is_version_aware) {
+    GOOGLESQL_RETURN_IF_ERROR(ValidateVersionAwareDmlTarget(
+        ast_statement, target_name_list.get(), target_alias,
+        /*has_temporal_at=*/ast_statement->temporal_at() != nullptr,
+        /*has_with_timestamp=*/ast_statement->timestamp() != nullptr));
+  }
+
+  std::unique_ptr<NameScope> version_target_scope_owner;
+
+  std::unique_ptr<const ResolvedExpr> resolved_temporal_at;
+  std::unique_ptr<const ResolvedColumnHolder> resolved_timestamp_version_column;
+  std::shared_ptr<const NameList> version_aware_name_list;
+
+  if (ast_statement->temporal_at() != nullptr) {
+    GOOGLESQL_RETURN_IF_ERROR(ResolveTemporalAtClause(ast_statement->temporal_at(),
+                                            /*temporal_at_scope=*/outer_scope,
+                                            &resolved_temporal_at));
+  } else if (ast_statement->timestamp() != nullptr) {
+    GOOGLESQL_RETURN_IF_ERROR(ResolveWithTimestampClause(
+        ast_statement->timestamp(), target_alias, update_scope,
+        target_name_list.get(), &resolved_timestamp_version_column,
+        &version_aware_name_list));
+  }
+
+  if (version_aware_name_list != nullptr) {
+    // Add timestamp column to target scope (for returning clause / unparser
+    // visibility)
+    version_target_scope_owner =
+        std::make_unique<NameScope>(target_scope, version_aware_name_list);
+    target_scope = version_target_scope_owner.get();
+  }
+
+  // Track the active timestamp version column in the current context (e.g. for
+  // validation of temporal_at or assignability restrictions). Restores the
+  // previous context upon exiting this scope to safely support nested scopes.
+  std::optional<ResolvedColumn> prev_timestamp_column =
+      active_timestamp_version_column_;
+  if (resolved_timestamp_version_column != nullptr) {
+    active_timestamp_version_column_ =
+        resolved_timestamp_version_column->column();
+  }
+  absl::Cleanup cleanup_timestamp_column = [this, prev_timestamp_column] {
+    active_timestamp_version_column_ = prev_timestamp_column;
+  };
+
+  // `dml_extras_name_list` contains "extra" names introduced by the DML
+  // statement itself (like the `WITH TIMESTAMP` and `WITH OFFSET`
+  // columns) that should be visible in the DML statement's scope
+  // (e.g., in the `WHERE` clause). We lazily allocate it only if we actually
+  // have extras.
+  std::shared_ptr<NameList> dml_extras_name_list;
+  if (version_aware_name_list != nullptr) {
+    dml_extras_name_list = std::make_shared<NameList>();
+    GOOGLESQL_RETURN_IF_ERROR(dml_extras_name_list->MergeFrom(*version_aware_name_list,
+                                                    ast_statement));
+  }
+
   std::unique_ptr<ResolvedColumnHolder> resolved_array_offset_column;
-  std::unique_ptr<NameScope> new_update_scope_owner;
   if (ast_statement->offset() != nullptr) {
     if (!language().LanguageFeatureEnabled(
             FEATURE_NESTED_UPDATE_DELETE_WITH_OFFSET)) {
@@ -2484,19 +2838,17 @@ absl::Status Resolver::ResolveUpdateStatementImpl(
                                        types::Int64Type());
     resolved_array_offset_column = MakeResolvedColumnHolder(offset_column);
 
-    // Stack a scope on top of 'update_scope' to include the offset column.
-    // Stacking a scope is not ideal because it makes the error messages worse
-    // (no more "Did you mean ...?"), and we also have to perform the manual
-    // check above to handle the case where 'offset_alias == target_alias'. A
-    // possible alternative to stacking is to have this method create
-    // 'update_scope' in the first place rather than passing it in and then
-    // stacking something on top of it. But that does not seem worth the
-    // complexity.
-    std::shared_ptr<NameList> offset_column_list(new NameList);
-    GOOGLESQL_RETURN_IF_ERROR(offset_column_list->AddColumn(
+    if (dml_extras_name_list == nullptr) {
+      dml_extras_name_list = std::make_shared<NameList>();
+    }
+    GOOGLESQL_RETURN_IF_ERROR(dml_extras_name_list->AddColumn(
         offset_column.name_id(), offset_column, /*is_explicit=*/false));
+  }
+
+  std::unique_ptr<NameScope> new_update_scope_owner;
+  if (dml_extras_name_list != nullptr) {
     new_update_scope_owner =
-        std::make_unique<NameScope>(update_scope, offset_column_list);
+        std::make_unique<NameScope>(update_scope, dml_extras_name_list);
     update_scope = new_update_scope_owner.get();
   }
 
@@ -2523,13 +2875,21 @@ absl::Status Resolver::ResolveUpdateStatementImpl(
              << "THEN RETURN is not supported";
     }
     if (is_nested) {
-      GOOGLESQL_RET_CHECK_EQ(target_name_list, nullptr);
       return MakeSqlErrorAt(ast_statement->returning())
              << "THEN RETURN is not allowed in nested UPDATE statements";
     }
+    std::shared_ptr<const NameList> returning_name_list = target_name_list;
+    if (version_aware_name_list != nullptr) {
+      std::shared_ptr<NameList> merged_name_list = target_name_list->Copy();
+      GOOGLESQL_RETURN_IF_ERROR(
+          merged_name_list->MergeFrom(*version_aware_name_list, ast_statement));
+      returning_name_list = std::move(merged_name_list);
+    }
+    const std::unique_ptr<const NameScope> returning_scope(
+        new NameScope(*returning_name_list));
     GOOGLESQL_RETURN_IF_ERROR(ResolveReturningClause(
-        ast_statement->returning(), target_alias, target_name_list,
-        target_scope, &resolved_returning_clause));
+        ast_statement->returning(), target_alias, returning_name_list,
+        returning_scope.get(), &resolved_returning_clause));
   }
 
   std::vector<std::unique_ptr<const ResolvedUpdateItem>> update_item_list;
@@ -2558,7 +2918,9 @@ absl::Status Resolver::ResolveUpdateStatementImpl(
       std::move(resolved_array_offset_column), std::move(resolved_where_expr),
       std::move(update_item_list), std::move(resolved_from_scan),
       out_topologically_sorted_generated_column_ids,
-      std::move(out_generated_column_expr_list));
+      std::move(out_generated_column_expr_list),
+      std::move(resolved_timestamp_version_column),
+      std::move(resolved_temporal_at));
   MaybeRecordResolvedNodeOperatorKeywordLocation(ast_statement, output->get());
   return absl::OkStatus();
 }
@@ -3022,4 +3384,164 @@ absl::Status Resolver::ResolveGeneratedColumnsForDml(
 
   return absl::OkStatus();
 }
+
+absl::Status Resolver::ResolveTemporalAtClause(
+    const ASTTemporalAt* temporal_at, const NameScope* temporal_at_scope,
+    std::unique_ptr<const ResolvedExpr>* resolved_temporal_at) {
+  GOOGLESQL_RET_CHECK(temporal_at != nullptr);
+  std::unique_ptr<const ResolvedExpr> temp_expr;
+  GOOGLESQL_RETURN_IF_ERROR(ResolveScalarExpr(
+      temporal_at->expression(), temporal_at_scope, "AT clause", &temp_expr));
+
+  GOOGLESQL_RETURN_IF_ERROR(CoerceExprToType(
+      temporal_at->expression(), type_factory_->get_timestamp(),
+      TypeModifiers(), CoercionMode::kImplicitCoercion,
+      "AT clause expression must be $0, but was $1", &temp_expr));
+  *resolved_temporal_at = std::move(temp_expr);
+  return absl::OkStatus();
+}
+
+absl::Status Resolver::ResolveWithTimestampClause(
+    const ASTWithTimestamp* with_timestamp, IdString target_alias,
+    const NameScope* scope, const NameList* target_name_list,
+    std::unique_ptr<const ResolvedColumnHolder>*
+        resolved_timestamp_version_column,
+    std::shared_ptr<const NameList>* new_name_list,
+    const ResolvedColumnList& insert_target_columns,
+    bool has_explicit_column_list) {
+  GOOGLESQL_RET_CHECK(with_timestamp != nullptr);
+  IdString alias = kTimestampId;
+  if (with_timestamp->alias() != nullptr) {
+    alias = with_timestamp->alias()->GetAsIdString();
+  }
+
+  const ASTNode* alias_error_location =
+      with_timestamp->alias() != nullptr
+          ? static_cast<const ASTNode*>(with_timestamp->alias()->identifier())
+          : with_timestamp;
+
+  if (alias == target_alias) {
+    return MakeSqlErrorAt(alias_error_location)
+           << "WITH TIMESTAMP alias " << ToIdentifierLiteral(alias)
+           << " conflicts with the target table alias";
+  }
+
+  // We must check both the DML body `scope` and the `target_name_list` for
+  // conflicts. For UPDATE/DELETE, the target columns are in `scope`, but for
+  // INSERT they are not (as target columns cannot be referenced in the VALUES
+  // or SELECT clause). Checking both ensures we catch conflicts across all DML
+  // statement types.
+  if (scope != nullptr) {
+    NameTarget existing_target;
+    GOOGLESQL_ASSIGN_OR_RETURN(bool name_found,
+                     scope->LookupName(alias, &existing_target));
+    if (name_found) {
+      return MakeSqlErrorAt(alias_error_location)
+             << "WITH TIMESTAMP alias " << ToIdentifierLiteral(alias)
+             << " conflicts with a column";
+    }
+  }
+
+  if (target_name_list != nullptr) {
+    NameTarget dummy_target;
+    GOOGLESQL_ASSIGN_OR_RETURN(bool name_found,
+                     target_name_list->LookupName(alias, &dummy_target));
+    if (name_found) {
+      return MakeSqlErrorAt(alias_error_location)
+             << "WITH TIMESTAMP alias " << ToIdentifierLiteral(alias)
+             << " conflicts with a column";
+    }
+  }
+
+  // Check if the pseudo-column alias matches any of the target columns being
+  // inserted into (only relevant for INSERT statements).
+  ResolvedColumn timestamp_col;
+  auto it = absl::c_find_if(
+      insert_target_columns,
+      [alias](const ResolvedColumn& col) { return col.name_id() == alias; });
+  bool found = (it != insert_target_columns.end());
+  if (found) {
+    // If the pseudo-column was already resolved as part of the target column
+    // list (for INSERT with an explicit column list), we must reuse it to
+    // ensure column ID consistency.
+    timestamp_col = *it;
+  }
+
+  if (has_explicit_column_list) {
+    // For INSERT statements with an explicit column list, the timestamp column
+    // must be explicitly specified in that column list.
+    if (!found) {
+      return MakeSqlErrorAt(with_timestamp)
+             << "WITH TIMESTAMP column " << ToIdentifierLiteral(alias)
+             << " must be explicitly specified in the column list";
+    }
+  } else {
+    // For UPDATE/DELETE, or INSERT without an explicit column list, we
+    // allocate a new ResolvedColumn for the timestamp column.
+    timestamp_col =
+        ResolvedColumn(AllocateColumnId(), kTimestampPseudoTableId, alias,
+                       AnnotatedType(type_factory_->get_timestamp()));
+  }
+
+  *resolved_timestamp_version_column = MakeResolvedColumnHolder(timestamp_col);
+
+  std::shared_ptr<NameList> timestamp_name_list = std::make_shared<NameList>();
+  GOOGLESQL_RETURN_IF_ERROR(timestamp_name_list->AddColumn(alias, timestamp_col,
+                                                 /*is_explicit=*/true));
+  *new_name_list = std::move(timestamp_name_list);
+
+  return absl::OkStatus();
+}
+
+absl::Status Resolver::ValidateVersionAwareDmlTarget(
+    const ASTStatement* ast_statement, const NameList* versioned_name_list,
+    IdString target_alias, bool has_temporal_at, bool has_with_timestamp) {
+  if (!language().LanguageFeatureEnabled(FEATURE_VERSION_AWARE_DML)) {
+    return MakeSqlErrorAt(ast_statement)
+           << "Version-aware DML is not supported";
+  }
+
+  bool has_top_level_versioned_column = false;
+  bool has_versioned_subfields = false;
+
+  if (versioned_name_list != nullptr) {
+    for (const NamedColumn& named_column : versioned_name_list->columns()) {
+      if (IsNamedColumnVersioned(named_column, /*allow_subfields=*/false)) {
+        has_top_level_versioned_column = true;
+        has_versioned_subfields = true;
+      } else if (IsNamedColumnVersioned(named_column,
+                                        /*allow_subfields=*/true)) {
+        has_versioned_subfields = true;
+      }
+    }
+  }
+
+  if (has_with_timestamp) {
+    if (ast_statement != nullptr && ast_statement->Is<ASTInsertStatement>()) {
+      if (!has_versioned_subfields) {
+        return MakeSqlErrorAt(ast_statement)
+               << "WITH TIMESTAMP clause is not supported on target "
+               << ToIdentifierLiteral(target_alias)
+               << " because it has no versioned columns or fields";
+      }
+    } else {
+      if (!has_top_level_versioned_column) {
+        return MakeSqlErrorAt(ast_statement)
+               << "WITH TIMESTAMP clause is not supported on target "
+               << ToIdentifierLiteral(target_alias)
+               << " because it has no versioned columns in the immediate scope";
+      }
+    }
+  }
+
+  if (has_temporal_at && !has_versioned_subfields) {
+    return MakeSqlErrorAt(ast_statement)
+           << "AT clause is not supported on target "
+           << ToIdentifierLiteral(target_alias)
+           << " because it has no versioned columns or fields";
+  }
+
+  return absl::OkStatus();
+}
+
 }  // namespace googlesql

@@ -1034,7 +1034,8 @@ public class SimpleCatalogTest {
     DeclarativeType declType =
         factory.createDeclarativeType(
             DeclarativeTypeDescriptor.builder()
-                .setTypeId(new DeclarativeTypeDescriptor.TypeId("N1", "DeclType", 0))
+                .setTypeId(
+                    new DeclarativeTypeDescriptor.TypeId("N1", "DeclType", /* versionId= */ ""))
                 .setDisplayName("DeclType")
                 .setBackingType(TypeFactory.createSimpleType(TypeKind.TYPE_INT64))
                 .setCoercionFromBackingType(

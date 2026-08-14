@@ -322,6 +322,7 @@ QueryStmt
     |       +-Parameter(parse_location=53-60, type=DeclArray, name="param2")
     +-input_scan=
       +-SingleRowScan
+
 [UNDECLARED_PARAMETERS]
 param: DeclInt
 param2: DeclArray

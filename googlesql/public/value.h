@@ -343,10 +343,22 @@ class Value {
   // Requires: !is_null() && type_kind() == TYPE_STRUCT
   absl::StatusOr<ListView> fields_view() const;
 #endif
+  // Returns the value of the field with the given 'name' case-insensitively.
+  //
+  // Returns an error if
+  // - The value is null, or
+  // - The value is not a struct, or
+  // - The `name` is empty (anonymous fields), or
+  // - The lookup is ambiguous, or
+  // - The field is not found.
+  absl::StatusOr<Value> FindStructFieldByNameCaseInsensitive(
+      absl::string_view name) const;
+
   // Returns the value of the first field with the given 'name'. If one doesn't
   // exist, returns an invalid value.
   // Does not find anonymous fields (those with empty names).
   // Requires (crashes otherwise): !is_null() && type_kind() == TYPE_STRUCT
+  ABSL_DEPRECATED("Use FindStructFieldByNameCaseInsensitive instead")
   const Value& FindFieldByName(absl::string_view name) const;
 
   // Array and Map-specific methods.

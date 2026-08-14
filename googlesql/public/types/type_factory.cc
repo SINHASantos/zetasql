@@ -37,6 +37,7 @@
 #include "googlesql/public/functions/bitwise_agg_mode.pb.h"
 #include "googlesql/public/functions/datetime.pb.h"
 #include "googlesql/public/functions/differential_privacy.pb.h"
+#include "googlesql/public/functions/endianness.pb.h"
 #include "googlesql/public/functions/normalize_mode.pb.h"
 #include "googlesql/public/functions/range_sessionize_mode.pb.h"
 #include "googlesql/public/functions/rank_type.pb.h"
@@ -278,18 +279,20 @@ absl::StatusOr<const ArrayType*> TypeFactory::MakeArrayType(
   if (this != s_type_factory() && StaticTypeSet()->contains(element_type)) {
     return s_type_factory()->MakeArrayType(element_type, allow_array_of_array);
   }
-
-  AddDependency(element_type);
   if (!allow_array_of_array && element_type->IsArray()) {
     return ::googlesql_base::InvalidArgumentErrorBuilder()
            << "Array of array types are not supported";
   }
+  GOOGLESQL_RET_CHECK(!element_type->IsRow()) << "Array of RowType is not supported";
 
   const int depth_limit = nesting_depth_limit();
   if (element_type->nesting_depth() + 1 > depth_limit) {
     return ::googlesql_base::InvalidArgumentErrorBuilder()
            << "Array type would exceed nesting depth limit of " << depth_limit;
   }
+
+  AddDependency(element_type);
+
   absl::MutexLock lock(store_->mutex_);
   return MakeTypeWithChildElementType(element_type, cached_array_types_);
 }
@@ -338,8 +341,15 @@ absl::Status TypeFactory::MakeStructTypeFromVector(
              << "Struct type would exceed nesting depth limit of "
              << depth_limit;
     }
+    GOOGLESQL_RET_CHECK(!field.type->IsRow())
+        << "Struct type cannot contain RowType fields";
+  }
+
+  // Only add dependencies if validations passed and we will create the type.
+  for (const StructType::StructField& field : fields) {
     AddDependency(field.type);
   }
+
   // We calculate <max_nesting_depth> in the previous loop. We also need to
   // increment it to take into account the struct itself.
   *result = TakeOwnership(
@@ -450,9 +460,9 @@ static absl::Status ValidateDeclarativeTypeDescriptor(
   GOOGLESQL_RET_CHECK(!descriptor.type_id().name_space.empty());
   GOOGLESQL_RET_CHECK(!descriptor.type_id().local_id.empty());
 
-  GOOGLESQL_RET_CHECK(descriptor.type_id().counter >= 0);
   if (descriptor.type_id().IsGoogleSQLBuiltin()) {
-    GOOGLESQL_RET_CHECK_EQ(descriptor.type_id().counter, 0);
+    GOOGLESQL_RET_CHECK(descriptor.type_id().version_id.empty())
+        << "version_id must be empty for GoogleSQL built-in types";
   }
 
   GOOGLESQL_RET_CHECK(!descriptor.display_name().empty());
@@ -465,7 +475,6 @@ static absl::Status ValidateDeclarativeTypeDescriptor(
 absl::StatusOr<const Type*> TypeFactory::MakeDeclarativeType(
     DeclarativeTypeDescriptor descriptor) {
   GOOGLESQL_RETURN_IF_ERROR(ValidateDeclarativeTypeDescriptor(descriptor));
-
 
   if (this != s_type_factory() && descriptor.type_id().IsGoogleSQLBuiltin() &&
       descriptor.backing_type()->type_store_ == s_type_factory()->store_) {
@@ -634,15 +643,17 @@ absl::StatusOr<const Type*> TypeFactory::MakeMapTypeImpl(
     return s_type_factory()->MakeMapTypeImpl(key_type, value_type);
   }
 
-  AddDependency(key_type);
-  AddDependency(value_type);
-
   const int depth_limit = nesting_depth_limit();
   if (std::max(key_type->nesting_depth(), value_type->nesting_depth()) + 1 >
       depth_limit) {
     return ::googlesql_base::InvalidArgumentErrorBuilder()
            << "Map type would exceed nesting depth limit of " << depth_limit;
   }
+  GOOGLESQL_RET_CHECK(!key_type->IsRow()) << "Map with Row type key is not supported";
+  GOOGLESQL_RET_CHECK(!value_type->IsRow()) << "Map with Row type value is not supported";
+
+  AddDependency(key_type);
+  AddDependency(value_type);
 
   // Cannot use TypeFactory::MakeTypeWithChildElementType here because we have a
   // pair of types.
@@ -1237,6 +1248,19 @@ static const EnumType* s_normalize_mode_enum_type() {
   return s_normalize_mode_enum_type;
 }
 
+static absl::StatusOr<const EnumType*> s_endianness_enum_type() {
+  static const absl::StatusOr<const EnumType*>* s_endianness_enum_type =
+      new absl::StatusOr<const EnumType*>(
+          []() -> absl::StatusOr<const EnumType*> {
+            const EnumType* enum_type;
+            GOOGLESQL_RETURN_IF_ERROR(internal::TypeFactoryHelper::MakeOpaqueEnumType(
+                s_type_factory(), functions::Endianness_descriptor(),
+                &enum_type, /*catalog_name_path=*/{}));
+            return enum_type;
+          }());
+  return *s_endianness_enum_type;
+}
+
 static const EnumType* s_rounding_mode_enum_type() {
   static const EnumType* s_rounding_mode_enum_type = [] {
     const EnumType* enum_type;
@@ -1539,6 +1563,9 @@ const Type* TokenListType() { return s_tokenlist_type(); }
 const StructType* EmptyStructType() { return s_empty_struct_type(); }
 const EnumType* DatePartEnumType() { return s_date_part_enum_type(); }
 const EnumType* NormalizeModeEnumType() { return s_normalize_mode_enum_type(); }
+absl::StatusOr<const EnumType*> EndiannessEnumType() {
+  return s_endianness_enum_type();
+}
 const EnumType* RoundingModeEnumType() { return s_rounding_mode_enum_type(); }
 const EnumType* ArrayFindModeEnumType() { return GetArrayFindModeEnumType(); }
 const EnumType* DifferentialPrivacyReportFormatEnumType() {
@@ -1711,6 +1738,8 @@ absl::StatusOr<const EnumType*> GetOpaqueEnumTypeFromSqlName(
           DifferentialPrivacyCountDistinctContributionBoundingStrategyEnumType());  // NOLINT
   GOOGLESQL_ASSIGN_OR_RETURN(const EnumType* rank_type_enum_type,
                    types::RankTypeEnumType());
+  GOOGLESQL_ASSIGN_OR_RETURN(const EnumType* endianness_enum_type,
+                   types::EndiannessEnumType());
 
   static const auto* kStaticEnumMap =
       new absl::flat_hash_map<absl::string_view, const EnumType*,
@@ -1729,6 +1758,7 @@ absl::StatusOr<const EnumType*> GetOpaqueEnumTypeFromSqlName(
           {"BITWISE_AGG_MODE", types::BitwiseAggModeEnumType()},
           {"UNSUPPORTED_FIELDS", types::UnsupportedFieldsEnumType()},
           {"RANK_TYPE", rank_type_enum_type},
+          {"ENDIANNESS", endianness_enum_type},
       };
   return googlesql_base::FindPtrOrNull(*kStaticEnumMap, enum_name);
 }

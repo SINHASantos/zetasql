@@ -734,6 +734,7 @@ QueryStmt
                   +-FunctionCall(GoogleSQL:ifnull(STRING, STRING) -> STRING)
                     +-ColumnRef(type=STRING, column=KeyValue.Value#2)
                     +-Literal(type=STRING, value="NULL")
+
 [SQLBUILDER_TARGET_SYNTAX_MODE standard]
 [SQLBUILDER_OUTPUT]
 SELECT

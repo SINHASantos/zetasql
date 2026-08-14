@@ -1229,6 +1229,46 @@ ERROR: Nested INSERTs cannot have insert mode UPDATE [at 3:4]
    ^
 ==
 
+# Nested INSERT with explicit column list emits NESTED_INSERT_COLUMN_LIST deprecation warning.
+[language_features=NONE]
+UPDATE TestTable SET
+  (INSERT KitchenSink.repeated_int64_val (ignored_value)
+   VALUES (1))
+WHERE true
+--
+UpdateStmt
++-table_scan=
+| +-TableScan(column_list=[TestTable.KitchenSink#3], table=TestTable, column_index_list=[2])
++-column_access_list=READ_WRITE
++-where_expr=
+| +-Literal(type=BOOL, value=true)
++-update_item_list=
+  +-UpdateItem
+    +-target=
+    | +-GetProtoField
+    |   +-type=ARRAY<INT64>
+    |   +-expr=
+    |   | +-ColumnRef(type=PROTO<googlesql_test.KitchenSinkPB>, column=TestTable.KitchenSink#3)
+    |   +-field_descriptor=repeated_int64_val
+    |   +-default_value=[]
+    +-element_column=
+    | +-ColumnHolder(column=$array.repeated_int64_val#4)
+    +-insert_list=
+      +-InsertStmt
+        +-row_list=
+          +-InsertRow
+            +-value_list=
+              +-DMLValue
+                +-value=
+                  +-Literal(type=INT64, value=1)
+
+DEPRECATION WARNING:
+Explicit column list in nested INSERT is ignored and will be disallowed in a future release [at 2:42]
+  (INSERT KitchenSink.repeated_int64_val (ignored_value)
+                                         ^
+[googlesql.DeprecationWarning] { kind: NESTED_INSERT_COLUMN_LIST }
+==
+
 # Nested INSERT with query
 [language_features=NONE,{{|+CORRELATED_REFS_IN_NESTED_DML}}]
 UPDATE TestTable SET

@@ -150,6 +150,7 @@ FunctionCall(GoogleSQL:$equal(INT32, INT32) -> BOOL)
 +-parse_location=0-16
 +-ExpressionColumn(parse_location=0-12, type=INT32, name="column_int32")
 +-Parameter(parse_location=15-16, type=INT32, position=1)
+
 [UNDECLARED_PARAMETERS]
 INT32
 ==
@@ -1366,7 +1367,6 @@ SubqueryExpr
         | +-TestConstantInt64#3 := Constant(TestConstantInt64, parse_location=68-85, type=INT64, value=1)
         +-input_scan=
           +-SingleRowScan
-
 
 DEPRECATION WARNING:
 Lateral column alias will shadow original target: ambiguous [at 1:39]

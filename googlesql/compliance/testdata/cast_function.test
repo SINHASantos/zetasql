@@ -1714,3 +1714,31 @@ SELECT CAST(MAP_FROM_ARRAY([STRUCT<STRING, DOUBLE>("1.1", 1.0 + 0.1)]) AS MAP<DO
 ARRAY<STRUCT<MAP<DOUBLE, STRING>>>[{{1.1: "1.1"}}]
 
 NOTE: Reference implementation reports non-determinism.
+
+==
+
+[required_features=CAST_OPERATORS]
+[name=cast_operator_double_colon]
+SELECT 1 :: int64, "hello" :: string, 3.7 :: uint32
+--
+ARRAY<STRUCT<INT64, STRING, UINT32>>[{1, "hello", 4}]
+==
+
+[required_features=CAST_OPERATORS]
+[name=cast_operator_question_double_colon]
+SELECT 1 ?:: int64, "hello" ?:: string, 3.7 ?:: uint32, "invalid" ?:: int64
+--
+ARRAY<STRUCT<INT64, STRING, UINT32, INT64>>[{1, "hello", 4, NULL}]
+==
+
+[required_features=CAST_OPERATORS]
+[name=cast_operator_smallest_negative_literal]
+SELECT -2147483648 :: int32, -9223372036854775808 :: int64, -2147483648 ?:: int32, -9223372036854775808 ?:: int64, -0x8000000000000000 :: int64
+--
+ARRAY<STRUCT<INT32, INT64, INT32, INT64, INT64>>[
+  {-2147483648,
+   -9223372036854775808,
+   -2147483648,
+   -9223372036854775808,
+   -9223372036854775808}
+]

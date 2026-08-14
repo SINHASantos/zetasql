@@ -3385,7 +3385,8 @@ public class ValueTest {
     DeclarativeType declInt =
         factory.createDeclarativeType(
             DeclarativeTypeDescriptor.builder()
-                .setTypeId(new DeclarativeTypeDescriptor.TypeId("NS", "IntDeclVal", 1))
+                .setTypeId(
+                    new DeclarativeTypeDescriptor.TypeId("NS", "IntDeclVal", /* versionId= */ "v1"))
                 .setDisplayName("int_decl_val")
                 .setBackingType(TypeFactory.createSimpleType(TypeKind.TYPE_INT64))
                 .build());
@@ -3414,7 +3415,8 @@ public class ValueTest {
     DeclarativeType declInt =
         factory.createDeclarativeType(
             DeclarativeTypeDescriptor.builder()
-                .setTypeId(new DeclarativeTypeDescriptor.TypeId("NS", "IntDeclVal", 1))
+                .setTypeId(
+                    new DeclarativeTypeDescriptor.TypeId("NS", "IntDeclVal", /* versionId= */ "v1"))
                 .setDisplayName("int_decl_val")
                 .setBackingType(TypeFactory.createSimpleType(TypeKind.TYPE_INT64))
                 .build());
@@ -3444,7 +3446,9 @@ public class ValueTest {
     DeclarativeType declInt =
         factory.createDeclarativeType(
             DeclarativeTypeDescriptor.builder()
-                .setTypeId(new DeclarativeTypeDescriptor.TypeId("NS", "IntDeclHashVal", 1))
+                .setTypeId(
+                    new DeclarativeTypeDescriptor.TypeId(
+                        "NS", "IntDeclHashVal", /* versionId= */ "v1"))
                 .setDisplayName("int_decl_hash_val")
                 .setBackingType(TypeFactory.createSimpleType(TypeKind.TYPE_INT64))
                 .build());
@@ -3452,7 +3456,9 @@ public class ValueTest {
     DeclarativeType declIntOther =
         factory.createDeclarativeType(
             DeclarativeTypeDescriptor.builder()
-                .setTypeId(new DeclarativeTypeDescriptor.TypeId("NS", "IntDeclOtherHashVal", 1))
+                .setTypeId(
+                    new DeclarativeTypeDescriptor.TypeId(
+                        "NS", "IntDeclOtherHashVal", /* versionId= */ "v1"))
                 .setDisplayName("int_decl_other_hash_val")
                 .setBackingType(TypeFactory.createSimpleType(TypeKind.TYPE_INT64))
                 .build());
@@ -3479,7 +3485,8 @@ public class ValueTest {
     DeclarativeType declInt64 =
         factory.createDeclarativeType(
             DeclarativeTypeDescriptor.builder()
-                .setTypeId(new DeclarativeTypeDescriptor.TypeId("NS", "DeclInt64", 1))
+                .setTypeId(
+                    new DeclarativeTypeDescriptor.TypeId("NS", "DeclInt64", /* versionId= */ "v1"))
                 .setDisplayName("decl_int64")
                 .setBackingType(TypeFactory.createSimpleType(TypeKind.TYPE_INT64))
                 .build());
@@ -3487,7 +3494,9 @@ public class ValueTest {
     DeclarativeType declDatetime =
         factory.createDeclarativeType(
             DeclarativeTypeDescriptor.builder()
-                .setTypeId(new DeclarativeTypeDescriptor.TypeId("NS", "DeclDatetime", 1))
+                .setTypeId(
+                    new DeclarativeTypeDescriptor.TypeId(
+                        "NS", "DeclDatetime", /* versionId= */ "v1"))
                 .setDisplayName("decl_datetime")
                 .setBackingType(TypeFactory.createSimpleType(TypeKind.TYPE_DATETIME))
                 .build());

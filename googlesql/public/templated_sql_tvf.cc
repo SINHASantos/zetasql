@@ -214,7 +214,27 @@ absl::Status TemplatedSQLTVF::Resolve(
   // Construct the output schema for the TemplatedSQLTVFSignature return object.
   TVFRelation return_tvf_relation({});
   if (specified_output_schema) {
-    return_tvf_relation = *specified_output_schema;
+    // Do not use the `specified_output_schema` directly as some extra
+    // annotations may have propagated through the coercions, e.g. like lineage.
+    std::vector<TVFRelation::Column> output_schema_columns;
+    GOOGLESQL_RET_CHECK(resolved_sql_body->Is<ResolvedQueryStmt>());
+    const auto* query_stmt = resolved_sql_body->GetAs<ResolvedQueryStmt>();
+    output_schema_columns.reserve(query_stmt->output_column_list_size());
+    for (int i = 0; i < query_stmt->output_column_list_size(); ++i) {
+      const auto& output_column = query_stmt->output_column_list()[i];
+      output_schema_columns.emplace_back(
+          specified_output_schema->column(i).name,
+          output_column->column().annotated_type(),
+          specified_output_schema->column(i).is_pseudo_column,
+          specified_output_schema->column(i).is_passthrough_column,
+          specified_output_schema->column(i).type_modifiers);
+    }
+    if (specified_output_schema->is_value_table()) {
+      GOOGLESQL_RET_CHECK_EQ(output_schema_columns.size(), 1);
+      return_tvf_relation = TVFRelation::ValueTable(output_schema_columns[0]);
+    } else {
+      return_tvf_relation = TVFRelation(std::move(output_schema_columns));
+    }
   } else if (tvf_body_name_list->is_value_table()) {
     // TODO: Attach proper error locations to the returned Status.
     GOOGLESQL_RET_CHECK_EQ(1, tvf_body_name_list->num_columns());

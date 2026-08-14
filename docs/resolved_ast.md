@@ -78,6 +78,7 @@ Additional non-generated classes that are documented separately:
       <a id="ResolvedRevokeFromAction-toc" href="#ResolvedRevokeFromAction">ResolvedRevokeFromAction</a>
       <a id="ResolvedSetAsAction-toc" href="#ResolvedSetAsAction">ResolvedSetAsAction</a>
       <a id="ResolvedSetCollateClause-toc" href="#ResolvedSetCollateClause">ResolvedSetCollateClause</a>
+      <a id="ResolvedSetConditionAction-toc" href="#ResolvedSetConditionAction">ResolvedSetConditionAction</a>
       <a id="ResolvedSetOptionsAction-toc" href="#ResolvedSetOptionsAction">ResolvedSetOptionsAction</a>
     <a id="ResolvedAnalyticFunctionGroup-toc" href="#ResolvedAnalyticFunctionGroup">ResolvedAnalyticFunctionGroup</a>
     <a id="ResolvedArgumentDef-toc" href="#ResolvedArgumentDef">ResolvedArgumentDef</a>
@@ -116,6 +117,7 @@ Additional non-generated classes that are documented separately:
     <a id="ResolvedGraphElementLabel-toc" href="#ResolvedGraphElementLabel">ResolvedGraphElementLabel</a>
     <a id="ResolvedGraphElementProperty-toc" href="#ResolvedGraphElementProperty">ResolvedGraphElementProperty</a>
     <a id="ResolvedGraphElementTable-toc" href="#ResolvedGraphElementTable">ResolvedGraphElementTable</a>
+    <a id="ResolvedGraphElementType-toc" href="#ResolvedGraphElementType">ResolvedGraphElementType</a>
     <a id="ResolvedGraphLabelExpr-toc" href="#ResolvedGraphLabelExpr">ResolvedGraphLabelExpr</a>
       <a id="ResolvedGraphLabel-toc" href="#ResolvedGraphLabel">ResolvedGraphLabel</a>
       <a id="ResolvedGraphLabelNaryExpr-toc" href="#ResolvedGraphLabelNaryExpr">ResolvedGraphLabelNaryExpr</a>
@@ -200,6 +202,7 @@ Additional non-generated classes that are documented separately:
       <a id="ResolvedNonScalarFunctionCallBase-toc" href="#ResolvedNonScalarFunctionCallBase">ResolvedNonScalarFunctionCallBase</a>
         <a id="ResolvedAggregateFunctionCall-toc" href="#ResolvedAggregateFunctionCall">ResolvedAggregateFunctionCall</a>
         <a id="ResolvedAnalyticFunctionCall-toc" href="#ResolvedAnalyticFunctionCall">ResolvedAnalyticFunctionCall</a>
+        <a id="ResolvedEstimatorFunctionCall-toc" href="#ResolvedEstimatorFunctionCall">ResolvedEstimatorFunctionCall</a>
     <a id="ResolvedGetJsonField-toc" href="#ResolvedGetJsonField">ResolvedGetJsonField</a>
     <a id="ResolvedGetProtoField-toc" href="#ResolvedGetProtoField">ResolvedGetProtoField</a>
     <a id="ResolvedGetProtoOneof-toc" href="#ResolvedGetProtoOneof">ResolvedGetProtoOneof</a>
@@ -247,6 +250,7 @@ Additional non-generated classes that are documented separately:
       <a id="ResolvedGraphScan-toc" href="#ResolvedGraphScan">ResolvedGraphScan</a>
     <a id="ResolvedGraphTableScan-toc" href="#ResolvedGraphTableScan">ResolvedGraphTableScan</a>
     <a id="ResolvedGroupRowsScan-toc" href="#ResolvedGroupRowsScan">ResolvedGroupRowsScan</a>
+    <a id="ResolvedInsertScan-toc" href="#ResolvedInsertScan">ResolvedInsertScan</a>
     <a id="ResolvedJoinScan-toc" href="#ResolvedJoinScan">ResolvedJoinScan</a>
     <a id="ResolvedLimitOffsetScan-toc" href="#ResolvedLimitOffsetScan">ResolvedLimitOffsetScan</a>
     <a id="ResolvedLogScan-toc" href="#ResolvedLogScan">ResolvedLogScan</a>
@@ -256,7 +260,6 @@ Additional non-generated classes that are documented separately:
     <a id="ResolvedPipeExportDataScan-toc" href="#ResolvedPipeExportDataScan">ResolvedPipeExportDataScan</a>
     <a id="ResolvedPipeForkScan-toc" href="#ResolvedPipeForkScan">ResolvedPipeForkScan</a>
     <a id="ResolvedPipeIfScan-toc" href="#ResolvedPipeIfScan">ResolvedPipeIfScan</a>
-    <a id="ResolvedPipeInsertScan-toc" href="#ResolvedPipeInsertScan">ResolvedPipeInsertScan</a>
     <a id="ResolvedPipeTeeScan-toc" href="#ResolvedPipeTeeScan">ResolvedPipeTeeScan</a>
     <a id="ResolvedPivotScan-toc" href="#ResolvedPivotScan">ResolvedPivotScan</a>
     <a id="ResolvedProjectScan-toc" href="#ResolvedProjectScan">ResolvedProjectScan</a>
@@ -272,6 +275,7 @@ Additional non-generated classes that are documented separately:
     <a id="ResolvedTableScan-toc" href="#ResolvedTableScan">ResolvedTableScan</a>
     <a id="ResolvedUnpivotScan-toc" href="#ResolvedUnpivotScan">ResolvedUnpivotScan</a>
     <a id="ResolvedUnsetArgumentScan-toc" href="#ResolvedUnsetArgumentScan">ResolvedUnsetArgumentScan</a>
+    <a id="ResolvedUpdateScan-toc" href="#ResolvedUpdateScan">ResolvedUpdateScan</a>
     <a id="ResolvedWithRefScan-toc" href="#ResolvedWithRefScan">ResolvedWithRefScan</a>
     <a id="ResolvedWithScan-toc" href="#ResolvedWithScan">ResolvedWithScan</a>
   <a id="ResolvedStatement-toc" href="#ResolvedStatement">ResolvedStatement</a>
@@ -280,6 +284,7 @@ Additional non-generated classes that are documented separately:
       <a id="ResolvedAlterAllRowAccessPoliciesStmt-toc" href="#ResolvedAlterAllRowAccessPoliciesStmt">ResolvedAlterAllRowAccessPoliciesStmt</a>
       <a id="ResolvedAlterApproxViewStmt-toc" href="#ResolvedAlterApproxViewStmt">ResolvedAlterApproxViewStmt</a>
       <a id="ResolvedAlterConnectionStmt-toc" href="#ResolvedAlterConnectionStmt">ResolvedAlterConnectionStmt</a>
+      <a id="ResolvedAlterDataPolicyStmt-toc" href="#ResolvedAlterDataPolicyStmt">ResolvedAlterDataPolicyStmt</a>
       <a id="ResolvedAlterDatabaseStmt-toc" href="#ResolvedAlterDatabaseStmt">ResolvedAlterDatabaseStmt</a>
       <a id="ResolvedAlterEntityStmt-toc" href="#ResolvedAlterEntityStmt">ResolvedAlterEntityStmt</a>
       <a id="ResolvedAlterExternalSchemaStmt-toc" href="#ResolvedAlterExternalSchemaStmt">ResolvedAlterExternalSchemaStmt</a>
@@ -306,6 +311,7 @@ Additional non-generated classes that are documented separately:
     <a id="ResolvedCreateStatement-toc" href="#ResolvedCreateStatement">ResolvedCreateStatement</a>
       <a id="ResolvedCreateConnectionStmt-toc" href="#ResolvedCreateConnectionStmt">ResolvedCreateConnectionStmt</a>
       <a id="ResolvedCreateConstantStmt-toc" href="#ResolvedCreateConstantStmt">ResolvedCreateConstantStmt</a>
+      <a id="ResolvedCreateDataPolicyStmt-toc" href="#ResolvedCreateDataPolicyStmt">ResolvedCreateDataPolicyStmt</a>
       <a id="ResolvedCreateEntityStmt-toc" href="#ResolvedCreateEntityStmt">ResolvedCreateEntityStmt</a>
       <a id="ResolvedCreateFunctionStmt-toc" href="#ResolvedCreateFunctionStmt">ResolvedCreateFunctionStmt</a>
       <a id="ResolvedCreateIndexStmt-toc" href="#ResolvedCreateIndexStmt">ResolvedCreateIndexStmt</a>
@@ -313,6 +319,7 @@ Additional non-generated classes that are documented separately:
       <a id="ResolvedCreatePrivilegeRestrictionStmt-toc" href="#ResolvedCreatePrivilegeRestrictionStmt">ResolvedCreatePrivilegeRestrictionStmt</a>
       <a id="ResolvedCreateProcedureStmt-toc" href="#ResolvedCreateProcedureStmt">ResolvedCreateProcedureStmt</a>
       <a id="ResolvedCreatePropertyGraphStmt-toc" href="#ResolvedCreatePropertyGraphStmt">ResolvedCreatePropertyGraphStmt</a>
+      <a id="ResolvedCreatePropertyGraphTypeStmt-toc" href="#ResolvedCreatePropertyGraphTypeStmt">ResolvedCreatePropertyGraphTypeStmt</a>
       <a id="ResolvedCreateSchemaStmtBase-toc" href="#ResolvedCreateSchemaStmtBase">ResolvedCreateSchemaStmtBase</a>
         <a id="ResolvedCreateExternalSchemaStmt-toc" href="#ResolvedCreateExternalSchemaStmt">ResolvedCreateExternalSchemaStmt</a>
         <a id="ResolvedCreateSchemaStmt-toc" href="#ResolvedCreateSchemaStmt">ResolvedCreateSchemaStmt</a>
@@ -967,6 +974,23 @@ class ResolvedAnalyticFunctionCall : public <a href="#ResolvedNonScalarFunctionC
   static const ResolvedNodeKind TYPE = RESOLVED_ANALYTIC_FUNCTION_CALL;
 
   const <a href="#ResolvedWindowFrame">ResolvedWindowFrame</a>* window_frame() const;
+};
+</code></pre></p>
+
+### ResolvedEstimatorFunctionCall
+<a id="ResolvedEstimatorFunctionCall"></a>
+
+<a href="#ResolvedNode">ResolvedNode</a> &rsaquo; <a href="#ResolvedExpr">ResolvedExpr</a>  &rsaquo; <a href="#ResolvedFunctionCallBase">ResolvedFunctionCallBase</a>  &rsaquo; <a href="#ResolvedNonScalarFunctionCallBase">ResolvedNonScalarFunctionCallBase</a>  &rsaquo; ResolvedEstimatorFunctionCall
+ &nbsp;(<a href="#ResolvedEstimatorFunctionCall-toc">tree</a>)
+
+<p><pre><code class="lang-c++"><font color="brown">// An estimator function call. It computes a value by applying an aggregate
+// function to input rows falling within the range specified by the
+// &lt;within_bounds&gt;. This node only ever shows up as a function call in a
+// <a href="#ResolvedAlignScan">ResolvedAlignScan</a>::estimator_function_list.</font>
+class ResolvedEstimatorFunctionCall : public <a href="#ResolvedNonScalarFunctionCallBase">ResolvedNonScalarFunctionCallBase</a> {
+  static const ResolvedNodeKind TYPE = RESOLVED_ESTIMATOR_FUNCTION_CALL;
+
+  const <a href="#ResolvedWithinBound">ResolvedWithinBounds</a>* within_bounds() const;
 };
 </code></pre></p>
 
@@ -2325,8 +2349,13 @@ class ResolvedCube : public <a href="#ResolvedGroupingSetBase">ResolvedGroupingS
 // See (broken link).
 //
 // Compute all aggregations in &lt;aggregate_list&gt;.  All expressions in
-// &lt;aggregate_list&gt; have a <a href="#ResolvedAggregateFunctionCall">ResolvedAggregateFunctionCall</a> with mode
-// Function::AGGREGATE as their outermost node.
+// &lt;aggregate_list&gt; are either:
+// - a <a href="#ResolvedAggregateFunctionCall">ResolvedAggregateFunctionCall</a> with mode Function::AGGREGATE as their
+//   outermost node
+// - a <a href="#ResolvedSubqueryExpr">ResolvedSubqueryExpr</a> evaluated once per aggregation group (enabled by
+//   FEATURE_WITH_GROUP_ROWS). It may contain a <a href="#ResolvedGroupRowsScan">ResolvedGroupRowsScan</a> to read
+//   the input rows for the current group, though a <a href="#ResolvedGroupRowsScan">ResolvedGroupRowsScan</a> is
+//   not strictly required.
 //
 // The output &lt;column_list&gt; contains only columns produced from
 // &lt;group_by_list&gt; and &lt;aggregate_list&gt;.  No other columns are visible after
@@ -3351,120 +3380,6 @@ class ResolvedProjectScan : public <a href="#ResolvedScan">ResolvedScan</a> {
 };
 </code></pre></p>
 
-### ResolvedTVFScan
-<a id="ResolvedTVFScan"></a>
-
-<a href="#ResolvedNode">ResolvedNode</a> &rsaquo; <a href="#ResolvedScan">ResolvedScan</a>  &rsaquo; ResolvedTVFScan
- &nbsp;(<a href="#ResolvedTVFScan-toc">tree</a>)
-
-<p><pre><code class="lang-c++"><font color="brown">// This scan represents a call to a table-valued function (TVF). Each TVF
-// returns an entire output relation instead of a single scalar value. The
-// enclosing query may refer to the TVF as if it were a table subquery. The
-// TVF may accept scalar arguments and/or other input relations.
-//
-// Scalar arguments work the same way as arguments for non-table-valued
-// functions: in the resolved AST, their types are equal to the required
-// argument types specified in the function signature.
-//
-// The function signature may also include relation arguments, and any such
-// relation argument may specify a required schema. If such a required schema
-// is present, then in the resolved AST, the <a href="#ResolvedScan">ResolvedScan</a> for each relational
-// <a href="#ResolvedFunctionArgument">ResolvedFunctionArgument</a> is guaranteed to have the same number of columns
-// as the required schema, and the provided columns match position-wise with
-// the required columns. Each provided column has the same name and type as
-// the corresponding required column.
-//
-// If AnalyzerOptions::prune_unused_columns is true, the &lt;column_list&gt; and
-// &lt;column_index_list&gt; will include only columns that were referenced
-// in the user query. (SELECT * counts as referencing all columns.)
-// Pruning has no effect on value tables (the value is never pruned).
-//
-// &lt;column_list&gt; is a set of new <a href="#ResolvedColumn">ResolvedColumns</a> created by this scan.
-// The &lt;column_list&gt;[i] should be matched to the related TVFScan&#39;s output
-// relation column by
-// &lt;signature&gt;.result_schema().column(&lt;column_index_list&gt;[i]).
-//
-// &lt;tvf&gt; The TableValuedFunction entry that the catalog returned for this TVF
-//       scan. Contains non-concrete function signatures which may include
-//       arguments with templated types.
-// &lt;signature&gt; The concrete table function signature for this TVF call,
-//             including the types of all scalar arguments and the
-//             number and types of columns of all table-valued
-//             arguments. An engine may also subclass this object to
-//             provide extra custom information and return an instance
-//             of the subclass from the TableValuedFunction::Resolve
-//             method.
-// &lt;argument_list&gt; The vector of resolved concrete arguments for this TVF
-//                 call, including the default values or NULLs injected for
-//                 the omitted arguments (Note the NULL injection is a
-//                 temporary solution to handle omitted named arguments. This
-//                 is subject to change by upcoming CLs).
-//
-// &lt;column_index_list&gt; This list matches 1:1 with the &lt;column_list&gt;, and
-// identifies the index of the corresponding column in the &lt;signature&gt;&#39;s
-// result relation column list.
-//
-// &lt;alias&gt; The AS alias for the scan, or empty if none.
-// &lt;function_call_signature&gt; The FunctionSignature object from the
-//                           &lt;tvf-&gt;signatures()&gt; list that matched the
-//                           current call. The TVFScan&#39;s
-//                           &lt;FunctionSignature::ConcreteArgument&gt; list
-//                           matches 1:1 to &lt;argument_list&gt;, while its
-//                           &lt;FunctionSignature::arguments&gt; list still has
-//                           the full argument list.
-//                           Engines may use this object to
-//                           check for the argument names and omitted
-//                           arguments. SQLBuilder may also need this object
-//                           in cases when the named argument notation is
-//                           required for this call.</font>
-class ResolvedTVFScan : public <a href="#ResolvedScan">ResolvedScan</a> {
-  static const ResolvedNodeKind TYPE = RESOLVED_TVFSCAN;
-
-  const TableValuedFunction* tvf() const;
-
-  const std::shared_ptr&lt;TVFSignature&gt;&amp; signature() const;
-
-  const std::vector&lt;std::unique_ptr&lt;const <a href="#ResolvedFunctionArgument">ResolvedFunctionArgument</a>&gt;&gt;&amp; argument_list() const;
-  int argument_list_size() const;
-  const <a href="#ResolvedFunctionArgument">ResolvedFunctionArgument</a>* argument_list(int i) const;
-
-  const std::vector&lt;int&gt;&amp; column_index_list() const;
-  int column_index_list_size() const;
-  int column_index_list(int i) const;
-
-  const std::string&amp; alias() const;
-
-  const std::shared_ptr&lt;FunctionSignature&gt;&amp; function_call_signature() const;
-};
-</code></pre></p>
-
-### ResolvedGroupRowsScan
-<a id="ResolvedGroupRowsScan"></a>
-
-<a href="#ResolvedNode">ResolvedNode</a> &rsaquo; <a href="#ResolvedScan">ResolvedScan</a>  &rsaquo; ResolvedGroupRowsScan
- &nbsp;(<a href="#ResolvedGroupRowsScan-toc">tree</a>)
-
-<p><pre><code class="lang-c++"><font color="brown">// <a href="#ResolvedGroupRowsScan">ResolvedGroupRowsScan</a> represents a call to a group rows TVF.
-//
-// It can be created in two ways:
-// - WITH g() AS GROUP ROWS ... FROM g()
-// - FROM GROUP ROWS
-//
-// This scan produces rows corresponding to the input of
-// <a href="#ResolvedAggregateScan">ResolvedAggregateScan</a> that belong to the current group.
-//
-// &lt;input_column_list&gt; creates new columns that map 1:1 to columns from
-// the input of the aggregate scan. Each column contains a <a href="#ResolvedColumnRef">ResolvedColumnRef</a>
-// referencing a non-correlated column from the pre-aggregation scan.</font>
-class ResolvedGroupRowsScan : public <a href="#ResolvedScan">ResolvedScan</a> {
-  static const ResolvedNodeKind TYPE = RESOLVED_GROUP_ROWS_SCAN;
-
-  const std::vector&lt;std::unique_ptr&lt;const <a href="#ResolvedComputedColumn">ResolvedComputedColumn</a>&gt;&gt;&amp; input_column_list() const;
-  int input_column_list_size() const;
-  const <a href="#ResolvedComputedColumn">ResolvedComputedColumn</a>* input_column_list(int i) const;
-};
-</code></pre></p>
-
 ### ResolvedFunctionRef
 <a id="ResolvedFunctionRef"></a>
 
@@ -3574,6 +3489,121 @@ class ResolvedFunctionArgument : public <a href="#ResolvedArgument">ResolvedArgu
   // alias if its type is `expr`, but the support may be extended to
   // other types, e.g. `scan` or `model` in the future.</font>
   const std::string&amp; argument_alias() const;
+};
+</code></pre></p>
+
+### ResolvedTVFScan
+<a id="ResolvedTVFScan"></a>
+
+<a href="#ResolvedNode">ResolvedNode</a> &rsaquo; <a href="#ResolvedScan">ResolvedScan</a>  &rsaquo; ResolvedTVFScan
+ &nbsp;(<a href="#ResolvedTVFScan-toc">tree</a>)
+
+<p><pre><code class="lang-c++"><font color="brown">// This scan represents a call to a table-valued function (TVF). Each TVF
+// returns an entire output relation instead of a single scalar value. The
+// enclosing query may refer to the TVF as if it were a table subquery. The
+// TVF may accept scalar arguments and/or other input relations.
+//
+// Scalar arguments work the same way as arguments for non-table-valued
+// functions: in the resolved AST, their types are equal to the required
+// argument types specified in the function signature.
+//
+// The function signature may also include relation arguments, and any such
+// relation argument may specify a required schema. If such a required schema
+// is present, then in the resolved AST, the <a href="#ResolvedScan">ResolvedScan</a> for each relational
+// <a href="#ResolvedFunctionArgument">ResolvedFunctionArgument</a> is guaranteed to have the same number of columns
+// as the required schema, and the provided columns match position-wise with
+// the required columns. Each provided column has the same name and type as
+// the corresponding required column.
+//
+// If AnalyzerOptions::prune_unused_columns is true, the &lt;column_list&gt; and
+// &lt;column_index_list&gt; will include only columns that were referenced
+// in the user query. (SELECT * counts as referencing all columns.)
+// Pruning has no effect on value tables (the value is never pruned).
+//
+// &lt;column_list&gt; is a set of new <a href="#ResolvedColumn">ResolvedColumns</a> created by this scan.
+// The &lt;column_list&gt;[i] should be matched to the related TVFScan&#39;s output
+// relation column by
+// &lt;signature&gt;.result_schema().column(&lt;column_index_list&gt;[i]).
+//
+// &lt;tvf&gt; The TableValuedFunction entry that the catalog returned for this TVF
+//       scan. Contains non-concrete function signatures which may include
+//       arguments with templated types.
+// &lt;signature&gt; The concrete table function signature for this TVF call,
+//             including the types of all scalar arguments and the
+//             number and types of columns of all table-valued
+//             arguments. An engine may also subclass this object to
+//             provide extra custom information and return an instance
+//             of the subclass from the TableValuedFunction::Resolve
+//             method.
+// &lt;argument_list&gt; The vector of resolved concrete arguments for this TVF
+//                 call, including the default values or NULLs injected for
+//                 the omitted arguments (Note the NULL injection is a
+//                 temporary solution to handle omitted named arguments. This
+//                 is subject to change by upcoming CLs).
+//
+// &lt;column_index_list&gt; This list matches 1:1 with the &lt;column_list&gt;, and
+// identifies the index of the corresponding column in the &lt;signature&gt;&#39;s
+// result relation column list.
+//
+// &lt;alias&gt; The AS alias for the scan, or empty if none.
+// &lt;function_call_signature&gt; The concrete FunctionSignature based on the
+//                           matching signature from &lt;tvf-&gt;signatures()&gt; and
+//                           the function&#39;s resolved input &lt;argument_list&gt;.
+//                           The TVFScan&#39;s
+//                           &lt;FunctionSignature::ConcreteArgument&gt; list
+//                           matches 1:1 to &lt;argument_list&gt;, while its
+//                           &lt;FunctionSignature::arguments&gt; list still has
+//                           the full argument list.
+//                           Engines may use this object to
+//                           check for the argument names and omitted
+//                           arguments. SQLBuilder may also need this object
+//                           in cases when the named argument notation is
+//                           required for this call.</font>
+class ResolvedTVFScan : public <a href="#ResolvedScan">ResolvedScan</a> {
+  static const ResolvedNodeKind TYPE = RESOLVED_TVFSCAN;
+
+  const TableValuedFunction* tvf() const;
+
+  const std::shared_ptr&lt;TVFSignature&gt;&amp; signature() const;
+
+  const std::vector&lt;std::unique_ptr&lt;const <a href="#ResolvedFunctionArgument">ResolvedFunctionArgument</a>&gt;&gt;&amp; argument_list() const;
+  int argument_list_size() const;
+  const <a href="#ResolvedFunctionArgument">ResolvedFunctionArgument</a>* argument_list(int i) const;
+
+  const std::vector&lt;int&gt;&amp; column_index_list() const;
+  int column_index_list_size() const;
+  int column_index_list(int i) const;
+
+  const std::string&amp; alias() const;
+
+  const std::shared_ptr&lt;FunctionSignature&gt;&amp; function_call_signature() const;
+};
+</code></pre></p>
+
+### ResolvedGroupRowsScan
+<a id="ResolvedGroupRowsScan"></a>
+
+<a href="#ResolvedNode">ResolvedNode</a> &rsaquo; <a href="#ResolvedScan">ResolvedScan</a>  &rsaquo; ResolvedGroupRowsScan
+ &nbsp;(<a href="#ResolvedGroupRowsScan-toc">tree</a>)
+
+<p><pre><code class="lang-c++"><font color="brown">// <a href="#ResolvedGroupRowsScan">ResolvedGroupRowsScan</a> represents a call to a group rows TVF.
+//
+// It can be created in two ways:
+// - WITH g() AS GROUP ROWS ... FROM g()
+// - FROM GROUP ROWS
+//
+// This scan produces rows corresponding to the input of
+// <a href="#ResolvedAggregateScan">ResolvedAggregateScan</a> that belong to the current group.
+//
+// &lt;input_column_list&gt; creates new columns that map 1:1 to columns from
+// the input of the aggregate scan. Each column contains a <a href="#ResolvedColumnRef">ResolvedColumnRef</a>
+// referencing a non-correlated column from the pre-aggregation scan.</font>
+class ResolvedGroupRowsScan : public <a href="#ResolvedScan">ResolvedScan</a> {
+  static const ResolvedNodeKind TYPE = RESOLVED_GROUP_ROWS_SCAN;
+
+  const std::vector&lt;std::unique_ptr&lt;const <a href="#ResolvedComputedColumn">ResolvedComputedColumn</a>&gt;&gt;&amp; input_column_list() const;
+  int input_column_list_size() const;
+  const <a href="#ResolvedComputedColumn">ResolvedComputedColumn</a>* input_column_list(int i) const;
 };
 </code></pre></p>
 
@@ -5666,65 +5696,89 @@ class ResolvedInsertRow : public <a href="#ResolvedArgument">ResolvedArgument</a
 <p><pre><code class="lang-c++"><font color="brown">// This represents an INSERT statement, or a nested INSERT inside an
 // UPDATE statement.
 //
-// It&#39;s also used for the pipe operator
+// This node is also used for inserts inside <a href="#ResolvedInsertScan">ResolvedInsertScan</a>.
+// When used there:
+// - `returning` must be present;
+// - `row_list` must not be present;
+// - `query` must be present and contains the flow-through input;
+// - It always returns all rows from `query`.
+// - It returns the columns from `query`, plus columns from `returning`;
+// - `insert_mode` is always OR_IGNORE.
+// This is the case for the pipe operator
 //   |&gt; INSERT INTO table ...
-// which supports all the same optional modifier fields, but cannot include a
-// query or VALUES.  This occurs inside <a href="#ResolvedPipeInsertScan">ResolvedPipeInsertScan</a>, with the
-// pipe input stored in `query`.
+// which supports all the same optional modifier fields, but cannot include
+// query or VALUES clause.
+// If this is used for a terminal pipe insert operator, a <a href="#ResolvedFinishScan">ResolvedFinishScan</a>
+// will wrap this node to express the terminal behavior.
 //
-// For top-level INSERT statements, &lt;table_scan&gt; gives the table to
+// For top-level INSERT statements, `table_scan` gives the table to
 // scan and creates <a href="#ResolvedColumn">ResolvedColumns</a> for its columns.  Those columns can be
-// referenced in &lt;insert_column_list&gt;.
+// referenced in `insert_column_list`.
 //
-// For nested INSERTS, there is no &lt;table_scan&gt; or &lt;insert_column_list&gt;.
+// For nested INSERTS, there is no `table_scan` or `insert_column_list`.
 // There is implicitly a single column to insert, and its type is the
 // element type of the array being updated in the <a href="#ResolvedUpdateItem">ResolvedUpdateItem</a>
 // containing this statement.
 //
-// For nested INSERTs, alternate modes are not supported and &lt;insert_mode&gt;
+// For nested INSERTs, alternate modes are not supported and `insert_mode`
 // will always be set to OR_ERROR.
 //
-// The rows to insert come from &lt;row_list&gt; or the result of &lt;query&gt;.
+// The rows to insert come from `row_list` or the result of `query`.
 // Exactly one of these must be present.
 //
-// If &lt;row_list&gt; is present, the columns in the row_list match
-// positionally with &lt;insert_column_list&gt;.
+// If `row_list` is present, the columns in the `row_list` match
+// positionally with `insert_column_list`.
 //
-// If &lt;query&gt; is present, &lt;query_output_column_list&gt; must also be present.
-// &lt;query_output_column_list&gt; is the list of output columns produced by
-// &lt;query&gt; that correspond positionally with the target &lt;insert_column_list&gt;
-// on the output table.  For nested INSERTs with no &lt;insert_column_list&gt;,
-// &lt;query_output_column_list&gt; must have exactly one column.
+// If `query` is present, `query_output_column_list` must also be present.
+// `query_output_column_list` is a subset of output columns from `query` and
+// corresponds positionally with the target `insert_column_list` on the
+// output table.  For nested INSERTs with no `insert_column_list`,
+// `query_output_column_list` must have exactly one column.
 //
-// &lt;query_parameter_list&gt; is set for nested INSERTs where &lt;query&gt; is set and
+// `query_parameter_list` is set for nested INSERTs where `query` is set and
 // references non-target values (columns or field values) from the table. It
 // is only set when FEATURE_CORRELATED_REFS_IN_NESTED_DML is enabled.
 //
-// If &lt;returning&gt; is present, the INSERT statement will return newly inserted
-// rows. &lt;returning&gt; can only occur on top-level statements.
+// When `returning` is present:
+// - If the <a href="#ResolvedInsertStmt">ResolvedInsertStmt</a> is in a <a href="#ResolvedInsertscan">ResolvedInsertscan</a>, return all
+//   rows from `query` (see above for more details about <a href="#ResolvedInsertScan">ResolvedInsertScan</a>
+//   case); otherwise, return newly inserted rows.
+// - `returning-&gt;output_column_list` can access columns from the `table_scan`
+//   as well as `query`. If `returning-&gt;output_column_list` is empty, no
+//   `returning`-specific columns are available to reference downstream.
 //
-// The returning clause has a &lt;output_column_list&gt; to represent the data
-// sent back to clients. It can only access columns from the &lt;table_scan&gt;.
-//
-// &lt;topologically_sorted_generated_column_id_list&gt; is set for queries to
+// `topologically_sorted_generated_column_id_list` is set for queries to
 // tables having generated columns. It provides the resolved column ids of
 // the generated columns in topological order, which the computed generated
 // column expressions can be computed in.
 //
-// &lt;generated_expr_list&gt; has generated expressions for the corresponding
-// generated column in the topologically_sorted_generated_column_id_list.
+// `generated_expr_list` has generated expressions for the corresponding
+// generated column in the `topologically_sorted_generated_column_id_list`.
 // Hence, these lists have the same size.
 //
-// &lt;column_access_list&gt; indicates for each column in &lt;table_scan.column_list&gt;
+// `column_access_list` indicates for each column in `table_scan.column_list`
 // whether it was read and/or written. The query engine may also require
 // read or write permissions across all columns, including unreferenced
 // columns, depending on the operation.
 //
-// &lt;on_conflict_clause&gt; specifies the alternate action if the insert row
+// `on_conflict_clause` specifies the alternate action if the insert row
 // causes unique constraint violations. It handles violations in both primary
 // key and UNIQUE constraints. Alternate actions are (1) to do nothing
 // (ignore the insert row), or (2) update the original table row using the
-// specified SET clauses and the optional WHERE clause.</font>
+// specified SET clauses and the optional WHERE clause.
+//
+// If &lt;timestamp_version_column&gt; is present, it represents the read-only
+// timestamp pseudo-column introduced by the `WITH TIMESTAMP [AS alias]` clause.
+// It is a <a href="#ResolvedColumnHolder">ResolvedColumnHolder</a> and is system-generated unless an explicit alias
+// is provided.
+//
+// If &lt;temporal_at&gt; is present, it represents the target write time or read
+// time expression specified in the `AT(expression)` clause. Its type must
+// be TIMESTAMP.
+//
+// &lt;timestamp_version_column&gt; and &lt;temporal_at&gt; are mutually exclusive.
+// Both fields are enabled by FEATURE_VERSION_AWARE_DML.
+// See (broken link) for more details.</font>
 class ResolvedInsertStmt : public <a href="#ResolvedStatement">ResolvedStatement</a> {
   static const ResolvedNodeKind TYPE = RESOLVED_INSERT_STMT;
 
@@ -5801,6 +5855,10 @@ class ResolvedInsertStmt : public <a href="#ResolvedStatement">ResolvedStatement
   const std::vector&lt;std::unique_ptr&lt;const <a href="#ResolvedExpr">ResolvedExpr</a>&gt;&gt;&amp; generated_column_expr_list() const;
   int generated_column_expr_list_size() const;
   const <a href="#ResolvedExpr">ResolvedExpr</a>* generated_column_expr_list(int i) const;
+
+  const <a href="#ResolvedColumnHolder">ResolvedColumnHolder</a>* timestamp_version_column() const;
+
+  const <a href="#ResolvedExpr">ResolvedExpr</a>* temporal_at() const;
 };
 </code></pre></p>
 
@@ -5836,7 +5894,18 @@ class ResolvedInsertStmt : public <a href="#ResolvedStatement">ResolvedStatement
 // &lt;column_access_list&gt; indicates for each column in &lt;table_scan.column_list&gt;
 // whether it was read and/or written. The query engine may also require
 // read or write permissions across all columns, including unreferenced
-// columns, depending on the operation.</font>
+// columns, depending on the operation.
+//
+// If &lt;timestamp_version_column&gt; is present, it represents the read-only
+// timestamp pseudo-column introduced by the `WITH TIMESTAMP [AS alias]` clause.
+// It is a <a href="#ResolvedColumnHolder">ResolvedColumnHolder</a> and is system-generated unless an explicit alias
+// is provided.
+//
+// Note: DELETE statements do not support the AT clause, so &lt;temporal_at&gt;
+// is not present.
+//
+// This field is enabled by FEATURE_VERSION_AWARE_DML.
+// See (broken link) for more details.</font>
 class ResolvedDeleteStmt : public <a href="#ResolvedStatement">ResolvedStatement</a> {
   static const ResolvedNodeKind TYPE = RESOLVED_DELETE_STMT;
 
@@ -5853,6 +5922,8 @@ class ResolvedDeleteStmt : public <a href="#ResolvedStatement">ResolvedStatement
   const <a href="#ResolvedColumnHolder">ResolvedColumnHolder</a>* array_offset_column() const;
 
   const <a href="#ResolvedExpr">ResolvedExpr</a>* where_expr() const;
+
+  const <a href="#ResolvedColumnHolder">ResolvedColumnHolder</a>* timestamp_version_column() const;
 };
 </code></pre></p>
 
@@ -6124,7 +6195,20 @@ class ResolvedUpdateItemElement : public <a href="#ResolvedArgument">ResolvedArg
 // &lt;generated_expr_list&gt; has generated expressions for the corresponding
 // generated column in the topologically_sorted_generated_column_id_list.
 // Hence, these lists have the same size. This field is similar to the
-// INSERT case, more details can be found in <a href="#ResolvedInsertStmt">ResolvedInsertStmt</a>.</font>
+// INSERT case, more details can be found in <a href="#ResolvedInsertStmt">ResolvedInsertStmt</a>.
+//
+// If &lt;timestamp_version_column&gt; is present, it represents the read-only
+// timestamp pseudo-column introduced by the `WITH TIMESTAMP [AS alias]` clause.
+// It is a <a href="#ResolvedColumnHolder">ResolvedColumnHolder</a> and is system-generated unless an explicit alias
+// is provided.
+//
+// If &lt;temporal_at&gt; is present, it represents the target write time or read
+// time expression specified in the `AT(expression)` clause. Its type must
+// be TIMESTAMP.
+//
+// &lt;timestamp_version_column&gt; and &lt;temporal_at&gt; are mutually exclusive.
+// Both fields are enabled by FEATURE_VERSION_AWARE_DML.
+// See (broken link) for more details.</font>
 class ResolvedUpdateStmt : public <a href="#ResolvedStatement">ResolvedStatement</a> {
   static const ResolvedNodeKind TYPE = RESOLVED_UPDATE_STMT;
 
@@ -6157,6 +6241,10 @@ class ResolvedUpdateStmt : public <a href="#ResolvedStatement">ResolvedStatement
   const std::vector&lt;std::unique_ptr&lt;const <a href="#ResolvedExpr">ResolvedExpr</a>&gt;&gt;&amp; generated_column_expr_list() const;
   int generated_column_expr_list_size() const;
   const <a href="#ResolvedExpr">ResolvedExpr</a>* generated_column_expr_list(int i) const;
+
+  const <a href="#ResolvedColumnHolder">ResolvedColumnHolder</a>* timestamp_version_column() const;
+
+  const <a href="#ResolvedExpr">ResolvedExpr</a>* temporal_at() const;
 };
 </code></pre></p>
 
@@ -6476,6 +6564,20 @@ class ResolvedAlterDatabaseStmt : public <a href="#ResolvedAlterObjectStmt">Reso
 };
 </code></pre></p>
 
+### ResolvedAlterDataPolicyStmt
+<a id="ResolvedAlterDataPolicyStmt"></a>
+
+<a href="#ResolvedNode">ResolvedNode</a> &rsaquo; <a href="#ResolvedStatement">ResolvedStatement</a>  &rsaquo; <a href="#ResolvedAlterObjectStmt">ResolvedAlterObjectStmt</a>  &rsaquo; ResolvedAlterDataPolicyStmt
+ &nbsp;(<a href="#ResolvedAlterDataPolicyStmt-toc">tree</a>)
+
+<p><pre><code class="lang-c++"><font color="brown">// This statement: ALTER DATA_POLICY [IF EXISTS] &lt;name_path&gt;
+// &lt;alter_action_list&gt;</font>
+class ResolvedAlterDataPolicyStmt : public <a href="#ResolvedAlterObjectStmt">ResolvedAlterObjectStmt</a> {
+  static const ResolvedNodeKind TYPE = RESOLVED_ALTER_DATA_POLICY_STMT;
+
+};
+</code></pre></p>
+
 ### ResolvedAlterIndexStmt
 <a id="ResolvedAlterIndexStmt"></a>
 
@@ -6662,6 +6764,26 @@ class ResolvedSetOptionsAction : public <a href="#ResolvedAlterAction">ResolvedA
   const std::vector&lt;std::unique_ptr&lt;const <a href="#ResolvedOption">ResolvedOption</a>&gt;&gt;&amp; option_list() const;
   int option_list_size() const;
   const <a href="#ResolvedOption">ResolvedOption</a>* option_list(int i) const;
+};
+</code></pre></p>
+
+### ResolvedSetConditionAction
+<a id="ResolvedSetConditionAction"></a>
+
+<a href="#ResolvedNode">ResolvedNode</a> &rsaquo; <a href="#ResolvedArgument">ResolvedArgument</a>  &rsaquo; <a href="#ResolvedAlterAction">ResolvedAlterAction</a>  &rsaquo; ResolvedSetConditionAction
+ &nbsp;(<a href="#ResolvedSetConditionAction-toc">tree</a>)
+
+<p><pre><code class="lang-c++"><font color="brown">// SET CONDITION action for ALTER DATA_POLICY statement.</font>
+class ResolvedSetConditionAction : public <a href="#ResolvedAlterAction">ResolvedAlterAction</a> {
+  static const ResolvedNodeKind TYPE = RESOLVED_SET_CONDITION_ACTION;
+
+  const <a href="#ResolvedExpr">ResolvedExpr</a>* expression() const;
+
+<font color="brown">  // The original SQL text of the SET CONDITION
+  // expression. This is only used by SQLBuilder for the
+  // purpose of reconstructing the original sql syntax
+  // and does not have semantic meaning.</font>
+  const std::string&amp; expression_string() const;
 };
 </code></pre></p>
 
@@ -7243,6 +7365,32 @@ class ResolvedCreateRowAccessPolicyStmt : public <a href="#ResolvedStatement">Re
   const <a href="#ResolvedExpr">ResolvedExpr</a>* predicate() const;
 
   const std::string&amp; predicate_str() const;
+};
+</code></pre></p>
+
+### ResolvedCreateDataPolicyStmt
+<a id="ResolvedCreateDataPolicyStmt"></a>
+
+<a href="#ResolvedNode">ResolvedNode</a> &rsaquo; <a href="#ResolvedStatement">ResolvedStatement</a>  &rsaquo; <a href="#ResolvedCreateStatement">ResolvedCreateStatement</a>  &rsaquo; ResolvedCreateDataPolicyStmt
+ &nbsp;(<a href="#ResolvedCreateDataPolicyStmt-toc">tree</a>)
+
+<p><pre><code class="lang-c++"><font color="brown">// This statement: CREATE [OR REPLACE] DATA_POLICY [IF NOT EXISTS] &lt;name_path&gt;
+// [OPTIONS &lt;option_list&gt;]
+// [WITH CONDITION (&lt;condition&gt;)];</font>
+class ResolvedCreateDataPolicyStmt : public <a href="#ResolvedCreateStatement">ResolvedCreateStatement</a> {
+  static const ResolvedNodeKind TYPE = RESOLVED_CREATE_DATA_POLICY_STMT;
+
+  const std::vector&lt;std::unique_ptr&lt;const <a href="#ResolvedOption">ResolvedOption</a>&gt;&gt;&amp; option_list() const;
+  int option_list_size() const;
+  const <a href="#ResolvedOption">ResolvedOption</a>* option_list(int i) const;
+
+  const <a href="#ResolvedExpr">ResolvedExpr</a>* condition() const;
+
+<font color="brown">  // The original SQL text of the condition expression.
+  // This is only used by SQLBuilder for the
+  // purpose of reconstructing the original sql syntax
+  // and does not have semantic meaning.</font>
+  const std::string&amp; condition_string() const;
 };
 </code></pre></p>
 
@@ -7933,6 +8081,8 @@ class ResolvedCreateTableFunctionStmt : public <a href="#ResolvedCreateStatement
   bool is_value_table() const;
 
   <a href="#ResolvedCreateStatement">ResolvedCreateStatement</a>::SqlSecurity sql_security() const;
+
+  const <a href="#ResolvedConnection">ResolvedConnection</a>* connection() const;
 };
 </code></pre></p>
 
@@ -8623,7 +8773,7 @@ class ResolvedUnpivotArg : public <a href="#ResolvedArgument">ResolvedArgument</
  &nbsp;(<a href="#ResolvedCreateLiveTableStmt-toc">tree</a>)
 
 <p><pre><code class="lang-c++"><font color="brown">// This statement:
-//   CREATE [OR REPLACE] [TEMP|TEMPORARY|PUBLIC|PRIVATE] LIVE TABLE [IF NOT EXISTS] &lt;name_path&gt;
+//   CREATE [OR REPLACE] LIVE TABLE [IF NOT EXISTS] &lt;name_path&gt;
 //   [ (column schema, ...) ]
 //   [DEFAULT COLLATE &lt;collation_name&gt;]
 //   [PARTITION BY expr, ...]
@@ -9165,6 +9315,14 @@ class ResolvedAlignScan : public <a href="#ResolvedScan">ResolvedScan</a> {
   // each row. This column must appear in the `column_list` of this
   // scan.</font>
   const <a href="#ResolvedColumn">ResolvedColumn</a>&amp; aligned_timestamp_column() const;
+
+<font color="brown">  // The estimator functions computed by this scan for the METRICS
+  // clause. This contains a list of <a href="#ResolvedEstimatorFunctionCall">ResolvedEstimatorFunctionCalls</a>.
+  // Any scalar operations on top of these functions to will be
+  // represented by a later <a href="#ResolvedProjectScan">ResolvedProjectScan</a> with computed columns.</font>
+  const std::vector&lt;std::unique_ptr&lt;const <a href="#ResolvedComputedColumnBase">ResolvedComputedColumnBase</a>&gt;&gt;&amp; estimator_function_list() const;
+  int estimator_function_list_size() const;
+  const <a href="#ResolvedComputedColumnBase">ResolvedComputedColumnBase</a>* estimator_function_list(int i) const;
 };
 </code></pre></p>
 
@@ -9453,6 +9611,60 @@ class ResolvedCreatePropertyGraphStmt : public <a href="#ResolvedCreateStatement
 };
 </code></pre></p>
 
+### ResolvedCreatePropertyGraphTypeStmt
+<a id="ResolvedCreatePropertyGraphTypeStmt"></a>
+
+<a href="#ResolvedNode">ResolvedNode</a> &rsaquo; <a href="#ResolvedStatement">ResolvedStatement</a>  &rsaquo; <a href="#ResolvedCreateStatement">ResolvedCreateStatement</a>  &rsaquo; ResolvedCreatePropertyGraphTypeStmt
+ &nbsp;(<a href="#ResolvedCreatePropertyGraphTypeStmt-toc">tree</a>)
+
+<p><pre><code class="lang-c++"><font color="brown">// This statement:
+//   CREATE [OR REPLACE] PROPERTY GRAPH TYPE [IF NOT EXISTS] &lt;name_path&gt;
+//   NODE TYPES (&lt;node_type_list&gt;)
+//   [EDGE TYPES (&lt;edge_type_list&gt;)]
+//   [OPTIONS (&lt;option_list&gt;)]
+//
+// A property graph type describes only the logical shape of a graph: its
+// element types, their default labels, and the property declarations exposed
+// by those labels. Unlike <a href="#ResolvedCreatePropertyGraphStmt">ResolvedCreatePropertyGraphStmt</a>, it has no
+// physical table bindings (no input scans, key columns or property
+// definitions).
+// See (broken link):logical-graph-type for the design.
+//
+// The labels and property declarations of the graph type are collected once
+// in label_list and property_declaration_list; each element type refers to
+// them by name rather than owning its own copies. See the individual fields
+// for details.</font>
+class ResolvedCreatePropertyGraphTypeStmt : public <a href="#ResolvedCreateStatement">ResolvedCreateStatement</a> {
+  static const ResolvedNodeKind TYPE = RESOLVED_CREATE_PROPERTY_GRAPH_TYPE_STMT;
+
+<font color="brown">  // The node type definitions. May be empty, e.g. `NODE TYPES ()`.</font>
+  const std::vector&lt;std::unique_ptr&lt;const <a href="#ResolvedGraphElementType">ResolvedGraphElementType</a>&gt;&gt;&amp; node_type_list() const;
+  int node_type_list_size() const;
+  const <a href="#ResolvedGraphElementType">ResolvedGraphElementType</a>* node_type_list(int i) const;
+
+<font color="brown">  // The edge type definitions. Optional; may also be empty.</font>
+  const std::vector&lt;std::unique_ptr&lt;const <a href="#ResolvedGraphElementType">ResolvedGraphElementType</a>&gt;&gt;&amp; edge_type_list() const;
+  int edge_type_list_size() const;
+  const <a href="#ResolvedGraphElementType">ResolvedGraphElementType</a>* edge_type_list(int i) const;
+
+<font color="brown">  // All labels defined in this property graph type (the default
+  // label of each element type).</font>
+  const std::vector&lt;std::unique_ptr&lt;const <a href="#ResolvedGraphElementLabel">ResolvedGraphElementLabel</a>&gt;&gt;&amp; label_list() const;
+  int label_list_size() const;
+  const <a href="#ResolvedGraphElementLabel">ResolvedGraphElementLabel</a>* label_list(int i) const;
+
+<font color="brown">  // All property declarations exposed by labels in this property
+  // graph type.</font>
+  const std::vector&lt;std::unique_ptr&lt;const <a href="#ResolvedGraphPropertyDeclaration">ResolvedGraphPropertyDeclaration</a>&gt;&gt;&amp; property_declaration_list() const;
+  int property_declaration_list_size() const;
+  const <a href="#ResolvedGraphPropertyDeclaration">ResolvedGraphPropertyDeclaration</a>* property_declaration_list(int i) const;
+
+  const std::vector&lt;std::unique_ptr&lt;const <a href="#ResolvedOption">ResolvedOption</a>&gt;&gt;&amp; option_list() const;
+  int option_list_size() const;
+  const <a href="#ResolvedOption">ResolvedOption</a>* option_list(int i) const;
+};
+</code></pre></p>
+
 ### ResolvedGraphElementTable
 <a id="ResolvedGraphElementTable"></a>
 
@@ -9511,6 +9723,46 @@ class ResolvedGraphElementTable : public <a href="#ResolvedArgument">ResolvedArg
   const <a href="#ResolvedGraphDynamicLabelSpecification">ResolvedGraphDynamicLabelSpecification</a>* dynamic_label() const;
 
   const <a href="#ResolvedGraphDynamicPropertiesSpecification">ResolvedGraphDynamicPropertiesSpecification</a>* dynamic_properties() const;
+};
+</code></pre></p>
+
+### ResolvedGraphElementType
+<a id="ResolvedGraphElementType"></a>
+
+<a href="#ResolvedNode">ResolvedNode</a> &rsaquo; <a href="#ResolvedArgument">ResolvedArgument</a>  &rsaquo; ResolvedGraphElementType
+ &nbsp;(<a href="#ResolvedGraphElementType-toc">tree</a>)
+
+<p><pre><code class="lang-c++"><font color="brown">// Represents the logical type of a single element (node or edge) in a
+// property graph type. It is the type analogue of <a href="#ResolvedGraphElementTable">ResolvedGraphElementTable</a>,
+// with all physical table binding stripped (no input scan, key list,
+// property definitions or dynamic label/properties):
+//   &lt;name&gt; [FROM &lt;source_node_type&gt;] [TO &lt;dest_node_type&gt;]
+//
+// &lt;name&gt; is the element type name, which is also the name of its default
+// label.
+// &lt;label_name_list&gt; lists the labels applied to this element type (at least
+// the default label). This node stores no properties of its own; the
+// element type&#39;s properties are the property declarations of these labels,
+// held in property_declaration_list on the containing
+// <a href="#ResolvedCreatePropertyGraphTypeStmt">ResolvedCreatePropertyGraphTypeStmt</a>.
+// &lt;source_node_type&gt; and &lt;dest_node_type&gt; name the FROM and TO node types.
+// They must only be set for edge types and are both absent for node types;
+// an edge type may set both, just one (FROM-only or TO-only), or neither.
+//
+// TODO: Derived properties (`&lt;expr&gt; AS &lt;name&gt;`), measure
+// properties and property options are not supported yet.</font>
+class ResolvedGraphElementType : public <a href="#ResolvedArgument">ResolvedArgument</a> {
+  static const ResolvedNodeKind TYPE = RESOLVED_GRAPH_ELEMENT_TYPE;
+
+  const std::string&amp; name() const;
+
+  const std::vector&lt;std::string&gt;&amp; label_name_list() const;
+  int label_name_list_size() const;
+  std::string label_name_list(int i) const;
+
+  const std::string&amp; source_node_type() const;
+
+  const std::string&amp; dest_node_type() const;
 };
 </code></pre></p>
 
@@ -10751,6 +11003,31 @@ class ResolvedPipeTeeScan : public <a href="#ResolvedScan">ResolvedScan</a> {
 };
 </code></pre></p>
 
+### ResolvedInsertScan
+<a id="ResolvedInsertScan"></a>
+
+<a href="#ResolvedNode">ResolvedNode</a> &rsaquo; <a href="#ResolvedScan">ResolvedScan</a>  &rsaquo; ResolvedInsertScan
+ &nbsp;(<a href="#ResolvedInsertScan-toc">tree</a>)
+
+<p><pre><code class="lang-c++"><font color="brown">// This represents an INSERT operator, typically used for pipe INSERT or
+// the rewrite of GQL INSERT (<a href="#ResolvedGraphInsertScan">ResolvedGraphInsertScan</a>).
+//
+// This only occurs inside <a href="#ResolvedGeneralizedQueryStmt">ResolvedGeneralizedQueryStmts</a>, which must be
+// enabled in SupportedStatementKinds.
+//
+// For every input row, it performs one insert into the target table.
+// - `insert_stmt-&gt;query` is the input, which must be present.
+// - `insert_stmt-&gt;row_list` must be null.
+// - `insert_stmt-&gt;returning` must be present. The input rows are returned.
+// - `column_list` can contain columns from `insert_stmt-&gt;query` and
+//   `insert_stmt-&gt;returning`.</font>
+class ResolvedInsertScan : public <a href="#ResolvedScan">ResolvedScan</a> {
+  static const ResolvedNodeKind TYPE = RESOLVED_INSERT_SCAN;
+
+  const <a href="#ResolvedInsertStmt">ResolvedInsertStmt</a>* insert_stmt() const;
+};
+</code></pre></p>
+
 ### ResolvedPipeExportDataScan
 <a id="ResolvedPipeExportDataScan"></a>
 
@@ -10800,26 +11077,6 @@ class ResolvedPipeCreateTableScan : public <a href="#ResolvedScan">ResolvedScan<
   // don&#39;t make senes when there&#39;s an input table, including a pipe
   // input table.</font>
   const <a href="#ResolvedCreateTableAsSelectStmt">ResolvedCreateTableAsSelectStmt</a>* create_table_as_select_stmt() const;
-};
-</code></pre></p>
-
-### ResolvedPipeInsertScan
-<a id="ResolvedPipeInsertScan"></a>
-
-<a href="#ResolvedNode">ResolvedNode</a> &rsaquo; <a href="#ResolvedScan">ResolvedScan</a>  &rsaquo; ResolvedPipeInsertScan
- &nbsp;(<a href="#ResolvedPipeInsertScan-toc">tree</a>)
-
-<p><pre><code class="lang-c++"><font color="brown">// This represents the pipe INSERT operator, which is controlled by
-// FEATURE_PIPE_INSERT.  See (broken link).
-//
-// This only occurs inside <a href="#ResolvedGeneralizedQueryStmt">ResolvedGeneralizedQueryStmts</a>, so that statement
-// must be enabled in SupportedStatementKinds.
-//
-// The pipe input is in `insert_stmt-&gt;query`, which must be present.</font>
-class ResolvedPipeInsertScan : public <a href="#ResolvedScan">ResolvedScan</a> {
-  static const ResolvedNodeKind TYPE = RESOLVED_PIPE_INSERT_SCAN;
-
-  const <a href="#ResolvedInsertStmt">ResolvedInsertStmt</a>* insert_stmt() const;
 };
 </code></pre></p>
 
@@ -11274,6 +11531,68 @@ class ResolvedGraphInsertScan : public <a href="#ResolvedScan">ResolvedScan</a> 
   const std::vector&lt;<a href="#ResolvedColumn">ResolvedColumn</a>&gt;&amp; path_element_list() const;
   int path_element_list_size() const;
   <a href="#ResolvedColumn">ResolvedColumn</a> path_element_list(int i) const;
+};
+</code></pre></p>
+
+### ResolvedUpdateScan
+<a id="ResolvedUpdateScan"></a>
+
+<a href="#ResolvedNode">ResolvedNode</a> &rsaquo; <a href="#ResolvedScan">ResolvedScan</a>  &rsaquo; ResolvedUpdateScan
+ &nbsp;(<a href="#ResolvedUpdateScan-toc">tree</a>)
+
+<p><pre><code class="lang-c++"><font color="brown">// This represents a pipe UPDATE operator.
+// - `output_mode` (OUTPUT_UPDATED_ROWS and OUTPUT_INPUT_ROWS) specifies what
+//    rows are included in the output table.
+// - `update_collision_action_type` (COLLISION_ACTION_ERROR and
+//    COLLISION_ACTION_PICK_ONE) specifies what action to take when a single
+//    target table row is matched to be updated more than once.
+// The overall procedure for this operator is as follows:
+// 1) Scan the pipe input table `update_stmt-&gt;from_scan` and join it with target
+//    table `update_stmt-&gt;table_scan` using `update_stmt-&gt;where_clause` as a join
+//    condition and also a filter.
+// 2) For each input row, there can be 0, 1 or multiple matches from the target
+//    table:
+//    If input row gets 0 match:
+//       If `output_mode` is OUTPUT_UPDATED_ROWS, the input row gets discarded.
+//       If `output_mode` is OUTPUT_INPUT_ROWS, the input row gets returned, with
+//       target table columns in `update_stmt-&gt;returning` being NULL.
+//    If input row gets 1 match, the input row gets returned in either mode.
+//    If input row gets multiple matches:
+//       If `output_mode` is OUTPUT_UPDATED_ROWS, the input row gets returned.
+//       If `output_mode` is OUTPUT_INPUT_ROWS, a runtime error is returned.
+// 3) When a target table row gets matched more than once for update:
+//    If `update_collision_action_type` is COLLISION_ACTION_ERROR (default), a
+//    runtime error is returned.
+//    If `update_collision_action_type` is COLLISION_ACTION_PICK_ONE,
+//    engine is allowed to pick one of the value as winning update. This type is
+//    not allowed when `output_mode` is set to OUTPUT_UPDATED_ROWS.
+// 4) Columns from target table (`update_stmt-&gt;table_scan`) can be updated as
+//    specified by `update_stmt-&gt;update_item_list`.
+// 5) `column_list` can include columns from pipe input table
+//    `update_stmt-&gt;from_scan` and `update_stmt-&gt;returning`.
+// This operator only occurs inside a <a href="#ResolvedGeneralizedQueryStmt">ResolvedGeneralizedQueryStmt</a>, which
+// must be enabled in SupportedStatementKinds.
+// A pipe update operator is typically used for rewriting a GQL DML
+// SET/REMOVE statement or inside a pipe query.</font>
+class ResolvedUpdateScan : public <a href="#ResolvedScan">ResolvedScan</a> {
+  static const ResolvedNodeKind TYPE = RESOLVED_UPDATE_SCAN;
+
+  typedef <a href="#ResolvedUpdateScanEnum">ResolvedUpdateScanEnums</a>::UpdateScanOutputMode UpdateScanOutputMode;
+  typedef <a href="#ResolvedUpdateScanEnum">ResolvedUpdateScanEnums</a>::UpdateCollisionActionType UpdateCollisionActionType;
+  static const UpdateScanOutputMode OUTPUT_MODE_UNSPECIFIED = <a href="#ResolvedUpdateScanEnum">ResolvedUpdateScanEnums</a>::OUTPUT_MODE_UNSPECIFIED;
+  static const UpdateScanOutputMode OUTPUT_UPDATED_ROWS = <a href="#ResolvedUpdateScanEnum">ResolvedUpdateScanEnums</a>::OUTPUT_UPDATED_ROWS;
+  static const UpdateScanOutputMode OUTPUT_INPUT_ROWS = <a href="#ResolvedUpdateScanEnum">ResolvedUpdateScanEnums</a>::OUTPUT_INPUT_ROWS;
+  static const UpdateCollisionActionType COLLISION_ACTION_UNSPECIFIED = <a href="#ResolvedUpdateScanEnum">ResolvedUpdateScanEnums</a>::COLLISION_ACTION_UNSPECIFIED;
+  static const UpdateCollisionActionType COLLISION_ACTION_ERROR = <a href="#ResolvedUpdateScanEnum">ResolvedUpdateScanEnums</a>::COLLISION_ACTION_ERROR;
+  static const UpdateCollisionActionType COLLISION_ACTION_PICK_ONE = <a href="#ResolvedUpdateScanEnum">ResolvedUpdateScanEnums</a>::COLLISION_ACTION_PICK_ONE;
+
+  const <a href="#ResolvedUpdateStmt">ResolvedUpdateStmt</a>* update_stmt() const;
+
+<font color="brown">  // OUTPUT_UPDATED_ROWS and OUTPUT_INPUT_ROWS</font>
+  <a href="#ResolvedUpdateScan">ResolvedUpdateScan</a>::UpdateScanOutputMode output_mode() const;
+
+<font color="brown">  // COLLISION_ACTION_ERROR (default) or COLLISION_ACTION_PICK_ONE</font>
+  <a href="#ResolvedUpdateScan">ResolvedUpdateScan</a>::UpdateCollisionActionType update_collision_action_type() const;
 };
 </code></pre></p>
 

@@ -1710,13 +1710,17 @@ int FindNextParamList(const std::vector<Token*>& tokens, int index) {
     }
 
     // CASE: 'RUN script::name(a = b)'.
-    if (index == 1 && tokens.size() > 2 && tokens[0]->GetKeyword() == "RUN" &&
+    if (tokens[index - 1]->Is(Token::Type::TOP_LEVEL_KEYWORD) &&
+        tokens[index - 1]->GetKeyword() == "RUN" &&
         tokens[index]->MayBeStartOfIdentifier()) {
       ++index;
-      while (tokens[index]->MayBeIdentifierContinuation(*tokens[index - 1])) {
-        if (++index >= tokens.size()) {
-          return index;
-        }
+      while (index < tokens.size() &&
+             tokens[index]->MayBeIdentifierContinuation(*tokens[index - 1])) {
+        ++index;
+      }
+
+      if (index >= tokens.size()) {
+        return index;
       }
 
       if (tokens[index]->GetKeyword() == "(") {
@@ -2516,6 +2520,9 @@ void MarkAllComplexScriptNames(const TokensView& tokens_view) {
     if (tokens[t]->Is(Token::Type::TOP_LEVEL_KEYWORD) &&
         tokens[t]->GetKeyword() == "RUN") {
       ++t;
+      if (t >= tokens.size()) {
+        break;
+      }
       // Find the end of identifier. Look only for tokens that don't have any
       // spaces in between in the original input.
       int end = t + 1;
@@ -2523,6 +2530,12 @@ void MarkAllComplexScriptNames(const TokensView& tokens_view) {
              !SpaceBetweenTokensInInput(*tokens[end - 1], *tokens[end]) &&
              !kIdentifierTerminators->contains(tokens[end]->GetKeyword())) {
         ++end;
+      }
+      // If the script name starts with a keyword (e.g., `RUN select::from()`),
+      // mark it as an identifier fragment so the formatter doesn't mistake it
+      // for a SQL clause.
+      if (tokens[t]->IsKeyword()) {
+        tokens[t]->SetType(Token::Type::KEYWORD_AS_IDENTIFIER_FRAGMENT);
       }
       for (int i = t + 1; i < end; ++i) {
         tokens[i]->SetType(Token::Type::COMPLEX_TOKEN_CONTINUATION);

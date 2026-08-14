@@ -88,3 +88,108 @@ ERROR: generic::out_of_range: error
 SELECT IF(TRUE, JSON '1', ERROR("error"))
 --
 ARRAY<STRUCT<JSON>>[{1}]
+==
+[name=bit_cast_nested_in_array_struct]
+[required_features=BIT_CAST_BYTES_FUNCTIONS]
+SELECT [STRUCT(BIT_CAST_TO_DOUBLE(b'\x00\x00\x00\x00\x00\x00\xf0\x3f'), BIT_CAST_TO_FLOAT(b'\x00\x00\x80\x3f'))]
+--
+ARRAY<STRUCT<ARRAY<>>>[{ARRAY<STRUCT<DOUBLE, FLOAT>>[{1, 1}]}]
+==
+[name=safe_bit_cast_nested_in_array_struct]
+[required_features=BIT_CAST_BYTES_FUNCTIONS,SAFE_FUNCTION_CALL]
+SELECT [STRUCT(SAFE.BIT_CAST_TO_DOUBLE(b'123'), SAFE.BIT_CAST_TO_FLOAT(b'123'))]
+--
+ARRAY<STRUCT<ARRAY<>>>[{ARRAY<STRUCT<DOUBLE, FLOAT>>[{NULL, NULL}]}]
+==
+[name=bit_cast_to_bytes_unordered_subquery_array]
+[required_features=BIT_CAST_BYTES_FUNCTIONS]
+WITH t AS (SELECT value FROM UNNEST([1, 2, 3]) AS value)
+SELECT ARRAY(SELECT BIT_CAST_TO_BYTES(value) FROM t);
+--
+ARRAY<STRUCT<ARRAY<>>>[
+  {ARRAY<BYTES>[unknown order:
+     b"\x01\x00\x00\x00\x00\x00\x00\x00",
+     b"\x02\x00\x00\x00\x00\x00\x00\x00",
+     b"\x03\x00\x00\x00\x00\x00\x00\x00"
+   ]}
+]
+==
+[name=bit_cast_float_to_bytes_unordered_subquery_array]
+[required_features=BIT_CAST_BYTES_FUNCTIONS]
+WITH t AS (SELECT value FROM UNNEST([1.0, 2.0]) AS value)
+SELECT ARRAY(SELECT BIT_CAST_TO_BYTES(value) FROM t);
+--
+ARRAY<STRUCT<ARRAY<>>>[
+  {ARRAY<BYTES>[unknown order:
+     b"\x00\x00\x00\x00\x00\x00\xf0?",
+     b"\x00\x00\x00\x00\x00\x00\x00@"
+   ]}
+]
+==
+[name=bit_cast_to_float_unordered_subquery_array]
+[required_features=BIT_CAST_BYTES_FUNCTIONS]
+WITH t AS (SELECT value FROM UNNEST([b'\x00\x00\x80\x3f', b'\x00\x00\x00\x40']) AS value)
+SELECT ARRAY(SELECT BIT_CAST_TO_FLOAT(value) FROM t);
+--
+ARRAY<STRUCT<ARRAY<>>>[{ARRAY<FLOAT>[unknown order:1, 2]}]
+==
+# Test BIT_CAST_TO_BYTES for FLOAT special values (0.0, -0.0, INF, -INF, NaN)
+[name=bit_cast_to_bytes_float_special_values]
+[required_features=BIT_CAST_BYTES_FUNCTIONS]
+SELECT
+  BIT_CAST_TO_BYTES(CAST(0.0 AS FLOAT)),
+  BIT_CAST_TO_BYTES(CAST(-0.0 AS FLOAT)),
+  BIT_CAST_TO_BYTES(CAST("inf" AS FLOAT)),
+  BIT_CAST_TO_BYTES(CAST("-inf" AS FLOAT)),
+  BIT_CAST_TO_BYTES(CAST("nan" AS FLOAT));
+--
+ARRAY<STRUCT<BYTES, BYTES, BYTES, BYTES, BYTES>>[
+  {b"\x00\x00\x00\x00",
+   b"\x00\x00\x00\x80",
+   b"\x00\x00\x80\x7f",
+   b"\x00\x00\x80\xff",
+   b"\x00\x00\xc0\x7f"}
+]
+==
+# Test BIT_CAST_TO_BYTES for DOUBLE special values (0.0, -0.0, INF, -INF, NaN)
+[name=bit_cast_to_bytes_double_special_values]
+[required_features=BIT_CAST_BYTES_FUNCTIONS]
+SELECT
+  BIT_CAST_TO_BYTES(CAST(0.0 AS DOUBLE)),
+  BIT_CAST_TO_BYTES(CAST(-0.0 AS DOUBLE)),
+  BIT_CAST_TO_BYTES(CAST("inf" AS DOUBLE)),
+  BIT_CAST_TO_BYTES(CAST("-inf" AS DOUBLE)),
+  BIT_CAST_TO_BYTES(CAST("nan" AS DOUBLE));
+--
+ARRAY<STRUCT<BYTES, BYTES, BYTES, BYTES, BYTES>>[
+  {
+    b"\x00\x00\x00\x00\x00\x00\x00\x00",
+    b"\x00\x00\x00\x00\x00\x00\x00\x80",
+    b"\x00\x00\x00\x00\x00\x00\xf0\x7f",
+    b"\x00\x00\x00\x00\x00\x00\xf0\xff",
+    b"\x00\x00\x00\x00\x00\x00\xf8\x7f"
+  }
+]
+==
+# Test BIT_CAST_TO_BYTES for integer extreme values (INT/UINT min and max)
+[name=bit_cast_to_bytes_int_min_max]
+[required_features=BIT_CAST_BYTES_FUNCTIONS]
+SELECT
+  BIT_CAST_TO_BYTES(CAST(2147483647 AS INT32)),
+  BIT_CAST_TO_BYTES(CAST(-2147483648 AS INT32)),
+  BIT_CAST_TO_BYTES(CAST(4294967295 AS UINT32)),
+  BIT_CAST_TO_BYTES(CAST(9223372036854775807 AS INT64)),
+  BIT_CAST_TO_BYTES(CAST(-9223372036854775808 AS INT64)),
+  BIT_CAST_TO_BYTES(CAST(18446744073709551615 AS UINT64));
+--
+ARRAY<STRUCT<BYTES, BYTES, BYTES, BYTES, BYTES, BYTES>>[
+  {
+    b"\xff\xff\xff\x7f",
+    b"\x00\x00\x00\x80",
+    b"\xff\xff\xff\xff",
+    b"\xff\xff\xff\xff\xff\xff\xff\x7f",
+    b"\x00\x00\x00\x00\x00\x00\x00\x80",
+    b"\xff\xff\xff\xff\xff\xff\xff\xff"
+  }
+]
+

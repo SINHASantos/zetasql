@@ -281,6 +281,9 @@ absl::StatusOr<ConstnessLevel> GetConstnessLevel(const ResolvedNode* node) {
     // non-deterministic.
     case RESOLVED_AGGREGATE_FUNCTION_CALL:
     case RESOLVED_ANALYTIC_FUNCTION_CALL:
+    // Estimator functions are not constant because they might be
+    // non-deterministic.
+    case RESOLVED_ESTIMATOR_FUNCTION_CALL:
     case RESOLVED_ARRAY_AGGREGATE:
     case RESOLVED_AGGREGATE_SCAN:
     case RESOLVED_ANALYTIC_SCAN: {

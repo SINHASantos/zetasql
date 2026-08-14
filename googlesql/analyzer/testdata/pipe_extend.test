@@ -604,7 +604,7 @@ FROM ComplexTypes
 |> SELECT TestStruct
 |> EXTEND TestStruct.* EXCEPT (c,d)
 --
-ERROR: SELECT * expands to zero columns after applying EXCEPT [at 3:11]
+ERROR: SELECT .* expands to zero columns after applying EXCEPT [at 3:11]
 |> EXTEND TestStruct.* EXCEPT (c,d)
           ^
 ==

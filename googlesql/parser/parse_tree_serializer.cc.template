@@ -141,7 +141,7 @@ absl::Status ParseTreeSerializer::Serialize(const {{node.name}}* node,
   return absl::OkStatus();
 }
   # endfor
- # if node.is_abstract
+ # if node.is_abstract or node.allow_non_final_concrete_class_for_legacy_migration
 absl::Status ParseTreeSerializer::Serialize(const {{node.name}}* node,
                                            {{node.proto_field_type}}* proto) {
   {# Serialize() for an abstract class delegates to Serialize() of the #}
@@ -153,6 +153,12 @@ absl::Status ParseTreeSerializer::Serialize(const {{node.name}}* node,
     GOOGLESQL_RETURN_IF_ERROR(Serialize(static_cast<const {{subclass.name}}*>(node),
                               proto->mutable_{{subclass.member_name}}_node()));
   # endfor
+  {# For non-final concrete classes, if no subclasses are matched, the #}
+  {# base class itself is serialized.                                  #}
+  # if node.allow_non_final_concrete_class_for_legacy_migration
+    {% if node.subclasses %}  } else if{% else %}  if{% endif %} (dynamic_cast<const {{node.name}}*>(node)) {
+    GOOGLESQL_RETURN_IF_ERROR(Serialize(node, proto->mutable_{{node.member_name}}_node()));
+  # endif
   } else {
     return absl::InvalidArgumentError("Unknown subclass of {{node.name}}");
   }
@@ -160,7 +166,7 @@ absl::Status ParseTreeSerializer::Serialize(const {{node.name}}* node,
 }
  # endif
 
- # if node.is_abstract
+ # if node.is_abstract or node.allow_non_final_concrete_class_for_legacy_migration
 {# Deserialize() for abstract methods passes control to Deserialize() of the subclass #}
 {# of which it is an instance, which may final or abstract also. #}
 absl::StatusOr<{{node.name}}*> ParseTreeSerializer::Deserialize(
@@ -178,12 +184,23 @@ absl::StatusOr<{{node.name}}*> ParseTreeSerializer::Deserialize(
           allocated_ast_nodes);
     }
   # endfor
+  {# For non-final concrete classes, deserialization of the base class #}
+  {# itself is supported.                                              #}
+  # if node.allow_non_final_concrete_class_for_legacy_migration
+    case {{node.proto_field_type}}::{{node.node_kind_oneof_value}}: {
+      return Deserialize(
+          proto.{{node.member_name}}_node(),
+          id_string_pool, arena,
+          allocated_ast_nodes);
+    }
+  # endif
     case {{node.proto_field_type}}::NODE_NOT_SET:
       break;
   }
   return absl::InvalidArgumentError("Empty proto!");
 }
- # else
+ # endif
+ # if not node.is_abstract
 absl::StatusOr<{{node.name}}*> ParseTreeSerializer::Deserialize(
     const {{node.proto_type}}& proto,
     IdStringPool* id_string_pool,
@@ -205,7 +222,7 @@ absl::StatusOr<{{node.name}}*> ParseTreeSerializer::Deserialize(
 }
  # endif
 
- # if node.is_abstract
+ # if node.is_abstract or node.allow_non_final_concrete_class_for_legacy_migration
 absl::Status ParseTreeSerializer::DeserializeAbstract(
       {{node.name}}* node, const {{node.proto_type}}& proto,
       IdStringPool* id_string_pool,

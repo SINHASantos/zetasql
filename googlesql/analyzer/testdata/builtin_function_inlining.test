@@ -349,7 +349,7 @@ QueryStmt
     |         |     |             +-right_scan=
     |         |     |             | +-TVFScan
     |         |     |             |   +-column_list=[builtin_tvf_exactly_one_arg.col#5]
-    |         |     |             |   +-tvf=GoogleSQL:builtin_tvf_exactly_one_arg((INT64) -> ANY TABLE)
+    |         |     |             |   +-tvf=GoogleSQL:builtin_tvf_exactly_one_arg
     |         |     |             |   +-signature=(INT64) -> TABLE<col STRING>
     |         |     |             |   +-argument_list=
     |         |     |             |   | +-FunctionArgument
@@ -459,7 +459,7 @@ QueryStmt
     |         |                 +-right_scan=
     |         |                 | +-TVFScan
     |         |                 |   +-column_list=[builtin_tvf_exactly_one_arg.col#5]
-    |         |                 |   +-tvf=GoogleSQL:builtin_tvf_exactly_one_arg((INT64) -> ANY TABLE)
+    |         |                 |   +-tvf=GoogleSQL:builtin_tvf_exactly_one_arg
     |         |                 |   +-signature=(INT64) -> TABLE<col STRING>
     |         |                 |   +-argument_list=
     |         |                 |   | +-FunctionArgument

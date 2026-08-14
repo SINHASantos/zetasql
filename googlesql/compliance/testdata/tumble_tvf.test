@@ -1,3 +1,6 @@
+[load_proto_files=googlesql/testdata/test_hop_tumble.proto]
+[load_proto_names=googlesql_test.TestHopAndTumblePB, google.protobuf.Timestamp]
+
 [prepare_database]
 CREATE TABLE TableWithTimestampColumn AS (
   SELECT TIMESTAMP '2025-01-01 00:00:00' AS ts_col
@@ -15,6 +18,53 @@ ARRAY<STRUCT<ts_col TIMESTAMP>>[
   {2025-01-03 08:00:00+00},
   {2025-01-04 08:00:00+00}
 ]
+==
+[prepare_database]
+CREATE TABLE TableWithStructAndProto AS (
+  SELECT
+    1 AS key,
+    STRUCT(
+      1 AS ambiguous_field,
+      'abc' AS other_field,
+      NEW googlesql_test.TestHopAndTumblePB(
+        100 AS int32_val,
+        TO_PROTO(TIMESTAMP '2025-01-01 00:00:00 UTC') AS timestamp_val,
+        TIMESTAMP '2025-01-01 00:00:00 UTC' AS annotated_timestamp_val
+      ) AS proto_field
+    ) AS StructWithProto,
+    NEW googlesql_test.TestHopAndTumblePB(
+      200 AS int32_val,
+      TO_PROTO(TIMESTAMP '2025-01-01 00:00:00 UTC') AS timestamp_val,
+      TIMESTAMP '2025-01-01 00:00:00 UTC' AS annotated_timestamp_val
+    ) AS ProtoColumn
+);
+--
+ARRAY<STRUCT<
+        key INT64,
+        StructWithProto STRUCT<
+               ambiguous_field INT64,
+               other_field STRING,
+               proto_field PROTO<googlesql_test.TestHopAndTumblePB>
+             >,
+        ProtoColumn PROTO<googlesql_test.TestHopAndTumblePB>
+      >>
+[{1,
+  {1,
+   "abc",
+   {
+     int32_val: 100
+     timestamp_val {
+       seconds: 1735689600
+     }
+     annotated_timestamp_val: 1735689600000
+   }},
+  {
+    int32_val: 200
+    timestamp_val {
+      seconds: 1735689600
+    }
+    annotated_timestamp_val: 1735689600000
+  }}]
 ==
 [prepare_database]
 CREATE TABLE TableWithNestedFields AS (
@@ -503,3 +553,145 @@ ARRAY<STRUCT<
                  2025-01-02 00:00:00+00
                },
                {NULL, "c", NULL, NULL}]
+==
+[required_features=INTERVAL_TYPE,TABLE_VALUED_FUNCTIONS,TUMBLE_HOP_TVFS]
+[name=tumble_proto_annotated_timestamp_val]
+SELECT * FROM tumble(TABLE TableWithStructAndProto, "ProtoColumn.annotated_timestamp_val", INTERVAL 1 DAY);
+--
+ARRAY<STRUCT<
+        key INT64,
+        StructWithProto STRUCT<
+               ambiguous_field INT64,
+               other_field STRING,
+               proto_field PROTO<googlesql_test.TestHopAndTumblePB>
+             >,
+        ProtoColumn PROTO<googlesql_test.TestHopAndTumblePB>,
+        WINDOW_START TIMESTAMP,
+        WINDOW_END TIMESTAMP
+      >>
+[{1,
+  {1,
+   "abc",
+   {
+     int32_val: 100
+     timestamp_val {
+       seconds: 1735689600
+     }
+     annotated_timestamp_val: 1735689600000
+   }},
+  {
+    int32_val: 200
+    timestamp_val {
+      seconds: 1735689600
+    }
+    annotated_timestamp_val: 1735689600000
+  },
+  2025-01-01 00:00:00+00,
+  2025-01-02 00:00:00+00}]
+==
+[required_features=INTERVAL_TYPE,TABLE_VALUED_FUNCTIONS,TUMBLE_HOP_TVFS]
+[name=tumble_proto_timestamp_val]
+SELECT * FROM tumble(TABLE TableWithStructAndProto, "ProtoColumn.timestamp_val", INTERVAL 1 DAY);
+--
+ARRAY<STRUCT<
+        key INT64,
+        StructWithProto STRUCT<
+               ambiguous_field INT64,
+               other_field STRING,
+               proto_field PROTO<googlesql_test.TestHopAndTumblePB>
+             >,
+        ProtoColumn PROTO<googlesql_test.TestHopAndTumblePB>,
+        WINDOW_START TIMESTAMP,
+        WINDOW_END TIMESTAMP
+      >>
+[{1,
+  {1,
+   "abc",
+   {
+     int32_val: 100
+     timestamp_val {
+       seconds: 1735689600
+     }
+     annotated_timestamp_val: 1735689600000
+   }},
+  {
+    int32_val: 200
+    timestamp_val {
+      seconds: 1735689600
+    }
+    annotated_timestamp_val: 1735689600000
+  },
+  2025-01-01 00:00:00+00,
+  2025-01-02 00:00:00+00}]
+==
+[required_features=INTERVAL_TYPE,TABLE_VALUED_FUNCTIONS,TUMBLE_HOP_TVFS]
+[name=tumble_struct_proto_timestamp_val]
+SELECT * FROM tumble(TABLE TableWithStructAndProto, "StructWithProto.proto_field.timestamp_val", INTERVAL 1 DAY);
+--
+ARRAY<STRUCT<
+        key INT64,
+        StructWithProto STRUCT<
+               ambiguous_field INT64,
+               other_field STRING,
+               proto_field PROTO<googlesql_test.TestHopAndTumblePB>
+             >,
+        ProtoColumn PROTO<googlesql_test.TestHopAndTumblePB>,
+        WINDOW_START TIMESTAMP,
+        WINDOW_END TIMESTAMP
+      >>
+[{1,
+  {1,
+   "abc",
+   {
+     int32_val: 100
+     timestamp_val {
+       seconds: 1735689600
+     }
+     annotated_timestamp_val: 1735689600000
+   }},
+  {
+    int32_val: 200
+    timestamp_val {
+      seconds: 1735689600
+    }
+    annotated_timestamp_val: 1735689600000
+  },
+  2025-01-01 00:00:00+00,
+  2025-01-02 00:00:00+00}]
+==
+[required_features=INTERVAL_TYPE,TABLE_VALUED_FUNCTIONS,TUMBLE_HOP_TVFS]
+[name=tumble_proto_null_timestamp_val]
+WITH TableWithNullProtoTimestamp AS (
+  SELECT
+    1 AS key,
+    NEW googlesql_test.TestHopAndTumblePB(
+      100 AS int32_val,
+      TO_PROTO(TIMESTAMP '2025-01-01 00:00:00 UTC') AS timestamp_val
+    ) AS ProtoColumn
+  UNION ALL
+  SELECT
+    2 AS key,
+    NEW googlesql_test.TestHopAndTumblePB(
+      200 AS int32_val
+    ) AS ProtoColumn
+)
+SELECT * FROM tumble(TABLE TableWithNullProtoTimestamp, "ProtoColumn.timestamp_val", INTERVAL 1 DAY);
+--
+ARRAY<STRUCT<
+        key INT64,
+        ProtoColumn PROTO<googlesql_test.TestHopAndTumblePB>,
+        WINDOW_START TIMESTAMP,
+        WINDOW_END TIMESTAMP
+      >>
+[unknown order:{1,
+                {
+                  int32_val: 100
+                  timestamp_val {
+                    seconds: 1735689600
+                  }
+                },
+                2025-01-01 00:00:00+00,
+                2025-01-02 00:00:00+00},
+               {2, {int32_val: 200}, NULL, NULL}]
+
+

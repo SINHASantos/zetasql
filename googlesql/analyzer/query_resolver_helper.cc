@@ -31,6 +31,7 @@
 #include <vector>
 
 #include "googlesql/analyzer/analytic_function_resolver.h"
+#include "googlesql/analyzer/estimator_function_resolver.h"
 #include "googlesql/analyzer/expr_resolver_helper.h"
 #include "googlesql/analyzer/name_scope.h"
 #include "googlesql/parser/ast_node_kind.h"
@@ -331,6 +332,8 @@ std::string SelectColumnState::DebugString(absl::string_view indent) const {
   absl::StrAppend(&debug_string, indent,
                   "has_analytic: ", expr_findings.has_analytic, "\n");
   absl::StrAppend(&debug_string, indent,
+                  "has_estimator: ", expr_findings.has_estimator, "\n");
+  absl::StrAppend(&debug_string, indent,
                   "is_group_by_column: ", is_group_by_column, "\n");
   absl::StrAppend(&debug_string, indent, "resolved_select_column: ",
                   (resolved_select_column.IsInitialized()
@@ -536,6 +539,7 @@ QueryResolutionInfo::QueryResolutionInfo(Resolver* resolver,
                                          const QueryResolutionInfo* parent) {
   select_column_state_list_ = std::make_unique<SelectColumnStateList>();
   analytic_resolver_ = std::make_unique<AnalyticFunctionResolver>(resolver);
+  estimator_resolver_ = std::make_unique<EstimatorFunctionResolver>(resolver);
   if (parent != nullptr) {
     scoped_aggregation_state_ = parent->scoped_aggregation_state_;
     is_nested_aggregation_ = true;

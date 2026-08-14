@@ -23,6 +23,7 @@
 #include <vector>
 
 #include "googlesql/public/functions/rounding_mode.pb.h"
+#include "googlesql/public/proto/vector_encoding_id.pb.h"
 #include "googlesql/public/type.pb.h"
 #include "googlesql/public/type_parameters.pb.h"
 #include "googlesql/public/types/annotation.h"
@@ -33,6 +34,7 @@
 #include "googlesql/public/types/type.h"
 #include "googlesql/public/types/type_factory.h"
 #include "googlesql/public/types/type_modifiers.h"
+#include "googlesql/public/types/vector_type_util.h"
 #include "googlesql/testdata/test_schema.pb.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -421,6 +423,18 @@ TEST(TypeParameters, DeserializeNumericTypeParametersFailed) {
       "scale: 35");
 }
 
+TEST(TypeParameters, DeserializeVectorTypeParametersFailed) {
+  DeserializeWithExpectedError(
+      R"pb(
+        vector_type_parameters { length: -10 })pb",
+      "vector_type_parameters.length() > 0");
+
+  DeserializeWithExpectedError(
+      R"pb(
+        vector_type_parameters { length: 10 encoding: UNKNOWN_VECTOR_ENCODING })pb",
+      "Unrecognized VECTOR encoding: \"UNKNOWN_VECTOR_ENCODING\"");
+}
+
 // StringTypeParameters matches STRING and BYTES.
 TEST(TypeParameters, MatchStringOrBytesType) {
   StringTypeParametersProto string_param;
@@ -656,18 +670,27 @@ TEST(TypeParametersTest, VectorTypeParametersResolution) {
   EXPECT_EQ(type_params.ToParenthesizedString(), "(128)");
 }
 
+TEST(TypeParametersTest, VectorTypeParametersWithEncodingResolution) {
+  VectorTypeParametersProto proto;
+  proto.set_length(128);
+  proto.set_encoding(googlesql::VectorEncodingId::FLOAT32);
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(TypeParameters type_params,
+                       TypeParameters::MakeVectorTypeParameters(proto));
+  EXPECT_TRUE(type_params.IsVectorTypeParameters());
+  const VectorTypeParametersProto* vector_params =
+      type_params.vector_type_parameters();
+  ASSERT_NE(vector_params, nullptr);
+  EXPECT_EQ(vector_params->length(), 128);
+  EXPECT_EQ(vector_params->encoding(), googlesql::VectorEncodingId::FLOAT32);
+  EXPECT_EQ(type_params.DebugString(), "(length=128, encoding=FLOAT32)");
+  EXPECT_EQ(type_params.ToParenthesizedString(), "(128, 'FLOAT32')");
+}
+
 TEST(TypeParametersTest, CompositeTypeParametersResolution) {
   TypeFactory type_factory;
 
   // 1. Construct the declarative type for VECTOR.
-  const Type* vector_type = nullptr;
-  GOOGLESQL_ASSERT_OK_AND_ASSIGN(
-      vector_type,
-      type_factory.MakeDeclarativeType(
-          DeclarativeTypeDescriptor()
-              .set_type_id({std::string(TypeId::kGoogleSqlNamespace), "VECTOR"})
-              .set_display_name("VECTOR")
-              .set_backing_type(type_factory.get_bytes())));
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(const Type* vector_type, MakeVectorType(&type_factory));
 
   // 2. Construct the array type for ARRAY<VECTOR>.
   GOOGLESQL_ASSERT_OK_AND_ASSIGN(const Type* array_vector_type,

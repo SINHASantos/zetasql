@@ -158,7 +158,8 @@ ScriptExecutorImpl::ScriptExecutorImpl(
     : options_(options),
       evaluator_(evaluator),
       total_memory_usage_(0),
-      type_factory_(options.type_factory()) {
+      type_factory_(options.type_factory()),
+      script_text_(parsed_script->script_text()) {
   const ControlFlowNode* start_node =
       parsed_script->control_flow_graph().start_node();
   callstack_.emplace_back(StackFrameImpl(std::move(parsed_script), start_node));
@@ -412,14 +413,19 @@ absl::StatusOr<const ASTStatement*> ScriptExecutorImpl::ExitProcedure(
 }
 
 bool ScriptExecutorImpl::IsComplete() const {
+  if (callstack_.empty()) return true;
   return callstack_.back().current_node() == nullptr ||
          callstack_.back().current_node()->ast_node() == nullptr;
 }
 
 absl::Status ScriptExecutorImpl::ExecuteNext() {
+  if (callstack_.empty()) {
+    return absl::FailedPreconditionError(
+        "Script executor is in an invalid state.");
+  }
   absl::Status status = ExecuteNextImpl();
   return ConvertInternalErrorLocationAndAdjustErrorString(
-      options_.error_message_options(), CurrentScript()->script_text(), status);
+      options_.error_message_options(), GetScriptText(), status);
 }
 
 absl::Status ScriptExecutorImpl::ExecuteNextImpl() {
@@ -1848,10 +1854,16 @@ absl::Status ScriptExecutorImpl::ExecuteDynamicStatement() {
 }
 
 absl::string_view ScriptExecutorImpl::GetScriptText() const {
+  if (callstack_.empty()) {
+    return script_text_;
+  }
   return CurrentScript()->script_text();
 }
 
 const ControlFlowNode* ScriptExecutorImpl::GetCurrentNode() const {
+  if (callstack_.empty()) {
+    return nullptr;
+  }
   return callstack_.back().current_node();
 }
 
@@ -1989,6 +2001,15 @@ ParserOptions ScriptExecutorImpl::GetParserOptions() const {
 
 absl::Status ScriptExecutorImpl::SetState(
     const ScriptExecutorStateProto& state) {
+  absl::Status status = SetStateInternal(state);
+  if (!status.ok()) {
+    callstack_.clear();
+  }
+  return status;
+}
+
+absl::Status ScriptExecutorImpl::SetStateInternal(
+    const ScriptExecutorStateProto& state) {
   GOOGLESQL_RETURN_IF_ERROR(Reset());
   if (state.callstack().empty()) {
     // For now, ScriptExecutor may not have a state with an empty callstack.
@@ -2077,10 +2098,6 @@ absl::Status ScriptExecutorImpl::SetState(
     }
 
     std::vector<std::unique_ptr<EvaluatorTableIterator>> for_loop_stack;
-    // Temporarily add the current StackFrame to the back of callstack_ so that
-    // calls to this->GetCurrentStack() returns the current parsed_script.
-    // A non-nullptr cfg_node is used at StackFrame initialization to
-    // differentiate from a script that is complete.
     const ControlFlowNode* unused_cfg_node =
         parsed_script->control_flow_graph().start_node();
     callstack_.emplace_back(
@@ -2140,6 +2157,10 @@ absl::Status ScriptExecutorImpl::SetState(
 }
 
 absl::StatusOr<ScriptExecutorStateProto> ScriptExecutorImpl::GetState() const {
+  if (callstack_.empty()) {
+    return absl::FailedPreconditionError(
+        "Script executor is in an invalid state.");
+  }
   ScriptExecutorStateProto state_proto;
   FileDescriptorSetMap file_descriptor_set_map;
   for (const StackFrameImpl& stack_frame : callstack_) {
@@ -2332,6 +2353,7 @@ absl::string_view ScriptExecutorImpl::GetCurrentProcedureName() const {
 }
 
 absl::string_view ScriptExecutorImpl::GetCurrentStackFrameName() const {
+  if (callstack_.empty()) return "";
   if (callstack_.back().procedure_definition() != nullptr) {
     return callstack_.back().procedure_definition()->name();
   } else {
@@ -2377,6 +2399,10 @@ absl::StatusOr<std::vector<StackFrameTrace>> ScriptExecutorImpl::StackTrace()
 }
 
 absl::Status ScriptExecutorImpl::Reset() {
+  if (callstack_.empty()) {
+    return absl::FailedPreconditionError(
+        "Script executor is in an invalid state.");
+  }
   // Leave only main script on call stack
   if (callstack_.size() > 1) {
     callstack_.erase(callstack_.begin() + 1, callstack_.end());

@@ -1013,3 +1013,17 @@ DROP VIEW foo ON bar;
 ERROR: DROP VIEW does not support the ON clause [at 1:15]
 DROP VIEW foo ON bar;
               ^
+==
+
+DROP MATERIALIZED VIEW foo ON bar;
+--
+ERROR: DROP MATERIALIZED VIEW does not support the ON clause [at 1:28]
+DROP MATERIALIZED VIEW foo ON bar;
+                           ^
+==
+
+DROP FUNCTION foo ON bar;
+--
+ERROR: DROP FUNCTION does not support the ON clause [at 1:19]
+DROP FUNCTION foo ON bar;
+                  ^

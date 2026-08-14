@@ -33,6 +33,7 @@
 #include "googlesql/analyzer/annotation_propagator.h"
 #include "googlesql/analyzer/column_cycle_detector.h"
 #include "googlesql/analyzer/container_hash_equals.h"
+#include "googlesql/analyzer/estimator_function_resolver.h"
 #include "googlesql/analyzer/expr_matching_helpers.h"
 #include "googlesql/analyzer/expr_resolver_helper.h"
 #include "googlesql/analyzer/name_scope.h"
@@ -276,6 +277,13 @@ class Resolver {
   // The returned annotation map is internalized in the TypeFactory.
   absl::StatusOr<const AnnotationMap*> CreateAnnotationMapFromTypeWithModifiers(
       const Type* type, const TypeModifiers& type_modifiers) const;
+
+  // Checks if any argument in `arg_list` has value/type annotations that differ
+  // from the annotation map derived from the corresponding parameter in
+  // `concrete_signature`.
+  absl::StatusOr<bool> FunctionCallHasDifferentArgumentAnnotations(
+      absl::Span<const std::unique_ptr<const ResolvedExpr>> arg_list,
+      const FunctionSignature& concrete_signature) const;
 
   // Checks if the language features are enabled for the given type modifiers.
   // Specifically, checks
@@ -527,6 +535,12 @@ class Resolver {
     // node in the AST input, and will be resolved to a ResolvedLiteral
     // argument.
     PROPERTY_NAME,
+
+    // ELEMENT_DEFINITION_NAME indicates that function argument is an identifier
+    // to an element table in a property graph. This is an ASTIdentifier
+    // node in the AST input, and will be resolved to a ResolvedLiteral
+    // argument.
+    ELEMENT_DEFINITION_NAME,
   };
 
   enum class PartitioningKind { PARTITION_BY, CLUSTER_BY };
@@ -713,6 +727,16 @@ class Resolver {
 
   // The current state of the innermost MATCH_RECOGNIZE clause.
   std::stack<MatchRecognizeState> match_recognize_state_;
+
+  // The active version-aware DML statement node. Version-aware DML statements
+  // (using `AT` or `WITH TIMESTAMP` clauses) are not allowed to be nested under
+  // another version-aware DML statement.
+  const ASTNode* active_version_aware_node_ = nullptr;
+
+  // The current write timestamp column for the active version-aware DML
+  // statement. Since nesting version-aware DML statements is not allowed, at
+  // most one active column is tracked at a time.
+  std::optional<ResolvedColumn> active_timestamp_version_column_;
 
   // This is true if we found any of the operators that only work in
   // ResolvedGeneralizedQueryStmt (not in ResolvedQueryStmt).
@@ -1390,7 +1414,7 @@ class Resolver {
   // parameter.
   absl::Status ResolveAlignOperatorPartitionBy(
       const ASTPartitionByWithOptAlias* partition_by,
-      ExprResolutionInfo* expr_resolution_info,
+      const NameScope* input_scope,
       std::vector<std::unique_ptr<const ResolvedComputedColumn>>&
           computed_columns);
 
@@ -1657,6 +1681,10 @@ class Resolver {
       const ASTCreateRowAccessPolicyStatement* ast_statement,
       std::unique_ptr<ResolvedStatement>* output);
 
+  absl::Status ResolveCreateDataPolicyStatement(
+      const ASTCreateDataPolicyStatement* ast_statement,
+      std::unique_ptr<ResolvedStatement>* output);
+
   absl::Status ResolveCloneDataStatement(
       const ASTCloneDataStatement* ast_statement,
       std::unique_ptr<ResolvedStatement>* output);
@@ -1797,6 +1825,57 @@ class Resolver {
           resolved_columns_to_catalog_columns_for_target_scan,
       std::unique_ptr<ResolvedInsertStmt>* output);
 
+  // Resolves the `AT` clause of a version-aware DML statement.
+  //
+  // Inputs:
+  // - `temporal_at`: The `AT` clause AST node.
+  // - `temporal_at_scope`: The scope for resolving the `AT` expression.
+  //
+  // Outputs:
+  // - `resolved_temporal_at`: The resolved timestamp expression for `AT`.
+  absl::Status ResolveTemporalAtClause(
+      const ASTTemporalAt* temporal_at, const NameScope* temporal_at_scope,
+      std::unique_ptr<const ResolvedExpr>* resolved_temporal_at);
+
+  // Resolves the `WITH TIMESTAMP` clause of a version-aware DML statement.
+  //
+  // Inputs:
+  // - `with_timestamp`: The `WITH TIMESTAMP` clause AST node.
+  // - `target_alias`: The alias of the target table.
+  // - `scope`: The scope of the DML statement, used for conflict checks.
+  // - `target_name_list`: The columns of the target table, used for conflict
+  //   checks.
+  // - `insert_target_columns`: (INSERT only) The columns of the target table
+  //   that are being inserted into. When `has_explicit_column_list` is true
+  //   (i.e., the statement specifies an explicit column list), this list
+  //   already contains the resolved timestamp column, which we must look up and
+  //   reuse to ensure column ID consistency.
+  // - `has_explicit_column_list`: (INSERT only) True if target columns were
+  //   explicitly listed. Used to enforce that the version timestamp column is
+  //   explicitly specified in the column list when one is provided.
+  //
+  // Outputs:
+  // - `resolved_timestamp_version_column`: The resolved column holder for the
+  //   timestamp column.
+  // - `new_name_list`: A NameList containing the timestamp column, to be merged
+  //   into the active resolving scope.
+  absl::Status ResolveWithTimestampClause(
+      const ASTWithTimestamp* with_timestamp, IdString target_alias,
+      const NameScope* scope, const NameList* target_name_list,
+      std::unique_ptr<const ResolvedColumnHolder>*
+          resolved_timestamp_version_column,
+      std::shared_ptr<const NameList>* new_name_list,
+      const ResolvedColumnList& insert_target_columns = {},
+      bool has_explicit_column_list = false);
+
+  // Validates that the target table of a version-aware DML statement is valid.
+  // It ensures that FEATURE_VERSION_AWARE_DML is enabled, and that the target
+  // table has at least one versioned column (or subfield if `allow_subfields`
+  // is true).
+  absl::Status ValidateVersionAwareDmlTarget(
+      const ASTStatement* ast_statement, const NameList* versioned_name_list,
+      IdString target_alias, bool has_temporal_at, bool has_with_timestamp);
+
   absl::Status ResolveUpdateStatement(
       const ASTUpdateStatement* ast_statement,
       std::unique_ptr<ResolvedUpdateStmt>* output);
@@ -1811,7 +1890,7 @@ class Resolver {
       const ASTUpdateStatement* ast_statement, bool is_nested,
       IdString target_alias, const NameScope* target_scope,
       const std::shared_ptr<const NameList>& target_name_list,
-      const NameScope* update_scope,
+      const NameScope* update_scope, const NameScope* outer_scope,
       std::unique_ptr<const ResolvedTableScan> table_scan,
       std::unique_ptr<const ResolvedScan> from_scan,
       ResolvedColumnToCatalogColumnHashMap&
@@ -4927,6 +5006,11 @@ class Resolver {
       ExprResolutionInfo* expr_resolution_info,
       std::unique_ptr<const ResolvedExpr>* resolved_expr_out);
 
+  absl::Status ResolveEstimatorFunctionCall(
+      const ASTEstimatorFunctionCall* estimator_function_call,
+      ExprResolutionInfo* expr_resolution_info,
+      std::unique_ptr<const ResolvedExpr>* resolved_expr_out);
+
   // Populates <resolved_date_part> with a ResolvedLiteral that wraps a literal
   // Value of EnumType(functions::DateTimestampPart) corresponding to
   // <date_part_name> and <date_part_arg_name>. If <date_part> is not null, sets
@@ -5575,6 +5659,10 @@ class Resolver {
       const ASTNode* ast_location, const ResolvedColumn& column,
       const char* statement_type, const ASTExpression* value = nullptr);
 
+  // Returns true if the column is the active version-aware DML write timestamp
+  // column.
+  bool IsReadOnlyTimestampColumn(const ResolvedColumn& column) const;
+
   // Determines if <ast_update_item> should share the same ResolvedUpdateItem as
   // <update_item>.  Sets <merge> to true if they have the same target. Sets
   // <merge> to false if they have different, non-overlapping targets. Returns
@@ -5605,9 +5693,9 @@ class Resolver {
       std::vector<UpdateTargetInfo>& update_target_infos,
       ResolvedUpdateItem*& deepest_new_resolved_update_item);
 
-  // Merges <ast_input_update_item> into <merged_update_item> (which might be
-  // uninitialized). <input_update_target_infos> is the output of
-  // PopulateUpdateTargetInfos() corresponding to <ast_update_item>.
+  // Merges `ast_input_update_item` into `merged_update_item` (which might be
+  // uninitialized). `input_update_target_infos` is the output of
+  // PopulateUpdateTargetInfos() corresponding to `ast_update_item`.
   absl::Status MergeWithUpdateItem(
       const NameScope* update_scope, const ASTUpdateItem* ast_input_update_item,
       std::vector<UpdateTargetInfo>* input_update_target_infos,
@@ -5693,6 +5781,10 @@ class Resolver {
       const ASTAlterEntityStatement* ast_statement,
       std::unique_ptr<ResolvedStatement>* output);
 
+  absl::Status ResolveAlterDataPolicyStatement(
+      const ASTAlterDataPolicyStatement* ast_statement,
+      std::unique_ptr<ResolvedStatement>* output);
+
   // Resolves a generic DROP <entity_type> statement.
   absl::Status ResolveDropEntityStatement(
       const ASTDropEntityStatement* ast_statement,
@@ -5701,6 +5793,11 @@ class Resolver {
   // Resolves a create property graph statement.
   absl::Status ResolveCreatePropertyGraphStatement(
       const ASTCreatePropertyGraphStatement* ast_stmt,
+      std::unique_ptr<ResolvedStatement>* output);
+
+  // Resolves a create property graph type statement.
+  absl::Status ResolveCreatePropertyGraphTypeStatement(
+      const ASTCreatePropertyGraphTypeStatement* ast_stmt,
       std::unique_ptr<ResolvedStatement>* output);
 
   // Resolves a GQL query expression.
@@ -5729,6 +5826,16 @@ class Resolver {
   //  the graph referenced by the graph element.
   absl::Status ResolvePropertyNameArgument(
       const ASTExpression* property_name_identifier,
+      std::vector<std::unique_ptr<const ResolvedExpr>>& resolved_arguments_out,
+      std::vector<const ASTNode*>& ast_arguments_out);
+
+  // Resolves argument of special argument type ELEMENT_DEFINITION_NAME.
+  // Requires:
+  //  1. Last resolved argument in `resolved_arguments_out` is a graph element.
+  //  2. `element_table_name_identifier` is an identifier to an element table in
+  //  the graph referenced by the graph element.
+  absl::Status ResolveElementDefinitionNameArgument(
+      const ASTExpression* element_table_name_identifier,
       std::vector<std::unique_ptr<const ResolvedExpr>>& resolved_arguments_out,
       std::vector<const ASTNode*>& ast_arguments_out);
 
@@ -5893,6 +6000,18 @@ class Resolver {
       std::vector<const ASTExpression*>* function_arguments,
       std::map<int, SpecialArgumentType>* argument_option_map,
       QueryResolutionInfo* query_resolution_info);
+
+  // Performs catalog lookup for function, validates and resolves the
+  // arguments. This serves as a common helper for resolving analytic and
+  // estimator functions.
+  absl::Status ResolveFunctionNameAndArguments(
+      const ASTFunctionCall* ast_function,
+      ExprResolutionInfo* expr_resolution_info,
+      ExprResolutionInfo* argument_resolution_info, const Function*& function,
+      std::vector<std::string>& function_name_path,
+      std::vector<NamedArgumentInfo>& named_arguments,
+      std::vector<const ASTNode*>& ast_arguments,
+      std::vector<std::unique_ptr<const ResolvedExpr>>& resolved_arguments);
 
   // Returns the function name, arguments and options. It handles the special
   // cases for ANON functions. If FEATURE_ANONYMIZATION is disabled the function
@@ -6820,6 +6939,7 @@ class Resolver {
       std::unique_ptr<ResolvedStatement>* output);
 
   friend class AnalyticFunctionResolver;
+  friend class EstimatorFunctionResolver;
   friend class FunctionResolver;
   friend class FunctionResolverTest;
   friend class GraphDdlResolver;

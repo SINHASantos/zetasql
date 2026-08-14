@@ -18,18 +18,13 @@
 // with "functions_testlib_" because an optimized compile with ASAN of the
 // original single file timed out at 900 seconds.
 #include <cstdint>
-#include <limits>
-#include <numeric>
 #include <string>
-#include <utility>
 #include <vector>
 
-#include "googlesql/base/logging.h"
-#include "google/protobuf/descriptor.h"
-#include "googlesql/common/float_margin.h"
 #include "googlesql/compliance/functions_testlib_common.h"
 #include "googlesql/public/functions/date_time_util.h"
 #include "googlesql/public/functions/datetime.pb.h"
+#include "googlesql/public/functions/endianness.pb.h"
 #include "googlesql/public/numeric_value.h"
 #include "googlesql/public/options.pb.h"
 #include "googlesql/public/type.h"
@@ -38,20 +33,252 @@
 #include "googlesql/testing/test_function.h"
 #include "googlesql/testing/test_value.h"
 #include "googlesql/testing/using_test_value.cc"  // NOLINT
+#include "googlesql/base/check.h"
+#include "absl/status/status.h"
+#include "googlesql/base/status_macros.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/escaping.h"
 #include "absl/strings/string_view.h"
 #include "absl/types/span.h"
-#include "re2/re2.h"
-#include "googlesql/base/status.h"
 
 namespace googlesql {
 namespace {
 constexpr absl::StatusCode OUT_OF_RANGE = absl::StatusCode::kOutOfRange;
 }  // namespace
 
-std::vector<FunctionTestCall> GetFunctionTestsBitCast() {
-  return {
+namespace {
+
+static absl::StatusOr<std::vector<FunctionTestCall>> GetBitCastBytesTests() {
+  GOOGLESQL_ASSIGN_OR_RETURN(const EnumType* endianness_type,
+                   types::EndiannessEnumType());
+  const Value enum_big_endian =
+      Value::Enum(endianness_type, functions::Endianness::BIG);
+
+  std::vector<FunctionTestCall> tests = {
+      // BYTES <-> FLOAT / DOUBLE / INTEGER (Extreme values, INF, -INF, NaN)
+      // FLOAT -> BYTES: 0.0, -0.0, 1.0, -1.0, floatmax, floatmin,
+      // floatminpositive, INF, -INF, NaN, -NaN
+      {"bit_cast_to_bytes", {Float(0.0f)}, Bytes("\x00\x00\x00\x00")},
+      {"bit_cast_to_bytes", {Float(-0.0f)}, Bytes("\x00\x00\x00\x80")},
+      {"bit_cast_to_bytes", {Float(1.0f)}, Bytes("\x00\x00\x80\x3f")},
+      {"bit_cast_to_bytes", {Float(-1.0f)}, Bytes("\x00\x00\x80\xbf")},
+      // FLOAT extreme values (max, min/lowest, smallest positive)
+      {"bit_cast_to_bytes", {Float(floatmax)}, Bytes("\xff\xff\x7f\x7f")},
+      {"bit_cast_to_bytes", {Float(floatmin)}, Bytes("\xff\xff\x7f\xff")},
+      {"bit_cast_to_bytes",
+       {Float(floatminpositive)},
+       Bytes("\x00\x00\x80\x00")},
+      {"bit_cast_to_bytes",
+       {Float(floatminnegative)},
+       Bytes("\x00\x00\x80\x80")},
+      // FLOAT special values (INF, -INF, NaN, -NaN)
+      {"bit_cast_to_bytes", {Float(float_pos_inf)}, Bytes("\x00\x00\x80\x7f")},
+      {"bit_cast_to_bytes", {Float(float_neg_inf)}, Bytes("\x00\x00\x80\xff")},
+      {"bit_cast_to_bytes", {Float(float_nan)}, Bytes("\x00\x00\xc0\x7f")},
+      {"bit_cast_to_bytes", {Float(float_neg_nan)}, Bytes("\x00\x00\xc0\xff")},
+
+      // DOUBLE -> BYTES: 0.0, -0.0, 1.0, -1.0, doublemax, doublemin,
+      // doubleminpositive, INF, -INF, NaN, -NaN
+      {"bit_cast_to_bytes",
+       {Double(0.0)},
+       Bytes("\x00\x00\x00\x00\x00\x00\x00\x00")},
+      {"bit_cast_to_bytes",
+       {Double(-0.0)},
+       Bytes("\x00\x00\x00\x00\x00\x00\x00\x80")},
+      {"bit_cast_to_bytes",
+       {Double(1.0)},
+       Bytes("\x00\x00\x00\x00\x00\x00\xf0\x3f")},
+      {"bit_cast_to_bytes",
+       {Double(-1.0)},
+       Bytes("\x00\x00\x00\x00\x00\x00\xf0\xbf")},
+      // DOUBLE extreme values (max, min/lowest, smallest positive)
+      {"bit_cast_to_bytes",
+       {Double(doublemax)},
+       Bytes("\xff\xff\xff\xff\xff\xff\xef\x7f")},
+      {"bit_cast_to_bytes",
+       {Double(doublemin)},
+       Bytes("\xff\xff\xff\xff\xff\xff\xef\xff")},
+      {"bit_cast_to_bytes",
+       {Double(doubleminpositive)},
+       Bytes("\x00\x00\x00\x00\x00\x00\x10\x00")},
+      {"bit_cast_to_bytes",
+       {Double(doubleminnegative)},
+       Bytes("\x00\x00\x00\x00\x00\x00\x10\x80")},
+      // DOUBLE special values (INF, -INF, NaN, -NaN)
+      {"bit_cast_to_bytes",
+       {Double(double_pos_inf)},
+       Bytes("\x00\x00\x00\x00\x00\x00\xf0\x7f")},
+      {"bit_cast_to_bytes",
+       {Double(double_neg_inf)},
+       Bytes("\x00\x00\x00\x00\x00\x00\xf0\xff")},
+      {"bit_cast_to_bytes",
+       {Double(double_nan)},
+       Bytes("\x00\x00\x00\x00\x00\x00\xf8\x7f")},
+      {"bit_cast_to_bytes",
+       {Double(double_neg_nan)},
+       Bytes("\x00\x00\x00\x00\x00\x00\xf8\xff")},
+
+      // INT32 / UINT32 / INT64 / UINT64 -> BYTES (0, 1, -1, min, max)
+      {"bit_cast_to_bytes", {Int32(0)}, Bytes("\x00\x00\x00\x00")},
+      {"bit_cast_to_bytes", {Int32(1)}, Bytes("\x01\x00\x00\x00")},
+      {"bit_cast_to_bytes", {Int32(-1)}, Bytes("\xff\xff\xff\xff")},
+      {"bit_cast_to_bytes", {Int32(int32max)}, Bytes("\xff\xff\xff\x7f")},
+      {"bit_cast_to_bytes", {Int32(int32min)}, Bytes("\x00\x00\x00\x80")},
+      {"bit_cast_to_bytes", {Uint32(0)}, Bytes("\x00\x00\x00\x00")},
+      {"bit_cast_to_bytes", {Uint32(1)}, Bytes("\x01\x00\x00\x00")},
+      {"bit_cast_to_bytes", {Uint32(uint32max)}, Bytes("\xff\xff\xff\xff")},
+      {"bit_cast_to_bytes",
+       {Int64(0)},
+       Bytes("\x00\x00\x00\x00\x00\x00\x00\x00")},
+      {"bit_cast_to_bytes",
+       {Int64(1)},
+       Bytes("\x01\x00\x00\x00\x00\x00\x00\x00")},
+      {"bit_cast_to_bytes",
+       {Int64(-1)},
+       Bytes("\xff\xff\xff\xff\xff\xff\xff\xff")},
+      {"bit_cast_to_bytes",
+       {Int64(int64max)},
+       Bytes("\xff\xff\xff\xff\xff\xff\xff\x7f")},
+      {"bit_cast_to_bytes",
+       {Int64(int64min)},
+       Bytes("\x00\x00\x00\x00\x00\x00\x00\x80")},
+      {"bit_cast_to_bytes",
+       {Uint64(0)},
+       Bytes("\x00\x00\x00\x00\x00\x00\x00\x00")},
+      {"bit_cast_to_bytes",
+       {Uint64(1)},
+       Bytes("\x01\x00\x00\x00\x00\x00\x00\x00")},
+      {"bit_cast_to_bytes",
+       {Uint64(uint64max)},
+       Bytes("\xff\xff\xff\xff\xff\xff\xff\xff")},
+
+      // Endianness argument (BIG ENDIAN extreme values, INF, -INF, NaN)
+      {"bit_cast_to_bytes",
+       {Float(float_pos_inf), enum_big_endian},
+       Bytes("\x7f\x80\x00\x00")},
+      {"bit_cast_to_bytes",
+       {Float(float_neg_inf), enum_big_endian},
+       Bytes("\xff\x80\x00\x00")},
+      {"bit_cast_to_bytes",
+       {Float(float_nan), enum_big_endian},
+       Bytes("\x7f\xc0\x00\x00")},
+      {"bit_cast_to_bytes",
+       {Float(floatmax), enum_big_endian},
+       Bytes("\x7f\x7f\xff\xff")},
+      {"bit_cast_to_bytes",
+       {Float(floatmin), enum_big_endian},
+       Bytes("\xff\x7f\xff\xff")},
+      {"bit_cast_to_bytes",
+       {Double(double_pos_inf), enum_big_endian},
+       Bytes("\x7f\xf0\x00\x00\x00\x00\x00\x00")},
+      {"bit_cast_to_bytes",
+       {Double(double_neg_inf), enum_big_endian},
+       Bytes("\xff\xf0\x00\x00\x00\x00\x00\x00")},
+      {"bit_cast_to_bytes",
+       {Double(double_nan), enum_big_endian},
+       Bytes("\x7f\xf8\x00\x00\x00\x00\x00\x00")},
+      {"bit_cast_to_bytes",
+       {Double(doublemax), enum_big_endian},
+       Bytes("\x7f\xef\xff\xff\xff\xff\xff\xff")},
+      {"bit_cast_to_bytes",
+       {Double(doublemin), enum_big_endian},
+       Bytes("\xff\xef\xff\xff\xff\xff\xff\xff")},
+      {"bit_cast_to_bytes",
+       {Int32(int32max), enum_big_endian},
+       Bytes("\x7f\xff\xff\xff")},
+      {"bit_cast_to_bytes",
+       {Int32(int32min), enum_big_endian},
+       Bytes("\x80\x00\x00\x00")},
+      {"bit_cast_to_bytes",
+       {Int64(int64max), enum_big_endian},
+       Bytes("\x7f\xff\xff\xff\xff\xff\xff\xff")},
+      {"bit_cast_to_bytes",
+       {Int64(int64min), enum_big_endian},
+       Bytes("\x80\x00\x00\x00\x00\x00\x00\x00")},
+
+      // BYTES -> FLOAT / DOUBLE / INTEGER
+      {"bit_cast_to_float", {Bytes("\x00\x00\x00\x00")}, Float(0.0f)},
+      {"bit_cast_to_float", {Bytes("\x00\x00\x00\x80")}, Float(-0.0f)},
+      {"bit_cast_to_float", {Bytes("\x00\x00\x80\x3f")}, Float(1.0f)},
+      {"bit_cast_to_float", {Bytes("\x00\x00\x80\xbf")}, Float(-1.0f)},
+      {"bit_cast_to_float", {Bytes("\xff\xff\x7f\x7f")}, Float(floatmax)},
+      {"bit_cast_to_float", {Bytes("\xff\xff\x7f\xff")}, Float(floatmin)},
+      {"bit_cast_to_float",
+       {Bytes("\x00\x00\x80\x00")},
+       Float(floatminpositive)},
+      {"bit_cast_to_float",
+       {Bytes("\x00\x00\x80\x80")},
+       Float(floatminnegative)},
+      {"bit_cast_to_float", {Bytes("\x00\x00\x80\x7f")}, Float(float_pos_inf)},
+      {"bit_cast_to_float", {Bytes("\x00\x00\x80\xff")}, Float(float_neg_inf)},
+      {"bit_cast_to_float", {Bytes("\x00\x00\xc0\x7f")}, Float(float_nan)},
+
+      {"bit_cast_to_double",
+       {Bytes("\x00\x00\x00\x00\x00\x00\x00\x00")},
+       Double(0.0)},
+      {"bit_cast_to_double",
+       {Bytes("\x00\x00\x00\x00\x00\x00\x00\x80")},
+       Double(-0.0)},
+      {"bit_cast_to_double",
+       {Bytes("\x00\x00\x00\x00\x00\x00\xf0\x3f")},
+       Double(1.0)},
+      {"bit_cast_to_double",
+       {Bytes("\x00\x00\x00\x00\x00\x00\xf0\xbf")},
+       Double(-1.0)},
+      {"bit_cast_to_double",
+       {Bytes("\xff\xff\xff\xff\xff\xff\xef\x7f")},
+       Double(doublemax)},
+      {"bit_cast_to_double",
+       {Bytes("\xff\xff\xff\xff\xff\xff\xef\xff")},
+       Double(doublemin)},
+      {"bit_cast_to_double",
+       {Bytes("\x00\x00\x00\x00\x00\x00\x10\x00")},
+       Double(doubleminpositive)},
+      {"bit_cast_to_double",
+       {Bytes("\x00\x00\x00\x00\x00\x00\x10\x80")},
+       Double(doubleminnegative)},
+      {"bit_cast_to_double",
+       {Bytes("\x00\x00\x00\x00\x00\x00\xf0\x7f")},
+       Double(double_pos_inf)},
+      {"bit_cast_to_double",
+       {Bytes("\x00\x00\x00\x00\x00\x00\xf0\xff")},
+       Double(double_neg_inf)},
+      {"bit_cast_to_double",
+       {Bytes("\x00\x00\x00\x00\x00\x00\xf8\x7f")},
+       Double(double_nan)},
+
+      {"bit_cast_to_int32", {Bytes("\x00\x00\x00\x00")}, Int32(0)},
+      {"bit_cast_to_int32", {Bytes("\xff\xff\xff\x7f")}, Int32(int32max)},
+      {"bit_cast_to_int32", {Bytes("\x00\x00\x00\x80")}, Int32(int32min)},
+      {"bit_cast_to_uint32", {Bytes("\xff\xff\xff\xff")}, Uint32(uint32max)},
+      {"bit_cast_to_int64",
+       {Bytes("\xff\xff\xff\xff\xff\xff\xff\x7f")},
+       Int64(int64max)},
+      {"bit_cast_to_int64",
+       {Bytes("\x00\x00\x00\x00\x00\x00\x00\x80")},
+       Int64(int64min)},
+      {"bit_cast_to_uint64",
+       {Bytes("\xff\xff\xff\xff\xff\xff\xff\xff")},
+       Uint64(uint64max)},
+
+      // Invalid BYTES length -> OUT_OF_RANGE error
+      // For both 32-bit (FLOAT) and 64-bit (DOUBLE), IEEE 754 partitions all
+      // possible bit combinations into fully defined value ranges.
+      {"bit_cast_to_float", {Bytes("123")}, NullFloat(), OUT_OF_RANGE},
+      {"bit_cast_to_double", {Bytes("123")}, NullDouble(), OUT_OF_RANGE},
+  };
+
+  for (FunctionTestCall& test : tests) {
+    test.params.AddRequiredFeature(FEATURE_BIT_CAST_BYTES_FUNCTIONS);
+  }
+
+  return tests;
+}
+
+}  // namespace
+
+absl::StatusOr<std::vector<FunctionTestCall>> GetFunctionTestsBitCast() {
+  std::vector<FunctionTestCall> tests = {
       // Null -> Null
       {"bit_cast_to_int32", {NullInt32()}, NullInt32()},
       {"bit_cast_to_int32", {NullUint32()}, NullInt32()},
@@ -118,6 +345,12 @@ std::vector<FunctionTestCall> GetFunctionTestsBitCast() {
        {Int64(int64min + 3)},
        Uint64(uint64_t{9223372036854775811u})},
   };
+
+  GOOGLESQL_ASSIGN_OR_RETURN(std::vector<FunctionTestCall> bytes_tests,
+                   GetBitCastBytesTests());
+  tests.insert(tests.end(), bytes_tests.begin(), bytes_tests.end());
+
+  return tests;
 }
 
 namespace {

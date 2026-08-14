@@ -478,6 +478,7 @@ QueryStmt
             |                     +-column_ref=
             |                       +-ColumnRef(type=INT64, column=$full_join.offset#13)
             +-element_column_list=[$array.$with_expr_element#15]
+
 [SQLBUILDER_TARGET_SYNTAX_MODE standard]
 [SQLBUILDER_OUTPUT]
 SELECT
@@ -785,6 +786,7 @@ QueryStmt
             |                     +-column_ref=
             |                       +-ColumnRef(type=INT64, column=$full_join.offset#13)
             +-element_column_list=[$array.$with_expr_element#15]
+
 [SQLBUILDER_TARGET_SYNTAX_MODE standard]
 [SQLBUILDER_OUTPUT]
 SELECT
@@ -1646,6 +1648,7 @@ QueryStmt
             |                     +-column_ref=
             |                       +-ColumnRef(type=INT64, column=$full_join.offset#14)
             +-element_column_list=[$array.$with_expr_element#16]
+
 [SQLBUILDER_TARGET_SYNTAX_MODE standard]
 [SQLBUILDER_OUTPUT]
 SELECT
@@ -3978,6 +3981,7 @@ QueryStmt
             |                     +-column_ref=
             |                       +-ColumnRef(type=INT64, column=$full_join.offset#16)
             +-element_column_list=[$array.$with_expr_element#18]
+
 [SQLBUILDER_TARGET_SYNTAX_MODE standard]
 [SQLBUILDER_OUTPUT]
 SELECT
@@ -4368,6 +4372,7 @@ QueryStmt
             |                     +-column_ref=
             |                       +-ColumnRef(type=INT64, column=$full_join.offset#16)
             +-element_column_list=[$array.$with_expr_element#18]
+
 [SQLBUILDER_TARGET_SYNTAX_MODE standard]
 [SQLBUILDER_OUTPUT]
 SELECT
@@ -4750,6 +4755,7 @@ QueryStmt
             |                     +-column_ref=
             |                       +-ColumnRef(type=INT64, column=$full_join.offset#16)
             +-element_column_list=[$array.$with_expr_element#18]
+
 [SQLBUILDER_TARGET_SYNTAX_MODE standard]
 [SQLBUILDER_OUTPUT]
 SELECT
@@ -5405,6 +5411,7 @@ QueryStmt
         | +-TableScan(column_list=[TestTable.KitchenSink#3], table=TestTable, column_index_list=[2])
         +-right_scan=
           +-TableScan(column_list=[ComplexTypes.Int32Array#7], table=ComplexTypes, column_index_list=[3])
+
 [SQLBUILDER_TARGET_SYNTAX_MODE standard]
 [SQLBUILDER_OUTPUT]
 SELECT

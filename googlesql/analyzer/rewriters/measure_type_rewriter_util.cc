@@ -22,11 +22,14 @@
 #include <utility>
 #include <vector>
 
+#include "googlesql/analyzer/rewriters/measure_collector.h"
+#include "googlesql/analyzer/rewriters/measure_dependency_graph.h"
 #include "googlesql/common/measure_utils.h"
 #include "googlesql/public/builtin_function.pb.h"
 #include "googlesql/public/catalog.h"
 #include "googlesql/public/function.h"
 #include "googlesql/public/function_signature.h"
+#include "googlesql/public/types/measure_type.h"
 #include "googlesql/public/types/struct_type.h"
 #include "googlesql/public/types/type.h"
 #include "googlesql/public/types/type_factory.h"
@@ -43,6 +46,7 @@
 #include "absl/algorithm/container.h"
 #include "absl/cleanup/cleanup.h"
 #include "absl/container/btree_set.h"
+#include "absl/container/flat_hash_map.h"
 #include "absl/container/flat_hash_set.h"
 #include "googlesql/base/check.h"
 #include "absl/memory/memory.h"
@@ -670,6 +674,10 @@ class StructColumnReferenceRewriter : public ResolvedASTDeepCopyVisitor {
     //  +-expr=
     //  | +-<struct_column_ref>
     //  +-field_idx=0
+    GOOGLESQL_RET_CHECK(struct_column_ref->type() != nullptr);
+    GOOGLESQL_RET_CHECK(struct_column_ref->type()->IsStruct())
+        << "Expected struct type for closure column, but got: "
+        << struct_column_ref->type()->DebugString();
     GOOGLESQL_RET_CHECK_EQ(struct_column_ref->type()->AsStruct()->num_fields(), 2);
     const StructField& referenced_columns_field =
         struct_column_ref->type()->AsStruct()->field(
@@ -723,14 +731,10 @@ class StructColumnReferenceRewriter : public ResolvedASTDeepCopyVisitor {
 //
 // Returns the rewritten expression.
 static absl::StatusOr<std::unique_ptr<const ResolvedExpr>> RewriteReferences(
-    std::unique_ptr<const ResolvedExpr> expr,
-    const ResolvedColumnRef* closure_struct_ref) {
-  GOOGLESQL_ASSIGN_OR_RETURN(std::unique_ptr<ResolvedExpr> copy,
-                   ResolvedASTDeepCopyVisitor::Copy(expr.get()));
-
+    const ResolvedExpr* expr, const ResolvedColumnRef* closure_struct_ref) {
   StructColumnReferenceRewriter rewriter(closure_struct_ref->column(),
                                          closure_struct_ref->is_correlated());
-  GOOGLESQL_RETURN_IF_ERROR(copy->Accept(&rewriter));
+  GOOGLESQL_RETURN_IF_ERROR(expr->Accept(&rewriter));
 
   return rewriter.ConsumeRootNode<ResolvedExpr>();
 }
@@ -757,14 +761,75 @@ static absl::StatusOr<std::unique_ptr<const ResolvedExpr>> GrainLock(
   return absl::WrapUnique(rewritten.release()->GetAs<ResolvedExpr>());
 }
 
+// Visitor to replace ResolvedColumnRef with expressions.
+class ColumnRefReplacer : public ResolvedASTRewriteVisitor {
+ public:
+  explicit ColumnRefReplacer(
+      absl::flat_hash_map<ResolvedColumn, std::unique_ptr<const ResolvedExpr>>
+          substitution)
+      : substitution_(std::move(substitution)) {}
+
+ protected:
+  absl::StatusOr<std::unique_ptr<const ResolvedNode>>
+  PostVisitResolvedColumnRef(
+      std::unique_ptr<const ResolvedColumnRef> node) override {
+    auto it = substitution_.find(node->column());
+    if (it != substitution_.end()) {
+      return ResolvedASTDeepCopyVisitor::Copy(it->second.get());
+    }
+    return node;
+  }
+
+ private:
+  absl::flat_hash_map<ResolvedColumn, std::unique_ptr<const ResolvedExpr>>
+      substitution_;
+};
+
+// Substitutes column references in `expr` with expressions from `substitution`.
+//
+// For each `ResolvedColumnRef` in `expr` pointing to a column `C` that is
+// present in `substitution`, it replaces the reference with a deep copy of the
+// corresponding expression `substitution[C]`.
+//
+// Arguments:
+// - `expr`: The expression to perform substitution on.
+// - `substitution`: A map from columns to the expressions that should replace
+//     references to them.
+static absl::StatusOr<std::unique_ptr<const ResolvedExpr>> SubstituteColumnRefs(
+    std::unique_ptr<const ResolvedExpr> expr,
+    absl::flat_hash_map<ResolvedColumn, std::unique_ptr<const ResolvedExpr>>
+        substitution) {
+  ColumnRefReplacer substitution_visitor(std::move(substitution));
+  return substitution_visitor.VisitAll<ResolvedExpr>(std::move(expr));
+}
+
+// TODO: Add caching to avoid exponential AST size bloat.
+// Currently, the function does not do any caching, so the same AGG(dep_m) calls
+// can be rewritten multiple times. This includes:
+//
+// - The `AGG(dep_m)` calls in the definition expression of a measure, e.g.,
+//   `m := MEASURE(AGG(dep_m) + AGG(dep_m))`.
+// - The `AGG(dep_m)` calls in multiple derived measure definitions, e.g.,
+//   `m1 := MEASURE(AGG(dep_m) + 1)`, `m2 := MEASURE(AGG(dep_m) + 2)`.
+//
+// As a result, there can be exponential AST size bloat. For example,
+// consider n measures that depend on each other, specifically,
+//
+// m_i := MEASURE(AGG(m_1) + ... + AGG(m_{i-1})) for i = 2..n.
+//
+// Rewriting this `AGG(m_n)` has the time complexity O(2^n).
 absl::StatusOr<RewriteMeasureExprResult> RewriteMeasureExpr(
-    const ResolvedExpr* measure_expr,
+    const MeasureType* measure_type,
     const ResolvedColumnRef* closure_struct_ref,
-    const absl::btree_set<std::string, googlesql_base::CaseLess>&
-        row_identity_column_names,
-    const Function* any_value_fn, FunctionCallBuilder& function_call_builder,
+    const MeasureCollector& measure_collector, const Function* any_value_fn,
+    FunctionCallBuilder& function_call_builder,
     const LanguageOptions& language_options, ColumnFactory& column_factory,
     TypeFactory& type_factory) {
+  GOOGLESQL_ASSIGN_OR_RETURN(MeasureInfo measure_info,
+                   measure_collector.GetMeasureInfo(measure_type));
+
+  const ResolvedExpr* measure_expr = measure_info.measure_expr;
+
   // Remap column ids in the measure expression to use new column ids
   // allocated by `column_factory`. Since the measure expression was
   // analyzed in a different context, it's column ids will be invalid in
@@ -782,29 +847,169 @@ absl::StatusOr<RewriteMeasureExprResult> RewriteMeasureExpr(
       ExtractTopLevelAggregates(std::move(rewritten_measure_expr),
                                 temp_constituent_aggregates, column_factory));
 
-  // Replace the ResolvedExpressionColumn placeholders with field accesses on
-  // the closure struct column, and apply grain-locking to avoid overcounting.
+  // The list of standard aggregates that need to be computed by the
+  // AggregateScan to evaluate this AGG(m) call.
+  std::vector<std::unique_ptr<const ResolvedComputedColumnBase>> aggregates;
+
+  // Computed columns representing the closure struct expressions of
+  // dependent measures.
+  //
+  // For example, suppose the input measure is m := MEASURE(AGG(b) + 1). The
+  // closure struct expression of b is `GetStructField(closure_struct_ref, b)`,
+  // and we construct a ResolvedComputedColumn to encapsulate its value to
+  // simplify the recursive call.
+  std::vector<std::unique_ptr<const ResolvedComputedColumn>>
+      closure_computed_columns;
+
+  // A replacement map to rewrite the scalar expression of AGG(m).
+  //
+  // The keys are the columns representing the output of each AGG(dep_m),
+  // and the values are the rewritten scalar expressions of AGG(dep_m).
+  absl::flat_hash_map<ResolvedColumn, std::unique_ptr<const ResolvedExpr>>
+      substitution;
+
   for (std::unique_ptr<const ResolvedComputedColumnBase>& aggregate_col :
        temp_constituent_aggregates) {
     GOOGLESQL_RET_CHECK(aggregate_col->Is<ResolvedComputedColumn>());
     ResolvedComputedColumnBuilder builder = ToBuilder(absl::WrapUnique(
         aggregate_col.release()->GetAs<ResolvedComputedColumn>()));
 
-    std::unique_ptr<const ResolvedExpr> expr = builder.release_expr();
+    if (!IsMeasureAggFunction(builder.expr())) {
+      // Standard aggregate. Apply grain locking to the aggregate expression.
+      //
+      // We do not allow defining measures with AGG calls nested under other
+      // aggregate functions, so the expression here is guaranteed to not
+      // contain any nested AGG calls.
+      GOOGLESQL_ASSIGN_OR_RETURN(std::unique_ptr<const ResolvedExpr> expr,
+                       RewriteReferences(builder.expr(), closure_struct_ref));
+      GOOGLESQL_ASSIGN_OR_RETURN(
+          expr, GrainLock(std::move(expr), closure_struct_ref,
+                          measure_info.row_identity_column_names, any_value_fn,
+                          function_call_builder, language_options,
+                          column_factory, type_factory));
+      GOOGLESQL_ASSIGN_OR_RETURN(auto grain_locked_aggregate,
+                       std::move(builder).set_expr(std::move(expr)).Build());
+      aggregates.push_back(std::move(grain_locked_aggregate));
+    } else {
+      // AGG(<dep_m_expr>) call. Rewrite it recursively.
+      //
+      // <dep_m_expr> is guaranteed to be a one of the following:
+      //
+      // - ExpressionColumn, e.g., `AGG(b)`
+      // - GetStructField, e.g., `AGG(STRUCT(b).b)`
+      const ResolvedAggregateFunctionCall* agg_call =
+          builder.expr()->GetAs<ResolvedAggregateFunctionCall>();
+      GOOGLESQL_RET_CHECK(agg_call != nullptr);
+      GOOGLESQL_RET_CHECK_EQ(agg_call->argument_list().size(), 1);
 
-    GOOGLESQL_ASSIGN_OR_RETURN(expr,
-                     RewriteReferences(std::move(expr), closure_struct_ref));
-    GOOGLESQL_ASSIGN_OR_RETURN(expr, GrainLock(std::move(expr), closure_struct_ref,
-                                     row_identity_column_names, any_value_fn,
-                                     function_call_builder, language_options,
-                                     column_factory, type_factory));
-    builder.set_expr(std::move(expr));
-    GOOGLESQL_ASSIGN_OR_RETURN(aggregate_col, std::move(builder).Build());
+      // The `agg_arg` is can be a complex expression that evaluates to
+      // a measure type, e.g., `STRUCT(b).b`, not necessarily a
+      // ResolvedExpressionColumn.
+      const ResolvedExpr* agg_arg = agg_call->argument_list()[0].get();
+      const MeasureType* dep_measure_type = agg_arg->type()->AsMeasure();
+      GOOGLESQL_RET_CHECK(dep_measure_type != nullptr);
+      GOOGLESQL_RET_CHECK(agg_arg->Is<ResolvedExpressionColumn>() ||
+                agg_arg->Is<ResolvedGetStructField>());
+
+      // Replacing the references to `dep_m` in `agg_arg` with the corresponding
+      // struct field access on `closure_struct_ref`, which evaluates to the
+      // closure expression of `dep_m`, gives the closure expression of `dep_m`.
+      //
+      // Example:
+      //
+      // Suppose we have:
+      //   b := MEASURE( SUM(x) )
+      //   m := MEASURE( AGG(b) + 1 )
+      //
+      // The closure struct columns for b and m are constructed by
+      // ComputeClosureColumnsForMeasuresFromScan (if they are from a scan) or
+      // BuildStructFromRowFields (if they are from a RowType). Specifically,
+      //
+      // The closure struct of the base measure b is:
+      //
+      //   closure_of_b := STRUCT<
+      //     referenced_columns: STRUCT<x TYPEOF(x)>,
+      //     key_columns: ...
+      //   >
+      //
+      // The closure struct of the derived measure m is:
+      //
+      //   closure_of_m := STRUCT<
+      //     referenced_columns: STRUCT<b closure_of_b>,
+      //     key_columns: ...
+      //   >
+      //
+      // When calling RewriteMeasureExpr on m, `closure_struct_ref` is
+      // `closure_of_m`. To recursively rewrite `AGG(b)` in m's definition, we
+      // call RewriteMeasureExpr on b, which requires the closure expression
+      // of b.
+      //
+      // We extract b's closure from `closure_of_m` via struct field access:
+      //
+      //   `closure_struct_ref.referenced_columns.b`
+      //
+      // which evaluates to `closure_of_b`. (See the definition of
+      // `closure_of_m` above.)
+      //
+      // In the implementation, b in `AGG(b)` is a ResolvedExpressionColumn.
+      // Calling `RewriteReferences(b, closure_struct_ref)` produces the
+      // resolved expression for `closure_struct_ref.referenced_columns.b`.
+      //
+      // Also supports more complex `agg_arg` shapes. For example, if `agg_arg`
+      // is `STRUCT(dep_m AS f).f`, the result expression is
+      // `STRUCT(closure_struct_ref.referenced_columns.dep_m AS f).f`, which
+      // evaluates to the closure expression of `dep_m`.
+      GOOGLESQL_ASSIGN_OR_RETURN(std::unique_ptr<const ResolvedExpr> dep_closure_expr,
+                       RewriteReferences(agg_arg, closure_struct_ref));
+
+      // Create a local ResolvedComputedColumn to hold the closure struct
+      // expression of `dep_m`.
+      ResolvedColumn dep_closure_column = column_factory.MakeCol(
+          "$aggregate", "dep_closure", dep_closure_expr->type());
+      auto dep_closure_computed_column = MakeResolvedComputedColumn(
+          dep_closure_column, std::move(dep_closure_expr));
+
+      auto sub_closure_ref = MakeResolvedColumnRef(
+          dep_closure_column.type(), dep_closure_column,
+          // The created ResolvedComputedColumn will be added to a ProjectScan
+          // that wraps the `input_scan` of the AggregateScan, so for the AGG
+          // call this column reference is always local.
+          /*is_correlated=*/false);
+
+      closure_computed_columns.push_back(
+          std::move(dep_closure_computed_column));
+
+      GOOGLESQL_ASSIGN_OR_RETURN(
+          RewriteMeasureExprResult sub_result,
+          RewriteMeasureExpr(dep_measure_type, sub_closure_ref.get(),
+                             measure_collector, any_value_fn,
+                             function_call_builder, language_options,
+                             column_factory, type_factory));
+
+      for (auto& cc : sub_result.closure_computed_columns) {
+        closure_computed_columns.push_back(std::move(cc));
+      }
+      for (auto& agg : sub_result.constituent_aggregate_list) {
+        aggregates.push_back(std::move(agg));
+      }
+      // The ColumnRefs to the ResolvedComputedColumn corresponding to the
+      // AGG(dep_m) call are replaced with the rewritten expression of
+      // AGG(dep_m).
+      substitution[builder.column()] =
+          std::move(sub_result.rewritten_measure_expr);
+    }
   }
 
+  // Apply substitutions to rewritten_measure_expr.
+  GOOGLESQL_ASSIGN_OR_RETURN(std::unique_ptr<const ResolvedExpr> substituted_expr,
+                   SubstituteColumnRefs(std::move(rewritten_measure_expr),
+                                        std::move(substitution)));
+
   return RewriteMeasureExprResult{
-      .rewritten_measure_expr = std::move(rewritten_measure_expr),
-      .constituent_aggregate_list = std::move(temp_constituent_aggregates)};
+      .rewritten_measure_expr = std::move(substituted_expr),
+      .constituent_aggregate_list = std::move(aggregates),
+      .closure_computed_columns = std::move(closure_computed_columns),
+  };
 }
 
 }  // namespace googlesql

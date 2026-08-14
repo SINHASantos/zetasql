@@ -778,6 +778,14 @@ absl::HashState SimpleType::HashValueContent(const ValueContent& value,
   }
 }
 
+absl::HashState SimpleType::HashValueContentIgnoringFloat(
+    const ValueContent& value, absl::HashState state) const {
+  if (kind() == TYPE_FLOAT || kind() == TYPE_DOUBLE) {
+    return absl::HashState::combine(std::move(state), kind());
+  }
+  return HashValueContent(value, std::move(state));
+}
+
 // Returns true if two INTERVAL values are an exact match (where 1 MONTH and
 // 30 DAYS are *not* considered equal).
 bool AllPartsIntervalMatch(const IntervalValue& x, const IntervalValue& y) {

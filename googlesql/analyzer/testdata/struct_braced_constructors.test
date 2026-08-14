@@ -1644,7 +1644,7 @@ QueryStmt
         |   +-input_scan=
         |     +-TVFScan
         |       +-column_list=[templated_struct_braced_ctor_tvf.dice_roll#4]
-        |       +-tvf=templated_struct_braced_ctor_tvf((ANY TABLE) -> ANY TABLE)
+        |       +-tvf=templated_struct_braced_ctor_tvf
         |       +-signature=(TABLE<v INT32>) -> TABLE<dice_roll STRUCT<int32_val1 INT32>>
         |       +-argument_list=
         |       | +-FunctionArgument

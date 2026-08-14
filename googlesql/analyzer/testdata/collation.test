@@ -5493,7 +5493,6 @@ QueryStmt
           +-PivotColumn(column=$pivot.v1#10, pivot_expr_index=0, pivot_value_index=0)
           +-PivotColumn(column=$pivot.v2#11, pivot_expr_index=0, pivot_value_index=1)
 
-
 DEPRECATION WARNING:
 PIVOT IN list item has collation which will be ignored [at 2:46]
 PIVOT(string_agg(distinct col) FOR value IN (collate('Value_1', 'und:ci') AS ...
@@ -5642,7 +5641,6 @@ QueryStmt
         +-pivot_column_list=
           +-PivotColumn(column=$pivot.v1#10, pivot_expr_index=0, pivot_value_index=0)
           +-PivotColumn(column=$pivot.v2#11, pivot_expr_index=0, pivot_value_index=1)
-
 
 DEPRECATION WARNING:
 PIVOT IN list item has collation which will be ignored [at 2:46]
@@ -8535,124 +8533,124 @@ QueryStmt
     +-column_list=[$query.$col1#1<{Collation:"und:ci"}>]
     +-expr_list=
     | +-$col1#1 :=
-    |   +-Cast(ARRAY<STRING> -> ARRAY<STRING>)
+    |   +-SubqueryExpr
+    |     +-type=ARRAY<STRING>
     |     +-type_annotation_map=<{Collation:"und:ci"}>
-    |     +-SubqueryExpr
-    |     | +-type=ARRAY<STRING>
-    |     | +-subquery_type=SCALAR
-    |     | +-subquery=
-    |     |   +-ProjectScan
-    |     |     +-column_list=[$expr_subquery.$col1#9]
-    |     |     +-expr_list=
-    |     |     | +-$col1#9 :=
-    |     |     |   +-FunctionCall(GoogleSQL:$case_no_value(repeated(2) BOOL, repeated(2) ARRAY<STRING>, ARRAY<STRING>) -> ARRAY<STRING>)
-    |     |     |     +-FunctionCall(GoogleSQL:$or(BOOL, repeated(2) BOOL) -> BOOL)
-    |     |     |     | +-FunctionCall(GoogleSQL:$is_null(ARRAY<STRING>) -> BOOL)
-    |     |     |     | | +-ColumnRef(type=ARRAY<STRING>, type_annotation_map=<{Collation:"und:ci"}>, column=$subquery1.array_to_slice#2<{Collation:"und:ci"}>)
-    |     |     |     | +-FunctionCall(GoogleSQL:$is_null(INT64) -> BOOL)
-    |     |     |     | | +-ColumnRef(type=INT64, column=$subquery1.start_offset#4)
-    |     |     |     | +-FunctionCall(GoogleSQL:$is_null(INT64) -> BOOL)
-    |     |     |     |   +-ColumnRef(type=INT64, column=$subquery1.end_offset#3)
-    |     |     |     +-Literal(type=ARRAY<STRING>, value=NULL)
-    |     |     |     +-FunctionCall(GoogleSQL:$equal(INT64, INT64) -> BOOL)
-    |     |     |     | +-FunctionCall(GoogleSQL:array_length(ARRAY<STRING>) -> INT64)
-    |     |     |     | | +-ColumnRef(type=ARRAY<STRING>, type_annotation_map=<{Collation:"und:ci"}>, column=$subquery1.array_to_slice#2<{Collation:"und:ci"}>)
-    |     |     |     | +-Literal(type=INT64, value=0)
-    |     |     |     +-Literal(type=ARRAY<STRING>, value=[])
-    |     |     |     +-SubqueryExpr
-    |     |     |       +-type=ARRAY<STRING>
-    |     |     |       +-subquery_type=SCALAR
-    |     |     |       +-parameter_list=
-    |     |     |       | +-ColumnRef(type=ARRAY<STRING>, type_annotation_map=<{Collation:"und:ci"}>, column=$subquery1.array_to_slice#2<{Collation:"und:ci"}>)
-    |     |     |       | +-ColumnRef(type=INT64, column=$subquery1.end_offset#3)
-    |     |     |       | +-ColumnRef(type=INT64, column=$subquery1.start_offset#4)
-    |     |     |       +-subquery=
-    |     |     |         +-ProjectScan
-    |     |     |           +-column_list=[$with_expr.injected#10]
-    |     |     |           +-expr_list=
-    |     |     |           | +-injected#10 :=
-    |     |     |           |   +-SubqueryExpr
-    |     |     |           |     +-type=ARRAY<STRING>
-    |     |     |           |     +-type_annotation_map=<{Collation:"und:ci"}>
-    |     |     |           |     +-subquery_type=ARRAY
-    |     |     |           |     +-parameter_list=
-    |     |     |           |     | +-ColumnRef(type=ARRAY<STRING>, type_annotation_map=<{Collation:"und:ci"}>, column=$subquery1.array_to_slice#2<{Collation:"und:ci"}>, is_correlated=TRUE)
-    |     |     |           |     | +-ColumnRef(type=INT64, column=$with_expr.start_offset#5)
-    |     |     |           |     | +-ColumnRef(type=INT64, column=$with_expr.end_offset#6)
-    |     |     |           |     +-subquery=
-    |     |     |           |       +-OrderByScan
-    |     |     |           |         +-column_list=[$array.e#7{Collation:"und:ci"}]
-    |     |     |           |         +-is_ordered=TRUE
-    |     |     |           |         +-input_scan=
-    |     |     |           |         | +-FilterScan
-    |     |     |           |         |   +-column_list=[$array.e#7{Collation:"und:ci"}, $array_offset.idx#8]
-    |     |     |           |         |   +-input_scan=
-    |     |     |           |         |   | +-ArrayScan
-    |     |     |           |         |   |   +-column_list=[$array.e#7{Collation:"und:ci"}, $array_offset.idx#8]
-    |     |     |           |         |   |   +-array_expr_list=
-    |     |     |           |         |   |   | +-ColumnRef(type=ARRAY<STRING>, type_annotation_map=<{Collation:"und:ci"}>, column=$subquery1.array_to_slice#2<{Collation:"und:ci"}>, is_correlated=TRUE)
-    |     |     |           |         |   |   +-element_column_list=[$array.e#7{Collation:"und:ci"}]
-    |     |     |           |         |   |   +-array_offset_column=
-    |     |     |           |         |   |     +-ColumnHolder(column=$array_offset.idx#8)
-    |     |     |           |         |   +-filter_expr=
-    |     |     |           |         |     +-FunctionCall(GoogleSQL:$between(INT64, INT64, INT64) -> BOOL)
-    |     |     |           |         |       +-ColumnRef(type=INT64, column=$array_offset.idx#8)
-    |     |     |           |         |       +-ColumnRef(type=INT64, column=$with_expr.start_offset#5, is_correlated=TRUE)
-    |     |     |           |         |       +-ColumnRef(type=INT64, column=$with_expr.end_offset#6, is_correlated=TRUE)
-    |     |     |           |         +-order_by_item_list=
-    |     |     |           |           +-OrderByItem
-    |     |     |           |             +-column_ref=
-    |     |     |           |               +-ColumnRef(type=INT64, column=$array_offset.idx#8)
-    |     |     |           +-input_scan=
-    |     |     |             +-ProjectScan
-    |     |     |               +-column_list=$with_expr.[start_offset#5, end_offset#6]
-    |     |     |               +-expr_list=
-    |     |     |               | +-end_offset#6 :=
-    |     |     |               |   +-FunctionCall(GoogleSQL:if(BOOL, INT64, INT64) -> INT64)
-    |     |     |               |     +-FunctionCall(GoogleSQL:$less(INT64, INT64) -> BOOL)
-    |     |     |               |     | +-ColumnRef(type=INT64, column=$subquery1.end_offset#3, is_correlated=TRUE)
-    |     |     |               |     | +-Literal(type=INT64, value=0)
-    |     |     |               |     +-FunctionCall(GoogleSQL:$add(INT64, INT64) -> INT64)
-    |     |     |               |     | +-ColumnRef(type=INT64, column=$subquery1.end_offset#3, is_correlated=TRUE)
-    |     |     |               |     | +-FunctionCall(GoogleSQL:array_length(ARRAY<STRING>) -> INT64)
-    |     |     |               |     |   +-ColumnRef(type=ARRAY<STRING>, type_annotation_map=<{Collation:"und:ci"}>, column=$subquery1.array_to_slice#2<{Collation:"und:ci"}>, is_correlated=TRUE)
-    |     |     |               |     +-ColumnRef(type=INT64, column=$subquery1.end_offset#3, is_correlated=TRUE)
-    |     |     |               +-input_scan=
-    |     |     |                 +-ProjectScan
-    |     |     |                   +-column_list=[$with_expr.start_offset#5]
-    |     |     |                   +-expr_list=
-    |     |     |                   | +-start_offset#5 :=
-    |     |     |                   |   +-FunctionCall(GoogleSQL:if(BOOL, INT64, INT64) -> INT64)
-    |     |     |                   |     +-FunctionCall(GoogleSQL:$less(INT64, INT64) -> BOOL)
-    |     |     |                   |     | +-ColumnRef(type=INT64, column=$subquery1.start_offset#4, is_correlated=TRUE)
-    |     |     |                   |     | +-Literal(type=INT64, value=0)
-    |     |     |                   |     +-FunctionCall(GoogleSQL:$add(INT64, INT64) -> INT64)
-    |     |     |                   |     | +-ColumnRef(type=INT64, column=$subquery1.start_offset#4, is_correlated=TRUE)
-    |     |     |                   |     | +-FunctionCall(GoogleSQL:array_length(ARRAY<STRING>) -> INT64)
-    |     |     |                   |     |   +-ColumnRef(type=ARRAY<STRING>, type_annotation_map=<{Collation:"und:ci"}>, column=$subquery1.array_to_slice#2<{Collation:"und:ci"}>, is_correlated=TRUE)
-    |     |     |                   |     +-ColumnRef(type=INT64, column=$subquery1.start_offset#4, is_correlated=TRUE)
-    |     |     |                   +-input_scan=
-    |     |     |                     +-SingleRowScan
-    |     |     +-input_scan=
-    |     |       +-ProjectScan
-    |     |         +-column_list=$subquery1.[array_to_slice#2, end_offset#3, start_offset#4]
-    |     |         +-expr_list=
-    |     |         | +-array_to_slice#2 :=
-    |     |         | | +-FunctionCall(GoogleSQL:$make_array(repeated(2) STRING) -> ARRAY<STRING>)
-    |     |         | |   +-type_annotation_map=<{Collation:"und:ci"}>
-    |     |         | |   +-FunctionCall(GoogleSQL:collate(STRING, STRING) -> STRING)
-    |     |         | |   | +-type_annotation_map={Collation:"und:ci"}
-    |     |         | |   | +-Literal(type=STRING, value="hello")
-    |     |         | |   | +-Literal(type=STRING, value="und:ci", preserve_in_literal_remover=TRUE)
-    |     |         | |   +-FunctionCall(GoogleSQL:collate(STRING, STRING) -> STRING)
-    |     |         | |     +-type_annotation_map={Collation:"und:ci"}
-    |     |         | |     +-Literal(type=STRING, value="googlesql")
-    |     |         | |     +-Literal(type=STRING, value="und:ci", preserve_in_literal_remover=TRUE)
-    |     |         | +-end_offset#3 := Literal(type=INT64, value=0)
-    |     |         | +-start_offset#4 := Literal(type=INT64, value=0)
-    |     |         +-input_scan=
-    |     |           +-SingleRowScan
-    |     +-type_modifiers=collation:[und:ci]
+    |     +-subquery_type=SCALAR
+    |     +-subquery=
+    |       +-ProjectScan
+    |         +-column_list=[$expr_subquery.$col1#9<{Collation:"und:ci"}>]
+    |         +-expr_list=
+    |         | +-$col1#9 :=
+    |         |   +-FunctionCall(GoogleSQL:$case_no_value(repeated(2) BOOL, repeated(2) ARRAY<STRING>, ARRAY<STRING>) -> ARRAY<STRING>)
+    |         |     +-type_annotation_map=<{Collation:"und:ci"}>
+    |         |     +-FunctionCall(GoogleSQL:$or(BOOL, repeated(2) BOOL) -> BOOL)
+    |         |     | +-FunctionCall(GoogleSQL:$is_null(ARRAY<STRING>) -> BOOL)
+    |         |     | | +-ColumnRef(type=ARRAY<STRING>, type_annotation_map=<{Collation:"und:ci"}>, column=$subquery1.array_to_slice#2<{Collation:"und:ci"}>)
+    |         |     | +-FunctionCall(GoogleSQL:$is_null(INT64) -> BOOL)
+    |         |     | | +-ColumnRef(type=INT64, column=$subquery1.start_offset#4)
+    |         |     | +-FunctionCall(GoogleSQL:$is_null(INT64) -> BOOL)
+    |         |     |   +-ColumnRef(type=INT64, column=$subquery1.end_offset#3)
+    |         |     +-Literal(type=ARRAY<STRING>, value=NULL)
+    |         |     +-FunctionCall(GoogleSQL:$equal(INT64, INT64) -> BOOL)
+    |         |     | +-FunctionCall(GoogleSQL:array_length(ARRAY<STRING>) -> INT64)
+    |         |     | | +-ColumnRef(type=ARRAY<STRING>, type_annotation_map=<{Collation:"und:ci"}>, column=$subquery1.array_to_slice#2<{Collation:"und:ci"}>)
+    |         |     | +-Literal(type=INT64, value=0)
+    |         |     +-Literal(type=ARRAY<STRING>, value=[])
+    |         |     +-SubqueryExpr
+    |         |       +-type=ARRAY<STRING>
+    |         |       +-type_annotation_map=<{Collation:"und:ci"}>
+    |         |       +-subquery_type=SCALAR
+    |         |       +-parameter_list=
+    |         |       | +-ColumnRef(type=ARRAY<STRING>, type_annotation_map=<{Collation:"und:ci"}>, column=$subquery1.array_to_slice#2<{Collation:"und:ci"}>)
+    |         |       | +-ColumnRef(type=INT64, column=$subquery1.end_offset#3)
+    |         |       | +-ColumnRef(type=INT64, column=$subquery1.start_offset#4)
+    |         |       +-subquery=
+    |         |         +-ProjectScan
+    |         |           +-column_list=[$with_expr.injected#10<{Collation:"und:ci"}>]
+    |         |           +-expr_list=
+    |         |           | +-injected#10 :=
+    |         |           |   +-SubqueryExpr
+    |         |           |     +-type=ARRAY<STRING>
+    |         |           |     +-type_annotation_map=<{Collation:"und:ci"}>
+    |         |           |     +-subquery_type=ARRAY
+    |         |           |     +-parameter_list=
+    |         |           |     | +-ColumnRef(type=ARRAY<STRING>, type_annotation_map=<{Collation:"und:ci"}>, column=$subquery1.array_to_slice#2<{Collation:"und:ci"}>, is_correlated=TRUE)
+    |         |           |     | +-ColumnRef(type=INT64, column=$with_expr.start_offset#5)
+    |         |           |     | +-ColumnRef(type=INT64, column=$with_expr.end_offset#6)
+    |         |           |     +-subquery=
+    |         |           |       +-OrderByScan
+    |         |           |         +-column_list=[$array.e#7{Collation:"und:ci"}]
+    |         |           |         +-is_ordered=TRUE
+    |         |           |         +-input_scan=
+    |         |           |         | +-FilterScan
+    |         |           |         |   +-column_list=[$array.e#7{Collation:"und:ci"}, $array_offset.idx#8]
+    |         |           |         |   +-input_scan=
+    |         |           |         |   | +-ArrayScan
+    |         |           |         |   |   +-column_list=[$array.e#7{Collation:"und:ci"}, $array_offset.idx#8]
+    |         |           |         |   |   +-array_expr_list=
+    |         |           |         |   |   | +-ColumnRef(type=ARRAY<STRING>, type_annotation_map=<{Collation:"und:ci"}>, column=$subquery1.array_to_slice#2<{Collation:"und:ci"}>, is_correlated=TRUE)
+    |         |           |         |   |   +-element_column_list=[$array.e#7{Collation:"und:ci"}]
+    |         |           |         |   |   +-array_offset_column=
+    |         |           |         |   |     +-ColumnHolder(column=$array_offset.idx#8)
+    |         |           |         |   +-filter_expr=
+    |         |           |         |     +-FunctionCall(GoogleSQL:$between(INT64, INT64, INT64) -> BOOL)
+    |         |           |         |       +-ColumnRef(type=INT64, column=$array_offset.idx#8)
+    |         |           |         |       +-ColumnRef(type=INT64, column=$with_expr.start_offset#5, is_correlated=TRUE)
+    |         |           |         |       +-ColumnRef(type=INT64, column=$with_expr.end_offset#6, is_correlated=TRUE)
+    |         |           |         +-order_by_item_list=
+    |         |           |           +-OrderByItem
+    |         |           |             +-column_ref=
+    |         |           |               +-ColumnRef(type=INT64, column=$array_offset.idx#8)
+    |         |           +-input_scan=
+    |         |             +-ProjectScan
+    |         |               +-column_list=$with_expr.[start_offset#5, end_offset#6]
+    |         |               +-expr_list=
+    |         |               | +-end_offset#6 :=
+    |         |               |   +-FunctionCall(GoogleSQL:if(BOOL, INT64, INT64) -> INT64)
+    |         |               |     +-FunctionCall(GoogleSQL:$less(INT64, INT64) -> BOOL)
+    |         |               |     | +-ColumnRef(type=INT64, column=$subquery1.end_offset#3, is_correlated=TRUE)
+    |         |               |     | +-Literal(type=INT64, value=0)
+    |         |               |     +-FunctionCall(GoogleSQL:$add(INT64, INT64) -> INT64)
+    |         |               |     | +-ColumnRef(type=INT64, column=$subquery1.end_offset#3, is_correlated=TRUE)
+    |         |               |     | +-FunctionCall(GoogleSQL:array_length(ARRAY<STRING>) -> INT64)
+    |         |               |     |   +-ColumnRef(type=ARRAY<STRING>, type_annotation_map=<{Collation:"und:ci"}>, column=$subquery1.array_to_slice#2<{Collation:"und:ci"}>, is_correlated=TRUE)
+    |         |               |     +-ColumnRef(type=INT64, column=$subquery1.end_offset#3, is_correlated=TRUE)
+    |         |               +-input_scan=
+    |         |                 +-ProjectScan
+    |         |                   +-column_list=[$with_expr.start_offset#5]
+    |         |                   +-expr_list=
+    |         |                   | +-start_offset#5 :=
+    |         |                   |   +-FunctionCall(GoogleSQL:if(BOOL, INT64, INT64) -> INT64)
+    |         |                   |     +-FunctionCall(GoogleSQL:$less(INT64, INT64) -> BOOL)
+    |         |                   |     | +-ColumnRef(type=INT64, column=$subquery1.start_offset#4, is_correlated=TRUE)
+    |         |                   |     | +-Literal(type=INT64, value=0)
+    |         |                   |     +-FunctionCall(GoogleSQL:$add(INT64, INT64) -> INT64)
+    |         |                   |     | +-ColumnRef(type=INT64, column=$subquery1.start_offset#4, is_correlated=TRUE)
+    |         |                   |     | +-FunctionCall(GoogleSQL:array_length(ARRAY<STRING>) -> INT64)
+    |         |                   |     |   +-ColumnRef(type=ARRAY<STRING>, type_annotation_map=<{Collation:"und:ci"}>, column=$subquery1.array_to_slice#2<{Collation:"und:ci"}>, is_correlated=TRUE)
+    |         |                   |     +-ColumnRef(type=INT64, column=$subquery1.start_offset#4, is_correlated=TRUE)
+    |         |                   +-input_scan=
+    |         |                     +-SingleRowScan
+    |         +-input_scan=
+    |           +-ProjectScan
+    |             +-column_list=$subquery1.[array_to_slice#2, end_offset#3, start_offset#4]
+    |             +-expr_list=
+    |             | +-array_to_slice#2 :=
+    |             | | +-FunctionCall(GoogleSQL:$make_array(repeated(2) STRING) -> ARRAY<STRING>)
+    |             | |   +-type_annotation_map=<{Collation:"und:ci"}>
+    |             | |   +-FunctionCall(GoogleSQL:collate(STRING, STRING) -> STRING)
+    |             | |   | +-type_annotation_map={Collation:"und:ci"}
+    |             | |   | +-Literal(type=STRING, value="hello")
+    |             | |   | +-Literal(type=STRING, value="und:ci", preserve_in_literal_remover=TRUE)
+    |             | |   +-FunctionCall(GoogleSQL:collate(STRING, STRING) -> STRING)
+    |             | |     +-type_annotation_map={Collation:"und:ci"}
+    |             | |     +-Literal(type=STRING, value="googlesql")
+    |             | |     +-Literal(type=STRING, value="und:ci", preserve_in_literal_remover=TRUE)
+    |             | +-end_offset#3 := Literal(type=INT64, value=0)
+    |             | +-start_offset#4 := Literal(type=INT64, value=0)
+    |             +-input_scan=
+    |               +-SingleRowScan
     +-input_scan=
       +-SingleRowScan
 ==
@@ -8723,7 +8721,6 @@ QueryStmt
     +-input_scan=
       +-SingleRowScan
 
-
 [REWRITTEN AST]
 QueryStmt
 +-output_column_list=
@@ -8735,132 +8732,132 @@ QueryStmt
     | +-$col1#5 :=
     |   +-FunctionCall(GoogleSQL:iferror(ARRAY<STRUCT<int32_val INT32, string_val STRING>>, ARRAY<STRUCT<int32_val INT32, string_val STRING>>) -> ARRAY<STRUCT<int32_val INT32, string_val STRING>>)
     |     +-type_annotation_map=<<_,{Collation:"und:ci"}>>
-    |     +-Cast(ARRAY<STRUCT<int32_val INT32, string_val STRING>> -> ARRAY<STRUCT<int32_val INT32, string_val STRING>>)
+    |     +-SubqueryExpr
+    |     | +-type=ARRAY<STRUCT<int32_val INT32, string_val STRING>>
     |     | +-type_annotation_map=<<_,{Collation:"und:ci"}>>
-    |     | +-SubqueryExpr
-    |     | | +-type=ARRAY<STRUCT<int32_val INT32, string_val STRING>>
-    |     | | +-subquery_type=SCALAR
-    |     | | +-subquery=
-    |     | |   +-ProjectScan
-    |     | |     +-column_list=[$expr_subquery.$col1#13]
-    |     | |     +-expr_list=
-    |     | |     | +-$col1#13 :=
-    |     | |     |   +-FunctionCall(GoogleSQL:$case_no_value(repeated(2) BOOL, repeated(2) ARRAY<STRUCT<int32_val INT32, string_val STRING>>, ARRAY<STRUCT<int32_val INT32, string_val STRING>>) -> ARRAY<STRUCT<int32_val INT32, string_val STRING>>)
-    |     | |     |     +-FunctionCall(GoogleSQL:$or(BOOL, repeated(2) BOOL) -> BOOL)
-    |     | |     |     | +-FunctionCall(GoogleSQL:$is_null(ARRAY<STRUCT<int32_val INT32, string_val STRING>>) -> BOOL)
-    |     | |     |     | | +-ColumnRef(type=ARRAY<STRUCT<int32_val INT32, string_val STRING>>, type_annotation_map=<<_,{Collation:"und:ci"}>>, column=$subquery1.array_to_slice#6<<_,{Collation:"und:ci"}>>)
-    |     | |     |     | +-FunctionCall(GoogleSQL:$is_null(INT64) -> BOOL)
-    |     | |     |     | | +-ColumnRef(type=INT64, column=$subquery1.start_offset#8)
-    |     | |     |     | +-FunctionCall(GoogleSQL:$is_null(INT64) -> BOOL)
-    |     | |     |     |   +-ColumnRef(type=INT64, column=$subquery1.end_offset#7)
-    |     | |     |     +-Literal(type=ARRAY<STRUCT<int32_val INT32, string_val STRING>>, value=NULL)
-    |     | |     |     +-FunctionCall(GoogleSQL:$equal(INT64, INT64) -> BOOL)
-    |     | |     |     | +-FunctionCall(GoogleSQL:array_length(ARRAY<STRUCT<int32_val INT32, string_val STRING>>) -> INT64)
-    |     | |     |     | | +-ColumnRef(type=ARRAY<STRUCT<int32_val INT32, string_val STRING>>, type_annotation_map=<<_,{Collation:"und:ci"}>>, column=$subquery1.array_to_slice#6<<_,{Collation:"und:ci"}>>)
-    |     | |     |     | +-Literal(type=INT64, value=0)
-    |     | |     |     +-Literal(type=ARRAY<STRUCT<int32_val INT32, string_val STRING>>, value=[])
-    |     | |     |     +-SubqueryExpr
-    |     | |     |       +-type=ARRAY<STRUCT<int32_val INT32, string_val STRING>>
-    |     | |     |       +-subquery_type=SCALAR
-    |     | |     |       +-parameter_list=
-    |     | |     |       | +-ColumnRef(type=ARRAY<STRUCT<int32_val INT32, string_val STRING>>, type_annotation_map=<<_,{Collation:"und:ci"}>>, column=$subquery1.array_to_slice#6<<_,{Collation:"und:ci"}>>)
-    |     | |     |       | +-ColumnRef(type=INT64, column=$subquery1.end_offset#7)
-    |     | |     |       | +-ColumnRef(type=INT64, column=$subquery1.start_offset#8)
-    |     | |     |       +-subquery=
-    |     | |     |         +-ProjectScan
-    |     | |     |           +-column_list=[$with_expr.injected#14]
-    |     | |     |           +-expr_list=
-    |     | |     |           | +-injected#14 :=
-    |     | |     |           |   +-SubqueryExpr
-    |     | |     |           |     +-type=ARRAY<STRUCT<int32_val INT32, string_val STRING>>
-    |     | |     |           |     +-type_annotation_map=<<_,{Collation:"und:ci"}>>
-    |     | |     |           |     +-subquery_type=ARRAY
-    |     | |     |           |     +-parameter_list=
-    |     | |     |           |     | +-ColumnRef(type=ARRAY<STRUCT<int32_val INT32, string_val STRING>>, type_annotation_map=<<_,{Collation:"und:ci"}>>, column=$subquery1.array_to_slice#6<<_,{Collation:"und:ci"}>>, is_correlated=TRUE)
-    |     | |     |           |     | +-ColumnRef(type=INT64, column=$with_expr.start_offset#9)
-    |     | |     |           |     | +-ColumnRef(type=INT64, column=$with_expr.end_offset#10)
-    |     | |     |           |     +-subquery=
-    |     | |     |           |       +-OrderByScan
-    |     | |     |           |         +-column_list=[$array.e#11<_,{Collation:"und:ci"}>]
-    |     | |     |           |         +-is_ordered=TRUE
-    |     | |     |           |         +-input_scan=
-    |     | |     |           |         | +-FilterScan
-    |     | |     |           |         |   +-column_list=[$array.e#11<_,{Collation:"und:ci"}>, $array_offset.idx#12]
-    |     | |     |           |         |   +-input_scan=
-    |     | |     |           |         |   | +-ArrayScan
-    |     | |     |           |         |   |   +-column_list=[$array.e#11<_,{Collation:"und:ci"}>, $array_offset.idx#12]
-    |     | |     |           |         |   |   +-array_expr_list=
-    |     | |     |           |         |   |   | +-ColumnRef(type=ARRAY<STRUCT<int32_val INT32, string_val STRING>>, type_annotation_map=<<_,{Collation:"und:ci"}>>, column=$subquery1.array_to_slice#6<<_,{Collation:"und:ci"}>>, is_correlated=TRUE)
-    |     | |     |           |         |   |   +-element_column_list=[$array.e#11<_,{Collation:"und:ci"}>]
-    |     | |     |           |         |   |   +-array_offset_column=
-    |     | |     |           |         |   |     +-ColumnHolder(column=$array_offset.idx#12)
-    |     | |     |           |         |   +-filter_expr=
-    |     | |     |           |         |     +-FunctionCall(GoogleSQL:$between(INT64, INT64, INT64) -> BOOL)
-    |     | |     |           |         |       +-ColumnRef(type=INT64, column=$array_offset.idx#12)
-    |     | |     |           |         |       +-ColumnRef(type=INT64, column=$with_expr.start_offset#9, is_correlated=TRUE)
-    |     | |     |           |         |       +-ColumnRef(type=INT64, column=$with_expr.end_offset#10, is_correlated=TRUE)
-    |     | |     |           |         +-order_by_item_list=
-    |     | |     |           |           +-OrderByItem
-    |     | |     |           |             +-column_ref=
-    |     | |     |           |               +-ColumnRef(type=INT64, column=$array_offset.idx#12)
-    |     | |     |           +-input_scan=
-    |     | |     |             +-ProjectScan
-    |     | |     |               +-column_list=$with_expr.[start_offset#9, end_offset#10]
-    |     | |     |               +-expr_list=
-    |     | |     |               | +-end_offset#10 :=
-    |     | |     |               |   +-FunctionCall(GoogleSQL:if(BOOL, INT64, INT64) -> INT64)
-    |     | |     |               |     +-FunctionCall(GoogleSQL:$less(INT64, INT64) -> BOOL)
-    |     | |     |               |     | +-ColumnRef(type=INT64, column=$subquery1.end_offset#7, is_correlated=TRUE)
-    |     | |     |               |     | +-Literal(type=INT64, value=0)
-    |     | |     |               |     +-FunctionCall(GoogleSQL:$add(INT64, INT64) -> INT64)
-    |     | |     |               |     | +-ColumnRef(type=INT64, column=$subquery1.end_offset#7, is_correlated=TRUE)
-    |     | |     |               |     | +-FunctionCall(GoogleSQL:array_length(ARRAY<STRUCT<int32_val INT32, string_val STRING>>) -> INT64)
-    |     | |     |               |     |   +-ColumnRef(type=ARRAY<STRUCT<int32_val INT32, string_val STRING>>, type_annotation_map=<<_,{Collation:"und:ci"}>>, column=$subquery1.array_to_slice#6<<_,{Collation:"und:ci"}>>, is_correlated=TRUE)
-    |     | |     |               |     +-ColumnRef(type=INT64, column=$subquery1.end_offset#7, is_correlated=TRUE)
-    |     | |     |               +-input_scan=
-    |     | |     |                 +-ProjectScan
-    |     | |     |                   +-column_list=[$with_expr.start_offset#9]
-    |     | |     |                   +-expr_list=
-    |     | |     |                   | +-start_offset#9 :=
-    |     | |     |                   |   +-FunctionCall(GoogleSQL:if(BOOL, INT64, INT64) -> INT64)
-    |     | |     |                   |     +-FunctionCall(GoogleSQL:$less(INT64, INT64) -> BOOL)
-    |     | |     |                   |     | +-ColumnRef(type=INT64, column=$subquery1.start_offset#8, is_correlated=TRUE)
-    |     | |     |                   |     | +-Literal(type=INT64, value=0)
-    |     | |     |                   |     +-FunctionCall(GoogleSQL:$add(INT64, INT64) -> INT64)
-    |     | |     |                   |     | +-ColumnRef(type=INT64, column=$subquery1.start_offset#8, is_correlated=TRUE)
-    |     | |     |                   |     | +-FunctionCall(GoogleSQL:array_length(ARRAY<STRUCT<int32_val INT32, string_val STRING>>) -> INT64)
-    |     | |     |                   |     |   +-ColumnRef(type=ARRAY<STRUCT<int32_val INT32, string_val STRING>>, type_annotation_map=<<_,{Collation:"und:ci"}>>, column=$subquery1.array_to_slice#6<<_,{Collation:"und:ci"}>>, is_correlated=TRUE)
-    |     | |     |                   |     +-ColumnRef(type=INT64, column=$subquery1.start_offset#8, is_correlated=TRUE)
-    |     | |     |                   +-input_scan=
-    |     | |     |                     +-SingleRowScan
-    |     | |     +-input_scan=
-    |     | |       +-ProjectScan
-    |     | |         +-column_list=$subquery1.[array_to_slice#6, end_offset#7, start_offset#8]
-    |     | |         +-expr_list=
-    |     | |         | +-array_to_slice#6 :=
-    |     | |         | | +-FunctionCall(GoogleSQL:array_concat(ARRAY<STRUCT<int32_val INT32, string_val STRING>>, repeated(1) ARRAY<STRUCT<int32_val INT32, string_val STRING>>) -> ARRAY<STRUCT<int32_val INT32, string_val STRING>>)
-    |     | |         | |   +-type_annotation_map=<<_,{Collation:"und:ci"}>>
-    |     | |         | |   +-Literal(type=ARRAY<STRUCT<int32_val INT32, string_val STRING>>, value=[{int32_val:123, string_val:"67MXcza829l0r4Vhravi4Mg5S7uc2P9SJ58ShEg0b35h4lC"}], has_explicit_type=TRUE)
-    |     | |         | |   +-Cast(ARRAY<STRUCT<a INT32, b STRING>> -> ARRAY<STRUCT<int32_val INT32, string_val STRING>>)
-    |     | |         | |     +-type_annotation_map=<<_,{Collation:"und:ci"}>>
-    |     | |         | |     +-SubqueryExpr
-    |     | |         | |     | +-type=ARRAY<STRUCT<a INT32, b STRING>>
-    |     | |         | |     | +-type_annotation_map=<<_,{Collation:"und:ci"}>>
-    |     | |         | |     | +-subquery_type=ARRAY
-    |     | |         | |     | +-subquery=
-    |     | |         | |     |   +-ProjectScan
-    |     | |         | |     |     +-column_list=[CollatedTable.struct_with_string_ci#3<_,{Collation:"und:ci"}>]
-    |     | |         | |     |     +-input_scan=
-    |     | |         | |     |       +-ProjectScan
-    |     | |         | |     |         +-column_list=CollatedTable.[string_ci#1, string_binary#2, struct_with_string_ci#3, array_with_string_ci#4]
-    |     | |         | |     |         +-input_scan=
-    |     | |         | |     |           +-TableScan(column_list=CollatedTable.[string_ci#1, string_binary#2, struct_with_string_ci#3, array_with_string_ci#4], table=CollatedTable, column_index_list=[0, 1, 2, 3])
-    |     | |         | |     +-type_modifiers=collation:[[_,und:ci]]
-    |     | |         | +-end_offset#7 := Literal(type=INT64, value=2)
-    |     | |         | +-start_offset#8 := Literal(type=INT64, value=0)
-    |     | |         +-input_scan=
-    |     | |           +-SingleRowScan
-    |     | +-type_modifiers=collation:[[_,und:ci]]
+    |     | +-subquery_type=SCALAR
+    |     | +-subquery=
+    |     |   +-ProjectScan
+    |     |     +-column_list=[$expr_subquery.$col1#13<<_,{Collation:"und:ci"}>>]
+    |     |     +-expr_list=
+    |     |     | +-$col1#13 :=
+    |     |     |   +-FunctionCall(GoogleSQL:$case_no_value(repeated(2) BOOL, repeated(2) ARRAY<STRUCT<int32_val INT32, string_val STRING>>, ARRAY<STRUCT<int32_val INT32, string_val STRING>>) -> ARRAY<STRUCT<int32_val INT32, string_val STRING>>)
+    |     |     |     +-type_annotation_map=<<_,{Collation:"und:ci"}>>
+    |     |     |     +-FunctionCall(GoogleSQL:$or(BOOL, repeated(2) BOOL) -> BOOL)
+    |     |     |     | +-FunctionCall(GoogleSQL:$is_null(ARRAY<STRUCT<int32_val INT32, string_val STRING>>) -> BOOL)
+    |     |     |     | | +-ColumnRef(type=ARRAY<STRUCT<int32_val INT32, string_val STRING>>, type_annotation_map=<<_,{Collation:"und:ci"}>>, column=$subquery1.array_to_slice#6<<_,{Collation:"und:ci"}>>)
+    |     |     |     | +-FunctionCall(GoogleSQL:$is_null(INT64) -> BOOL)
+    |     |     |     | | +-ColumnRef(type=INT64, column=$subquery1.start_offset#8)
+    |     |     |     | +-FunctionCall(GoogleSQL:$is_null(INT64) -> BOOL)
+    |     |     |     |   +-ColumnRef(type=INT64, column=$subquery1.end_offset#7)
+    |     |     |     +-Literal(type=ARRAY<STRUCT<int32_val INT32, string_val STRING>>, value=NULL)
+    |     |     |     +-FunctionCall(GoogleSQL:$equal(INT64, INT64) -> BOOL)
+    |     |     |     | +-FunctionCall(GoogleSQL:array_length(ARRAY<STRUCT<int32_val INT32, string_val STRING>>) -> INT64)
+    |     |     |     | | +-ColumnRef(type=ARRAY<STRUCT<int32_val INT32, string_val STRING>>, type_annotation_map=<<_,{Collation:"und:ci"}>>, column=$subquery1.array_to_slice#6<<_,{Collation:"und:ci"}>>)
+    |     |     |     | +-Literal(type=INT64, value=0)
+    |     |     |     +-Literal(type=ARRAY<STRUCT<int32_val INT32, string_val STRING>>, value=[])
+    |     |     |     +-SubqueryExpr
+    |     |     |       +-type=ARRAY<STRUCT<int32_val INT32, string_val STRING>>
+    |     |     |       +-type_annotation_map=<<_,{Collation:"und:ci"}>>
+    |     |     |       +-subquery_type=SCALAR
+    |     |     |       +-parameter_list=
+    |     |     |       | +-ColumnRef(type=ARRAY<STRUCT<int32_val INT32, string_val STRING>>, type_annotation_map=<<_,{Collation:"und:ci"}>>, column=$subquery1.array_to_slice#6<<_,{Collation:"und:ci"}>>)
+    |     |     |       | +-ColumnRef(type=INT64, column=$subquery1.end_offset#7)
+    |     |     |       | +-ColumnRef(type=INT64, column=$subquery1.start_offset#8)
+    |     |     |       +-subquery=
+    |     |     |         +-ProjectScan
+    |     |     |           +-column_list=[$with_expr.injected#14<<_,{Collation:"und:ci"}>>]
+    |     |     |           +-expr_list=
+    |     |     |           | +-injected#14 :=
+    |     |     |           |   +-SubqueryExpr
+    |     |     |           |     +-type=ARRAY<STRUCT<int32_val INT32, string_val STRING>>
+    |     |     |           |     +-type_annotation_map=<<_,{Collation:"und:ci"}>>
+    |     |     |           |     +-subquery_type=ARRAY
+    |     |     |           |     +-parameter_list=
+    |     |     |           |     | +-ColumnRef(type=ARRAY<STRUCT<int32_val INT32, string_val STRING>>, type_annotation_map=<<_,{Collation:"und:ci"}>>, column=$subquery1.array_to_slice#6<<_,{Collation:"und:ci"}>>, is_correlated=TRUE)
+    |     |     |           |     | +-ColumnRef(type=INT64, column=$with_expr.start_offset#9)
+    |     |     |           |     | +-ColumnRef(type=INT64, column=$with_expr.end_offset#10)
+    |     |     |           |     +-subquery=
+    |     |     |           |       +-OrderByScan
+    |     |     |           |         +-column_list=[$array.e#11<_,{Collation:"und:ci"}>]
+    |     |     |           |         +-is_ordered=TRUE
+    |     |     |           |         +-input_scan=
+    |     |     |           |         | +-FilterScan
+    |     |     |           |         |   +-column_list=[$array.e#11<_,{Collation:"und:ci"}>, $array_offset.idx#12]
+    |     |     |           |         |   +-input_scan=
+    |     |     |           |         |   | +-ArrayScan
+    |     |     |           |         |   |   +-column_list=[$array.e#11<_,{Collation:"und:ci"}>, $array_offset.idx#12]
+    |     |     |           |         |   |   +-array_expr_list=
+    |     |     |           |         |   |   | +-ColumnRef(type=ARRAY<STRUCT<int32_val INT32, string_val STRING>>, type_annotation_map=<<_,{Collation:"und:ci"}>>, column=$subquery1.array_to_slice#6<<_,{Collation:"und:ci"}>>, is_correlated=TRUE)
+    |     |     |           |         |   |   +-element_column_list=[$array.e#11<_,{Collation:"und:ci"}>]
+    |     |     |           |         |   |   +-array_offset_column=
+    |     |     |           |         |   |     +-ColumnHolder(column=$array_offset.idx#12)
+    |     |     |           |         |   +-filter_expr=
+    |     |     |           |         |     +-FunctionCall(GoogleSQL:$between(INT64, INT64, INT64) -> BOOL)
+    |     |     |           |         |       +-ColumnRef(type=INT64, column=$array_offset.idx#12)
+    |     |     |           |         |       +-ColumnRef(type=INT64, column=$with_expr.start_offset#9, is_correlated=TRUE)
+    |     |     |           |         |       +-ColumnRef(type=INT64, column=$with_expr.end_offset#10, is_correlated=TRUE)
+    |     |     |           |         +-order_by_item_list=
+    |     |     |           |           +-OrderByItem
+    |     |     |           |             +-column_ref=
+    |     |     |           |               +-ColumnRef(type=INT64, column=$array_offset.idx#12)
+    |     |     |           +-input_scan=
+    |     |     |             +-ProjectScan
+    |     |     |               +-column_list=$with_expr.[start_offset#9, end_offset#10]
+    |     |     |               +-expr_list=
+    |     |     |               | +-end_offset#10 :=
+    |     |     |               |   +-FunctionCall(GoogleSQL:if(BOOL, INT64, INT64) -> INT64)
+    |     |     |               |     +-FunctionCall(GoogleSQL:$less(INT64, INT64) -> BOOL)
+    |     |     |               |     | +-ColumnRef(type=INT64, column=$subquery1.end_offset#7, is_correlated=TRUE)
+    |     |     |               |     | +-Literal(type=INT64, value=0)
+    |     |     |               |     +-FunctionCall(GoogleSQL:$add(INT64, INT64) -> INT64)
+    |     |     |               |     | +-ColumnRef(type=INT64, column=$subquery1.end_offset#7, is_correlated=TRUE)
+    |     |     |               |     | +-FunctionCall(GoogleSQL:array_length(ARRAY<STRUCT<int32_val INT32, string_val STRING>>) -> INT64)
+    |     |     |               |     |   +-ColumnRef(type=ARRAY<STRUCT<int32_val INT32, string_val STRING>>, type_annotation_map=<<_,{Collation:"und:ci"}>>, column=$subquery1.array_to_slice#6<<_,{Collation:"und:ci"}>>, is_correlated=TRUE)
+    |     |     |               |     +-ColumnRef(type=INT64, column=$subquery1.end_offset#7, is_correlated=TRUE)
+    |     |     |               +-input_scan=
+    |     |     |                 +-ProjectScan
+    |     |     |                   +-column_list=[$with_expr.start_offset#9]
+    |     |     |                   +-expr_list=
+    |     |     |                   | +-start_offset#9 :=
+    |     |     |                   |   +-FunctionCall(GoogleSQL:if(BOOL, INT64, INT64) -> INT64)
+    |     |     |                   |     +-FunctionCall(GoogleSQL:$less(INT64, INT64) -> BOOL)
+    |     |     |                   |     | +-ColumnRef(type=INT64, column=$subquery1.start_offset#8, is_correlated=TRUE)
+    |     |     |                   |     | +-Literal(type=INT64, value=0)
+    |     |     |                   |     +-FunctionCall(GoogleSQL:$add(INT64, INT64) -> INT64)
+    |     |     |                   |     | +-ColumnRef(type=INT64, column=$subquery1.start_offset#8, is_correlated=TRUE)
+    |     |     |                   |     | +-FunctionCall(GoogleSQL:array_length(ARRAY<STRUCT<int32_val INT32, string_val STRING>>) -> INT64)
+    |     |     |                   |     |   +-ColumnRef(type=ARRAY<STRUCT<int32_val INT32, string_val STRING>>, type_annotation_map=<<_,{Collation:"und:ci"}>>, column=$subquery1.array_to_slice#6<<_,{Collation:"und:ci"}>>, is_correlated=TRUE)
+    |     |     |                   |     +-ColumnRef(type=INT64, column=$subquery1.start_offset#8, is_correlated=TRUE)
+    |     |     |                   +-input_scan=
+    |     |     |                     +-SingleRowScan
+    |     |     +-input_scan=
+    |     |       +-ProjectScan
+    |     |         +-column_list=$subquery1.[array_to_slice#6, end_offset#7, start_offset#8]
+    |     |         +-expr_list=
+    |     |         | +-array_to_slice#6 :=
+    |     |         | | +-FunctionCall(GoogleSQL:array_concat(ARRAY<STRUCT<int32_val INT32, string_val STRING>>, repeated(1) ARRAY<STRUCT<int32_val INT32, string_val STRING>>) -> ARRAY<STRUCT<int32_val INT32, string_val STRING>>)
+    |     |         | |   +-type_annotation_map=<<_,{Collation:"und:ci"}>>
+    |     |         | |   +-Literal(type=ARRAY<STRUCT<int32_val INT32, string_val STRING>>, value=[{int32_val:123, string_val:"67MXcza829l0r4Vhravi4Mg5S7uc2P9SJ58ShEg0b35h4lC"}], has_explicit_type=TRUE)
+    |     |         | |   +-Cast(ARRAY<STRUCT<a INT32, b STRING>> -> ARRAY<STRUCT<int32_val INT32, string_val STRING>>)
+    |     |         | |     +-type_annotation_map=<<_,{Collation:"und:ci"}>>
+    |     |         | |     +-SubqueryExpr
+    |     |         | |     | +-type=ARRAY<STRUCT<a INT32, b STRING>>
+    |     |         | |     | +-type_annotation_map=<<_,{Collation:"und:ci"}>>
+    |     |         | |     | +-subquery_type=ARRAY
+    |     |         | |     | +-subquery=
+    |     |         | |     |   +-ProjectScan
+    |     |         | |     |     +-column_list=[CollatedTable.struct_with_string_ci#3<_,{Collation:"und:ci"}>]
+    |     |         | |     |     +-input_scan=
+    |     |         | |     |       +-ProjectScan
+    |     |         | |     |         +-column_list=CollatedTable.[string_ci#1, string_binary#2, struct_with_string_ci#3, array_with_string_ci#4]
+    |     |         | |     |         +-input_scan=
+    |     |         | |     |           +-TableScan(column_list=CollatedTable.[string_ci#1, string_binary#2, struct_with_string_ci#3, array_with_string_ci#4], table=CollatedTable, column_index_list=[0, 1, 2, 3])
+    |     |         | |     +-type_modifiers=collation:[[_,und:ci]]
+    |     |         | +-end_offset#7 := Literal(type=INT64, value=2)
+    |     |         | +-start_offset#8 := Literal(type=INT64, value=0)
+    |     |         +-input_scan=
+    |     |           +-SingleRowScan
     |     +-Literal(type=ARRAY<STRUCT<int32_val INT32, string_val STRING>>, value=[{int32_val:1, string_val:"foo"}], has_explicit_type=TRUE)
     +-input_scan=
       +-SingleRowScan
@@ -9078,7 +9075,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=tvf_templated_select_collated_output_columns_with_collate_function.[col_ci#1, col_array_ci#2, col_struct_ci#3]
-        +-tvf=tvf_templated_select_collated_output_columns_with_collate_function((ANY TYPE, ANY TYPE) -> ANY TABLE)
+        +-tvf=tvf_templated_select_collated_output_columns_with_collate_function
         +-signature=(literal STRING, literal INT64) -> TABLE<col_ci STRING{Collation:"und:ci"}, col_array_ci ARRAY<STRING><{Collation:"und:ci"}>, col_struct_ci STRUCT<STRING, INT64><{Collation:"und:ci"},_>>
         +-argument_list=
         | +-FunctionArgument
@@ -9141,7 +9138,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=tvf_templated_select_collated_output_columns_with_collated_column_ref.[concat_ci#1, array_with_string_ci#2, struct_with_string_ci#3]
-        +-tvf=tvf_templated_select_collated_output_columns_with_collated_column_ref((ANY TYPE) -> ANY TABLE)
+        +-tvf=tvf_templated_select_collated_output_columns_with_collated_column_ref
         +-signature=(literal STRING) -> TABLE<concat_ci STRING{Collation:"und:ci"}, array_with_string_ci ARRAY<STRING><{Collation:"und:ci"}>, struct_with_string_ci STRUCT<a INT32, b STRING><_,{Collation:"und:ci"}>>
         +-argument_list=
         | +-FunctionArgument
@@ -9186,7 +9183,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=tvf_templated_select_collated_output_columns_with_relation_arg.[col_ci#2, col_array_ci#3, col_struct_ci#4]
-        +-tvf=tvf_templated_select_collated_output_columns_with_relation_arg((ANY TABLE, INT64) -> ANY TABLE)
+        +-tvf=tvf_templated_select_collated_output_columns_with_relation_arg
         +-signature=(TABLE<col_str STRING>, literal INT64) -> TABLE<col_ci STRING{Collation:"und:ci"}, col_array_ci ARRAY<STRING><{Collation:"und:ci"}>, col_struct_ci STRUCT<STRING, INT64><{Collation:"und:ci"},_>>
         +-argument_list=
         | +-FunctionArgument
@@ -9253,7 +9250,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=[tvf_templated_select_collated_output_column_as_value_table.$col0#1{Collation:"und:ci"}]
-        +-tvf=tvf_templated_select_collated_output_column_as_value_table((ANY TYPE, ANY TYPE) -> ANY TABLE)
+        +-tvf=tvf_templated_select_collated_output_column_as_value_table
         +-signature=(literal STRING, literal STRING) -> TABLE<STRING{Collation:"und:ci"}>
         +-argument_list=
         | +-FunctionArgument
@@ -9292,10 +9289,10 @@ QueryStmt
 # collation) from the function definition drops collation from the resolved body
 # before it becomes the final output.
 # TVF query with collated output column is not allowed when an explicit result schema is present.
-[language_features=MAXIMUM,+COLLATION_SUPPORT,{{-TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS|+TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS}}]
+[language_features=MAXIMUM,+COLLATION_SUPPORT,{{-TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS,-ALL_TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS|+TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS}}]
 select * from tvf_templated_select_collated_output_column_returns_int64_string_col(1, 'a')
 --
-ALTERNATION GROUP: -TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS
+ALTERNATION GROUP: -TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS,-ALL_TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS
 --
 ERROR: Invalid table-valued function tvf_templated_select_collated_output_column_returns_int64_string_col [at 1:15]
 select * from tvf_templated_select_collated_output_column_returns_int64_strin...
@@ -9319,7 +9316,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=tvf_templated_select_collated_output_column_returns_int64_string_col.[key#1, value#2]
-        +-tvf=tvf_templated_select_collated_output_column_returns_int64_string_col((ANY TYPE, ANY TYPE) -> TABLE<key INT64, value STRING>)
+        +-tvf=tvf_templated_select_collated_output_column_returns_int64_string_col
         +-signature=(literal INT64, literal STRING) -> TABLE<key INT64, value STRING>
         +-argument_list=
         | +-FunctionArgument
@@ -9360,10 +9357,10 @@ QueryStmt
 ==
 
 # TVF query with collated output column is not allowed when an explicit value table result schema is present.
-[language_features=MAXIMUM,+COLLATION_SUPPORT,{{-TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS|+TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS}}]
+[language_features=MAXIMUM,+COLLATION_SUPPORT,{{-TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS,-ALL_TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS|+TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS}}]
 select * from tvf_templated_select_collated_output_column_returns_value_table_string_col('x')
 --
-ALTERNATION GROUP: -TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS
+ALTERNATION GROUP: -TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS,-ALL_TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS
 --
 ERROR: Invalid table-valued function tvf_templated_select_collated_output_column_returns_value_table_string_col [at 1:15]
 select * from tvf_templated_select_collated_output_column_returns_value_table...
@@ -9386,7 +9383,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=[tvf_templated_select_collated_output_column_returns_value_table_string_col.$col0#1]
-        +-tvf=tvf_templated_select_collated_output_column_returns_value_table_string_col((ANY TYPE) -> TABLE<STRING>)
+        +-tvf=tvf_templated_select_collated_output_column_returns_value_table_string_col
         +-signature=(literal STRING) -> TABLE<STRING>
         +-argument_list=
         | +-FunctionArgument
@@ -9648,12 +9645,12 @@ CreateTableFunctionStmt
 ==
 
 # TVF query with collated output column is not allowed when an explicit result schema is present.
-[language_features=MAXIMUM,+COLLATION_SUPPORT,{{-TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS|+TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS}}]
+[language_features=MAXIMUM,+COLLATION_SUPPORT,{{-TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS,-ALL_TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS|+TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS}}]
 create table function tvf(x STRING)
 returns TABLE<output_str STRING>
 as (select COLLATE(x, 'und:ci') as output_str)
 --
-ALTERNATION GROUP: -TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS
+ALTERNATION GROUP: -TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS,-ALL_TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS
 --
 ERROR: Collation "und:ci" on output column output_str is not allowed when an explicit result schema is present [at 1:1]
 create table function tvf(x STRING)
@@ -9691,12 +9688,12 @@ CreateTableFunctionStmt
 ==
 
 # TVF query with collated output column is not allowed when an explicit value table result schema is present.
-[language_features=MAXIMUM,+COLLATION_SUPPORT,{{-TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS|+TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS}}]
+[language_features=MAXIMUM,+COLLATION_SUPPORT,{{-TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS,-ALL_TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS|+TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS}}]
 create table function tvf(x STRING)
 returns TABLE<STRING>
 as (select as value COLLATE(x, 'und:ci'))
 --
-ALTERNATION GROUP: -TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS
+ALTERNATION GROUP: -TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS,-ALL_TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS
 --
 ERROR: Collation "und:ci" on value-table column is not allowed when an explicit result schema is present [at 1:1]
 create table function tvf(x STRING)
@@ -9747,7 +9744,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=ScalarArgWithCollatedOutputCols.[col_ci#1, col_array_ci#2, col_struct_ci#3]
-        +-tvf=ScalarArgWithCollatedOutputCols((STRING arg0) -> TABLE<col_ci STRING{Collation:"und:ci"}, col_array_ci ARRAY<STRING><{Collation:"und:ci"}>, col_struct_ci STRUCT<ARRAY<STRING>, INT64><<{Collation:"und:ci"}>,_>>)
+        +-tvf=ScalarArgWithCollatedOutputCols
         +-signature=(literal STRING) -> TABLE<col_ci STRING{Collation:"und:ci"}, col_array_ci ARRAY<STRING><{Collation:"und:ci"}>, col_struct_ci STRUCT<ARRAY<STRING>, INT64><<{Collation:"und:ci"}>,_>>
         +-argument_list=
         | +-FunctionArgument
@@ -9770,7 +9767,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=TableArgWithCollatedOutputCols.[col_ci#2, col_array_ci#3, col_struct_ci#4]
-        +-tvf=TableArgWithCollatedOutputCols((TABLE<a STRING> arg0) -> TABLE<col_ci STRING{Collation:"und:ci"}, col_array_ci ARRAY<STRING><{Collation:"und:ci"}>, col_struct_ci STRUCT<ARRAY<STRING>, INT64><<{Collation:"und:ci"}>,_>>)
+        +-tvf=TableArgWithCollatedOutputCols
         +-signature=(TABLE<a STRING>) -> TABLE<col_ci STRING{Collation:"und:ci"}, col_array_ci ARRAY<STRING><{Collation:"und:ci"}>, col_struct_ci STRUCT<ARRAY<STRING>, INT64><<{Collation:"und:ci"}>,_>>
         +-argument_list=
         | +-FunctionArgument
@@ -9799,7 +9796,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=ValueTableArgWithCollatedOutputCols.[col_ci#3, col_array_ci#4, col_struct_ci#5]
-        +-tvf=ValueTableArgWithCollatedOutputCols((TABLE<STRUCT<str_field STRING>> arg0) -> TABLE<col_ci STRING{Collation:"und:ci"}, col_array_ci ARRAY<STRING><{Collation:"und:ci"}>, col_struct_ci STRUCT<ARRAY<STRING>, INT64><<{Collation:"und:ci"}>,_>>)
+        +-tvf=ValueTableArgWithCollatedOutputCols
         +-signature=(TABLE<STRUCT<str_field STRING>>) -> TABLE<col_ci STRING{Collation:"und:ci"}, col_array_ci ARRAY<STRING><{Collation:"und:ci"}>, col_struct_ci STRUCT<ARRAY<STRING>, INT64><<{Collation:"und:ci"}>,_>>
         +-argument_list=
         | +-FunctionArgument
@@ -9835,7 +9832,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=[ScalarArgWithCollatedOutputValueTableCol.$col0#1{Collation:"und:ci"}]
-        +-tvf=ScalarArgWithCollatedOutputValueTableCol((STRING arg0) -> TABLE<STRING{Collation:"und:ci"}>)
+        +-tvf=ScalarArgWithCollatedOutputValueTableCol
         +-signature=(literal STRING) -> TABLE<STRING{Collation:"und:ci"}>
         +-argument_list=
         | +-FunctionArgument
@@ -9845,10 +9842,10 @@ QueryStmt
         +-function_call_signature=(STRING arg0) -> TABLE<STRING{Collation:"und:ci"}>
 ==
 
-[language_features=MAXIMUM,+COLLATION_SUPPORT,{{-TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS|+TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS}}]
+[language_features=MAXIMUM,+COLLATION_SUPPORT,{{-TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS,-ALL_TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS|+TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS}}]
 select * from tvf_templated_select_any_scalar_arg(COLLATE('abc', 'und:ci'))
 --
-ALTERNATION GROUP: -TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS
+ALTERNATION GROUP: -TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS,-ALL_TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS
 --
 ERROR: Collation "und:ci" on argument of TVF call is not allowed [at 1:51]
 select * from tvf_templated_select_any_scalar_arg(COLLATE('abc', 'und:ci'))
@@ -9865,7 +9862,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=[tvf_templated_select_any_scalar_arg.x#1{Collation:"und:ci"}]
-        +-tvf=tvf_templated_select_any_scalar_arg((ANY TYPE) -> ANY TABLE)
+        +-tvf=tvf_templated_select_any_scalar_arg
         +-signature=(STRING {Collation:"und:ci"}) -> TABLE<x STRING{Collation:"und:ci"}>
         +-argument_list=
         | +-FunctionArgument
@@ -9893,7 +9890,7 @@ QueryStmt
 ==
 
 # Argument is accepted after removing the collation of the collated expression.
-[language_features=MAXIMUM,+COLLATION_SUPPORT,{{-TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS|+TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS}}]
+[language_features=MAXIMUM,+COLLATION_SUPPORT,{{-TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS,-ALL_TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS|+TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS}}]
 select * from tvf_templated_select_any_scalar_arg(COLLATE(COLLATE('abc', 'und:ci'), ''))
 --
 QueryStmt
@@ -9905,7 +9902,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=[tvf_templated_select_any_scalar_arg.x#1]
-        +-tvf=tvf_templated_select_any_scalar_arg((ANY TYPE) -> ANY TABLE)
+        +-tvf=tvf_templated_select_any_scalar_arg
         +-signature=(STRING) -> TABLE<x STRING>
         +-argument_list=
         | +-FunctionArgument
@@ -9934,10 +9931,10 @@ QueryStmt
       +-SingleRowScan
 ==
 
-[language_features=MAXIMUM,+COLLATION_SUPPORT,{{-TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS|+TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS}}]
+[language_features=MAXIMUM,+COLLATION_SUPPORT,{{-TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS,-ALL_TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS|+TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS}}]
 select * from tvf_templated_select_any_scalar_arg([COLLATE('abc', 'und:ci')])
 --
-ALTERNATION GROUP: -TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS
+ALTERNATION GROUP: -TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS,-ALL_TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS
 --
 ERROR: Collation <"und:ci"> on argument of TVF call is not allowed [at 1:51]
 select * from tvf_templated_select_any_scalar_arg([COLLATE('abc', 'und:ci')])
@@ -9954,7 +9951,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=[tvf_templated_select_any_scalar_arg.x#1<{Collation:"und:ci"}>]
-        +-tvf=tvf_templated_select_any_scalar_arg((ANY TYPE) -> ANY TABLE)
+        +-tvf=tvf_templated_select_any_scalar_arg
         +-signature=(ARRAY<STRING> <{Collation:"und:ci"}>) -> TABLE<x ARRAY<STRING><{Collation:"und:ci"}>>
         +-argument_list=
         | +-FunctionArgument
@@ -9985,10 +9982,10 @@ QueryStmt
 
 # TODO: reenable once the `COLLATE ...` syntax is supported in explicit types.
 [no_run_sqlbuilder]
-[language_features=MAXIMUM,+COLLATION_SUPPORT,{{-TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS|+TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS}}]
+[language_features=MAXIMUM,+COLLATION_SUPPORT,{{-TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS,-ALL_TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS|+TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS}}]
 select * from tvf_templated_select_any_scalar_arg(STRUCT(COLLATE('abc', 'und:ci') as x, 1 as y))
 --
-ALTERNATION GROUP: -TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS
+ALTERNATION GROUP: -TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS,-ALL_TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS
 --
 ERROR: Collation <"und:ci",_> on argument of TVF call is not allowed [at 1:51]
 select * from tvf_templated_select_any_scalar_arg(STRUCT(COLLATE('abc', 'und:...
@@ -10005,7 +10002,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=[tvf_templated_select_any_scalar_arg.x#1<{Collation:"und:ci"},_>]
-        +-tvf=tvf_templated_select_any_scalar_arg((ANY TYPE) -> ANY TABLE)
+        +-tvf=tvf_templated_select_any_scalar_arg
         +-signature=(STRUCT<x STRING, y INT64> <{Collation:"und:ci"},_>) -> TABLE<x STRUCT<x STRING, y INT64><{Collation:"und:ci"},_>>
         +-argument_list=
         | +-FunctionArgument
@@ -10037,10 +10034,10 @@ QueryStmt
       +-SingleRowScan
 ==
 
-[language_features=MAXIMUM,+COLLATION_SUPPORT,{{-TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS|+TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS}}]
+[language_features=MAXIMUM,+COLLATION_SUPPORT,{{-TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS,-ALL_TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS|+TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS}}]
 select * from tvf_templated_select_relation_arg_using_select_star((select [COLLATE('abc', 'und:ci')] as col_array_ci))
 --
-ALTERNATION GROUP: -TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS
+ALTERNATION GROUP: -TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS,-ALL_TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS
 --
 ERROR: Collation <"und:ci"> on column col_array_ci of argument of TVF call is not allowed [at 1:67]
 ...tvf_templated_select_relation_arg_using_select_star((select [COLLATE('abc'...
@@ -10057,7 +10054,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=[tvf_templated_select_relation_arg_using_select_star.col_array_ci#2<{Collation:"und:ci"}>]
-        +-tvf=tvf_templated_select_relation_arg_using_select_star((ANY TABLE) -> ANY TABLE)
+        +-tvf=tvf_templated_select_relation_arg_using_select_star
         +-signature=(TABLE<col_array_ci ARRAY<STRING><{Collation:"und:ci"}>>) -> TABLE<col_array_ci ARRAY<STRING><{Collation:"und:ci"}>>
         +-argument_list=
         | +-FunctionArgument
@@ -10093,10 +10090,10 @@ QueryStmt
 
 # TODO: reenable once the `COLLATE ...` syntax is supported in explicit types.
 [no_run_sqlbuilder]
-[language_features=MAXIMUM,+COLLATION_SUPPORT,{{-TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS|+TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS}}]
+[language_features=MAXIMUM,+COLLATION_SUPPORT,{{-TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS,-ALL_TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS|+TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS}}]
 select * from tvf_templated_select_relation_arg_using_select_star((select as struct COLLATE('abc', 'und:ci') x, 123 y))
 --
-ALTERNATION GROUP: -TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS
+ALTERNATION GROUP: -TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS,-ALL_TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS
 --
 ERROR: Collation <"und:ci",_> on value-table column of argument of TVF call is not allowed [at 1:67]
 ...tvf_templated_select_relation_arg_using_select_star((select as struct COLL...
@@ -10114,7 +10111,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=tvf_templated_select_relation_arg_using_select_star.[x#4, y#5]
-        +-tvf=tvf_templated_select_relation_arg_using_select_star((ANY TABLE) -> ANY TABLE)
+        +-tvf=tvf_templated_select_relation_arg_using_select_star
         +-signature=(TABLE<STRUCT<x STRING, y INT64><{Collation:"und:ci"},_>>) -> TABLE<x STRING{Collation:"und:ci"}, y INT64>
         +-argument_list=
         | +-FunctionArgument
@@ -10176,10 +10173,10 @@ QueryStmt
 # This tests verifies that the explictly declared concrete argument type (just
 # STRING, no collation) from the function definition drops collation from the
 # input.
-[language_features=MAXIMUM,+COLLATION_SUPPORT,{{-TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS|+TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS}}]
+[language_features=MAXIMUM,+COLLATION_SUPPORT,{{-TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS,-ALL_TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS|+TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS}}]
 select * from ScalarArgsOfCollatableTypes(COLLATE('abc', 'und:ci'), ['abc'], ('abc', 1))
 --
-ALTERNATION GROUP: -TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS
+ALTERNATION GROUP: -TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS,-ALL_TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS
 --
 ERROR: Collation "und:ci" on argument of TVF call is not allowed [at 1:43]
 select * from ScalarArgsOfCollatableTypes(COLLATE('abc', 'und:ci'), ['abc'], ...
@@ -10198,7 +10195,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=ScalarArgsOfCollatableTypes.[arg0#1, arg1#2, arg2#3]
-        +-tvf=ScalarArgsOfCollatableTypes((STRING arg0, ARRAY<STRING> arg1, STRUCT<STRING, INT64> arg2) -> TABLE<arg0 STRING, arg1 ARRAY<STRING>, arg2 STRUCT<STRING, INT64>>)
+        +-tvf=ScalarArgsOfCollatableTypes
         +-signature=(STRING, ARRAY<STRING>, STRUCT<STRING, INT64>) -> TABLE<arg0 STRING, arg1 ARRAY<STRING>, arg2 STRUCT<STRING, INT64>>
         +-argument_list=
         | +-FunctionArgument
@@ -10218,10 +10215,10 @@ QueryStmt
         +-function_call_signature=(STRING arg0, ARRAY<STRING> arg1, STRUCT<STRING, INT64> arg2) -> TABLE<arg0 STRING, arg1 ARRAY<STRING>, arg2 STRUCT<STRING, INT64>>
 ==
 
-[language_features=MAXIMUM,+COLLATION_SUPPORT,{{-TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS|+TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS}}]
+[language_features=MAXIMUM,+COLLATION_SUPPORT,{{-TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS,-ALL_TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS|+TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS}}]
 select * from ScalarArgsOfCollatableTypes(arg1=>[COLLATE('abc', 'und:ci')], arg0=>'abc', arg2=>('abc', 1))
 --
-ALTERNATION GROUP: -TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS
+ALTERNATION GROUP: -TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS,-ALL_TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS
 --
 ERROR: Collation <"und:ci"> on argument of TVF call is not allowed [at 1:43]
 select * from ScalarArgsOfCollatableTypes(arg1=>[COLLATE('abc', 'und:ci')], a...
@@ -10240,7 +10237,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=ScalarArgsOfCollatableTypes.[arg0#1, arg1#2, arg2#3]
-        +-tvf=ScalarArgsOfCollatableTypes((STRING arg0, ARRAY<STRING> arg1, STRUCT<STRING, INT64> arg2) -> TABLE<arg0 STRING, arg1 ARRAY<STRING>, arg2 STRUCT<STRING, INT64>>)
+        +-tvf=ScalarArgsOfCollatableTypes
         +-signature=(literal STRING, ARRAY<STRING>, STRUCT<STRING, INT64>) -> TABLE<arg0 STRING, arg1 ARRAY<STRING>, arg2 STRUCT<STRING, INT64>>
         +-argument_list=
         | +-FunctionArgument
@@ -10262,10 +10259,10 @@ QueryStmt
         +-function_call_signature=(STRING arg0, ARRAY<STRING> arg1, STRUCT<STRING, INT64> arg2) -> TABLE<arg0 STRING, arg1 ARRAY<STRING>, arg2 STRUCT<STRING, INT64>>
 ==
 
-[language_features=MAXIMUM,+COLLATION_SUPPORT,{{-TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS|+TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS}}]
+[language_features=MAXIMUM,+COLLATION_SUPPORT,{{-TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS,-ALL_TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS|+TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS}}]
 select * from ScalarArgsOfCollatableTypes('abc', ['abc'], (COLLATE('abc', 'und:ci'), 1))
 --
-ALTERNATION GROUP: -TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS
+ALTERNATION GROUP: -TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS,-ALL_TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS
 --
 ERROR: Collation <"und:ci",_> on argument of TVF call is not allowed [at 1:59]
 ...from ScalarArgsOfCollatableTypes('abc', ['abc'], (COLLATE('abc', 'und:ci')...
@@ -10284,7 +10281,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=ScalarArgsOfCollatableTypes.[arg0#1, arg1#2, arg2#3]
-        +-tvf=ScalarArgsOfCollatableTypes((STRING arg0, ARRAY<STRING> arg1, STRUCT<STRING, INT64> arg2) -> TABLE<arg0 STRING, arg1 ARRAY<STRING>, arg2 STRUCT<STRING, INT64>>)
+        +-tvf=ScalarArgsOfCollatableTypes
         +-signature=(literal STRING, ARRAY<STRING>, STRUCT<STRING, INT64>) -> TABLE<arg0 STRING, arg1 ARRAY<STRING>, arg2 STRUCT<STRING, INT64>>
         +-argument_list=
         | +-FunctionArgument
@@ -10308,10 +10305,10 @@ QueryStmt
         +-function_call_signature=(STRING arg0, ARRAY<STRING> arg1, STRUCT<STRING, INT64> arg2) -> TABLE<arg0 STRING, arg1 ARRAY<STRING>, arg2 STRUCT<STRING, INT64>>
 ==
 
-[language_features=MAXIMUM,+COLLATION_SUPPORT,{{-TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS|+TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS}}]
+[language_features=MAXIMUM,+COLLATION_SUPPORT,{{-TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS,-ALL_TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS|+TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS}}]
 select * from TableArgWithCollatedOutputCols((select COLLATE('abc', 'und:ci') as a))
 --
-ALTERNATION GROUP: -TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS
+ALTERNATION GROUP: -TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS,-ALL_TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS
 --
 ERROR: Collation "und:ci" on column a of argument of TVF call is not allowed [at 1:46]
 select * from TableArgWithCollatedOutputCols((select COLLATE('abc', 'und:ci')...
@@ -10330,7 +10327,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=TableArgWithCollatedOutputCols.[col_ci#3, col_array_ci#4, col_struct_ci#5]
-        +-tvf=TableArgWithCollatedOutputCols((TABLE<a STRING> arg0) -> TABLE<col_ci STRING{Collation:"und:ci"}, col_array_ci ARRAY<STRING><{Collation:"und:ci"}>, col_struct_ci STRUCT<ARRAY<STRING>, INT64><<{Collation:"und:ci"}>,_>>)
+        +-tvf=TableArgWithCollatedOutputCols
         +-signature=(TABLE<a STRING>) -> TABLE<col_ci STRING{Collation:"und:ci"}, col_array_ci ARRAY<STRING><{Collation:"und:ci"}>, col_struct_ci STRUCT<ARRAY<STRING>, INT64><<{Collation:"und:ci"}>,_>>
         +-argument_list=
         | +-FunctionArgument
@@ -10359,10 +10356,10 @@ QueryStmt
 
 # TODO: reenable once the `COLLATE ...` syntax is supported in explicit types.
 [no_run_sqlbuilder]
-[language_features=MAXIMUM,+COLLATION_SUPPORT,{{-TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS|+TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS}}]
+[language_features=MAXIMUM,+COLLATION_SUPPORT,{{-TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS,-ALL_TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS|+TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS}}]
 select * from ValueTableArgWithCollatedOutputCols((select as struct COLLATE('abc', 'und:ci') str_field))
 --
-ALTERNATION GROUP: -TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS
+ALTERNATION GROUP: -TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS,-ALL_TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS
 --
 ERROR: Collation <"und:ci"> on value-table column of argument of TVF call is not allowed [at 1:51]
 select * from ValueTableArgWithCollatedOutputCols((select as struct COLLATE('...
@@ -10372,47 +10369,54 @@ ALTERNATION GROUP: +TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS
 --
 QueryStmt
 +-output_column_list=
-| +-ValueTableArgWithCollatedOutputCols.col_ci#3{Collation:"und:ci"} AS col_ci [STRING]
-| +-ValueTableArgWithCollatedOutputCols.col_array_ci#4<{Collation:"und:ci"}> AS col_array_ci [ARRAY<STRING>]
-| +-ValueTableArgWithCollatedOutputCols.col_struct_ci#5<<{Collation:"und:ci"}>,_> AS col_struct_ci [STRUCT<ARRAY<STRING>, INT64>]
+| +-ValueTableArgWithCollatedOutputCols.col_ci#4{Collation:"und:ci"} AS col_ci [STRING]
+| +-ValueTableArgWithCollatedOutputCols.col_array_ci#5<{Collation:"und:ci"}> AS col_array_ci [ARRAY<STRING>]
+| +-ValueTableArgWithCollatedOutputCols.col_struct_ci#6<<{Collation:"und:ci"}>,_> AS col_struct_ci [STRUCT<ARRAY<STRING>, INT64>]
 +-query=
   +-ProjectScan
-    +-column_list=ValueTableArgWithCollatedOutputCols.[col_ci#3, col_array_ci#4, col_struct_ci#5]
+    +-column_list=ValueTableArgWithCollatedOutputCols.[col_ci#4, col_array_ci#5, col_struct_ci#6]
     +-input_scan=
       +-TVFScan
-        +-column_list=ValueTableArgWithCollatedOutputCols.[col_ci#3, col_array_ci#4, col_struct_ci#5]
-        +-tvf=ValueTableArgWithCollatedOutputCols((TABLE<STRUCT<str_field STRING>> arg0) -> TABLE<col_ci STRING{Collation:"und:ci"}, col_array_ci ARRAY<STRING><{Collation:"und:ci"}>, col_struct_ci STRUCT<ARRAY<STRING>, INT64><<{Collation:"und:ci"}>,_>>)
-        +-signature=(TABLE<STRUCT<str_field STRING><{Collation:"und:ci"}>>) -> TABLE<col_ci STRING{Collation:"und:ci"}, col_array_ci ARRAY<STRING><{Collation:"und:ci"}>, col_struct_ci STRUCT<ARRAY<STRING>, INT64><<{Collation:"und:ci"}>,_>>
+        +-column_list=ValueTableArgWithCollatedOutputCols.[col_ci#4, col_array_ci#5, col_struct_ci#6]
+        +-tvf=ValueTableArgWithCollatedOutputCols
+        +-signature=(TABLE<STRUCT<str_field STRING>>) -> TABLE<col_ci STRING{Collation:"und:ci"}, col_array_ci ARRAY<STRING><{Collation:"und:ci"}>, col_struct_ci STRUCT<ARRAY<STRING>, INT64><<{Collation:"und:ci"}>,_>>
         +-argument_list=
         | +-FunctionArgument
         |   +-scan=
         |   | +-ProjectScan
-        |   |   +-column_list=[$make_struct.$struct#2<{Collation:"und:ci"}>]
+        |   |   +-column_list=[$subquery2.$struct#3]
         |   |   +-expr_list=
-        |   |   | +-$struct#2 :=
-        |   |   |   +-MakeStruct
-        |   |   |     +-type=STRUCT<str_field STRING>
-        |   |   |     +-type_annotation_map=<{Collation:"und:ci"}>
-        |   |   |     +-field_list=
-        |   |   |       +-ColumnRef(type=STRING, type_annotation_map={Collation:"und:ci"}, column=$subquery1.str_field#1{Collation:"und:ci"})
+        |   |   | +-$struct#3 :=
+        |   |   |   +-Cast(STRUCT<str_field STRING> -> STRUCT<str_field STRING>)
+        |   |   |     +-ColumnRef(type=STRUCT<str_field STRING>, type_annotation_map=<{Collation:"und:ci"}>, column=$make_struct.$struct#2<{Collation:"und:ci"}>)
         |   |   +-input_scan=
         |   |     +-ProjectScan
-        |   |       +-column_list=[$subquery1.str_field#1{Collation:"und:ci"}]
+        |   |       +-column_list=[$make_struct.$struct#2<{Collation:"und:ci"}>]
         |   |       +-expr_list=
-        |   |       | +-str_field#1 :=
-        |   |       |   +-FunctionCall(GoogleSQL:collate(STRING, STRING) -> STRING)
-        |   |       |     +-type_annotation_map={Collation:"und:ci"}
-        |   |       |     +-Literal(type=STRING, value="abc")
-        |   |       |     +-Literal(type=STRING, value="und:ci", preserve_in_literal_remover=TRUE)
+        |   |       | +-$struct#2 :=
+        |   |       |   +-MakeStruct
+        |   |       |     +-type=STRUCT<str_field STRING>
+        |   |       |     +-type_annotation_map=<{Collation:"und:ci"}>
+        |   |       |     +-field_list=
+        |   |       |       +-ColumnRef(type=STRING, type_annotation_map={Collation:"und:ci"}, column=$subquery1.str_field#1{Collation:"und:ci"})
         |   |       +-input_scan=
-        |   |         +-SingleRowScan
-        |   +-argument_column_list=[$make_struct.$struct#2<{Collation:"und:ci"}>]
+        |   |         +-ProjectScan
+        |   |           +-column_list=[$subquery1.str_field#1{Collation:"und:ci"}]
+        |   |           +-expr_list=
+        |   |           | +-str_field#1 :=
+        |   |           |   +-FunctionCall(GoogleSQL:collate(STRING, STRING) -> STRING)
+        |   |           |     +-type_annotation_map={Collation:"und:ci"}
+        |   |           |     +-Literal(type=STRING, value="abc")
+        |   |           |     +-Literal(type=STRING, value="und:ci", preserve_in_literal_remover=TRUE)
+        |   |           +-input_scan=
+        |   |             +-SingleRowScan
+        |   +-argument_column_list=[$subquery2.$struct#3]
         +-column_index_list=[0, 1, 2]
         +-function_call_signature=(TABLE<STRUCT<str_field STRING>> arg0) -> TABLE<col_ci STRING{Collation:"und:ci"}, col_array_ci ARRAY<STRING><{Collation:"und:ci"}>, col_struct_ci STRUCT<ARRAY<STRING>, INT64><<{Collation:"und:ci"}>,_>>
 ==
 
 # Collation in return type of SQL function body is not allowed.
-[language_features=MAXIMUM,+COLLATION_SUPPORT,-TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS]
+[language_features=MAXIMUM,+COLLATION_SUPPORT,-TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS,-ALL_TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS]
 create function myfunc(x STRING) as (COLLATE(x, 'und:ci'));
 --
 ERROR: Collation "und:ci" in return type of user-defined function body is not allowed [at 1:37]
@@ -10421,7 +10425,7 @@ create function myfunc(x STRING) as (COLLATE(x, 'und:ci'));
 ==
 
 # Collation in return type of SQL function body is not allowed.
-[language_features=MAXIMUM,+COLLATION_SUPPORT,-TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS]
+[language_features=MAXIMUM,+COLLATION_SUPPORT,-TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS,-ALL_TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS]
 create function myfunc(x STRING) as ([COLLATE(x, 'und:ci')]);
 --
 ERROR: Collation <"und:ci"> in return type of user-defined function body is not allowed [at 1:37]
@@ -10431,7 +10435,7 @@ create function myfunc(x STRING) as ([COLLATE(x, 'und:ci')]);
 
 # Collation in return type of SQL function body is not allowed.
 # Add a case where the flag is disabled to ensure we get the correct errors.
-[language_features=MAXIMUM,+COLLATION_SUPPORT,-TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS]
+[language_features=MAXIMUM,+COLLATION_SUPPORT,-TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS,-ALL_TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS]
 create function myfunc(x STRING) as ((COLLATE(x, 'und:ci'), 1));
 --
 ERROR: Collation <"und:ci",_> in return type of user-defined function body is not allowed [at 1:37]
@@ -10440,7 +10444,7 @@ create function myfunc(x STRING) as ((COLLATE(x, 'und:ci'), 1));
 ==
 
 # Collation in return type of SQL function body is not allowed.
-[language_features=MAXIMUM,+COLLATION_SUPPORT,-TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS]
+[language_features=MAXIMUM,+COLLATION_SUPPORT,-TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS,-ALL_TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS]
 create function myfunc(x STRING) as (COLLATE(x, 'binary'));
 --
 ERROR: Collation "binary" in return type of user-defined function body is not allowed [at 1:37]
@@ -10468,7 +10472,7 @@ CreateFunctionStmt
 # Collation in return type of SQL function body is not allowed.
 # Returns an error even if the function has an explicit return type without
 # collation.
-[language_features=MAXIMUM,+COLLATION_SUPPORT,-TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS]
+[language_features=MAXIMUM,+COLLATION_SUPPORT,-TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS,-ALL_TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS]
 create function myfunc(x STRING) returns string
 as (COLLATE(x, 'und:ci'));
 --
@@ -10489,7 +10493,7 @@ as (MIN(COLLATE(x, 'und:ci')));
 ==
 
 # Collation in return type of templated SQL function body is not allowed.
-[language_features=MAXIMUM,{{|-TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS,}}+ANALYTIC_FUNCTIONS,+ANNOTATION_FRAMEWORK,+COLLATION_SUPPORT,+TABLE_VALUED_FUNCTIONS,+CREATE_TABLE_FUNCTION,+COLLATION_IN_EXPLICIT_CAST]
+[language_features=MAXIMUM{{|,-TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS,-ALL_TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS}},+ANALYTIC_FUNCTIONS,+ANNOTATION_FRAMEWORK,+COLLATION_SUPPORT,+TABLE_VALUED_FUNCTIONS,+CREATE_TABLE_FUNCTION,+COLLATION_IN_EXPLICIT_CAST]
 select udf_templated_collate_function('abc');
 --
 ALTERNATION GROUP: <empty>
@@ -10516,7 +10520,7 @@ FunctionCall(GoogleSQL:collate(STRING, STRING) -> STRING)
 +-ArgumentRef(type=STRING, name="x")
 +-Literal(type=STRING, value="und:ci", preserve_in_literal_remover=TRUE)
 --
-ALTERNATION GROUP: -TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS,
+ALTERNATION GROUP: ,-TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS,-ALL_TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS
 --
 ERROR: Invalid function udf_templated_collate_function [at 1:8]
 select udf_templated_collate_function('abc');
@@ -10525,10 +10529,10 @@ Collation "und:ci" in return type of user-defined function body is not allowed
 ==
 
 # Collation in return type of templated SQL function body is not allowed.
-[language_features=MAXIMUM,+COLLATION_SUPPORT,{{-TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS|+TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS}}]
+[language_features=MAXIMUM,+COLLATION_SUPPORT,{{-TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS,-ALL_TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS|+TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS}}]
 select udf_templated_collate_function_in_array('abc');
 --
-ALTERNATION GROUP: -TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS
+ALTERNATION GROUP: -TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS,-ALL_TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS
 --
 ERROR: Invalid function udf_templated_collate_function_in_array [at 1:8]
 select udf_templated_collate_function_in_array('abc');
@@ -10609,10 +10613,10 @@ a = b
 ==
 
 # Collation in return type of templated SQL function body is not allowed.
-[language_features=MAXIMUM,+COLLATION_SUPPORT,{{-TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS|+TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS}}]
+[language_features=MAXIMUM,+COLLATION_SUPPORT,{{-TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS,-ALL_TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS|+TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS}}]
 select udf_templated_collate_function_in_struct('abc');
 --
-ALTERNATION GROUP: -TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS
+ALTERNATION GROUP: -TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS,-ALL_TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS
 --
 ERROR: Invalid function udf_templated_collate_function_in_struct [at 1:8]
 select udf_templated_collate_function_in_struct('abc');
@@ -10650,11 +10654,11 @@ MakeStruct
 ==
 
 # Fixed UDA
-[language_features=MAXIMUM,+COLLATION_SUPPORT,{{-TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS|+TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS}}]
+[language_features=MAXIMUM,+COLLATION_SUPPORT,{{-TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS,-ALL_TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS|+TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS}}]
 SELECT UdaWithHavingMax(string_ci, 1)
 FROM CollatedTable;
 --
-ALTERNATION GROUP: -TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS
+ALTERNATION GROUP: -TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS,-ALL_TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS
 --
 ERROR: Annotations on arguments of SQL functions are not supported, but found annotations on argument agg_arg [at 1:25]
 SELECT UdaWithHavingMax(string_ci, 1)
@@ -10682,11 +10686,11 @@ QueryStmt
 ==
 
 # Templated UDA
-[language_features=MAXIMUM,+COLLATION_SUPPORT,{{-TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS|+TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS}}]
+[language_features=MAXIMUM,+COLLATION_SUPPORT,{{-TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS,-ALL_TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS|+TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS}}]
 SELECT UdaTemplateWithHavingMax(struct_with_string_ci)
 FROM CollatedTable;
 --
-ALTERNATION GROUP: -TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS
+ALTERNATION GROUP: -TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS,-ALL_TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS
 --
 ERROR: Annotations on arguments of SQL functions are not supported, but found annotations on argument agg_arg [at 1:33]
 SELECT UdaTemplateWithHavingMax(struct_with_string_ci)
@@ -10736,7 +10740,7 @@ ColumnRef(type=ARRAY<INT32>, column=$aggregate.$agg1#1)
 
 # Collation on arguments of SQL functions requires the flag even for concrete
 # functions.
-[language_features=MAXIMUM,+COLLATION_SUPPORT,-TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS]
+[language_features=MAXIMUM,+COLLATION_SUPPORT,-TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS,-ALL_TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS]
 SELECT UdaWithHavingMax(string_ci, 1)
 FROM CollatedTable
 --
@@ -10748,7 +10752,7 @@ SELECT UdaWithHavingMax(string_ci, 1)
 
 # Collation on arguments of SQL functions requires the flag even for concrete
 # TVFs.
-[language_features=MAXIMUM,+COLLATION_SUPPORT,-TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS]
+[language_features=MAXIMUM,+COLLATION_SUPPORT,-TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS,-ALL_TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS]
 SELECT *
 FROM UnaryAbTableArg((SELECT 1 AS a, COLLATE('x', 'und:ci') AS b))
 --
@@ -10786,7 +10790,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=TvfWithTemplatedAndNonTemplatedArgs.[a#4, b#5, c#6]
-        +-tvf=TvfWithTemplatedAndNonTemplatedArgs((ANY TABLE t, TABLE<b STRING> t2, STRING c) -> ANY TABLE)
+        +-tvf=TvfWithTemplatedAndNonTemplatedArgs
         +-signature=(TABLE<a STRING{Collation:"und:ci"}>, TABLE<b STRING>, STRING) -> TABLE<a STRING{Collation:"und:ci"}, b STRING, c STRING>
         +-argument_list=
         | +-FunctionArgument
@@ -10891,7 +10895,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=TvfWithTemplatedAndNonTemplatedArgs.[a#4, b#5, c#6]
-        +-tvf=TvfWithTemplatedAndNonTemplatedArgs((ANY TABLE t, TABLE<b STRING> t2, STRING c) -> ANY TABLE)
+        +-tvf=TvfWithTemplatedAndNonTemplatedArgs
         +-signature=(TABLE<a STRING{Collation:"und:ci"}>, TABLE<b STRING>, STRING) -> TABLE<a STRING{Collation:"und:ci"}, b STRING, c STRING>
         +-argument_list=
         | +-FunctionArgument
@@ -10989,7 +10993,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=tvf_concrete_with_explicit_return_type.[a#5, b#6]
-        +-tvf=tvf_concrete_with_explicit_return_type((TABLE<a STRING, b ARRAY<STRING>> t) -> TABLE<a STRING, b ARRAY<STRING>>)
+        +-tvf=tvf_concrete_with_explicit_return_type
         +-signature=(TABLE<a STRING, b ARRAY<STRING>>) -> TABLE<a STRING, b ARRAY<STRING>>
         +-argument_list=
         | +-FunctionArgument
@@ -11051,7 +11055,7 @@ QueryStmt
     +-input_scan=
       +-TVFScan
         +-column_list=tvf_templated_with_explicit_return_type.[a#3, b#4]
-        +-tvf=tvf_templated_with_explicit_return_type((ANY TABLE t) -> TABLE<a STRING, b ARRAY<STRING>>)
+        +-tvf=tvf_templated_with_explicit_return_type
         +-signature=(TABLE<a STRING{Collation:"und:ci"}, b ARRAY<STRING><{Collation:"und:ci"}>>) -> TABLE<a STRING, b ARRAY<STRING>>
         +-argument_list=
         | +-FunctionArgument
@@ -11102,11 +11106,11 @@ QueryStmt
 ==
 
 # Multi-level aggregation
-[language_features=MAXIMUM,+COLLATION_SUPPORT,{{-TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS|+TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS}}]
+[language_features=MAXIMUM,+COLLATION_SUPPORT,{{-TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS,-ALL_TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS|+TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS}}]
 SELECT UdaWithMultilevelAggMultiArg(1, 2, string_ci, CAST(NULL AS BYTES))
 FROM CollatedTable
 --
-ALTERNATION GROUP: -TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS
+ALTERNATION GROUP: -TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS,-ALL_TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS
 --
 ERROR: Annotations on arguments of SQL functions are not supported, but found annotations on argument arg3 [at 1:43]
 SELECT UdaWithMultilevelAggMultiArg(1, 2, string_ci, CAST(NULL AS BYTES))
@@ -11137,10 +11141,10 @@ QueryStmt
 
 # Collation in return type of templated SQL function body is not allowed, even
 # if the function has an explicit return type without collation.
-[language_features=MAXIMUM,+COLLATION_SUPPORT,{{-TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS|+TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS}}]
+[language_features=MAXIMUM,+COLLATION_SUPPORT,{{-TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS,-ALL_TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS|+TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS}}]
 select udf_templated_collate_function_return_string('abc');
 --
-ALTERNATION GROUP: -TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS
+ALTERNATION GROUP: -TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS,-ALL_TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS
 --
 ERROR: Invalid function udf_templated_collate_function_return_string [at 1:8]
 select udf_templated_collate_function_return_string('abc');
@@ -11174,11 +11178,11 @@ Cast(STRING -> STRING)
 
 # Collation in return type of templated SQL function body is not allowed. The
 # function is a SQL aggregate function.
-[language_features=MAXIMUM,+COLLATION_SUPPORT,{{-TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS|+TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS}}]
+[language_features=MAXIMUM,+COLLATION_SUPPORT,{{-TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS,-ALL_TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS|+TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS}}]
 select uda_templated_aggregate_with_min_collate_function(x)
 from unnest(['a', 'b', 'c']) x;
 --
-ALTERNATION GROUP: -TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS
+ALTERNATION GROUP: -TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS,-ALL_TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS
 --
 ERROR: Invalid function uda_templated_aggregate_with_min_collate_function [at 1:8]
 select uda_templated_aggregate_with_min_collate_function(x)
@@ -12215,7 +12219,6 @@ QueryStmt
                 +-column_list=
                   +-ColumnRef(type=STRING, column=$groupby.string_binary#9{Collation:"binary"})
 
-
 [REWRITTEN AST]
 QueryStmt
 +-output_column_list=
@@ -12638,7 +12641,6 @@ QueryStmt
     |           +-Literal(type=STRING, value="und:ci", preserve_in_literal_remover=TRUE)
     +-input_scan=
       +-SingleRowScan
-
 
 DEPRECATION WARNING:
 Array constructor with explicit type leaks collation from argument 0 [at 1:8]
@@ -13415,7 +13417,7 @@ UNPIVOT(val FOR name IN (c1 AS 'C1', c2 AS 'C2'));
                          ^
 ==
 
-[language_features=MAXIMUM,+COLLATION_SUPPORT,{{-TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS|+TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS}}]
+[language_features=MAXIMUM,+COLLATION_SUPPORT,-ALL_TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS,{{-TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS|+TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS}}]
 CREATE FUNCTION udf_with_explicit_return_type_and_collated_body(s STRING)
 RETURNS STRING AS (
   COLLATE(s, 'und:ci')
@@ -13445,7 +13447,7 @@ CreateFunctionStmt
       +-Literal(type=STRING, value="und:ci", preserve_in_literal_remover=TRUE)
 ==
 
-[language_features=MAXIMUM,+COLLATION_SUPPORT,{{-TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS|+TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS}}]
+[language_features=MAXIMUM,+COLLATION_SUPPORT,-ALL_TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS,{{-TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS|+TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS}}]
 CREATE TABLE FUNCTION tvf_with_explicit_return_schema_and_collated_body(t TABLE<a STRING>)
 RETURNS TABLE<a STRING> AS (
   SELECT COLLATE(a, 'und:ci') AS a FROM t

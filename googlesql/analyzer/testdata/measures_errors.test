@@ -81,7 +81,6 @@ QueryStmt
             +-AggregateFunctionCall(GoogleSQL:AGG(MEASURE<INT64>) -> INT64)
               +-ColumnRef(type=MEASURE<INT64>, column=MeasureTable_SingleKey.measure_sum_quantity#9)
 
-
 Rewrite ERROR: generic::unimplemented: Multi-level aggregation is needed to rewrite measures.
 ==
 
@@ -105,7 +104,6 @@ QueryStmt
           +-$agg1#15 :=
             +-AggregateFunctionCall(GoogleSQL:AGG(MEASURE<INT64>) -> INT64)
               +-ColumnRef(type=MEASURE<INT64>, column=MeasureTable_SingleKey.measure_sum_quantity#9)
-
 
 Rewrite ERROR: generic::unimplemented: Grouping by STRUCT types is needed to rewrite measures.
 ==
@@ -971,7 +969,6 @@ QueryStmt
                 +-AggregateFunctionCall(GoogleSQL:AGG(MEASURE<INT64>) -> INT64)
                   +-ColumnRef(type=MEASURE<INT64>, column=MeasureTable_SingleKey.measure_sum_price#10)
 
-
 Rewrite ERROR: generic::unimplemented: Measure type rewriter does not support scalar subqueries that emit measure columns
 ==
 
@@ -1026,7 +1023,6 @@ QueryStmt
             +-AggregateFunctionCall(GoogleSQL:AGG(MEASURE<INT64>) -> INT64)
               +-ColumnRef(type=MEASURE<INT64>, column=$subquery1.measure_renamed#30)
 
-
 Rewrite ERROR: generic::unimplemented: Measure type rewriter does not support WITH expressions emitting a measure type
 ==
 
@@ -1074,7 +1070,6 @@ QueryStmt
                 +-AggregateFunctionCall(GoogleSQL:AGG(MEASURE<INT64>) -> INT64)
                   +-ColumnRef(type=MEASURE<INT64>, column=wq0.measure_sum_price#17)
 
-
 Rewrite ERROR: generic::unimplemented: Measure type rewriter does not support WITH scans emitting duplicate measure columns
 ==
 
@@ -1121,7 +1116,6 @@ QueryStmt
           +-$agg1#17 :=
             +-AggregateFunctionCall(GoogleSQL:AGG(MEASURE<INT64>) -> INT64)
               +-ColumnRef(type=MEASURE<INT64>, column=$subquery1.renamed_measure#16)
-
 
 Rewrite ERROR: generic::unimplemented: Measure type rewriter does not support WITH expressions emitting a measure type
 ==
@@ -1172,7 +1166,6 @@ QueryStmt
             +-AggregateFunctionCall(GoogleSQL:AGG(MEASURE<INT64>) -> INT64)
               +-ColumnRef(type=MEASURE<INT64>, column=$subquery1.a_10#16)
 
-
 Rewrite ERROR: generic::unimplemented: Measure type rewriter does not support WITH expressions emitting a measure type
 ==
 
@@ -1218,7 +1211,6 @@ QueryStmt
             +-AggregateFunctionCall(GoogleSQL:AGG(MEASURE<INT64>) -> INT64)
               +-ColumnRef(type=MEASURE<INT64>, column=MeasureTable_SingleKey.measure_count_star#5)
 
-
 Rewrite ERROR: generic::unimplemented: Measure type rewriter does not support LATERAL joins that emit measure columns
 ==
 
@@ -1263,7 +1255,6 @@ QueryStmt
           +-$agg1#8 :=
             +-AggregateFunctionCall(GoogleSQL:AGG(MEASURE<INT64>) -> INT64)
               +-ColumnRef(type=MEASURE<INT64>, column=MeasureTable_WithUdas.measure_uda_sum_price#5)
-
 
 Rewrite ERROR: SQL function inliner cannot inline aggregate function Lazy_resolution_function:SumOfAggregateArgs with GROUP BY modifier
 ==

@@ -175,5 +175,30 @@ TEST_F(GetKMeansTableValuedFunctionsTest, KMeansFunction) {
       "optional PROTO<googlesql.KMeansOptions> options) -> ANY TABLE");
 }
 
+TEST_F(GetVectorSearchTableValuedFunctionsTest,
+       BatchHybridVectorSearchFunction) {
+  NameToTableValuedFunctionMap functions;
+  GOOGLESQL_ASSERT_OK(GetVectorSearchTableValuedFunctions(
+      &type_factory_, *options_, &functions, output_properties_));
+  constexpr absl::string_view kHybridBatchVectorSearch = "hybrid_vector_search";
+  ASSERT_TRUE(functions.contains(kHybridBatchVectorSearch));
+  EXPECT_EQ(
+      functions[kHybridBatchVectorSearch]->DebugString(),
+      "GoogleSQL:hybrid_vector_search\n  (ANY TABLE, STRING column_to_search, "
+      "ANY "
+      "TABLE, ARRAY<STRING> lexical_search_columns, optional STRING "
+      "query_column_to_search, optional STRING lexical_search_query_column, "
+      "optional INT64 top_k, optional STRING distance_type, optional DOUBLE "
+      "max_distance) -> ANY TABLE\n  (ANY TABLE, STRING column_to_search, "
+      "ANY "
+      "TABLE, ARRAY<STRING> lexical_search_columns, optional STRING "
+      "query_column_to_search, optional STRING lexical_search_query_column, "
+      "optional JSON options, optional INT64 top_k, optional STRING "
+      "distance_type, optional DOUBLE max_distance) -> ANY TABLE");
+  EXPECT_EQ(output_properties_.SupportsSuppliedArgumentType(
+                FN_BATCH_HYBRID_VECTOR_SEARCH_TVF_WITH_PROTO_OPTIONS, 6),
+            true);
+}
+
 }  // namespace
 }  // namespace googlesql

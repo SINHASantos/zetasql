@@ -109,11 +109,16 @@ class RootHandler : public CivetHandler {
     std::string enabled_ast_rewrites_text;
     CivetServer::getParam(conn, "ast-rewrites-text", enabled_ast_rewrites_text);
 
+    std::string resolved_ast_render_mode;
+    CivetServer::getParam(conn, "resolved_ast_render_mode",
+                          resolved_ast_render_mode);
+
     return std::make_unique<ExecuteQueryWebRequest>(
         GetModesParams(conn), ExecuteQueryConfig::parse_sql_mode(sql_mode),
         ExecuteQueryConfig::parse_target_syntax_mode(target_syntax_mode), query,
         catalog, enabled_language_features, enabled_language_features_text,
-        enabled_ast_rewrites, enabled_ast_rewrites_text);
+        enabled_ast_rewrites, enabled_ast_rewrites_text,
+        resolved_ast_render_mode);
   }
 
   // Gets all the modes currently checked in the form.

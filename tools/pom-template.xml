@@ -18,10 +18,10 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
   <modelVersion>4.0.0</modelVersion>
 
-  <groupId>com.google.googlesql</groupId>
-  <artifactId>{artifact_id}</artifactId>
-  <version>{pom_version}</version>
-  <name>{artifact_name}</name>
+  <groupId>{groupId}</groupId>
+  <artifactId>{artifactId}</artifactId>
+  <version>{version}</version>
+  <name>{artifactId}</name>
   <description>Analyzer Framework for SQL</description>
   <url>https://github.com/google/googlesql</url>
 
@@ -49,13 +49,13 @@
     <dependency>
       <groupId>com.google.protobuf</groupId>
       <artifactId>protobuf-java</artifactId>
-      <version>3.19.3</version>
+      <version>4.33.5</version>
     </dependency>
     <dependency>
       <groupId>com.google.protobuf</groupId>
       <artifactId>protobuf-java-util</artifactId>
-      <version>3.19.3</version>
+      <version>4.33.5</version>
     </dependency>
-{generated_bzl_deps}
+{dependencies}
   </dependencies>
 </project>

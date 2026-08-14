@@ -41,8 +41,10 @@
 #include "googlesql/public/time_series_tvf_util.h"
 #include "googlesql/public/type.pb.h"
 #include "googlesql/public/types/annotation.h"
+#include "googlesql/public/types/proto_type.h"
 #include "googlesql/public/types/type.h"
 #include "googlesql/public/types/type_factory.h"
+#include "googlesql/public/value.h"
 #include "googlesql/resolved_ast/column_factory.h"
 #include "googlesql/resolved_ast/make_node_vector.h"
 #include "googlesql/resolved_ast/resolved_ast.h"
@@ -58,12 +60,14 @@
 #include "absl/algorithm/container.h"
 #include "absl/base/nullability.h"
 #include "absl/cleanup/cleanup.h"
+#include "absl/container/flat_hash_map.h"
 #include "absl/container/flat_hash_set.h"
 #include "googlesql/base/check.h"
 #include "absl/memory/memory.h"
 #include "absl/status/status.h"
 #include "googlesql/base/status_macros.h"
 #include "absl/status/statusor.h"
+#include "absl/strings/ascii.h"
 #include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_join.h"
@@ -324,6 +328,22 @@ static absl::Status SetCollationList(const LanguageOptions& language_options,
   return absl::OkStatus();
 }
 
+// Visitor to detect if a node contains WithScan.
+class WithScanVisitor : public googlesql::ResolvedASTVisitor {
+ public:
+  WithScanVisitor() : contains_with_scan_(false) {}
+  bool contains_with_scan() const { return contains_with_scan_; }
+
+ private:
+  absl::Status VisitResolvedWithScan(
+      const googlesql::ResolvedWithScan* node) override {
+    contains_with_scan_ = true;
+    return absl::OkStatus();
+  }
+
+  bool contains_with_scan_ = false;
+};
+
 }  // namespace
 
 absl::StatusOr<std::unique_ptr<ResolvedExpr>> CorrelateColumnRefsImpl(
@@ -397,24 +417,27 @@ absl::Status CollectSortUniqueColumnRefs(
 // allocated by `column_factory`.
 class ColumnRemappingResolvedASTRewriter : public ResolvedASTRewriteVisitor {
  public:
-  ColumnRemappingResolvedASTRewriter(ColumnReplacementMap& column_map,
-                                     ColumnFactory* column_factory)
+  ColumnRemappingResolvedASTRewriter(
+      ColumnReplacementMap& column_map,
+      ColumnFactory* /*absl_nullable*/ column_factory)
       : column_map_(column_map), column_factory_(column_factory) {}
 
   absl::StatusOr<ResolvedColumn> PostVisitResolvedColumn(
       const ResolvedColumn& column) override {
-    auto it = column_map_.find(column);
-    if (it != column_map_.end()) {
-      return it->second;
-    }
-
     if (column_factory_ == nullptr) {
+      auto it = column_map_.find(column);
+      if (it != column_map_.end()) {
+        return it->second;
+      }
       return column;
     }
-    ResolvedColumn new_column = column_factory_->MakeCol(
-        column.table_name(), column.name(), column.annotated_type());
-    column_map_[column] = new_column;
-    return new_column;
+
+    auto [it, inserted] = column_map_.try_emplace(column);
+    if (inserted) {
+      it->second = column_factory_->MakeCol(column.table_name(), column.name(),
+                                            column.annotated_type());
+    }
+    return it->second;
   }
 
  private:
@@ -425,7 +448,7 @@ class ColumnRemappingResolvedASTRewriter : public ResolvedASTRewriteVisitor {
   // All ResolvedColumns in the copied ResolvedAST will have new column ids
   // allocated by `column_factory_`. If this is a nullptr, ignore columns that
   // are not in `column_map_`.
-  ColumnFactory* column_factory_;
+  ColumnFactory* /*absl_nullable*/ column_factory_;
 };
 
 // A visitor that copies a ResolvedAST with columns ids allocated by a
@@ -440,11 +463,12 @@ class ColumnRemappingResolvedASTDeepCopyVisitor
 
   absl::StatusOr<ResolvedColumn> CopyResolvedColumn(
       const ResolvedColumn& column) override {
-    if (!column_map_.contains(column)) {
-      column_map_[column] = column_factory_.MakeCol(
-          column.table_name(), column.name(), column.annotated_type());
+    auto [it, inserted] = column_map_.try_emplace(column);
+    if (inserted) {
+      it->second = column_factory_.MakeCol(column.table_name(), column.name(),
+                                           column.annotated_type());
     }
-    return column_map_[column];
+    return it->second;
   }
 
  private:
@@ -468,7 +492,8 @@ CopyResolvedASTAndRemapColumnsImpl(const ResolvedNode& input_tree,
 
 absl::StatusOr<std::unique_ptr<const ResolvedNode>> RemapColumnsImpl(
     std::unique_ptr<const ResolvedNode> input_tree,
-    ColumnFactory* column_factory, ColumnReplacementMap& column_map) {
+    ColumnFactory* /*absl_nullable*/ column_factory,
+    ColumnReplacementMap& column_map) {
   ColumnRemappingResolvedASTRewriter rewriter(column_map, column_factory);
   return rewriter.VisitAll(std::move(input_tree));
 }
@@ -530,6 +555,32 @@ absl::StatusOr<std::unique_ptr<ResolvedFunctionCall>> FunctionCallBuilder::If(
   return if_call;
 }
 
+absl::StatusOr<std::unique_ptr<ResolvedFunctionCall>>
+FunctionCallBuilder::FromProto(std::unique_ptr<const ResolvedExpr> arg,
+                               FunctionSignatureId signature_id,
+                               const Type* target_type) {
+  GOOGLESQL_RET_CHECK_NE(arg.get(), nullptr);
+  GOOGLESQL_RET_CHECK(arg->type()->IsProto());
+  GOOGLESQL_RET_CHECK_NE(target_type, nullptr);
+
+  const Function* from_proto_fn = nullptr;
+  GOOGLESQL_RETURN_IF_ERROR(GetBuiltinFunctionFromCatalog("from_proto", &from_proto_fn));
+
+  GOOGLESQL_ASSIGN_OR_RETURN(FunctionSignature concrete_signature,
+                   MakeConcreteSignature(from_proto_fn, signature_id,
+                                         target_type, {{arg->type(), 1}}));
+
+  std::vector<std::unique_ptr<const ResolvedExpr>> from_proto_args;
+  from_proto_args.push_back(std::move(arg));
+  auto from_proto_call = MakeResolvedFunctionCall(
+      target_type, from_proto_fn, concrete_signature,
+      std::move(from_proto_args), ResolvedFunctionCall::DEFAULT_ERROR_MODE);
+
+  GOOGLESQL_RETURN_IF_ERROR(
+      PropagateAnnotationsAndProcessCollationList(from_proto_call.get()));
+  return from_proto_call;
+}
+
 absl::StatusOr<std::unique_ptr<ResolvedScan>> ReplaceScanColumns(
     ColumnFactory& column_factory, const ResolvedScan& scan,
     absl::Span<const int> target_column_indices,
@@ -539,13 +590,53 @@ absl::StatusOr<std::unique_ptr<ResolvedScan>> ReplaceScanColumns(
   // by the TableScan.
   GOOGLESQL_RET_CHECK_EQ(replacement_columns_to_use.size(), target_column_indices.size());
   ColumnReplacementMap column_map;
+  // Initialize a vector of <index, column> pairs for columns that are
+  // duplicated in the output column list. This is used to add computed columns
+  // to the output column list so that the duplicated columns can be resolved.
+  struct DuplicateInfo {
+    // Index of target_column_indices containing the index of the duplicate
+    // column.
+    int index;
+    // Canonical column to map duplicates to.
+    ResolvedColumn canonical_column;
+  };
+  std::vector<DuplicateInfo> duplicate_column_indices;
   for (int i = 0; i < target_column_indices.size(); ++i) {
     int column_idx = target_column_indices[i];
     GOOGLESQL_RET_CHECK_GT(scan.column_list_size(), column_idx);
-    column_map[scan.column_list(column_idx)] = replacement_columns_to_use[i];
+    const ResolvedColumn& original_column = scan.column_list(column_idx);
+    const auto [column, success] =
+        column_map.insert({original_column, replacement_columns_to_use[i]});
+    if (!success) {
+      duplicate_column_indices.push_back(DuplicateInfo{i, column->second});
+    }
   }
 
-  return CopyResolvedASTAndRemapColumns(scan, column_factory, column_map);
+  GOOGLESQL_ASSIGN_OR_RETURN(
+      std::unique_ptr<ResolvedScan> new_scan,
+      CopyResolvedASTAndRemapColumns(scan, column_factory, column_map));
+
+  // Creates a ProjectScan that maps duplicated columns such as [col#1, col#1]
+  // to [col#1, col#2], where col#2 is a ColumnRef(col#1).
+  if (!duplicate_column_indices.empty()) {
+    std::vector<ResolvedColumn> columns(new_scan->column_list());
+    std::vector<std::unique_ptr<const ResolvedComputedColumn>> computed_columns;
+    computed_columns.reserve(duplicate_column_indices.size());
+
+    for (const DuplicateInfo& duplicate_info : duplicate_column_indices) {
+      int index = duplicate_info.index;
+      computed_columns.push_back(MakeResolvedComputedColumn(
+          replacement_columns_to_use[index],
+          MakeResolvedColumnRef(duplicate_info.canonical_column,
+                                /*is_correlated=*/false)));
+      columns[target_column_indices[index]] = replacement_columns_to_use[index];
+    }
+
+    return MakeResolvedProjectScan(columns, std::move(computed_columns),
+                                   std::move(new_scan));
+  }
+
+  return new_scan;
 }
 
 std::vector<ResolvedColumn> CreateReplacementColumns(
@@ -2672,6 +2763,12 @@ absl::StatusOr<bool> HasGroupingCallNode(const ResolvedNode* node) {
   return has_grouping_call;
 }
 
+absl::StatusOr<bool> ContainsWithScan(const googlesql::ResolvedNode& node) {
+  WithScanVisitor visitor;
+  GOOGLESQL_RETURN_IF_ERROR(node.Accept(&visitor));
+  return visitor.contains_with_scan();
+}
+
 absl::Status FunctionCallBuilder::GetBuiltinFunctionFromCatalog(
     absl::string_view function_name, const Function** fn_out) {
   GOOGLESQL_RET_CHECK_NE(fn_out, nullptr);
@@ -2839,16 +2936,39 @@ absl::StatusOr<const ResolvedColumn*> FindAndValidateTimestampColumnInScan(
 
 absl::StatusOr<std::unique_ptr<const ResolvedExpr>>
 BuildTimestampColumnExpression(const ResolvedTimestampColumnPath& path,
-                               const ResolvedColumn& root_column) {
+                               const ResolvedColumn& root_column,
+                               FunctionCallBuilder& fn_builder) {
   std::unique_ptr<const ResolvedExpr> current_expr =
       MakeResolvedColumnRef(root_column.type(), root_column,
                             /*is_correlated=*/false);
 
   for (const auto& step : path.steps) {
-    GOOGLESQL_RET_CHECK_EQ(step.kind, TypeFieldPathStep::STRUCT_FIELD);
-    current_expr = MakeResolvedGetStructField(
-        step.type, std::move(current_expr), step.struct_field_index);
+    if (step.kind == TypeFieldPathStep::STRUCT_FIELD) {
+      current_expr = MakeResolvedGetStructField(
+          step.type, std::move(current_expr), step.struct_field_index);
+    } else if (step.kind == TypeFieldPathStep::PROTO_FIELD) {
+      current_expr = MakeResolvedGetProtoField(
+          step.type, std::move(current_expr), step.proto_field_descriptor,
+          /*default_value=*/Value::Null(step.type),
+          /*get_has_bit=*/false,
+          /*format=*/
+          ProtoType::GetFormatAnnotation(step.proto_field_descriptor),
+          /*return_default_value_when_unset=*/false);
+    } else {
+      return absl::InternalError("Unsupported TypeFieldPathStep kind");
+    }
   }
+
+  // We already validated in ResolveTimestampColumnPath() that if this is a
+  // proto, it is specifically `google.protobuf.Timestamp`.
+  if (current_expr->type()->IsProto()) {
+    GOOGLESQL_ASSIGN_OR_RETURN(
+        auto from_proto_expr,
+        fn_builder.FromProto(std::move(current_expr), FN_FROM_PROTO_TIMESTAMP,
+                             googlesql::types::TimestampType()));
+    current_expr = std::move(from_proto_expr);
+  }
+
   return current_expr;
 }
 
@@ -3459,6 +3579,31 @@ class MaxColumnIdVisitor : public googlesql::ResolvedASTVisitor {
 
 absl::StatusOr<int> GetMaxColumnId(const googlesql::ResolvedNode* node) {
   return MaxColumnIdVisitor::GetMaxColumnId(node);
+}
+
+absl::Status CteQueryNameGenerator::VisitResolvedWithEntry(
+    const ResolvedWithEntry* node) {
+  used_names_.insert(absl::AsciiStrToLower(node->with_query_name()));
+  return ResolvedASTVisitor::VisitResolvedWithEntry(node);
+}
+
+std::string CteQueryNameGenerator::MakeUniqueCteName(
+    absl::string_view base_name) {
+  if (base_name.empty()) {
+    base_name = "cte";
+  }
+  std::string lower_base = absl::AsciiStrToLower(base_name);
+  if (used_names_.insert(lower_base).second) {
+    return std::string(base_name);
+  }
+
+  std::string candidate;
+  do {
+    ++max_seen_index_;
+    candidate = absl::StrCat(base_name, "_", max_seen_index_);
+  } while (!used_names_.insert(absl::AsciiStrToLower(candidate)).second);
+
+  return candidate;
 }
 
 }  // namespace googlesql

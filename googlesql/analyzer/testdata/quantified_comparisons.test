@@ -6010,6 +6010,7 @@ QueryStmt
     |               +-SingleRowScan
     +-input_scan=
       +-SingleRowScan
+
 [SQLBUILDER_TARGET_SYNTAX_MODE standard]
 [SQLBUILDER_OUTPUT]
 SELECT

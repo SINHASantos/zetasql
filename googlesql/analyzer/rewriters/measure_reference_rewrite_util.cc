@@ -75,6 +75,8 @@ absl::Status MarkAggedMeasures(const ResolvedNode* resolved_ast,
   return resolved_ast->Accept(&visitor);
 }
 
+namespace {
+
 // Helper class to:
 // 1. Check if a type is or recursively contains an AGG'ed MeasureType.
 // 2. Compute the replacement type by recursively replacing AGG'ed MeasureTypes
@@ -198,27 +200,65 @@ class MeasureTypeReplacer {
   };
 };
 
-// Builds and returns a MakeStruct expression that contains the fields
-// in `target_struct_type` from a `row_expr`.
-static absl::StatusOr<std::unique_ptr<const ResolvedExpr>>
-BuildStructFromRowFields(const StructType* target_struct_type,
-                         const ResolvedExpr* row_expr) {
-  GOOGLESQL_RET_CHECK(row_expr->type()->IsRow());
-  const Table* table = row_expr->type()->AsRowType()->table();
-  GOOGLESQL_RET_CHECK(table != nullptr);
+// Each GetRowField::type is unique within the resolved ast. When copying a
+// ResolvedGetRowField node, we need to create a new type with the same
+// underlying table to ensure that the copied node has a unique type.
+class RowTypeAllocatingCopier : public ResolvedASTDeepCopyVisitor {
+ public:
+  explicit RowTypeAllocatingCopier(TypeFactory& type_factory)
+      : type_factory_(type_factory) {}
 
-  std::vector<std::unique_ptr<const ResolvedExpr>> fields;
-  fields.reserve(target_struct_type->num_fields());
-  for (const auto& field : target_struct_type->fields()) {
-    const Column* column = table->FindColumnByName(field.name);
-    GOOGLESQL_RET_CHECK(column != nullptr)
-        << "Column " << field.name << " not found in row type table";
-    GOOGLESQL_ASSIGN_OR_RETURN(std::unique_ptr<const ResolvedExpr> row_expr_copy,
-                     ResolvedASTDeepCopyVisitor::Copy(row_expr));
-    fields.push_back(MakeResolvedGetRowField(column->GetType(),
-                                             std::move(row_expr_copy), column));
+ protected:
+  absl::Status VisitResolvedGetRowField(
+      const ResolvedGetRowField* node) override {
+    GOOGLESQL_ASSIGN_OR_RETURN(std::unique_ptr<const ResolvedExpr> expr,
+                     ProcessNode(node->expr()));
+    const Type* type = node->type();
+    if (type->IsRow()) {
+      GOOGLESQL_RETURN_IF_ERROR(type_factory_.MakeRowType(
+          type->AsRowType()->table(), type->AsRowType()->table_name(), &type));
+    }
+    PushNodeToStack(
+        MakeResolvedGetRowField(type, std::move(expr), node->column()));
+    return absl::OkStatus();
   }
-  return MakeResolvedMakeStruct(target_struct_type, std::move(fields));
+
+ private:
+  TypeFactory& type_factory_;
+};
+
+// Wraps the `input_scan` in a chain of `ProjectScan`s to evaluate the
+// `pending_computed_columns` before aggregation. Chaining is required because
+// a computed column may depend on another one in the list.
+//
+// Input:
+// - `input_scan`: The scan to wrap. Must not be null.
+// - `pending_computed_columns`: The computed columns to evaluate. The
+//   depdencies of a computed column must be put before it in the list.
+//
+// Returns:
+// - The wrapped scan, which is a ProjectScan (or chain of them) over the
+//   original `input_scan`.
+absl::StatusOr<std::unique_ptr<const ResolvedScan>>
+WrapInputScanWithPendingComputedColumns(
+    std::unique_ptr<const ResolvedScan> input_scan,
+    std::vector<std::unique_ptr<const ResolvedComputedColumn>>
+        pending_computed_columns) {
+  GOOGLESQL_RET_CHECK(input_scan != nullptr);
+  if (pending_computed_columns.empty()) {
+    return input_scan;
+  }
+
+  std::unique_ptr<const ResolvedScan> current_scan = std::move(input_scan);
+  for (auto& cc : pending_computed_columns) {
+    ResolvedColumnList new_project_column_list = current_scan->column_list();
+    new_project_column_list.push_back(cc->column());
+    std::vector<std::unique_ptr<const ResolvedComputedColumn>> expr_list;
+    expr_list.push_back(std::move(cc));
+    current_scan = MakeResolvedProjectScan(
+        new_project_column_list, std::move(expr_list), std::move(current_scan));
+  }
+  return current_scan;
 }
 
 // Rewrites measure columns to closure struct columns and expands AGG(m) calls
@@ -297,10 +337,12 @@ class MeasureColumnRewriter : public ResolvedASTRewriteVisitor {
 
     GOOGLESQL_ASSIGN_OR_RETURN(
         RewriteMeasureExprResult result,
-        RewriteMeasureExpr(measure_info.measure_expr, closure_struct_ref,
-                           measure_info.row_identity_column_names,
+        RewriteMeasureExpr(measure_type, closure_struct_ref, measure_collector_,
                            any_value_fn_, function_call_builder_,
                            language_options_, column_factory_, type_factory_));
+    for (auto& cc : result.closure_computed_columns) {
+      pending_computed_columns_stack_.back().push_back(std::move(cc));
+    }
     for (auto& agg : result.constituent_aggregate_list) {
       constituent_aggregates_stack_.back().constituent_aggregate_list.push_back(
           std::move(agg));
@@ -329,7 +371,7 @@ class MeasureColumnRewriter : public ResolvedASTRewriteVisitor {
     GOOGLESQL_RET_CHECK_OK(measure_collector_.GetMeasureInfo(measure_type).status())
         << "Measure type " << measure_type->DebugString()
         << " is not collected";
-    return BuildClosureExprFromGetRowField(node.get());
+    return BuildClosureExprFromRow(node->type()->AsStruct(), node->expr());
   }
 
   absl::StatusOr<ResolvedColumn> PostVisitResolvedColumn(
@@ -380,8 +422,12 @@ class MeasureColumnRewriter : public ResolvedASTRewriteVisitor {
     return ReplaceMeasureColumnTypeToClosureStruct(column);
   }
 
-  absl::StatusOr<const Type*> PostVisitType(const Type* type) override {
-    return measure_type_replacer_.ComputeClosureType(type);
+  absl::StatusOr<AnnotatedType> PostVisitAnnotatedType(
+      const Type* type,
+      std::optional<const AnnotationMap*> annotation_map) override {
+    GOOGLESQL_ASSIGN_OR_RETURN(const Type* new_type,
+                     measure_type_replacer_.ComputeClosureType(type));
+    return AnnotatedType(new_type, annotation_map.value_or(nullptr));
   }
 
   // If AGG(m) calls are present under `node`, this function rewrites `node`
@@ -453,21 +499,15 @@ class MeasureColumnRewriter : public ResolvedASTRewriteVisitor {
 
     ResolvedAggregateScanBuilder agg_scan_builder = ToBuilder(std::move(node));
 
-    // If there are pending computed columns (from `AGG(expr)` where `expr` is
-    // not a column reference), wrap the input scan in a `ProjectScan` to
-    // evaluate the <expr>s before aggregation.
+    // If there are pending computed columns for the closure structs, wrap the
+    // input scan in a (chain of) `ProjectScan`s to evaluate them before
+    // aggregation.
     if (!pending_computed_columns.empty()) {
-      auto input_scan = agg_scan_builder.release_input_scan();
-      ResolvedColumnList new_project_column_list = input_scan->column_list();
-      for (const auto& cc : pending_computed_columns) {
-        new_project_column_list.push_back(cc->column());
-      }
-
-      auto project_scan = MakeResolvedProjectScan(
-          new_project_column_list, std::move(pending_computed_columns),
-          std::move(input_scan));
-
-      agg_scan_builder.set_input_scan(std::move(project_scan));
+      GOOGLESQL_ASSIGN_OR_RETURN(std::unique_ptr<const ResolvedScan> wrapped_input_scan,
+                       WrapInputScanWithPendingComputedColumns(
+                           agg_scan_builder.release_input_scan(),
+                           std::move(pending_computed_columns)));
+      agg_scan_builder.set_input_scan(std::move(wrapped_input_scan));
     }
 
     std::vector<std::unique_ptr<const ResolvedComputedColumnBase>>
@@ -538,20 +578,20 @@ class MeasureColumnRewriter : public ResolvedASTRewriteVisitor {
         AnnotatedType(new_type, column.type_annotation_map()));
   }
 
-  // Builds a closure struct expression from a `ResolvedGetRowField` node that
-  // accesses a measure column from a row type.
+  // Builds the closure struct expression for a measure `m` which comes from
+  // the RowType expression `row_expr`.
+  //
+  // - `closure_struct_type`: The closure struct type of the measure `m`.
+  // - `row_expr`: The RowType expression that contains the measure `m`.
   //
   // To handle potential NULL RowType values, we return `IF(row IS NULL,
-  // ClosureStruct(NULL), CloureStruct(row))`.
-  absl::StatusOr<std::unique_ptr<const ResolvedExpr>>
-  BuildClosureExprFromGetRowField(const ResolvedGetRowField* node) {
-    // `node->type()` has been rewritten to the closure struct type by
-    // `PostVisitType` before we visit this node.
-    GOOGLESQL_RET_CHECK(node->type()->IsStruct()) << node->type()->DebugString();
-    const StructType* closure_struct_type = node->type()->AsStruct();
-    const ResolvedExpr* row_expr = node->expr();
+  // ClosureStruct(NULL), ClosureStruct(row))`.
+  absl::StatusOr<std::unique_ptr<const ResolvedExpr>> BuildClosureExprFromRow(
+      const StructType* closure_struct_type, const ResolvedExpr* row_expr) {
+    GOOGLESQL_RET_CHECK(closure_struct_type != nullptr);
+    GOOGLESQL_RET_CHECK(row_expr != nullptr);
+    GOOGLESQL_RET_CHECK(row_expr->type()->IsRow());
 
-    // Validation on the closure struct type.
     GOOGLESQL_RET_CHECK_EQ(closure_struct_type->num_fields(), 2);
     const Type* ref_type =
         closure_struct_type->field(kReferencedColumnsFieldIndex).type;
@@ -563,10 +603,12 @@ class MeasureColumnRewriter : public ResolvedASTRewriteVisitor {
     GOOGLESQL_RET_CHECK(key_type->IsStruct()) << key_type->DebugString();
     const StructType* key_struct_type = key_type->AsStruct();
 
-    GOOGLESQL_ASSIGN_OR_RETURN(std::unique_ptr<const ResolvedExpr> ref_struct,
-                     BuildStructFromRowFields(ref_struct_type, row_expr));
-    GOOGLESQL_ASSIGN_OR_RETURN(std::unique_ptr<const ResolvedExpr> key_struct,
-                     BuildStructFromRowFields(key_struct_type, row_expr));
+    GOOGLESQL_ASSIGN_OR_RETURN(
+        std::unique_ptr<const ResolvedExpr> ref_struct,
+        BuildStructFromRowFields(ref_struct_type, row_expr, type_factory_));
+    GOOGLESQL_ASSIGN_OR_RETURN(
+        std::unique_ptr<const ResolvedExpr> key_struct,
+        BuildStructFromRowFields(key_struct_type, row_expr, type_factory_));
 
     std::vector<std::unique_ptr<const ResolvedExpr>> closure_struct_fields;
     closure_struct_fields.resize(2);
@@ -576,8 +618,14 @@ class MeasureColumnRewriter : public ResolvedASTRewriteVisitor {
     std::unique_ptr<ResolvedMakeStruct> closure_struct = MakeResolvedMakeStruct(
         closure_struct_type, std::move(closure_struct_fields));
 
+    // Since `row_expr` can be copied multiple times (here for the null check,
+    // and later for field extraction), we use `RowTypeAllocatingCopier` to
+    // ensure each copied `ResolvedGetRowField` gets a unique `RowType` pointer,
+    // as required by the validator.
+    RowTypeAllocatingCopier copier(type_factory_);
+    GOOGLESQL_RETURN_IF_ERROR(row_expr->Accept(&copier));
     GOOGLESQL_ASSIGN_OR_RETURN(std::unique_ptr<const ResolvedExpr> row_expr_copy,
-                     ResolvedASTDeepCopyVisitor::Copy(row_expr));
+                     copier.ConsumeRootNode<ResolvedExpr>());
     GOOGLESQL_ASSIGN_OR_RETURN(std::unique_ptr<const ResolvedExpr> row_is_null,
                      function_call_builder_.IsNull(std::move(row_expr_copy)));
 
@@ -590,9 +638,84 @@ class MeasureColumnRewriter : public ResolvedASTRewriteVisitor {
     // non-NULL struct with NULL fields. This ensures that the unmatched rows
     // are discarded when evaluating the measure (due to `closure IS NOT NULL`
     // filtering injected by the rewriter).
+    //
+    // Example:
+    //   SELECT key, AGG(t2.measure_sum_price)
+    //   FROM t1 LEFT JOIN t2 ON t1.key = t2.key;
+    //
+    // For unmatched rows, the `t2` row variable is NULL.
+    //
+    // If we built the closure struct from `t2`'s columns directly, we would
+    // get `STRUCT(t2.price) -> STRUCT(NULL)` which is NOT NULL.
+    //
+    // The rewriter injects `where_expr = closure IS NOT NULL` to filter out
+    // unmatched rows. If the closure is `STRUCT(NULL)`, the filter
+    // `STRUCT(NULL) IS NOT NULL` evaluates to TRUE, so the unmatched row is
+    // NOT filtered out.
+    //
+    // By wrapping it in `IF(t2 IS NULL, NULL, STRUCT(t2.price))`, the closure
+    // evaluates to `NULL` (struct), and `NULL IS NOT NULL` is FALSE, correctly
+    // filtering out the unmatched row.
     return function_call_builder_.If(std::move(row_is_null),
                                      std::move(null_closure_struct),
                                      std::move(closure_struct));
+  }
+
+  // Builds the closure struct expression for a measure `m` which comes from
+  // the RowType expression `row_expr`.
+  //
+  // - `target_struct_type`: The closure struct type of `m`.
+  //   The struct type contains two top-level fields:
+  //   - `referenced_columns`: A struct containing the referenced columns, where
+  //     each field name is the name of the reference column.
+  //   - `key_columns`: A struct containing the key columns.
+  //
+  // - `row_expr`: The RowType expression that contains the measure `m`.
+  absl::StatusOr<std::unique_ptr<const ResolvedExpr>> BuildStructFromRowFields(
+      const StructType* target_struct_type, const ResolvedExpr* row_expr,
+      TypeFactory& type_factory) {
+    GOOGLESQL_RET_CHECK(row_expr->type()->IsRow());
+    const Table* table = row_expr->type()->AsRowType()->table();
+    GOOGLESQL_RET_CHECK(table != nullptr);
+
+    std::vector<std::unique_ptr<const ResolvedExpr>> fields;
+    fields.reserve(target_struct_type->num_fields());
+    for (const auto& field : target_struct_type->fields()) {
+      const Column* column = table->FindColumnByName(field.name);
+      GOOGLESQL_RET_CHECK(column != nullptr)
+          << "Column " << field.name << " not found in row type table";
+
+      if (column->GetType()->IsMeasureType()) {
+        // This dependency column is a measure column, build its closure
+        // expression recursively.
+        GOOGLESQL_RET_CHECK(field.type->IsStruct());
+        GOOGLESQL_ASSIGN_OR_RETURN(
+            std::unique_ptr<const ResolvedExpr> closure_expr,
+            BuildClosureExprFromRow(field.type->AsStruct(), row_expr));
+        fields.push_back(std::move(closure_expr));
+      } else {
+        // The dependency column is non-measure, get it from the row expression
+        // directly.
+        //
+        // Since `row_expr` is copied multiple times (once for each non-measure
+        // column), we use `RowTypeAllocatingCopier` to ensure each copied
+        // `ResolvedGetRowField` gets a unique `RowType` pointer, as required by
+        // the validator.
+        RowTypeAllocatingCopier copier(type_factory);
+        GOOGLESQL_RETURN_IF_ERROR(row_expr->Accept(&copier));
+        GOOGLESQL_ASSIGN_OR_RETURN(std::unique_ptr<const ResolvedExpr> row_expr_copy,
+                         copier.ConsumeRootNode<ResolvedExpr>());
+        const Type* type = column->GetType();
+        if (type->IsRow()) {
+          GOOGLESQL_RETURN_IF_ERROR(
+              type_factory.MakeRowType(type->AsRowType()->table(),
+                                       type->AsRowType()->table_name(), &type));
+        }
+        fields.push_back(
+            MakeResolvedGetRowField(type, std::move(row_expr_copy), column));
+      }
+    }
+    return MakeResolvedMakeStruct(target_struct_type, std::move(fields));
   }
 
   MeasureCollector& measure_collector_;
@@ -646,13 +769,16 @@ class MeasureColumnRewriter : public ResolvedASTRewriteVisitor {
   // The top of the stack is the list of pending computed columns to be added to
   // the `input_scan` of the current `AggregateScan`. These computed columns are
   // created for each `AGG(expr)` calls of the current AggregateScan where
-  // `expr` is not a column reference.
+  // `expr` is not a column reference. If a computed column depends on another
+  // column, the dependency column is guaranteed to appear before it.
   //
   // This allows us to rewrite `AGG(expr)` into `AGG(m)` where m is a single
   // column reference.
   std::vector<std::vector<std::unique_ptr<const ResolvedComputedColumn>>>
       pending_computed_columns_stack_;
 };
+
+}  // namespace
 
 absl::StatusOr<std::unique_ptr<const ResolvedNode>> RewriteMeasureColumns(
     std::unique_ptr<const ResolvedNode> resolved_ast,

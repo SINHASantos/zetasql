@@ -928,6 +928,16 @@ GoogleSQL supports [casting][con-func-cast] to `ARRAY`. The
       
     </td>
   </tr>
+  <tr>
+    <td><code>NULL</code></td>
+    <td><code>ARRAY</code></td>
+    <td>
+      Casts a <code>NULL</code> value to a specific type of array. For example,
+      <code>CAST(NULL AS ARRAY&lt;DOUBLE&gt;)</code> returns
+      a <code>NULL</code> literal of type
+      <code>ARRAY&lt;DOUBLE&gt;</code>.
+    </td>
+  </tr>
 </table>
 
 ### CAST AS BIGNUMERIC 
@@ -1569,6 +1579,71 @@ FROM UNNEST([
  | P1Y2M3D            | 1-2 3 0:0:0        |
  | PT10H20M30,456S    | 0-0 0 10:20:30.456 |
  +--------------------+--------------------*/
+```
+
+### CAST AS MAP
+
+```googlesql
+CAST(expression AS MAP<key_type, value_type>)
+```
+
+**Description**
+
+GoogleSQL supports [casting][con-func-cast] to `MAP`. The
+`expression` parameter can represent an expression for these data types:
+
++ `MAP`
+
+**Conversion rules**
+
+<table>
+  <tr>
+    <th>From</th>
+    <th>To</th>
+    <th>Rule(s) when casting <code>x</code></th>
+  </tr>
+  <tr>
+    <td><code>MAP</code></td>
+    <td><code>MAP</code></td>
+    <td>
+      The key-value types of the input map must be castable to the key-value
+      types of the target map.
+      For example, casting from type
+      <code>MAP&lt;STRING,INT64&gt;</code> to
+      <code>MAP&lt;STRING,DOUBLE&gt;</code> or
+      <code>MAP&lt;STRING,STRING&gt;</code> is valid;
+      casting from type <code>MAP&lt;STRING,INT64&gt;</code>
+      to <code>MAP&lt;STRING,BYTES&gt;</code> isn't valid.
+    </td>
+  </tr>
+</table>
+
+**Examples**
+
+```googlesql
+SELECT
+  CAST(input_map AS MAP<BYTES, INT64>) AS results
+FROM
+  MAP_FROM_ARRAY([('x', 1), ('y', 2), ('z', 3)]) AS input_map;
+
+/*-----------------------------+
+ | results                     |
+ +-----------------------------+
+ | {b'x': 1, b'y': 2, b'z': 3} |
+ +-----------------------------*/
+```
+
+```googlesql
+SELECT
+  CAST(input_map AS MAP<STRING, STRING>) AS results
+FROM
+  MAP_FROM_ARRAY([(b'x', b'\x41'), (b'y', b'\x42')]) AS input_map;
+
+/*----------------------------+
+ | results                    |
+ +----------------------------+
+ | {"x": "\x41", "y": "\x42"} |
+ +----------------------------*/
 ```
 
 ### CAST AS NUMERIC 
