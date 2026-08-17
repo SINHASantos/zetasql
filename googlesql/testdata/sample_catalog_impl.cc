@@ -2418,6 +2418,19 @@ absl::Status SampleCatalogImpl::LoadMeasureTables(
     analyzer_options.mutable_language()->EnableLanguageFeature(
         FEATURE_MEASURES_IN_STRUCT);
   }
+  if (language_options.LanguageFeatureEnabled(FEATURE_COLLATION_SUPPORT)) {
+    analyzer_options.mutable_language()->EnableLanguageFeature(
+        FEATURE_COLLATION_SUPPORT);
+  }
+  if (language_options.LanguageFeatureEnabled(FEATURE_ANNOTATION_FRAMEWORK)) {
+    analyzer_options.mutable_language()->EnableLanguageFeature(
+        FEATURE_ANNOTATION_FRAMEWORK);
+  }
+  if (language_options.LanguageFeatureEnabled(
+          FEATURE_TIMESTAMP_PRECISION_ANNOTATION)) {
+    analyzer_options.mutable_language()->EnableLanguageFeature(
+        FEATURE_TIMESTAMP_PRECISION_ANNOTATION);
+  }
 
   // key1, key2, country, quantity, price
   std::vector<std::tuple<int64_t, int64_t, std::string, int64_t, int64_t>>
@@ -2557,7 +2570,7 @@ absl::Status SampleCatalogImpl::LoadMeasureTables(
                                 Value::Int64(price), Value::Int64(quantity)});
   }
 
-  GOOGLESQL_RETURN_IF_ERROR(LoadBasicMeasureTables(analyzer_options,
+  GOOGLESQL_RETURN_IF_ERROR(LoadBasicMeasureTables(language_options, analyzer_options,
                                          measuretable_singlekey_data,
                                          measuretable_twokeys_data));
 
@@ -2581,7 +2594,7 @@ absl::Status SampleCatalogImpl::LoadMeasureTables(
 }
 
 absl::Status SampleCatalogImpl::LoadBasicMeasureTables(
-    AnalyzerOptions& analyzer_options,
+    const LanguageOptions& language_options, AnalyzerOptions& analyzer_options,
     const std::vector<std::vector<Value>>& singlekey_data,
     const std::vector<std::vector<Value>>& twokeys_data) {
   GOOGLESQL_RETURN_IF_ERROR(AddTableWithMeasures(
@@ -2610,6 +2623,71 @@ absl::Status SampleCatalogImpl::LoadBasicMeasureTables(
         "SUM(AVG(price) + MIN(price) GROUP BY key) / "
         "SUM(AVG(price) + MAX(price) GROUP BY key)"}},
       /*is_value_table=*/false, singlekey_data));
+
+  if (language_options.LanguageFeatureEnabled(FEATURE_COLLATION_SUPPORT) &&
+      language_options.LanguageFeatureEnabled(FEATURE_ANNOTATION_FRAMEWORK)) {
+    const AnnotationMap* collation_ci_map = nullptr;
+    {
+      std::unique_ptr<AnnotationMap> map =
+          AnnotationMap::Create(types_->get_string());
+      map->SetAnnotation<CollationAnnotation>(SimpleValue::String("und:ci"));
+      GOOGLESQL_ASSIGN_OR_RETURN(collation_ci_map, types_->TakeOwnership(std::move(map)));
+    }
+    const AnnotationMap* timestamp_3_map = nullptr;
+
+    std::vector<std::vector<Value>> annotated_singlekey_data;
+    annotated_singlekey_data.reserve(singlekey_data.size());
+    for (const auto& row : singlekey_data) {
+      int64_t key1 = row[0].int64_value();
+      annotated_singlekey_data.push_back(
+          {row[0], row[1],
+           Value::TimestampFromUnixMicros(1700000000000000ll +
+                                          key1 * 1000000ll)});
+    }
+
+    GOOGLESQL_RETURN_IF_ERROR(AddTableWithMeasures(
+        analyzer_options, "MeasureTable_SingleKey_WithAnnotations",
+        {new SimpleColumn("MeasureTable_SingleKey_WithAnnotations", "key",
+                          types_->get_int64()),
+         new SimpleColumn(
+             "MeasureTable_SingleKey_WithAnnotations", "col_ci",
+             AnnotatedType(types_->get_string(), collation_ci_map)),
+         new SimpleColumn(
+             "MeasureTable_SingleKey_WithAnnotations", "col_ts_3",
+             AnnotatedType(types_->get_timestamp(), timestamp_3_map))},
+        /*row_identity_column_indices=*/absl::btree_set<int>{0},
+        /*measures=*/
+        [&]() {
+          std::vector<MeasureColumnDef> measures = {
+              {"measure_ci", "MAX(col_ci)"},
+              {"measure_ts_3", "MAX(col_ts_3)"},
+              {"measure_distinct_count_ci", "COUNT(DISTINCT col_ci)"}};
+          if (language_options.LanguageFeatureEnabled(
+                  FEATURE_DERIVED_MEASURE)) {
+            measures.push_back({"measure_derived_concat_ci",
+                                "CONCAT(AGG(measure_ci), '-suffix')"});
+            measures.push_back({"measure_derived_two_ci",
+                                "CONCAT(AGG(measure_ci), AGG(measure_ci))"});
+            measures.push_back({"measure_derived_mixed_ci",
+                                "CONCAT(AGG(measure_ci), MAX(col_ci))"});
+            measures.push_back(
+                {"measure_derived_nest_l1", "CONCAT(AGG(measure_ci), '-l1')"});
+            measures.push_back({"measure_derived_nest_l2",
+                                "CONCAT(AGG(measure_derived_nest_l1), '-l2')"});
+            measures.push_back({"measure_derived_distinct_plus_one",
+                                "AGG(measure_distinct_count_ci) + 1"});
+            measures.push_back(
+                {"measure_derived_ts_add",
+                 "TIMESTAMP_ADD(AGG(measure_ts_3), INTERVAL 1 DAY)"});
+            measures.push_back({"measure_derived_struct",
+                                "STRUCT(AGG(measure_ci) AS field_ci, "
+                                "AGG(measure_ts_3) AS field_ts)"});
+            measures.push_back({"measure_derived_array", "[AGG(measure_ci)]"});
+          }
+          return measures;
+        }(),
+        /*is_value_table=*/false, annotated_singlekey_data));
+  }
 
   GOOGLESQL_RETURN_IF_ERROR(AddTableWithMeasures(
       analyzer_options, "MeasureTable_TwoKeys",
@@ -3181,6 +3259,22 @@ absl::Status SampleCatalogImpl::LoadRowTypeMeasureTables(
 
       GOOGLESQL_RETURN_IF_ERROR(AddTableBackedTvf(
           "tvf_returning_measure_row_type",
+          {TVFSchemaColumn("normal_col_1", types_->get_string()),
+           TVFSchemaColumn("row_type_col", row_type)},
+          *catalog_));
+    }
+
+    if (language_options.LanguageFeatureEnabled(FEATURE_COLLATION_SUPPORT) &&
+        language_options.LanguageFeatureEnabled(FEATURE_ANNOTATION_FRAMEWORK)) {
+      const Table* measure_table = nullptr;
+      GOOGLESQL_RETURN_IF_ERROR(catalog_->FindTable(
+          {"MeasureTable_SingleKey_WithAnnotations"}, &measure_table));
+      const RowType* row_type = nullptr;
+      GOOGLESQL_RETURN_IF_ERROR(types_->MakeRowType(
+          measure_table, measure_table->FullName(), &row_type));
+
+      GOOGLESQL_RETURN_IF_ERROR(AddTableBackedTvf(
+          "tvf_returning_annotated_measure_row_type",
           {TVFSchemaColumn("normal_col_1", types_->get_string()),
            TVFSchemaColumn("row_type_col", row_type)},
           *catalog_));

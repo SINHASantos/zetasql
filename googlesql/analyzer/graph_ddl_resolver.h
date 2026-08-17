@@ -142,6 +142,7 @@ class GraphDdlResolver {
     std::vector<std::unique_ptr<const ResolvedGraphElementLabel>> labels;
     std::vector<std::unique_ptr<PropertyDeclarationWithIsMeasure>>
         property_decls;
+    std::vector<const ASTGraphInlinedEdgeDefinition*> ast_inlined_edges;
   };
   absl::StatusOr<ElementTableWithLabelsAndProperties> ResolveGraphElementTable(
       const ASTGraphElementTable* ast_element_table,
@@ -163,6 +164,20 @@ class GraphDdlResolver {
   absl::StatusOr<ElementTypeWithLabelAndProperties> ResolveGraphElementType(
       const ASTGraphElementType* ast_element_type,
       PropertyGraphElementType::Kind element_kind) const;
+
+  // Resolves an inlined edge definition (`EDGE AS ... JOIN KEY (...) REFERENCES
+  // <node>`) nested inside a node table into a ResolvedGraphElementTable of
+  // edge kind. The edge reuses the enclosing node table's base table and keys.
+  //
+  // Must be called after all node tables in the graph are resolved, so that
+  // `node_table_map` is fully populated and the REFERENCES target can be
+  // resolved regardless of declaration order.
+  absl::StatusOr<ElementTableWithLabelsAndProperties> ResolveInlinedEdge(
+      const ASTGraphInlinedEdgeDefinition* ast_inlined_edge,
+      const ASTGraphElementTable* ast_enclosing_node_table,
+      const ResolvedGraphElementTable* enclosing_node_table,
+      const StringViewHashMapCase<const ResolvedGraphElementTable*>&
+          node_table_map) const;
 
   // Resolves the `ast_node_table_ref` into a ResolvedGraphNodeTableReference.
   //
@@ -284,6 +299,14 @@ class GraphDdlResolver {
       const CaseInsensitiveStringHashMap<const ASTGraphDerivedProperty*>&
           measure_properties,
       ResolvedGraphPropertyDefinitionMap& resolved_properties) const;
+
+  // Dedupes `property_defs` in place by property declaration name, then builds
+  // a ResolvedGraphPropertyDeclaration for each remaining definition (with the
+  // definition's parse location and is_measure flag).
+  absl::StatusOr<std::vector<std::unique_ptr<PropertyDeclarationWithIsMeasure>>>
+  BuildPropertyDeclarations(
+      std::vector<std::unique_ptr<const ResolvedGraphPropertyDefinition>>&
+          property_defs) const;
 
   Resolver& resolver_;
 };

@@ -82,6 +82,7 @@ absl::Status FunctionOptions::Deserialize(
   options->set_supports_having_modifier(proto.supports_having_modifier());
   options->set_supports_clamped_between_modifier(
       proto.supports_clamped_between_modifier());
+  options->set_supports_within_clause(proto.supports_within_clause());
   options->set_uses_upper_case_sql_name(proto.uses_upper_case_sql_name());
   options->set_may_suppress_side_effects(proto.may_suppress_side_effects());
   options->module_name_from_import.reserve(
@@ -109,6 +110,7 @@ void FunctionOptions::Serialize(FunctionOptionsProto* proto) const {
   proto->set_supports_having_modifier(supports_having_modifier);
   proto->set_supports_clamped_between_modifier(
       supports_clamped_between_modifier);
+  proto->set_supports_within_clause(supports_within_clause);
   proto->set_uses_upper_case_sql_name(uses_upper_case_sql_name);
 
   for (const LanguageFeature each : required_language_features) {

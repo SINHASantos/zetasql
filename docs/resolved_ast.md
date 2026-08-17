@@ -329,7 +329,9 @@ Additional non-generated classes that are documented separately:
       <a id="ResolvedCreateTableStmtBase-toc" href="#ResolvedCreateTableStmtBase">ResolvedCreateTableStmtBase</a>
         <a id="ResolvedCreateExternalTableStmt-toc" href="#ResolvedCreateExternalTableStmt">ResolvedCreateExternalTableStmt</a>
         <a id="ResolvedCreateLiveTableStmt-toc" href="#ResolvedCreateLiveTableStmt">ResolvedCreateLiveTableStmt</a>
-        <a id="ResolvedCreateTableAsSelectStmt-toc" href="#ResolvedCreateTableAsSelectStmt">ResolvedCreateTableAsSelectStmt</a>
+        <a id="ResolvedCreateTableAsSelectStmtBase-toc" href="#ResolvedCreateTableAsSelectStmtBase">ResolvedCreateTableAsSelectStmtBase</a>
+          <a id="ResolvedCreateLiveTableAsSelectStmt-toc" href="#ResolvedCreateLiveTableAsSelectStmt">ResolvedCreateLiveTableAsSelectStmt</a>
+          <a id="ResolvedCreateTableAsSelectStmt-toc" href="#ResolvedCreateTableAsSelectStmt">ResolvedCreateTableAsSelectStmt</a>
         <a id="ResolvedCreateTableStmt-toc" href="#ResolvedCreateTableStmt">ResolvedCreateTableStmt</a>
       <a id="ResolvedCreateViewBase-toc" href="#ResolvedCreateViewBase">ResolvedCreateViewBase</a>
         <a id="ResolvedCreateApproxViewStmt-toc" href="#ResolvedCreateApproxViewStmt">ResolvedCreateApproxViewStmt</a>
@@ -4277,10 +4279,50 @@ class ResolvedCreateTableStmt : public <a href="#ResolvedCreateTableStmtBase">Re
 };
 </code></pre></p>
 
+### ResolvedCreateTableAsSelectStmtBase
+<a id="ResolvedCreateTableAsSelectStmtBase"></a>
+
+<a href="#ResolvedNode">ResolvedNode</a> &rsaquo; <a href="#ResolvedStatement">ResolvedStatement</a>  &rsaquo; <a href="#ResolvedCreateStatement">ResolvedCreateStatement</a>  &rsaquo; <a href="#ResolvedCreateTableStmtBase">ResolvedCreateTableStmtBase</a>  &rsaquo; ResolvedCreateTableAsSelectStmtBase
+ &nbsp;(<a href="#ResolvedCreateTableAsSelectStmtBase-toc">tree</a>)
+
+<p><pre><code class="lang-c++"><font color="brown">// Abstract base class for CREATE TABLE and CREATE LIVE TABLE AS SELECT
+// statement nodes.
+//
+// The &lt;output_column_list&gt; matches 1:1 with the &lt;column_definition_list&gt; in
+// <a href="#ResolvedCreateTableStmtBase">ResolvedCreateTableStmtBase</a>, and maps <a href="#ResolvedColumn">ResolvedColumns</a> produced by &lt;query&gt;
+// into specific columns of the created table or live table.  The output column names and
+// types must match the column definition names and types.  If the table is
+// a value table, &lt;output_column_list&gt; must have exactly one column, with a
+// generated name such as &#34;$struct&#34;.
+//
+// &lt;output_column_list&gt; does not contain all table schema information that
+// &lt;column_definition_list&gt; does. For example, NOT NULL annotations, column
+// OPTIONS, and primary keys are only available in &lt;column_definition_list&gt;.
+// Consumers are encouraged to read from &lt;column_definition_list&gt; rather
+// than than &lt;output_column_list&gt; to determine the table schema, if possible.
+//
+// &lt;query&gt; is the query to run.</font>
+class ResolvedCreateTableAsSelectStmtBase : public <a href="#ResolvedCreateTableStmtBase">ResolvedCreateTableStmtBase</a> {
+  const std::vector&lt;std::unique_ptr&lt;const <a href="#ResolvedExpr">ResolvedExpr</a>&gt;&gt;&amp; partition_by_list() const;
+  int partition_by_list_size() const;
+  const <a href="#ResolvedExpr">ResolvedExpr</a>* partition_by_list(int i) const;
+
+  const std::vector&lt;std::unique_ptr&lt;const <a href="#ResolvedExpr">ResolvedExpr</a>&gt;&gt;&amp; cluster_by_list() const;
+  int cluster_by_list_size() const;
+  const <a href="#ResolvedExpr">ResolvedExpr</a>* cluster_by_list(int i) const;
+
+  const std::vector&lt;std::unique_ptr&lt;const <a href="#ResolvedOutputColumn">ResolvedOutputColumn</a>&gt;&gt;&amp; output_column_list() const;
+  int output_column_list_size() const;
+  const <a href="#ResolvedOutputColumn">ResolvedOutputColumn</a>* output_column_list(int i) const;
+
+  const <a href="#ResolvedScan">ResolvedScan</a>* query() const;
+};
+</code></pre></p>
+
 ### ResolvedCreateTableAsSelectStmt
 <a id="ResolvedCreateTableAsSelectStmt"></a>
 
-<a href="#ResolvedNode">ResolvedNode</a> &rsaquo; <a href="#ResolvedStatement">ResolvedStatement</a>  &rsaquo; <a href="#ResolvedCreateStatement">ResolvedCreateStatement</a>  &rsaquo; <a href="#ResolvedCreateTableStmtBase">ResolvedCreateTableStmtBase</a>  &rsaquo; ResolvedCreateTableAsSelectStmt
+<a href="#ResolvedNode">ResolvedNode</a> &rsaquo; <a href="#ResolvedStatement">ResolvedStatement</a>  &rsaquo; <a href="#ResolvedCreateStatement">ResolvedCreateStatement</a>  &rsaquo; <a href="#ResolvedCreateTableStmtBase">ResolvedCreateTableStmtBase</a>  &rsaquo; <a href="#ResolvedCreateTableAsSelectStmtBase">ResolvedCreateTableAsSelectStmtBase</a>  &rsaquo; ResolvedCreateTableAsSelectStmt
  &nbsp;(<a href="#ResolvedCreateTableAsSelectStmt-toc">tree</a>)
 
 <p><pre><code class="lang-c++"><font color="brown">// This statement:
@@ -4295,38 +4337,10 @@ class ResolvedCreateTableStmt : public <a href="#ResolvedCreateTableStmtBase">Re
 //   |&gt; CREATE [TEMP] TABLE ...
 // which also has the same optional modifiers, but no AS query.
 // This occurs inside <a href="#ResolvedPipeCreateTableScan">ResolvedPipeCreateTableScan</a>, with the pipe
-// input stored in `query`.  All other modifier fields are allowed.
-//
-// The &lt;output_column_list&gt; matches 1:1 with the &lt;column_definition_list&gt; in
-// <a href="#ResolvedCreateTableStmtBase">ResolvedCreateTableStmtBase</a>, and maps <a href="#ResolvedColumn">ResolvedColumns</a> produced by &lt;query&gt;
-// into specific columns of the created table.  The output column names and
-// types must match the column definition names and types.  If the table is
-// a value table, &lt;output_column_list&gt; must have exactly one column, with a
-// generated name such as &#34;$struct&#34;.
-//
-// &lt;output_column_list&gt; does not contain all table schema information that
-// &lt;column_definition_list&gt; does. For example, NOT NULL annotations, column
-// OPTIONS, and primary keys are only available in &lt;column_definition_list&gt;.
-// Consumers are encouraged to read from &lt;column_definition_list&gt; rather
-// than than &lt;output_column_list&gt; to determine the table schema, if possible.
-//
-// &lt;query&gt; is the query to run.</font>
-class ResolvedCreateTableAsSelectStmt : public <a href="#ResolvedCreateTableStmtBase">ResolvedCreateTableStmtBase</a> {
+// input stored in `query`.  All other modifier fields are allowed.</font>
+class ResolvedCreateTableAsSelectStmt : public <a href="#ResolvedCreateTableAsSelectStmtBase">ResolvedCreateTableAsSelectStmtBase</a> {
   static const ResolvedNodeKind TYPE = RESOLVED_CREATE_TABLE_AS_SELECT_STMT;
 
-  const std::vector&lt;std::unique_ptr&lt;const <a href="#ResolvedExpr">ResolvedExpr</a>&gt;&gt;&amp; partition_by_list() const;
-  int partition_by_list_size() const;
-  const <a href="#ResolvedExpr">ResolvedExpr</a>* partition_by_list(int i) const;
-
-  const std::vector&lt;std::unique_ptr&lt;const <a href="#ResolvedExpr">ResolvedExpr</a>&gt;&gt;&amp; cluster_by_list() const;
-  int cluster_by_list_size() const;
-  const <a href="#ResolvedExpr">ResolvedExpr</a>* cluster_by_list(int i) const;
-
-  const std::vector&lt;std::unique_ptr&lt;const <a href="#ResolvedOutputColumn">ResolvedOutputColumn</a>&gt;&gt;&amp; output_column_list() const;
-  int output_column_list_size() const;
-  const <a href="#ResolvedOutputColumn">ResolvedOutputColumn</a>* output_column_list(int i) const;
-
-  const <a href="#ResolvedScan">ResolvedScan</a>* query() const;
 };
 </code></pre></p>
 
@@ -8780,22 +8794,11 @@ class ResolvedUnpivotArg : public <a href="#ResolvedArgument">ResolvedArgument</
 //   [CLUSTER BY expr, ...]
 //   [WITH CONNECTION connection_name]
 //   [OPTIONS (...)]
-//   AS SELECT ...
 //
-// &lt;output_column_list&gt; has the names and types of the columns in the
-//                      created live table, and maps from &lt;query&gt;&#39;s column_list
-//                      to these output columns.
-// &lt;query&gt; is the query to run.
 // &lt;partition_by_list&gt; specifies the partitioning expressions for the table.
 // &lt;cluster_by_list&gt; specifies the clustering expressions for the table.</font>
 class ResolvedCreateLiveTableStmt : public <a href="#ResolvedCreateTableStmtBase">ResolvedCreateTableStmtBase</a> {
   static const ResolvedNodeKind TYPE = RESOLVED_CREATE_LIVE_TABLE_STMT;
-
-  const std::vector&lt;std::unique_ptr&lt;const <a href="#ResolvedOutputColumn">ResolvedOutputColumn</a>&gt;&gt;&amp; output_column_list() const;
-  int output_column_list_size() const;
-  const <a href="#ResolvedOutputColumn">ResolvedOutputColumn</a>* output_column_list(int i) const;
-
-  const <a href="#ResolvedScan">ResolvedScan</a>* query() const;
 
   const std::vector&lt;std::unique_ptr&lt;const <a href="#ResolvedExpr">ResolvedExpr</a>&gt;&gt;&amp; partition_by_list() const;
   int partition_by_list_size() const;
@@ -8804,6 +8807,27 @@ class ResolvedCreateLiveTableStmt : public <a href="#ResolvedCreateTableStmtBase
   const std::vector&lt;std::unique_ptr&lt;const <a href="#ResolvedExpr">ResolvedExpr</a>&gt;&gt;&amp; cluster_by_list() const;
   int cluster_by_list_size() const;
   const <a href="#ResolvedExpr">ResolvedExpr</a>* cluster_by_list(int i) const;
+};
+</code></pre></p>
+
+### ResolvedCreateLiveTableAsSelectStmt
+<a id="ResolvedCreateLiveTableAsSelectStmt"></a>
+
+<a href="#ResolvedNode">ResolvedNode</a> &rsaquo; <a href="#ResolvedStatement">ResolvedStatement</a>  &rsaquo; <a href="#ResolvedCreateStatement">ResolvedCreateStatement</a>  &rsaquo; <a href="#ResolvedCreateTableStmtBase">ResolvedCreateTableStmtBase</a>  &rsaquo; <a href="#ResolvedCreateTableAsSelectStmtBase">ResolvedCreateTableAsSelectStmtBase</a>  &rsaquo; ResolvedCreateLiveTableAsSelectStmt
+ &nbsp;(<a href="#ResolvedCreateLiveTableAsSelectStmt-toc">tree</a>)
+
+<p><pre><code class="lang-c++"><font color="brown">// This statement:
+// CREATE [OR REPLACE] LIVE TABLE [IF NOT EXISTS] &lt;name_path&gt;
+// [ (column schema, ...) ]
+// [DEFAULT COLLATE &lt;collation_name&gt;]
+// [PARTITION BY expr, ...]
+// [CLUSTER BY expr, ...]
+// [WITH CONNECTION connection_name]
+// [OPTIONS (...)]
+// AS SELECT ...</font>
+class ResolvedCreateLiveTableAsSelectStmt : public <a href="#ResolvedCreateTableAsSelectStmtBase">ResolvedCreateTableAsSelectStmtBase</a> {
+  static const ResolvedNodeKind TYPE = RESOLVED_CREATE_LIVE_TABLE_AS_SELECT_STMT;
+
 };
 </code></pre></p>
 

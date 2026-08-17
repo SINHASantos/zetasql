@@ -98,6 +98,7 @@ class SampleCatalogImpl {
   absl::Status LoadProtoTables();
   absl::Status LoadMeasureTables(const LanguageOptions& language_options);
   absl::Status LoadBasicMeasureTables(
+      const LanguageOptions& language_options,
       AnalyzerOptions& analyzer_options,
       const std::vector<std::vector<Value>>& singlekey_data,
       const std::vector<std::vector<Value>>& twokeys_data);

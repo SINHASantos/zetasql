@@ -2563,6 +2563,7 @@ TEST_F(GoogleSqlLocalServiceImplTest, GetBuiltinFunctions) {
         supports_having_modifier: true
         uses_upper_case_sql_name: true
         may_suppress_side_effects: false
+        supports_within_clause: false
       })",
                                       &function1);
   google::protobuf::TextFormat::ParseFromString(R"(
@@ -2614,6 +2615,7 @@ TEST_F(GoogleSqlLocalServiceImplTest, GetBuiltinFunctions) {
         supports_having_modifier: true
         uses_upper_case_sql_name: true
         may_suppress_side_effects: false
+        supports_within_clause: false
       })",
                                       &function2);
   function1.mutable_options()->set_supports_clamped_between_modifier(false);
@@ -2718,6 +2720,7 @@ TEST_F(GoogleSqlLocalServiceImplTest, GetBuiltinFunctionsReturnsTypes) {
         uses_upper_case_sql_name: true
         supports_clamped_between_modifier: false
         may_suppress_side_effects: false
+        supports_within_clause: false
       })",
                                       &expected_round_function);
 

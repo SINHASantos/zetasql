@@ -21,6 +21,8 @@ package googlesql;
 option java_package = "com.google.protos.googlesql";
 option java_outer_classname = "VectorEncodingIdProto";
 
+// Defines the identifiers for vector encodings and quantization formats in
+// GoogleSQL, as used in the Vector type's "encoding" type parameter.
 local message VectorEncodingId {
   // Proto enums are varint encoded. IDs in the range [0, 127] occupy only 1
   // byte on the wire. We partition the ID space as follows:
@@ -34,8 +36,5 @@ local message VectorEncodingId {
     FLOAT32 = 1;
   }
 
-  // Ensures this message is recognized as a pure "namespace wrapper" by the
-  // compiler, satisfying Edition 2024 strict visibility rules for nested
-  // exports. See (broken link)
   reserved 1 to max;
 }

@@ -3204,8 +3204,9 @@ void SQLTestBase::MaybeAddMeasureTables(
   // Adds the measure tables and measure function definitions to the output test
   // database.
   for (auto& [table_name, table] : measure_db.tables) {
-    *table.options.mutable_required_features() =
-        test_case_options.required_features();
+    table.options.mutable_required_features()->insert(
+        test_case_options.required_features().begin(),
+        test_case_options.required_features().end());
   }
   test_db.tables.insert(measure_db.tables.begin(), measure_db.tables.end());
   test_db.measure_function_defs.insert(test_db.measure_function_defs.end(),

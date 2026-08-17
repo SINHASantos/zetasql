@@ -121,7 +121,7 @@ message LanguageFeatureOptions {
 //
 // It's deprecated to use an enum ID which corresponds to a version. All new
 // enum names should use the next available ID starting from 0.
-// Next ID: 184
+// Next ID: 185
 enum LanguageFeature {
   reserved 3 to 4, 36 to 39, 44 to 46, 48, 54, 55, 74, 99, 107, 108, 110, 124,
       132, 134, 140, 13003, 13046, 14001, 14012, 14022, 14024, 14040, 14061,
@@ -998,6 +998,10 @@ enum LanguageFeature {
 
   // Enable CAST operators. See (broken link):cast-operator for details.
   FEATURE_CAST_OPERATORS = 181
+      [(language_feature_options).in_development = true];
+
+  // Enables support for inline edges in property graphs.
+  FEATURE_PROPERTY_GRAPH_INLINE_EDGES = 184
       [(language_feature_options).in_development = true];
 
   // -> Add more cross-version features here.

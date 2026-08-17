@@ -370,6 +370,10 @@ struct FunctionOptions {
     supports_clamped_between_modifier = value;
     return *this;
   }
+  FunctionOptions& set_supports_within_clause(bool value) {
+    supports_within_clause = value;
+    return *this;
+  }
   FunctionOptions& set_uses_upper_case_sql_name(bool value) {
     uses_upper_case_sql_name = value;
     return *this;
@@ -558,6 +562,14 @@ struct FunctionOptions {
   // (affects aggregate functions only).
   // Must only be true for differential privacy functions.
   bool supports_clamped_between_modifier = false;
+
+  // Whether a Function supports WITHIN clause depends on its MODE in general.
+  // FunctionEnums::AGGREGATE supports WITHIN, whereas FunctionEnums::SCALAR
+  // doesn't. FunctionEnums::ANALYTIC are special they supports WITHIN clause if
+  // supports_within_clause is enabled in options.
+  // Indicates whether this function supports WITHIN clause (affects analytic
+  // functions only).
+  bool supports_within_clause = false;
 
   // Indicates whether to use upper case name in SQLName() and GetSQL(), which
   // are used in (but not limited to) error messages such as

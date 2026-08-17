@@ -6848,20 +6848,6 @@ CreatePropertyGraphStmt
   +-GraphPropertyDeclaration(parse_location=434-452, name="t1", type=INT64)
   +-GraphPropertyDeclaration(parse_location=460-494, name="m_total1", type=INT64)
   +-GraphPropertyDeclaration(parse_location=502-530, name="m_total2", type=INT64)
-
-==
-
-# Create a property graph with an inlined edge, which is not supported yet
-create property graph catalog.aml
-node tables (
-  Person as person
-    edge as friend
-      join key (id) references Person (id)
-)
---
-ERROR: Inlined edge definition is not supported [at 4:5]
-    edge as friend
-    ^
 ==
 
 # The same name cannot be declared as both a non-measure property and a measure property.
@@ -7125,3 +7111,1478 @@ NODE TABLES (
 ERROR: Measure expressions referencing other measures are not supported [at 5:7]
       MEASURE(AGG(measure_sum_price) + 1) AS measure_sum_quantity
       ^
+==
+
+[language_features=NONE,+SQL_GRAPH]
+# Create a property graph with an inlined edge, failing when feature is disabled.
+create property graph catalog.aml
+node tables (
+  Person as person
+    edge as friend
+      join key (id) references Person (id)
+)
+--
+ERROR: Inlined edge definition is not supported [at 5:5]
+    edge as friend
+    ^
+==
+
+[language_features=NONE,+SQL_GRAPH,+PROPERTY_GRAPH_INLINE_EDGES]
+# Create a property graph with an inlined edge referencing a node table defined later.
+create property graph catalog.aml
+node tables (
+  Person as person
+    edge as owns
+      join key (id) references account (id) {{|forwards|backwards}},
+  Account as account
+    key (id)
+)
+--
+ALTERNATION GROUP: <empty>
+
+--
+CreatePropertyGraphStmt
++-name_path=catalog.aml
++-node_table_list=
+| +-GraphElementTable
+| | +-alias="person"
+| | +-input_scan=
+| | | +-TableScan(column_list=Person.[id#1, name#2, gender#3, birthday#4, email#5, age#6, data#7], table=Person, column_index_list=[0, 1, 2, 3, 4, 5, 6])
+| | +-key_list=
+| | | +-ColumnRef(type=INT64, column=Person.id#1)
+| | +-label_name_list=[person]
+| | +-property_definition_list=
+| |   +-GraphPropertyDefinition
+| |   | +-parse_location=153-153
+| |   | +-expr=
+| |   | | +-ColumnRef(type=INT64, column=Person.id#1)
+| |   | +-sql="id"
+| |   | +-property_declaration_name="id"
+| |   +-GraphPropertyDefinition
+| |   | +-parse_location=153-153
+| |   | +-expr=
+| |   | | +-ColumnRef(type=STRING, column=Person.name#2)
+| |   | +-sql="name"
+| |   | +-property_declaration_name="name"
+| |   +-GraphPropertyDefinition
+| |   | +-parse_location=153-153
+| |   | +-expr=
+| |   | | +-ColumnRef(type=STRING, column=Person.gender#3)
+| |   | +-sql="gender"
+| |   | +-property_declaration_name="gender"
+| |   +-GraphPropertyDefinition
+| |   | +-parse_location=153-153
+| |   | +-expr=
+| |   | | +-ColumnRef(type=DATE, column=Person.birthday#4)
+| |   | +-sql="birthday"
+| |   | +-property_declaration_name="birthday"
+| |   +-GraphPropertyDefinition
+| |   | +-parse_location=153-153
+| |   | +-expr=
+| |   | | +-ColumnRef(type=STRING, column=Person.email#5)
+| |   | +-sql="email"
+| |   | +-property_declaration_name="email"
+| |   +-GraphPropertyDefinition
+| |   | +-parse_location=153-153
+| |   | +-expr=
+| |   | | +-ColumnRef(type=UINT32, column=Person.age#6)
+| |   | +-sql="age"
+| |   | +-property_declaration_name="age"
+| |   +-GraphPropertyDefinition
+| |     +-parse_location=153-153
+| |     +-expr=
+| |     | +-ColumnRef(type=BYTES, column=Person.data#7)
+| |     +-sql="data"
+| |     +-property_declaration_name="data"
+| +-GraphElementTable
+|   +-alias="account"
+|   +-input_scan=
+|   | +-TableScan(column_list=Account.[id#8, name#9, balance#10], table=Account, column_index_list=[0, 1, 2])
+|   +-key_list=
+|   | +-ColumnRef(type=INT64, column=Account.id#8)
+|   +-label_name_list=[account]
+|   +-property_definition_list=
+|     +-GraphPropertyDefinition
+|     | +-parse_location=250-250
+|     | +-expr=
+|     | | +-ColumnRef(type=INT64, column=Account.id#8)
+|     | +-sql="id"
+|     | +-property_declaration_name="id"
+|     +-GraphPropertyDefinition
+|     | +-parse_location=250-250
+|     | +-expr=
+|     | | +-ColumnRef(type=STRING, column=Account.name#9)
+|     | +-sql="name"
+|     | +-property_declaration_name="name"
+|     +-GraphPropertyDefinition
+|       +-parse_location=250-250
+|       +-expr=
+|       | +-ColumnRef(type=UINT64, column=Account.balance#10)
+|       +-sql="balance"
+|       +-property_declaration_name="balance"
++-edge_table_list=
+| +-GraphElementTable
+|   +-parse_location=158-214
+|   +-alias="owns"
+|   +-input_scan=
+|   | +-TableScan(column_list=Person.[id#11, name#12, gender#13, birthday#14, email#15, age#16, data#17], table=Person, column_index_list=[0, 1, 2, 3, 4, 5, 6])
+|   +-key_list=
+|   | +-ColumnRef(type=INT64, column=Person.id#11)
+|   +-source_node_reference=
+|   | +-GraphNodeTableReference
+|   |   +-node_table_identifier="person"
+|   |   +-edge_table_column_list=
+|   |   | +-ColumnRef(type=INT64, column=Person.id#11)
+|   |   +-node_table_column_list=
+|   |     +-ColumnRef(type=INT64, column=Person.id#1)
+|   +-dest_node_reference=
+|   | +-GraphNodeTableReference
+|   |   +-node_table_identifier="account"
+|   |   +-edge_table_column_list=
+|   |   | +-ColumnRef(type=INT64, column=Person.id#11)
+|   |   +-node_table_column_list=
+|   |     +-ColumnRef(type=INT64, column=Account.id#8)
+|   +-label_name_list=[owns]
++-label_list=
+| +-GraphElementLabel(parse_location=153-153, name="person", property_declaration_name_list=[id, name, gender, birthday, email, age, data])
+| +-GraphElementLabel(parse_location=250-250, name="account", property_declaration_name_list=[id, name, balance])
+| +-GraphElementLabel(parse_location=214-214, name="owns")
++-property_declaration_list=
+  +-GraphPropertyDeclaration(parse_location=153-153, name="id", type=INT64)
+  +-GraphPropertyDeclaration(parse_location=153-153, name="name", type=STRING)
+  +-GraphPropertyDeclaration(parse_location=153-153, name="gender", type=STRING)
+  +-GraphPropertyDeclaration(parse_location=153-153, name="birthday", type=DATE)
+  +-GraphPropertyDeclaration(parse_location=153-153, name="email", type=STRING)
+  +-GraphPropertyDeclaration(parse_location=153-153, name="age", type=UINT32)
+  +-GraphPropertyDeclaration(parse_location=153-153, name="data", type=BYTES)
+  +-GraphPropertyDeclaration(parse_location=250-250, name="balance", type=UINT64)
+--
+ALTERNATION GROUP: forwards
+--
+CreatePropertyGraphStmt
++-name_path=catalog.aml
++-node_table_list=
+| +-GraphElementTable
+| | +-alias="person"
+| | +-input_scan=
+| | | +-TableScan(column_list=Person.[id#1, name#2, gender#3, birthday#4, email#5, age#6, data#7], table=Person, column_index_list=[0, 1, 2, 3, 4, 5, 6])
+| | +-key_list=
+| | | +-ColumnRef(type=INT64, column=Person.id#1)
+| | +-label_name_list=[person]
+| | +-property_definition_list=
+| |   +-GraphPropertyDefinition
+| |   | +-parse_location=153-153
+| |   | +-expr=
+| |   | | +-ColumnRef(type=INT64, column=Person.id#1)
+| |   | +-sql="id"
+| |   | +-property_declaration_name="id"
+| |   +-GraphPropertyDefinition
+| |   | +-parse_location=153-153
+| |   | +-expr=
+| |   | | +-ColumnRef(type=STRING, column=Person.name#2)
+| |   | +-sql="name"
+| |   | +-property_declaration_name="name"
+| |   +-GraphPropertyDefinition
+| |   | +-parse_location=153-153
+| |   | +-expr=
+| |   | | +-ColumnRef(type=STRING, column=Person.gender#3)
+| |   | +-sql="gender"
+| |   | +-property_declaration_name="gender"
+| |   +-GraphPropertyDefinition
+| |   | +-parse_location=153-153
+| |   | +-expr=
+| |   | | +-ColumnRef(type=DATE, column=Person.birthday#4)
+| |   | +-sql="birthday"
+| |   | +-property_declaration_name="birthday"
+| |   +-GraphPropertyDefinition
+| |   | +-parse_location=153-153
+| |   | +-expr=
+| |   | | +-ColumnRef(type=STRING, column=Person.email#5)
+| |   | +-sql="email"
+| |   | +-property_declaration_name="email"
+| |   +-GraphPropertyDefinition
+| |   | +-parse_location=153-153
+| |   | +-expr=
+| |   | | +-ColumnRef(type=UINT32, column=Person.age#6)
+| |   | +-sql="age"
+| |   | +-property_declaration_name="age"
+| |   +-GraphPropertyDefinition
+| |     +-parse_location=153-153
+| |     +-expr=
+| |     | +-ColumnRef(type=BYTES, column=Person.data#7)
+| |     +-sql="data"
+| |     +-property_declaration_name="data"
+| +-GraphElementTable
+|   +-alias="account"
+|   +-input_scan=
+|   | +-TableScan(column_list=Account.[id#8, name#9, balance#10], table=Account, column_index_list=[0, 1, 2])
+|   +-key_list=
+|   | +-ColumnRef(type=INT64, column=Account.id#8)
+|   +-label_name_list=[account]
+|   +-property_definition_list=
+|     +-GraphPropertyDefinition
+|     | +-parse_location=258-258
+|     | +-expr=
+|     | | +-ColumnRef(type=INT64, column=Account.id#8)
+|     | +-sql="id"
+|     | +-property_declaration_name="id"
+|     +-GraphPropertyDefinition
+|     | +-parse_location=258-258
+|     | +-expr=
+|     | | +-ColumnRef(type=STRING, column=Account.name#9)
+|     | +-sql="name"
+|     | +-property_declaration_name="name"
+|     +-GraphPropertyDefinition
+|       +-parse_location=258-258
+|       +-expr=
+|       | +-ColumnRef(type=UINT64, column=Account.balance#10)
+|       +-sql="balance"
+|       +-property_declaration_name="balance"
++-edge_table_list=
+| +-GraphElementTable
+|   +-parse_location=158-223
+|   +-alias="owns"
+|   +-input_scan=
+|   | +-TableScan(column_list=Person.[id#11, name#12, gender#13, birthday#14, email#15, age#16, data#17], table=Person, column_index_list=[0, 1, 2, 3, 4, 5, 6])
+|   +-key_list=
+|   | +-ColumnRef(type=INT64, column=Person.id#11)
+|   +-source_node_reference=
+|   | +-GraphNodeTableReference
+|   |   +-node_table_identifier="person"
+|   |   +-edge_table_column_list=
+|   |   | +-ColumnRef(type=INT64, column=Person.id#11)
+|   |   +-node_table_column_list=
+|   |     +-ColumnRef(type=INT64, column=Person.id#1)
+|   +-dest_node_reference=
+|   | +-GraphNodeTableReference
+|   |   +-node_table_identifier="account"
+|   |   +-edge_table_column_list=
+|   |   | +-ColumnRef(type=INT64, column=Person.id#11)
+|   |   +-node_table_column_list=
+|   |     +-ColumnRef(type=INT64, column=Account.id#8)
+|   +-label_name_list=[owns]
++-label_list=
+| +-GraphElementLabel(parse_location=153-153, name="person", property_declaration_name_list=[id, name, gender, birthday, email, age, data])
+| +-GraphElementLabel(parse_location=258-258, name="account", property_declaration_name_list=[id, name, balance])
+| +-GraphElementLabel(parse_location=223-223, name="owns")
++-property_declaration_list=
+  +-GraphPropertyDeclaration(parse_location=153-153, name="id", type=INT64)
+  +-GraphPropertyDeclaration(parse_location=153-153, name="name", type=STRING)
+  +-GraphPropertyDeclaration(parse_location=153-153, name="gender", type=STRING)
+  +-GraphPropertyDeclaration(parse_location=153-153, name="birthday", type=DATE)
+  +-GraphPropertyDeclaration(parse_location=153-153, name="email", type=STRING)
+  +-GraphPropertyDeclaration(parse_location=153-153, name="age", type=UINT32)
+  +-GraphPropertyDeclaration(parse_location=153-153, name="data", type=BYTES)
+  +-GraphPropertyDeclaration(parse_location=258-258, name="balance", type=UINT64)
+--
+ALTERNATION GROUP: backwards
+--
+CreatePropertyGraphStmt
++-name_path=catalog.aml
++-node_table_list=
+| +-GraphElementTable
+| | +-alias="person"
+| | +-input_scan=
+| | | +-TableScan(column_list=Person.[id#1, name#2, gender#3, birthday#4, email#5, age#6, data#7], table=Person, column_index_list=[0, 1, 2, 3, 4, 5, 6])
+| | +-key_list=
+| | | +-ColumnRef(type=INT64, column=Person.id#1)
+| | +-label_name_list=[person]
+| | +-property_definition_list=
+| |   +-GraphPropertyDefinition
+| |   | +-parse_location=153-153
+| |   | +-expr=
+| |   | | +-ColumnRef(type=INT64, column=Person.id#1)
+| |   | +-sql="id"
+| |   | +-property_declaration_name="id"
+| |   +-GraphPropertyDefinition
+| |   | +-parse_location=153-153
+| |   | +-expr=
+| |   | | +-ColumnRef(type=STRING, column=Person.name#2)
+| |   | +-sql="name"
+| |   | +-property_declaration_name="name"
+| |   +-GraphPropertyDefinition
+| |   | +-parse_location=153-153
+| |   | +-expr=
+| |   | | +-ColumnRef(type=STRING, column=Person.gender#3)
+| |   | +-sql="gender"
+| |   | +-property_declaration_name="gender"
+| |   +-GraphPropertyDefinition
+| |   | +-parse_location=153-153
+| |   | +-expr=
+| |   | | +-ColumnRef(type=DATE, column=Person.birthday#4)
+| |   | +-sql="birthday"
+| |   | +-property_declaration_name="birthday"
+| |   +-GraphPropertyDefinition
+| |   | +-parse_location=153-153
+| |   | +-expr=
+| |   | | +-ColumnRef(type=STRING, column=Person.email#5)
+| |   | +-sql="email"
+| |   | +-property_declaration_name="email"
+| |   +-GraphPropertyDefinition
+| |   | +-parse_location=153-153
+| |   | +-expr=
+| |   | | +-ColumnRef(type=UINT32, column=Person.age#6)
+| |   | +-sql="age"
+| |   | +-property_declaration_name="age"
+| |   +-GraphPropertyDefinition
+| |     +-parse_location=153-153
+| |     +-expr=
+| |     | +-ColumnRef(type=BYTES, column=Person.data#7)
+| |     +-sql="data"
+| |     +-property_declaration_name="data"
+| +-GraphElementTable
+|   +-alias="account"
+|   +-input_scan=
+|   | +-TableScan(column_list=Account.[id#8, name#9, balance#10], table=Account, column_index_list=[0, 1, 2])
+|   +-key_list=
+|   | +-ColumnRef(type=INT64, column=Account.id#8)
+|   +-label_name_list=[account]
+|   +-property_definition_list=
+|     +-GraphPropertyDefinition
+|     | +-parse_location=259-259
+|     | +-expr=
+|     | | +-ColumnRef(type=INT64, column=Account.id#8)
+|     | +-sql="id"
+|     | +-property_declaration_name="id"
+|     +-GraphPropertyDefinition
+|     | +-parse_location=259-259
+|     | +-expr=
+|     | | +-ColumnRef(type=STRING, column=Account.name#9)
+|     | +-sql="name"
+|     | +-property_declaration_name="name"
+|     +-GraphPropertyDefinition
+|       +-parse_location=259-259
+|       +-expr=
+|       | +-ColumnRef(type=UINT64, column=Account.balance#10)
+|       +-sql="balance"
+|       +-property_declaration_name="balance"
++-edge_table_list=
+| +-GraphElementTable
+|   +-parse_location=158-224
+|   +-alias="owns"
+|   +-input_scan=
+|   | +-TableScan(column_list=Person.[id#11, name#12, gender#13, birthday#14, email#15, age#16, data#17], table=Person, column_index_list=[0, 1, 2, 3, 4, 5, 6])
+|   +-key_list=
+|   | +-ColumnRef(type=INT64, column=Person.id#11)
+|   +-source_node_reference=
+|   | +-GraphNodeTableReference
+|   |   +-node_table_identifier="account"
+|   |   +-edge_table_column_list=
+|   |   | +-ColumnRef(type=INT64, column=Person.id#11)
+|   |   +-node_table_column_list=
+|   |     +-ColumnRef(type=INT64, column=Account.id#8)
+|   +-dest_node_reference=
+|   | +-GraphNodeTableReference
+|   |   +-node_table_identifier="person"
+|   |   +-edge_table_column_list=
+|   |   | +-ColumnRef(type=INT64, column=Person.id#11)
+|   |   +-node_table_column_list=
+|   |     +-ColumnRef(type=INT64, column=Person.id#1)
+|   +-label_name_list=[owns]
++-label_list=
+| +-GraphElementLabel(parse_location=153-153, name="person", property_declaration_name_list=[id, name, gender, birthday, email, age, data])
+| +-GraphElementLabel(parse_location=259-259, name="account", property_declaration_name_list=[id, name, balance])
+| +-GraphElementLabel(parse_location=224-224, name="owns")
++-property_declaration_list=
+  +-GraphPropertyDeclaration(parse_location=153-153, name="id", type=INT64)
+  +-GraphPropertyDeclaration(parse_location=153-153, name="name", type=STRING)
+  +-GraphPropertyDeclaration(parse_location=153-153, name="gender", type=STRING)
+  +-GraphPropertyDeclaration(parse_location=153-153, name="birthday", type=DATE)
+  +-GraphPropertyDeclaration(parse_location=153-153, name="email", type=STRING)
+  +-GraphPropertyDeclaration(parse_location=153-153, name="age", type=UINT32)
+  +-GraphPropertyDeclaration(parse_location=153-153, name="data", type=BYTES)
+  +-GraphPropertyDeclaration(parse_location=259-259, name="balance", type=UINT64)
+
+==
+
+# Create a property graph with an inlined edge defining explicit properties.
+[language_features=NONE,+SQL_GRAPH,+PROPERTY_GRAPH_INLINE_EDGES]
+CREATE PROPERTY GRAPH GraphWithInlinedEdgeExplicitProperties
+  NODE TABLES (
+    Account
+      KEY (id),
+    Person
+      KEY (id)
+      EDGE AS OwnsAccount
+        JOIN KEY (id) REFERENCES Account
+        LABEL Owns PROPERTIES (id AS account_id)
+  )
+--
+CreatePropertyGraphStmt
++-name_path=GraphWithInlinedEdgeExplicitProperties
++-node_table_list=
+| +-GraphElementTable
+| | +-alias="Account"
+| | +-input_scan=
+| | | +-TableScan(column_list=Account.[id#1, name#2, balance#3], table=Account, column_index_list=[0, 1, 2])
+| | +-key_list=
+| | | +-ColumnRef(type=INT64, column=Account.id#1)
+| | +-label_name_list=[Account]
+| | +-property_definition_list=
+| |   +-GraphPropertyDefinition
+| |   | +-parse_location=103-103
+| |   | +-expr=
+| |   | | +-ColumnRef(type=INT64, column=Account.id#1)
+| |   | +-sql="id"
+| |   | +-property_declaration_name="id"
+| |   +-GraphPropertyDefinition
+| |   | +-parse_location=103-103
+| |   | +-expr=
+| |   | | +-ColumnRef(type=STRING, column=Account.name#2)
+| |   | +-sql="name"
+| |   | +-property_declaration_name="name"
+| |   +-GraphPropertyDefinition
+| |     +-parse_location=103-103
+| |     +-expr=
+| |     | +-ColumnRef(type=UINT64, column=Account.balance#3)
+| |     +-sql="balance"
+| |     +-property_declaration_name="balance"
+| +-GraphElementTable
+|   +-alias="Person"
+|   +-input_scan=
+|   | +-TableScan(column_list=Person.[id#4, name#5, gender#6, birthday#7, email#8, age#9, data#10], table=Person, column_index_list=[0, 1, 2, 3, 4, 5, 6])
+|   +-key_list=
+|   | +-ColumnRef(type=INT64, column=Person.id#4)
+|   +-label_name_list=[Person]
+|   +-property_definition_list=
+|     +-GraphPropertyDefinition
+|     | +-parse_location=130-130
+|     | +-expr=
+|     | | +-ColumnRef(type=INT64, column=Person.id#4)
+|     | +-sql="id"
+|     | +-property_declaration_name="id"
+|     +-GraphPropertyDefinition
+|     | +-parse_location=130-130
+|     | +-expr=
+|     | | +-ColumnRef(type=STRING, column=Person.name#5)
+|     | +-sql="name"
+|     | +-property_declaration_name="name"
+|     +-GraphPropertyDefinition
+|     | +-parse_location=130-130
+|     | +-expr=
+|     | | +-ColumnRef(type=STRING, column=Person.gender#6)
+|     | +-sql="gender"
+|     | +-property_declaration_name="gender"
+|     +-GraphPropertyDefinition
+|     | +-parse_location=130-130
+|     | +-expr=
+|     | | +-ColumnRef(type=DATE, column=Person.birthday#7)
+|     | +-sql="birthday"
+|     | +-property_declaration_name="birthday"
+|     +-GraphPropertyDefinition
+|     | +-parse_location=130-130
+|     | +-expr=
+|     | | +-ColumnRef(type=STRING, column=Person.email#8)
+|     | +-sql="email"
+|     | +-property_declaration_name="email"
+|     +-GraphPropertyDefinition
+|     | +-parse_location=130-130
+|     | +-expr=
+|     | | +-ColumnRef(type=UINT32, column=Person.age#9)
+|     | +-sql="age"
+|     | +-property_declaration_name="age"
+|     +-GraphPropertyDefinition
+|       +-parse_location=130-130
+|       +-expr=
+|       | +-ColumnRef(type=BYTES, column=Person.data#10)
+|       +-sql="data"
+|       +-property_declaration_name="data"
++-edge_table_list=
+| +-GraphElementTable
+|   +-parse_location=137-246
+|   +-alias="OwnsAccount"
+|   +-input_scan=
+|   | +-TableScan(column_list=Person.[id#11, name#12, gender#13, birthday#14, email#15, age#16, data#17], table=Person, column_index_list=[0, 1, 2, 3, 4, 5, 6])
+|   +-key_list=
+|   | +-ColumnRef(type=INT64, column=Person.id#11)
+|   +-source_node_reference=
+|   | +-GraphNodeTableReference
+|   |   +-node_table_identifier="Person"
+|   |   +-edge_table_column_list=
+|   |   | +-ColumnRef(type=INT64, column=Person.id#11)
+|   |   +-node_table_column_list=
+|   |     +-ColumnRef(type=INT64, column=Person.id#4)
+|   +-dest_node_reference=
+|   | +-GraphNodeTableReference
+|   |   +-node_table_identifier="Account"
+|   |   +-edge_table_column_list=
+|   |   | +-ColumnRef(type=INT64, column=Person.id#11)
+|   |   +-node_table_column_list=
+|   |     +-ColumnRef(type=INT64, column=Account.id#1)
+|   +-label_name_list=[Owns]
+|   +-property_definition_list=
+|     +-GraphPropertyDefinition
+|       +-parse_location=229-245
+|       +-expr=
+|       | +-ColumnRef(type=INT64, column=Person.id#11)
+|       +-sql="id"
+|       +-property_declaration_name="account_id"
++-label_list=
+| +-GraphElementLabel(parse_location=103-103, name="Account", property_declaration_name_list=[id, name, balance])
+| +-GraphElementLabel(parse_location=130-130, name="Person", property_declaration_name_list=[id, name, gender, birthday, email, age, data])
+| +-GraphElementLabel(parse_location=206-246, name="Owns", property_declaration_name_list=[account_id])
++-property_declaration_list=
+  +-GraphPropertyDeclaration(parse_location=103-103, name="id", type=INT64)
+  +-GraphPropertyDeclaration(parse_location=103-103, name="name", type=STRING)
+  +-GraphPropertyDeclaration(parse_location=103-103, name="balance", type=UINT64)
+  +-GraphPropertyDeclaration(parse_location=130-130, name="gender", type=STRING)
+  +-GraphPropertyDeclaration(parse_location=130-130, name="birthday", type=DATE)
+  +-GraphPropertyDeclaration(parse_location=130-130, name="email", type=STRING)
+  +-GraphPropertyDeclaration(parse_location=130-130, name="age", type=UINT32)
+  +-GraphPropertyDeclaration(parse_location=130-130, name="data", type=BYTES)
+  +-GraphPropertyDeclaration(parse_location=229-245, name="account_id", type=INT64)
+==
+
+[language_features=NONE,+SQL_GRAPH,+PROPERTY_GRAPH_INLINE_EDGES]
+# Inlined edge referencing a node table that does not exist.
+create property graph catalog.aml
+node tables (
+  Person as person
+    edge as owns
+      join key (id) references missing_table (id)
+)
+--
+ERROR: The referenced node table 'missing_table' is not defined in the property graph [at 6:32]
+      join key (id) references missing_table (id)
+                               ^
+==
+
+[language_features=NONE,+SQL_GRAPH,+PROPERTY_GRAPH_INLINE_EDGES]
+# Inlined edge alias collides with another node table name.
+create property graph catalog.aml
+node tables (
+  Person as person
+    edge as account
+      join key (id) references account (id),
+  Account as account
+    key (id)
+)
+--
+ERROR: The edge table 'account' is defined more than once; use a unique name [at 5:5]
+    edge as account
+    ^
+==
+
+[language_features=NONE,+SQL_GRAPH,+PROPERTY_GRAPH_INLINE_EDGES]
+# Inlined edge is not allowed inside an EDGE TABLES entry.
+create property graph catalog.aml
+node tables (
+  Person as person,
+  Account as account
+)
+edge tables (
+  Person as friend
+    source key(id) references person
+    destination key(id) references person
+    edge as nested
+      join key(id) references account
+)
+--
+ERROR: Inlined edge definition is only allowed within a node table [at 11:5]
+    edge as nested
+    ^
+==
+
+[language_features=NONE,+SQL_GRAPH,+PROPERTY_GRAPH_INLINE_EDGES]
+# Inlined edge with duplicate JOIN KEY columns is rejected.
+create property graph catalog.aml
+node tables (
+  Person as person
+    edge as owns
+      join key (id, id) references account,
+  Account as account
+)
+--
+ERROR: Duplicate column 'id' in the referenced column list [at 6:21]
+      join key (id, id) references account,
+                    ^
+==
+
+[language_features=NONE,+SQL_GRAPH,+PROPERTY_GRAPH_INLINE_EDGES]
+# Inlined edge with duplicate REFERENCES columns is rejected.
+create property graph catalog.aml
+node tables (
+  Person as person
+    edge as owns
+      join key (id) references account (id, id),
+  Account as account
+)
+--
+ERROR: Duplicate column 'id' in the referenced column list [at 6:45]
+      join key (id) references account (id, id),
+                                            ^
+==
+
+[language_features=NONE,+SQL_GRAPH,+PROPERTY_GRAPH_INLINE_EDGES]
+# Inlined edge with JOIN KEY column count not matching REFERENCES column count
+# is rejected.
+create property graph catalog.aml
+node tables (
+  Person as person
+    edge as owns
+      join key (id, name) references account (id),
+  Account as account
+)
+--
+ERROR: The number of referencing columns in the edge table does not match that of referenced columns in the node table; the former has a size of 2 but the latter has a size of 1 [at 6:5]
+    edge as owns
+    ^
+==
+
+[language_features=NONE,+SQL_GRAPH,+PROPERTY_GRAPH_INLINE_EDGES]
+# Inlined edge where JOIN KEY column type does not match REFERENCES column type
+# is rejected.
+create property graph catalog.aml
+node tables (
+  Person as person
+    edge as owns
+      join key (name) references account (id),
+  Account as account
+)
+--
+ERROR: Data types and/or annotations of the referencing columns in the edge table do not match those of the referenced columns in the node table [at 6:5]
+    edge as owns
+    ^
+==
+
+[language_features=NONE,+SQL_GRAPH,+PROPERTY_GRAPH_INLINE_EDGES]
+# Inlined edge alias collides with another edge table name.
+create property graph catalog.aml
+node tables (
+  Person as person
+    edge as t
+      join key (id) references account,
+  Account as account
+)
+edge tables (
+  Transfer as t
+    source key(fromAccountId) references account
+    destination key(toAccountId) references account
+)
+--
+ERROR: The edge table 't' is defined more than once; use a unique name [at 5:5]
+    edge as t
+    ^
+==
+
+[language_features=NONE,+SQL_GRAPH,+PROPERTY_GRAPH_INLINE_EDGES]
+# PERIOD clause is not part of the inlined-edge grammar and triggers a parser
+# error.
+create property graph catalog.aml
+node tables (
+  Person as person
+    edge as owns
+      join key (id) references account
+      period for (validFrom, validTo),
+  Account as account
+    key (id)
+)
+--
+ERROR: Syntax error: Expected ")" or "," but got keyword PERIOD [at 8:7]
+      period for (validFrom, validTo),
+      ^
+==
+
+[language_features=NONE,+SQL_GRAPH,+PROPERTY_GRAPH_INLINE_EDGES,+SQL_GRAPH_DYNAMIC_LABEL_PROPERTIES_IN_DDL]
+# DYNAMIC LABEL is grammar-legal on inlined edges but the resolver rejects it
+# explicitly so the clause isn't silently dropped.
+create property graph catalog.aml
+node tables (
+  Person as person
+    edge as owns
+      join key (id) references account
+      dynamic label (name),
+  Account as account
+    key (id)
+)
+--
+ERROR: Dynamic label is not supported on inlined edges [at 8:22]
+      dynamic label (name),
+                     ^
+==
+
+[language_features=NONE,+SQL_GRAPH,+PROPERTY_GRAPH_INLINE_EDGES,+SQL_GRAPH_DYNAMIC_LABEL_PROPERTIES_IN_DDL]
+# DYNAMIC PROPERTIES is grammar-legal on inlined edges but the resolver
+# rejects it explicitly so the clause isn't silently dropped.
+create property graph catalog.aml
+node tables (
+  DynamicGraphNode as dyn
+    key (id)
+    edge as owns
+      join key (id) references account
+      dynamic properties (nodeJsonProp),
+  Account as account
+    key (id)
+)
+--
+ERROR: Dynamic properties are not supported on inlined edges [at 9:27]
+      dynamic properties (nodeJsonProp),
+                          ^
+==
+
+[language_features=NONE,+SQL_GRAPH,+PROPERTY_GRAPH_INLINE_EDGES,+SQL_GRAPH_DEFAULT_LABEL_AND_PROPERTY_DEFINITION_OPTIONS]
+# DEFAULT LABEL OPTIONS clause on an inlined edge attaches the options to the
+# default label (named after the edge alias).
+create property graph catalog.aml
+node tables (
+  Person as person
+    key (id)
+    edge as owns
+      join key (id) references account
+      default label options (description = "owns-edge")
+      properties (id as account_id),
+  Account as account
+    key (id)
+)
+--
+CreatePropertyGraphStmt
++-name_path=catalog.aml
++-node_table_list=
+| +-GraphElementTable
+| | +-alias="person"
+| | +-input_scan=
+| | | +-TableScan(column_list=Person.[id#1, name#2, gender#3, birthday#4, email#5, age#6, data#7], table=Person, column_index_list=[0, 1, 2, 3, 4, 5, 6])
+| | +-key_list=
+| | | +-ColumnRef(type=INT64, column=Person.id#1)
+| | +-label_name_list=[person]
+| | +-property_definition_list=
+| |   +-GraphPropertyDefinition
+| |   | +-parse_location=203-203
+| |   | +-expr=
+| |   | | +-ColumnRef(type=INT64, column=Person.id#1)
+| |   | +-sql="id"
+| |   | +-property_declaration_name="id"
+| |   +-GraphPropertyDefinition
+| |   | +-parse_location=203-203
+| |   | +-expr=
+| |   | | +-ColumnRef(type=STRING, column=Person.name#2)
+| |   | +-sql="name"
+| |   | +-property_declaration_name="name"
+| |   +-GraphPropertyDefinition
+| |   | +-parse_location=203-203
+| |   | +-expr=
+| |   | | +-ColumnRef(type=STRING, column=Person.gender#3)
+| |   | +-sql="gender"
+| |   | +-property_declaration_name="gender"
+| |   +-GraphPropertyDefinition
+| |   | +-parse_location=203-203
+| |   | +-expr=
+| |   | | +-ColumnRef(type=DATE, column=Person.birthday#4)
+| |   | +-sql="birthday"
+| |   | +-property_declaration_name="birthday"
+| |   +-GraphPropertyDefinition
+| |   | +-parse_location=203-203
+| |   | +-expr=
+| |   | | +-ColumnRef(type=STRING, column=Person.email#5)
+| |   | +-sql="email"
+| |   | +-property_declaration_name="email"
+| |   +-GraphPropertyDefinition
+| |   | +-parse_location=203-203
+| |   | +-expr=
+| |   | | +-ColumnRef(type=UINT32, column=Person.age#6)
+| |   | +-sql="age"
+| |   | +-property_declaration_name="age"
+| |   +-GraphPropertyDefinition
+| |     +-parse_location=203-203
+| |     +-expr=
+| |     | +-ColumnRef(type=BYTES, column=Person.data#7)
+| |     +-sql="data"
+| |     +-property_declaration_name="data"
+| +-GraphElementTable
+|   +-alias="account"
+|   +-input_scan=
+|   | +-TableScan(column_list=Account.[id#8, name#9, balance#10], table=Account, column_index_list=[0, 1, 2])
+|   +-key_list=
+|   | +-ColumnRef(type=INT64, column=Account.id#8)
+|   +-label_name_list=[account]
+|   +-property_definition_list=
+|     +-GraphPropertyDefinition
+|     | +-parse_location=386-386
+|     | +-expr=
+|     | | +-ColumnRef(type=INT64, column=Account.id#8)
+|     | +-sql="id"
+|     | +-property_declaration_name="id"
+|     +-GraphPropertyDefinition
+|     | +-parse_location=386-386
+|     | +-expr=
+|     | | +-ColumnRef(type=STRING, column=Account.name#9)
+|     | +-sql="name"
+|     | +-property_declaration_name="name"
+|     +-GraphPropertyDefinition
+|       +-parse_location=386-386
+|       +-expr=
+|       | +-ColumnRef(type=UINT64, column=Account.balance#10)
+|       +-sql="balance"
+|       +-property_declaration_name="balance"
++-edge_table_list=
+| +-GraphElementTable
+|   +-parse_location=208-351
+|   +-alias="owns"
+|   +-input_scan=
+|   | +-TableScan(column_list=Person.[id#11, name#12, gender#13, birthday#14, email#15, age#16, data#17], table=Person, column_index_list=[0, 1, 2, 3, 4, 5, 6])
+|   +-key_list=
+|   | +-ColumnRef(type=INT64, column=Person.id#11)
+|   +-source_node_reference=
+|   | +-GraphNodeTableReference
+|   |   +-node_table_identifier="person"
+|   |   +-edge_table_column_list=
+|   |   | +-ColumnRef(type=INT64, column=Person.id#11)
+|   |   +-node_table_column_list=
+|   |     +-ColumnRef(type=INT64, column=Person.id#1)
+|   +-dest_node_reference=
+|   | +-GraphNodeTableReference
+|   |   +-node_table_identifier="account"
+|   |   +-edge_table_column_list=
+|   |   | +-ColumnRef(type=INT64, column=Person.id#11)
+|   |   +-node_table_column_list=
+|   |     +-ColumnRef(type=INT64, column=Account.id#8)
+|   +-label_name_list=[owns]
+|   +-property_definition_list=
+|     +-GraphPropertyDefinition
+|       +-parse_location=334-350
+|       +-expr=
+|       | +-ColumnRef(type=INT64, column=Person.id#11)
+|       +-sql="id"
+|       +-property_declaration_name="account_id"
++-label_list=
+| +-GraphElementLabel(parse_location=203-203, name="person", property_declaration_name_list=[id, name, gender, birthday, email, age, data])
+| +-GraphElementLabel(parse_location=386-386, name="account", property_declaration_name_list=[id, name, balance])
+| +-GraphElementLabel
+|   +-parse_location=266-351
+|   +-name="owns"
+|   +-property_declaration_name_list=[account_id]
+|   +-options_list=
+|     +-description := Literal(type=STRING, value="owns-edge")
++-property_declaration_list=
+  +-GraphPropertyDeclaration(parse_location=203-203, name="id", type=INT64)
+  +-GraphPropertyDeclaration(parse_location=203-203, name="name", type=STRING)
+  +-GraphPropertyDeclaration(parse_location=203-203, name="gender", type=STRING)
+  +-GraphPropertyDeclaration(parse_location=203-203, name="birthday", type=DATE)
+  +-GraphPropertyDeclaration(parse_location=203-203, name="email", type=STRING)
+  +-GraphPropertyDeclaration(parse_location=203-203, name="age", type=UINT32)
+  +-GraphPropertyDeclaration(parse_location=203-203, name="data", type=BYTES)
+  +-GraphPropertyDeclaration(parse_location=386-386, name="balance", type=UINT64)
+  +-GraphPropertyDeclaration(parse_location=334-350, name="account_id", type=INT64)
+==
+
+[language_features=NONE,+SQL_GRAPH,+PROPERTY_GRAPH_INLINE_EDGES]
+# Multiple inlined edges defined in the same node table, with one self-loop.
+create property graph catalog.aml
+node tables (
+  Person as person
+    key (id)
+    edge as owns
+      join key (id) references account
+    edge as friend
+      join key (id) references person,
+  Account as account
+    key (id)
+)
+--
+CreatePropertyGraphStmt
++-name_path=catalog.aml
++-node_table_list=
+| +-GraphElementTable
+| | +-alias="person"
+| | +-input_scan=
+| | | +-TableScan(column_list=Person.[id#1, name#2, gender#3, birthday#4, email#5, age#6, data#7], table=Person, column_index_list=[0, 1, 2, 3, 4, 5, 6])
+| | +-key_list=
+| | | +-ColumnRef(type=INT64, column=Person.id#1)
+| | +-label_name_list=[person]
+| | +-property_definition_list=
+| |   +-GraphPropertyDefinition
+| |   | +-parse_location=156-156
+| |   | +-expr=
+| |   | | +-ColumnRef(type=INT64, column=Person.id#1)
+| |   | +-sql="id"
+| |   | +-property_declaration_name="id"
+| |   +-GraphPropertyDefinition
+| |   | +-parse_location=156-156
+| |   | +-expr=
+| |   | | +-ColumnRef(type=STRING, column=Person.name#2)
+| |   | +-sql="name"
+| |   | +-property_declaration_name="name"
+| |   +-GraphPropertyDefinition
+| |   | +-parse_location=156-156
+| |   | +-expr=
+| |   | | +-ColumnRef(type=STRING, column=Person.gender#3)
+| |   | +-sql="gender"
+| |   | +-property_declaration_name="gender"
+| |   +-GraphPropertyDefinition
+| |   | +-parse_location=156-156
+| |   | +-expr=
+| |   | | +-ColumnRef(type=DATE, column=Person.birthday#4)
+| |   | +-sql="birthday"
+| |   | +-property_declaration_name="birthday"
+| |   +-GraphPropertyDefinition
+| |   | +-parse_location=156-156
+| |   | +-expr=
+| |   | | +-ColumnRef(type=STRING, column=Person.email#5)
+| |   | +-sql="email"
+| |   | +-property_declaration_name="email"
+| |   +-GraphPropertyDefinition
+| |   | +-parse_location=156-156
+| |   | +-expr=
+| |   | | +-ColumnRef(type=UINT32, column=Person.age#6)
+| |   | +-sql="age"
+| |   | +-property_declaration_name="age"
+| |   +-GraphPropertyDefinition
+| |     +-parse_location=156-156
+| |     +-expr=
+| |     | +-ColumnRef(type=BYTES, column=Person.data#7)
+| |     +-sql="data"
+| |     +-property_declaration_name="data"
+| +-GraphElementTable
+|   +-alias="account"
+|   +-input_scan=
+|   | +-TableScan(column_list=Account.[id#8, name#9, balance#10], table=Account, column_index_list=[0, 1, 2])
+|   +-key_list=
+|   | +-ColumnRef(type=INT64, column=Account.id#8)
+|   +-label_name_list=[account]
+|   +-property_definition_list=
+|     +-GraphPropertyDefinition
+|     | +-parse_location=304-304
+|     | +-expr=
+|     | | +-ColumnRef(type=INT64, column=Account.id#8)
+|     | +-sql="id"
+|     | +-property_declaration_name="id"
+|     +-GraphPropertyDefinition
+|     | +-parse_location=304-304
+|     | +-expr=
+|     | | +-ColumnRef(type=STRING, column=Account.name#9)
+|     | +-sql="name"
+|     | +-property_declaration_name="name"
+|     +-GraphPropertyDefinition
+|       +-parse_location=304-304
+|       +-expr=
+|       | +-ColumnRef(type=UINT64, column=Account.balance#10)
+|       +-sql="balance"
+|       +-property_declaration_name="balance"
++-edge_table_list=
+| +-GraphElementTable
+| | +-parse_location=161-212
+| | +-alias="owns"
+| | +-input_scan=
+| | | +-TableScan(column_list=Person.[id#11, name#12, gender#13, birthday#14, email#15, age#16, data#17], table=Person, column_index_list=[0, 1, 2, 3, 4, 5, 6])
+| | +-key_list=
+| | | +-ColumnRef(type=INT64, column=Person.id#11)
+| | +-source_node_reference=
+| | | +-GraphNodeTableReference
+| | |   +-node_table_identifier="person"
+| | |   +-edge_table_column_list=
+| | |   | +-ColumnRef(type=INT64, column=Person.id#11)
+| | |   +-node_table_column_list=
+| | |     +-ColumnRef(type=INT64, column=Person.id#1)
+| | +-dest_node_reference=
+| | | +-GraphNodeTableReference
+| | |   +-node_table_identifier="account"
+| | |   +-edge_table_column_list=
+| | |   | +-ColumnRef(type=INT64, column=Person.id#11)
+| | |   +-node_table_column_list=
+| | |     +-ColumnRef(type=INT64, column=Account.id#8)
+| | +-label_name_list=[owns]
+| +-GraphElementTable
+|   +-parse_location=217-269
+|   +-alias="friend"
+|   +-input_scan=
+|   | +-TableScan(column_list=Person.[id#18, name#19, gender#20, birthday#21, email#22, age#23, data#24], table=Person, column_index_list=[0, 1, 2, 3, 4, 5, 6])
+|   +-key_list=
+|   | +-ColumnRef(type=INT64, column=Person.id#18)
+|   +-source_node_reference=
+|   | +-GraphNodeTableReference
+|   |   +-node_table_identifier="person"
+|   |   +-edge_table_column_list=
+|   |   | +-ColumnRef(type=INT64, column=Person.id#18)
+|   |   +-node_table_column_list=
+|   |     +-ColumnRef(type=INT64, column=Person.id#1)
+|   +-dest_node_reference=
+|   | +-GraphNodeTableReference
+|   |   +-node_table_identifier="person"
+|   |   +-edge_table_column_list=
+|   |   | +-ColumnRef(type=INT64, column=Person.id#18)
+|   |   +-node_table_column_list=
+|   |     +-ColumnRef(type=INT64, column=Person.id#1)
+|   +-label_name_list=[friend]
++-label_list=
+| +-GraphElementLabel(parse_location=156-156, name="person", property_declaration_name_list=[id, name, gender, birthday, email, age, data])
+| +-GraphElementLabel(parse_location=304-304, name="account", property_declaration_name_list=[id, name, balance])
+| +-GraphElementLabel(parse_location=212-212, name="owns")
+| +-GraphElementLabel(parse_location=269-269, name="friend")
++-property_declaration_list=
+  +-GraphPropertyDeclaration(parse_location=156-156, name="id", type=INT64)
+  +-GraphPropertyDeclaration(parse_location=156-156, name="name", type=STRING)
+  +-GraphPropertyDeclaration(parse_location=156-156, name="gender", type=STRING)
+  +-GraphPropertyDeclaration(parse_location=156-156, name="birthday", type=DATE)
+  +-GraphPropertyDeclaration(parse_location=156-156, name="email", type=STRING)
+  +-GraphPropertyDeclaration(parse_location=156-156, name="age", type=UINT32)
+  +-GraphPropertyDeclaration(parse_location=156-156, name="data", type=BYTES)
+  +-GraphPropertyDeclaration(parse_location=304-304, name="balance", type=UINT64)
+==
+
+[language_features=NONE,+SQL_GRAPH,+PROPERTY_GRAPH_INLINE_EDGES]
+# Inlined edge co-exists with a regular EDGE TABLES entry.
+create property graph catalog.aml
+node tables (
+  Person as person
+    key (id),
+  Account as account
+    key (id)
+    edge as owned_by
+      join key (id) references person
+)
+edge tables (
+  Transfer as t
+    source key(fromAccountId) references account
+    destination key(toAccountId) references account
+)
+--
+CreatePropertyGraphStmt
++-name_path=catalog.aml
++-node_table_list=
+| +-GraphElementTable
+| | +-alias="person"
+| | +-input_scan=
+| | | +-TableScan(column_list=Person.[id#1, name#2, gender#3, birthday#4, email#5, age#6, data#7], table=Person, column_index_list=[0, 1, 2, 3, 4, 5, 6])
+| | +-key_list=
+| | | +-ColumnRef(type=INT64, column=Person.id#1)
+| | +-label_name_list=[person]
+| | +-property_definition_list=
+| |   +-GraphPropertyDefinition
+| |   | +-parse_location=138-138
+| |   | +-expr=
+| |   | | +-ColumnRef(type=INT64, column=Person.id#1)
+| |   | +-sql="id"
+| |   | +-property_declaration_name="id"
+| |   +-GraphPropertyDefinition
+| |   | +-parse_location=138-138
+| |   | +-expr=
+| |   | | +-ColumnRef(type=STRING, column=Person.name#2)
+| |   | +-sql="name"
+| |   | +-property_declaration_name="name"
+| |   +-GraphPropertyDefinition
+| |   | +-parse_location=138-138
+| |   | +-expr=
+| |   | | +-ColumnRef(type=STRING, column=Person.gender#3)
+| |   | +-sql="gender"
+| |   | +-property_declaration_name="gender"
+| |   +-GraphPropertyDefinition
+| |   | +-parse_location=138-138
+| |   | +-expr=
+| |   | | +-ColumnRef(type=DATE, column=Person.birthday#4)
+| |   | +-sql="birthday"
+| |   | +-property_declaration_name="birthday"
+| |   +-GraphPropertyDefinition
+| |   | +-parse_location=138-138
+| |   | +-expr=
+| |   | | +-ColumnRef(type=STRING, column=Person.email#5)
+| |   | +-sql="email"
+| |   | +-property_declaration_name="email"
+| |   +-GraphPropertyDefinition
+| |   | +-parse_location=138-138
+| |   | +-expr=
+| |   | | +-ColumnRef(type=UINT32, column=Person.age#6)
+| |   | +-sql="age"
+| |   | +-property_declaration_name="age"
+| |   +-GraphPropertyDefinition
+| |     +-parse_location=138-138
+| |     +-expr=
+| |     | +-ColumnRef(type=BYTES, column=Person.data#7)
+| |     +-sql="data"
+| |     +-property_declaration_name="data"
+| +-GraphElementTable
+|   +-alias="account"
+|   +-input_scan=
+|   | +-TableScan(column_list=Account.[id#8, name#9, balance#10], table=Account, column_index_list=[0, 1, 2])
+|   +-key_list=
+|   | +-ColumnRef(type=INT64, column=Account.id#8)
+|   +-label_name_list=[account]
+|   +-property_definition_list=
+|     +-GraphPropertyDefinition
+|     | +-parse_location=173-173
+|     | +-expr=
+|     | | +-ColumnRef(type=INT64, column=Account.id#8)
+|     | +-sql="id"
+|     | +-property_declaration_name="id"
+|     +-GraphPropertyDefinition
+|     | +-parse_location=173-173
+|     | +-expr=
+|     | | +-ColumnRef(type=STRING, column=Account.name#9)
+|     | +-sql="name"
+|     | +-property_declaration_name="name"
+|     +-GraphPropertyDefinition
+|       +-parse_location=173-173
+|       +-expr=
+|       | +-ColumnRef(type=UINT64, column=Account.balance#10)
+|       +-sql="balance"
+|       +-property_declaration_name="balance"
++-edge_table_list=
+| +-GraphElementTable
+| | +-alias="t"
+| | +-input_scan=
+| | | +-TableScan(column_list=Transfer.[txnId#14, fromAccountId#15, toAccountId#16, time#17, amount#18], table=Transfer, column_index_list=[0, 1, 2, 3, 4])
+| | +-key_list=
+| | | +-ColumnRef(type=INT64, column=Transfer.txnId#14)
+| | +-source_node_reference=
+| | | +-GraphNodeTableReference
+| | |   +-node_table_identifier="account"
+| | |   +-edge_table_column_list=
+| | |   | +-ColumnRef(type=INT64, column=Transfer.fromAccountId#15)
+| | |   +-node_table_column_list=
+| | |     +-ColumnRef(type=INT64, column=Account.id#8)
+| | +-dest_node_reference=
+| | | +-GraphNodeTableReference
+| | |   +-node_table_identifier="account"
+| | |   +-edge_table_column_list=
+| | |   | +-ColumnRef(type=INT64, column=Transfer.toAccountId#16)
+| | |   +-node_table_column_list=
+| | |     +-ColumnRef(type=INT64, column=Account.id#8)
+| | +-label_name_list=[t]
+| | +-property_definition_list=
+| |   +-GraphPropertyDefinition
+| |   | +-parse_location=365-365
+| |   | +-expr=
+| |   | | +-ColumnRef(type=INT64, column=Transfer.txnId#14)
+| |   | +-sql="txnId"
+| |   | +-property_declaration_name="txnId"
+| |   +-GraphPropertyDefinition
+| |   | +-parse_location=365-365
+| |   | +-expr=
+| |   | | +-ColumnRef(type=INT64, column=Transfer.fromAccountId#15)
+| |   | +-sql="fromAccountId"
+| |   | +-property_declaration_name="fromAccountId"
+| |   +-GraphPropertyDefinition
+| |   | +-parse_location=365-365
+| |   | +-expr=
+| |   | | +-ColumnRef(type=INT64, column=Transfer.toAccountId#16)
+| |   | +-sql="toAccountId"
+| |   | +-property_declaration_name="toAccountId"
+| |   +-GraphPropertyDefinition
+| |   | +-parse_location=365-365
+| |   | +-expr=
+| |   | | +-ColumnRef(type=TIMESTAMP, column=Transfer.time#17)
+| |   | +-sql="time"
+| |   | +-property_declaration_name="time"
+| |   +-GraphPropertyDefinition
+| |     +-parse_location=365-365
+| |     +-expr=
+| |     | +-ColumnRef(type=UINT64, column=Transfer.amount#18)
+| |     +-sql="amount"
+| |     +-property_declaration_name="amount"
+| +-GraphElementTable
+|   +-parse_location=178-232
+|   +-alias="owned_by"
+|   +-input_scan=
+|   | +-TableScan(column_list=Account.[id#11, name#12, balance#13], table=Account, column_index_list=[0, 1, 2])
+|   +-key_list=
+|   | +-ColumnRef(type=INT64, column=Account.id#11)
+|   +-source_node_reference=
+|   | +-GraphNodeTableReference
+|   |   +-node_table_identifier="account"
+|   |   +-edge_table_column_list=
+|   |   | +-ColumnRef(type=INT64, column=Account.id#11)
+|   |   +-node_table_column_list=
+|   |     +-ColumnRef(type=INT64, column=Account.id#8)
+|   +-dest_node_reference=
+|   | +-GraphNodeTableReference
+|   |   +-node_table_identifier="person"
+|   |   +-edge_table_column_list=
+|   |   | +-ColumnRef(type=INT64, column=Account.id#11)
+|   |   +-node_table_column_list=
+|   |     +-ColumnRef(type=INT64, column=Person.id#1)
+|   +-label_name_list=[owned_by]
++-label_list=
+| +-GraphElementLabel(parse_location=138-138, name="person", property_declaration_name_list=[id, name, gender, birthday, email, age, data])
+| +-GraphElementLabel(parse_location=173-173, name="account", property_declaration_name_list=[id, name, balance])
+| +-GraphElementLabel(parse_location=232-232, name="owned_by")
+| +-GraphElementLabel(parse_location=365-365, name="t", property_declaration_name_list=[txnId, fromAccountId, toAccountId, time, amount])
++-property_declaration_list=
+  +-GraphPropertyDeclaration(parse_location=138-138, name="id", type=INT64)
+  +-GraphPropertyDeclaration(parse_location=138-138, name="name", type=STRING)
+  +-GraphPropertyDeclaration(parse_location=138-138, name="gender", type=STRING)
+  +-GraphPropertyDeclaration(parse_location=138-138, name="birthday", type=DATE)
+  +-GraphPropertyDeclaration(parse_location=138-138, name="email", type=STRING)
+  +-GraphPropertyDeclaration(parse_location=138-138, name="age", type=UINT32)
+  +-GraphPropertyDeclaration(parse_location=138-138, name="data", type=BYTES)
+  +-GraphPropertyDeclaration(parse_location=173-173, name="balance", type=UINT64)
+  +-GraphPropertyDeclaration(parse_location=365-365, name="txnId", type=INT64)
+  +-GraphPropertyDeclaration(parse_location=365-365, name="fromAccountId", type=INT64)
+  +-GraphPropertyDeclaration(parse_location=365-365, name="toAccountId", type=INT64)
+  +-GraphPropertyDeclaration(parse_location=365-365, name="time", type=TIMESTAMP)
+  +-GraphPropertyDeclaration(parse_location=365-365, name="amount", type=UINT64)
+==
+
+[language_features=NONE,+SQL_GRAPH,+PROPERTY_GRAPH_INLINE_EDGES]
+# Inlined edge with multiple LABEL clauses.
+create property graph catalog.aml
+node tables (
+  Person as person
+    key (id)
+    edge as owns
+      join key (id) references account
+      label Owns properties (id as account_id)
+      label HasAccount properties (id),
+  Account as account
+    key (id)
+)
+--
+CreatePropertyGraphStmt
++-name_path=catalog.aml
++-node_table_list=
+| +-GraphElementTable
+| | +-alias="person"
+| | +-input_scan=
+| | | +-TableScan(column_list=Person.[id#1, name#2, gender#3, birthday#4, email#5, age#6, data#7], table=Person, column_index_list=[0, 1, 2, 3, 4, 5, 6])
+| | +-key_list=
+| | | +-ColumnRef(type=INT64, column=Person.id#1)
+| | +-label_name_list=[person]
+| | +-property_definition_list=
+| |   +-GraphPropertyDefinition
+| |   | +-parse_location=123-123
+| |   | +-expr=
+| |   | | +-ColumnRef(type=INT64, column=Person.id#1)
+| |   | +-sql="id"
+| |   | +-property_declaration_name="id"
+| |   +-GraphPropertyDefinition
+| |   | +-parse_location=123-123
+| |   | +-expr=
+| |   | | +-ColumnRef(type=STRING, column=Person.name#2)
+| |   | +-sql="name"
+| |   | +-property_declaration_name="name"
+| |   +-GraphPropertyDefinition
+| |   | +-parse_location=123-123
+| |   | +-expr=
+| |   | | +-ColumnRef(type=STRING, column=Person.gender#3)
+| |   | +-sql="gender"
+| |   | +-property_declaration_name="gender"
+| |   +-GraphPropertyDefinition
+| |   | +-parse_location=123-123
+| |   | +-expr=
+| |   | | +-ColumnRef(type=DATE, column=Person.birthday#4)
+| |   | +-sql="birthday"
+| |   | +-property_declaration_name="birthday"
+| |   +-GraphPropertyDefinition
+| |   | +-parse_location=123-123
+| |   | +-expr=
+| |   | | +-ColumnRef(type=STRING, column=Person.email#5)
+| |   | +-sql="email"
+| |   | +-property_declaration_name="email"
+| |   +-GraphPropertyDefinition
+| |   | +-parse_location=123-123
+| |   | +-expr=
+| |   | | +-ColumnRef(type=UINT32, column=Person.age#6)
+| |   | +-sql="age"
+| |   | +-property_declaration_name="age"
+| |   +-GraphPropertyDefinition
+| |     +-parse_location=123-123
+| |     +-expr=
+| |     | +-ColumnRef(type=BYTES, column=Person.data#7)
+| |     +-sql="data"
+| |     +-property_declaration_name="data"
+| +-GraphElementTable
+|   +-alias="account"
+|   +-input_scan=
+|   | +-TableScan(column_list=Account.[id#8, name#9, balance#10], table=Account, column_index_list=[0, 1, 2])
+|   +-key_list=
+|   | +-ColumnRef(type=INT64, column=Account.id#8)
+|   +-label_name_list=[account]
+|   +-property_definition_list=
+|     +-GraphPropertyDefinition
+|     | +-parse_location=300-300
+|     | +-expr=
+|     | | +-ColumnRef(type=INT64, column=Account.id#8)
+|     | +-sql="id"
+|     | +-property_declaration_name="id"
+|     +-GraphPropertyDefinition
+|     | +-parse_location=300-300
+|     | +-expr=
+|     | | +-ColumnRef(type=STRING, column=Account.name#9)
+|     | +-sql="name"
+|     | +-property_declaration_name="name"
+|     +-GraphPropertyDefinition
+|       +-parse_location=300-300
+|       +-expr=
+|       | +-ColumnRef(type=UINT64, column=Account.balance#10)
+|       +-sql="balance"
+|       +-property_declaration_name="balance"
++-edge_table_list=
+| +-GraphElementTable
+|   +-parse_location=128-265
+|   +-alias="owns"
+|   +-input_scan=
+|   | +-TableScan(column_list=Person.[id#11, name#12, gender#13, birthday#14, email#15, age#16, data#17], table=Person, column_index_list=[0, 1, 2, 3, 4, 5, 6])
+|   +-key_list=
+|   | +-ColumnRef(type=INT64, column=Person.id#11)
+|   +-source_node_reference=
+|   | +-GraphNodeTableReference
+|   |   +-node_table_identifier="person"
+|   |   +-edge_table_column_list=
+|   |   | +-ColumnRef(type=INT64, column=Person.id#11)
+|   |   +-node_table_column_list=
+|   |     +-ColumnRef(type=INT64, column=Person.id#1)
+|   +-dest_node_reference=
+|   | +-GraphNodeTableReference
+|   |   +-node_table_identifier="account"
+|   |   +-edge_table_column_list=
+|   |   | +-ColumnRef(type=INT64, column=Person.id#11)
+|   |   +-node_table_column_list=
+|   |     +-ColumnRef(type=INT64, column=Account.id#8)
+|   +-label_name_list=[Owns, HasAccount]
+|   +-property_definition_list=
+|     +-GraphPropertyDefinition
+|     | +-parse_location=209-225
+|     | +-expr=
+|     | | +-ColumnRef(type=INT64, column=Person.id#11)
+|     | +-sql="id"
+|     | +-property_declaration_name="account_id"
+|     +-GraphPropertyDefinition
+|       +-parse_location=262-264
+|       +-expr=
+|       | +-ColumnRef(type=INT64, column=Person.id#11)
+|       +-sql="id"
+|       +-property_declaration_name="id"
++-label_list=
+| +-GraphElementLabel(parse_location=123-123, name="person", property_declaration_name_list=[id, name, gender, birthday, email, age, data])
+| +-GraphElementLabel(parse_location=300-300, name="account", property_declaration_name_list=[id, name, balance])
+| +-GraphElementLabel(parse_location=186-226, name="Owns", property_declaration_name_list=[account_id])
+| +-GraphElementLabel(parse_location=233-265, name="HasAccount", property_declaration_name_list=[id])
++-property_declaration_list=
+  +-GraphPropertyDeclaration(parse_location=123-123, name="id", type=INT64)
+  +-GraphPropertyDeclaration(parse_location=123-123, name="name", type=STRING)
+  +-GraphPropertyDeclaration(parse_location=123-123, name="gender", type=STRING)
+  +-GraphPropertyDeclaration(parse_location=123-123, name="birthday", type=DATE)
+  +-GraphPropertyDeclaration(parse_location=123-123, name="email", type=STRING)
+  +-GraphPropertyDeclaration(parse_location=123-123, name="age", type=UINT32)
+  +-GraphPropertyDeclaration(parse_location=123-123, name="data", type=BYTES)
+  +-GraphPropertyDeclaration(parse_location=300-300, name="balance", type=UINT64)
+  +-GraphPropertyDeclaration(parse_location=209-225, name="account_id", type=INT64)
+==
+
+[language_features=NONE,+SQL_GRAPH,+PROPERTY_GRAPH_INLINE_EDGES]
+# Inlined edge with LABEL ... NO PROPERTIES.
+create property graph catalog.aml
+node tables (
+  Person as person
+    key (id)
+    edge as owns
+      join key (id) references account
+      label Owns no properties,
+  Account as account
+    key (id)
+)
+--
+CreatePropertyGraphStmt
++-name_path=catalog.aml
++-node_table_list=
+| +-GraphElementTable
+| | +-alias="person"
+| | +-input_scan=
+| | | +-TableScan(column_list=Person.[id#1, name#2, gender#3, birthday#4, email#5, age#6, data#7], table=Person, column_index_list=[0, 1, 2, 3, 4, 5, 6])
+| | +-key_list=
+| | | +-ColumnRef(type=INT64, column=Person.id#1)
+| | +-label_name_list=[person]
+| | +-property_definition_list=
+| |   +-GraphPropertyDefinition
+| |   | +-parse_location=124-124
+| |   | +-expr=
+| |   | | +-ColumnRef(type=INT64, column=Person.id#1)
+| |   | +-sql="id"
+| |   | +-property_declaration_name="id"
+| |   +-GraphPropertyDefinition
+| |   | +-parse_location=124-124
+| |   | +-expr=
+| |   | | +-ColumnRef(type=STRING, column=Person.name#2)
+| |   | +-sql="name"
+| |   | +-property_declaration_name="name"
+| |   +-GraphPropertyDefinition
+| |   | +-parse_location=124-124
+| |   | +-expr=
+| |   | | +-ColumnRef(type=STRING, column=Person.gender#3)
+| |   | +-sql="gender"
+| |   | +-property_declaration_name="gender"
+| |   +-GraphPropertyDefinition
+| |   | +-parse_location=124-124
+| |   | +-expr=
+| |   | | +-ColumnRef(type=DATE, column=Person.birthday#4)
+| |   | +-sql="birthday"
+| |   | +-property_declaration_name="birthday"
+| |   +-GraphPropertyDefinition
+| |   | +-parse_location=124-124
+| |   | +-expr=
+| |   | | +-ColumnRef(type=STRING, column=Person.email#5)
+| |   | +-sql="email"
+| |   | +-property_declaration_name="email"
+| |   +-GraphPropertyDefinition
+| |   | +-parse_location=124-124
+| |   | +-expr=
+| |   | | +-ColumnRef(type=UINT32, column=Person.age#6)
+| |   | +-sql="age"
+| |   | +-property_declaration_name="age"
+| |   +-GraphPropertyDefinition
+| |     +-parse_location=124-124
+| |     +-expr=
+| |     | +-ColumnRef(type=BYTES, column=Person.data#7)
+| |     +-sql="data"
+| |     +-property_declaration_name="data"
+| +-GraphElementTable
+|   +-alias="account"
+|   +-input_scan=
+|   | +-TableScan(column_list=Account.[id#8, name#9, balance#10], table=Account, column_index_list=[0, 1, 2])
+|   +-key_list=
+|   | +-ColumnRef(type=INT64, column=Account.id#8)
+|   +-label_name_list=[account]
+|   +-property_definition_list=
+|     +-GraphPropertyDefinition
+|     | +-parse_location=246-246
+|     | +-expr=
+|     | | +-ColumnRef(type=INT64, column=Account.id#8)
+|     | +-sql="id"
+|     | +-property_declaration_name="id"
+|     +-GraphPropertyDefinition
+|     | +-parse_location=246-246
+|     | +-expr=
+|     | | +-ColumnRef(type=STRING, column=Account.name#9)
+|     | +-sql="name"
+|     | +-property_declaration_name="name"
+|     +-GraphPropertyDefinition
+|       +-parse_location=246-246
+|       +-expr=
+|       | +-ColumnRef(type=UINT64, column=Account.balance#10)
+|       +-sql="balance"
+|       +-property_declaration_name="balance"
++-edge_table_list=
+| +-GraphElementTable
+|   +-parse_location=129-211
+|   +-alias="owns"
+|   +-input_scan=
+|   | +-TableScan(column_list=Person.[id#11, name#12, gender#13, birthday#14, email#15, age#16, data#17], table=Person, column_index_list=[0, 1, 2, 3, 4, 5, 6])
+|   +-key_list=
+|   | +-ColumnRef(type=INT64, column=Person.id#11)
+|   +-source_node_reference=
+|   | +-GraphNodeTableReference
+|   |   +-node_table_identifier="person"
+|   |   +-edge_table_column_list=
+|   |   | +-ColumnRef(type=INT64, column=Person.id#11)
+|   |   +-node_table_column_list=
+|   |     +-ColumnRef(type=INT64, column=Person.id#1)
+|   +-dest_node_reference=
+|   | +-GraphNodeTableReference
+|   |   +-node_table_identifier="account"
+|   |   +-edge_table_column_list=
+|   |   | +-ColumnRef(type=INT64, column=Person.id#11)
+|   |   +-node_table_column_list=
+|   |     +-ColumnRef(type=INT64, column=Account.id#8)
+|   +-label_name_list=[Owns]
++-label_list=
+| +-GraphElementLabel(parse_location=124-124, name="person", property_declaration_name_list=[id, name, gender, birthday, email, age, data])
+| +-GraphElementLabel(parse_location=246-246, name="account", property_declaration_name_list=[id, name, balance])
+| +-GraphElementLabel(parse_location=187-211, name="Owns")
++-property_declaration_list=
+  +-GraphPropertyDeclaration(parse_location=124-124, name="id", type=INT64)
+  +-GraphPropertyDeclaration(parse_location=124-124, name="name", type=STRING)
+  +-GraphPropertyDeclaration(parse_location=124-124, name="gender", type=STRING)
+  +-GraphPropertyDeclaration(parse_location=124-124, name="birthday", type=DATE)
+  +-GraphPropertyDeclaration(parse_location=124-124, name="email", type=STRING)
+  +-GraphPropertyDeclaration(parse_location=124-124, name="age", type=UINT32)
+  +-GraphPropertyDeclaration(parse_location=124-124, name="data", type=BYTES)
+  +-GraphPropertyDeclaration(parse_location=246-246, name="balance", type=UINT64)
+==

@@ -426,6 +426,7 @@ class FunctionSerializationTests : public ::testing::Test {
     EXPECT_EQ(options1.volatility, options2.volatility);
     EXPECT_EQ(options1.supports_safe_error_mode,
               options2.supports_safe_error_mode);
+    EXPECT_EQ(options1.supports_within_clause, options2.supports_within_clause);
   }
 
   static void ExpectEqualsIgnoringCallbacks(const Function& function1,

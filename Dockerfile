@@ -10,15 +10,11 @@ RUN apt-get update && apt-get -qq install -y default-jre default-jdk
 # Install prerequisites for bazel
 RUN apt-get -qq install curl tar build-essential wget python3 zip unzip
 
-ENV BAZEL_VERSION=7.6.1
-
-RUN apt install apt-transport-https curl gnupg -y
-RUN curl -fsSL https://releases.bazel.build/bazel-release.pub.gpg | gpg --dearmor >bazel-archive-keyring.gpg
-RUN mv bazel-archive-keyring.gpg /usr/share/keyrings
-RUN echo "deb [arch=amd64 signed-by=/usr/share/keyrings/bazel-archive-keyring.gpg] https://storage.googleapis.com/bazel-apt stable jdk1.8" | tee /etc/apt/sources.list.d/bazel.list
-
-RUN apt update && apt -qq install -y bazel-${BAZEL_VERSION}
-RUN ln -s /usr/bin/bazel-${BAZEL_VERSION} /usr/bin/bazel
+# Install bazelisk
+RUN curl -fsSL -O https://github.com/bazelbuild/bazelisk/releases/latest/download/bazelisk-amd64.deb && \
+    apt-get install -y ./bazelisk-amd64.deb && \
+    rm bazelisk-amd64.deb && \
+    ln -sf /usr/bin/bazelisk /usr/bin/bazel
 
 RUN apt-get update && DEBIAN_FRONTEND="noninteractive"                         \
     TZ="America/Los_Angeles" apt-get install -y tzdata

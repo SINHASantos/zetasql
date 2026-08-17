@@ -322,19 +322,15 @@ absl::Status ValidateNoCrossKindCollision(
 }
 
 // Validates element tables all have distinct names and outputs the names to
-// `existing_identifiers`.
-absl::Status ValidateNoDuplicateElementTable(
-    const ASTGraphElementTableList* ast_table_list,
+// `existing_identifiers`. `ast_locations[i]` is the error location reported for
+// `element_tables[i]`; the two spans must be parallel.
+template <typename AstNodeT>
+absl::Status ValidateNoDuplicateElementTables(
+    absl::Span<const AstNodeT* const> ast_locations,
     absl::Span<const std::unique_ptr<const ResolvedGraphElementTable>>
         element_tables,
     const GraphElementTable::Kind element_kind,
     StringViewHashSetCase& existing_identifiers) {
-  if (ast_table_list == nullptr) {
-    GOOGLESQL_RET_CHECK(element_tables.empty());
-    return absl::OkStatus();
-  }
-  absl::Span<const ASTGraphElementTable* const> ast_locations =
-      ast_table_list->element_tables();
   GOOGLESQL_RET_CHECK_EQ(ast_locations.size(), element_tables.size());
   for (size_t i = 0; i < element_tables.size(); ++i) {
     const auto& element_table = element_tables.at(i);
@@ -350,6 +346,23 @@ absl::Status ValidateNoDuplicateElementTable(
     }
   }
   return absl::OkStatus();
+}
+
+// As above, for an element table list that may be absent (there is no EDGE
+// TABLES clause).
+absl::Status ValidateNoDuplicateElementTable(
+    const ASTGraphElementTableList* ast_table_list,
+    absl::Span<const std::unique_ptr<const ResolvedGraphElementTable>>
+        element_tables,
+    const GraphElementTable::Kind element_kind,
+    StringViewHashSetCase& existing_identifiers) {
+  if (ast_table_list == nullptr) {
+    GOOGLESQL_RET_CHECK(element_tables.empty());
+    return absl::OkStatus();
+  }
+  return ValidateNoDuplicateElementTables(ast_table_list->element_tables(),
+                                          element_tables, element_kind,
+                                          existing_identifiers);
 }
 
 // Validates newly added `element_labels` does not have OPTIONS defined
@@ -373,6 +386,29 @@ absl::Status ValidateLabelWithOptionsNotBoundInMultipleElementTables(
       labels_with_options.insert(element_label->name());
     }
   }
+  return absl::OkStatus();
+}
+
+// Validates an element table's `element_labels`/`element_property_decls` and
+// folds them into the graph-wide `labels`/`property_decls` accumulators.
+absl::Status ValidateAndRecordLabelsAndPropertyDeclarations(
+    std::vector<std::unique_ptr<const ResolvedGraphElementLabel>>&
+        element_labels,
+    std::vector<
+        std::unique_ptr<GraphDdlResolver::PropertyDeclarationWithIsMeasure>>&
+        element_property_decls,
+    StringViewHashSetCase& labels_with_options,
+    std::vector<std::unique_ptr<const ResolvedGraphElementLabel>>& labels,
+    std::vector<
+        std::unique_ptr<GraphDdlResolver::PropertyDeclarationWithIsMeasure>>&
+        property_decls) {
+  GOOGLESQL_RETURN_IF_ERROR(ValidateLabelWithOptionsNotBoundInMultipleElementTables(
+      element_labels, labels_with_options));
+  labels.insert(labels.end(), std::make_move_iterator(element_labels.begin()),
+                std::make_move_iterator(element_labels.end()));
+  property_decls.insert(property_decls.end(),
+                        std::make_move_iterator(element_property_decls.begin()),
+                        std::make_move_iterator(element_property_decls.end()));
   return absl::OkStatus();
 }
 
@@ -560,17 +596,14 @@ absl::Status ValidateElementLabel(const ASTNode& ast_location,
   return absl::OkStatus();
 }
 
-// Validates ResolvedGraphTableReference.
-absl::Status ValidateNodeTableReference(
-    const ASTGraphNodeTableReference* input_ast,
+// Validates the resolved column lists of a ResolvedGraphNodeTableReference:
+// non-empty, matching counts, matching types/annotations. AST-agnostic so it
+// can be called from both the explicit-edge path (ASTGraphNodeTableReference)
+// and the inlined-edge path (ASTGraphInlinedEdgeDefinition), which carry the
+// same columns under different AST shapes.
+absl::Status ValidateNodeTableReferenceColumns(
+    const ASTNode* error_location,
     const ResolvedGraphNodeTableReference& node_table_ref) {
-  // Node table reference level validation.
-  // 1) Validates node table columns are all distinct.
-  GOOGLESQL_RETURN_IF_ERROR(ValidateColumnsAreUnique(input_ast->node_table_columns()));
-
-  // 2) Validates edge table columns are all distinct.
-  GOOGLESQL_RETURN_IF_ERROR(ValidateColumnsAreUnique(input_ast->edge_table_columns()));
-
   const std::vector<std::unique_ptr<const ResolvedExpr>>& node_refs =
       node_table_ref.node_table_column_list();
   const std::vector<std::unique_ptr<const ResolvedExpr>>& edge_refs =
@@ -578,29 +611,39 @@ absl::Status ValidateNodeTableReference(
   GOOGLESQL_RET_CHECK(!node_refs.empty());
   GOOGLESQL_RET_CHECK(!edge_refs.empty());
 
-  // 3) Validates node and edge table columns are of the same number.
+  // Validates node and edge table columns are of the same number.
   if (node_refs.size() != edge_refs.size()) {
     std::string error_message = absl::Substitute(
         "The number of referencing columns in the edge table does not "
         "match that of referenced columns in the node table; the former has a "
         "size of $0 but the latter has a size of $1",
         edge_refs.size(), node_refs.size());
-    return MakeSqlErrorAt(input_ast) << error_message;
+    return MakeSqlErrorAt(error_location) << error_message;
   }
 
-  // 4) Validates node and edge table column types are consistent.
+  // Validates node and edge table column types are consistent.
   if (!absl::c_equal(
           node_refs, edge_refs, [](const auto& node_col, const auto& edge_col) {
             return node_col->type()->Equals(edge_col->type()) &&
                    AnnotationMap::Equals(node_col->type_annotation_map(),
                                          edge_col->type_annotation_map());
           })) {
-    return MakeSqlErrorAt(input_ast)
+    return MakeSqlErrorAt(error_location)
            << "Data types and/or annotations of the referencing columns in the "
               "edge table do not match those of the referenced columns in the "
               "node table";
   }
   return absl::OkStatus();
+}
+
+absl::Status ValidateNodeTableReference(
+    const ASTGraphNodeTableReference* input_ast,
+    const ResolvedGraphNodeTableReference& node_table_ref) {
+  // Validates node table columns are all distinct.
+  GOOGLESQL_RETURN_IF_ERROR(ValidateColumnsAreUnique(input_ast->node_table_columns()));
+  // Validates edge table columns are all distinct.
+  GOOGLESQL_RETURN_IF_ERROR(ValidateColumnsAreUnique(input_ast->edge_table_columns()));
+  return ValidateNodeTableReferenceColumns(input_ast, node_table_ref);
 }
 
 // Validates ResolvedGraphElementTable.
@@ -1238,6 +1281,37 @@ bool IsExprStringArray(const ResolvedExpr* expr) {
          expr->type()->AsArray()->element_type()->IsString();
 }
 
+absl::StatusOr<std::vector<
+    std::unique_ptr<GraphDdlResolver::PropertyDeclarationWithIsMeasure>>>
+GraphDdlResolver::BuildPropertyDeclarations(
+    std::vector<std::unique_ptr<const ResolvedGraphPropertyDefinition>>&
+        property_defs) const {
+  GOOGLESQL_RETURN_IF_ERROR(
+      Dedupe(property_defs,
+             &ResolvedGraphPropertyDefinition::property_declaration_name));
+
+  std::vector<std::unique_ptr<PropertyDeclarationWithIsMeasure>> property_decls;
+  property_decls.reserve(property_defs.size());
+  for (const std::unique_ptr<const ResolvedGraphPropertyDefinition>&
+           property_def : property_defs) {
+    GOOGLESQL_ASSIGN_OR_RETURN(
+        std::unique_ptr<const ResolvedGraphPropertyDeclaration> property_decl,
+        ResolvedGraphPropertyDeclarationBuilder()
+            .set_name(property_def->property_declaration_name())
+            .set_type(property_def->expr()->type())
+            .set_type_annotation_map(
+                property_def->expr()->type_annotation_map())
+            .Build());
+    GOOGLESQL_RET_CHECK_NE(property_def->GetParseLocationRangeOrNULL(), nullptr);
+    property_decls.push_back(std::make_unique<PropertyDeclarationWithIsMeasure>(
+        GetResolvedElementWithLocation(
+            std::move(property_decl),
+            *property_def->GetParseLocationRangeOrNULL()),
+        property_def->is_measure()));
+  }
+  return property_decls;
+}
+
 absl::StatusOr<GraphDdlResolver::ElementTableWithLabelsAndProperties>
 GraphDdlResolver::ResolveGraphElementTable(
     const ASTGraphElementTable* ast_element_table,
@@ -1369,36 +1443,30 @@ GraphDdlResolver::ResolveGraphElementTable(
                                        *table_scan, node_table_map));
   }
 
+  std::vector<const ASTGraphInlinedEdgeDefinition*> ast_inlined_edges;
   if (!ast_element_table->inlined_edge_definitions().empty()) {
-    return MakeSqlErrorAt(ast_element_table->inlined_edge_definitions()[0])
-           << "Inlined edge definition is not supported";
+    if (!resolver_.language().LanguageFeatureEnabled(
+            FEATURE_PROPERTY_GRAPH_INLINE_EDGES)) {
+      return MakeSqlErrorAt(ast_element_table->inlined_edge_definitions()[0])
+             << "Inlined edge definition is not supported";
+    }
+    if (element_kind != GraphElementTable::Kind::kNode) {
+      return MakeSqlErrorAt(ast_element_table->inlined_edge_definitions()[0])
+             << "Inlined edge definition is only allowed within a node table";
+    }
+    ast_inlined_edges.reserve(
+        ast_element_table->inlined_edge_definitions().size());
+    for (const auto* ast_inlined_edge :
+         ast_element_table->inlined_edge_definitions()) {
+      ast_inlined_edges.push_back(ast_inlined_edge);
+    }
   }
 
-  // Dedupe property definitions at element table level.
-  GOOGLESQL_RETURN_IF_ERROR(
-      Dedupe(label_and_properties_list.property_defs,
-             &ResolvedGraphPropertyDefinition::property_declaration_name));
-  // Build the property declarations from the property definitions resolved in
-  // this element table.
-  std::vector<std::unique_ptr<PropertyDeclarationWithIsMeasure>> property_decls;
-  property_decls.reserve(label_and_properties_list.property_defs.size());
-  for (const std::unique_ptr<const ResolvedGraphPropertyDefinition>&
-           property_def : label_and_properties_list.property_defs) {
-    GOOGLESQL_ASSIGN_OR_RETURN(
-        std::unique_ptr<const ResolvedGraphPropertyDeclaration> property_decl,
-        ResolvedGraphPropertyDeclarationBuilder()
-            .set_name(property_def->property_declaration_name())
-            .set_type(property_def->expr()->type())
-            .set_type_annotation_map(
-                property_def->expr()->type_annotation_map())
-            .Build());
-    GOOGLESQL_RET_CHECK_NE(property_def->GetParseLocationRangeOrNULL(), nullptr);
-    property_decls.push_back(std::make_unique<PropertyDeclarationWithIsMeasure>(
-        GetResolvedElementWithLocation(
-            std::move(property_decl),
-            *property_def->GetParseLocationRangeOrNULL()),
-        property_def->is_measure()));
-  }
+  GOOGLESQL_ASSIGN_OR_RETURN(
+      std::vector<std::unique_ptr<PropertyDeclarationWithIsMeasure>>
+          property_decls,
+      BuildPropertyDeclarations(label_and_properties_list.property_defs));
+
   // Collect the labels names declared in this element table.
   std::vector<std::string> label_names;
   label_names.reserve(label_and_properties_list.labels.size());
@@ -1425,7 +1493,158 @@ GraphDdlResolver::ResolveGraphElementTable(
   return ElementTableWithLabelsAndProperties{
       .element_table = std::move(element_table),
       .labels = std::move(label_and_properties_list.labels),
-      .property_decls = std::move(property_decls)};
+      .property_decls = std::move(property_decls),
+      .ast_inlined_edges = std::move(ast_inlined_edges)};
+}
+
+absl::StatusOr<GraphDdlResolver::ElementTableWithLabelsAndProperties>
+GraphDdlResolver::ResolveInlinedEdge(
+    const ASTGraphInlinedEdgeDefinition* ast_inlined_edge,
+    const ASTGraphElementTable* ast_enclosing_node_table,
+    const ResolvedGraphElementTable* enclosing_node_table,
+    const StringViewHashMapCase<const ResolvedGraphElementTable*>&
+        node_table_map) const {
+  const IdString edge_alias = ast_inlined_edge->edge_alias()->GetAsIdString();
+
+  // TODO: b/492867368 - Dynamic labels/properties are accepted by the grammar
+  // but not yet wired through for inlined edges. Reject explicitly so the
+  // clause isn't silently dropped.
+  if (ast_inlined_edge->dynamic_label() != nullptr) {
+    return MakeSqlErrorAt(ast_inlined_edge->dynamic_label())
+           << "Dynamic label is not supported on inlined edges";
+  }
+  if (ast_inlined_edge->dynamic_properties() != nullptr) {
+    return MakeSqlErrorAt(ast_inlined_edge->dynamic_properties())
+           << "Dynamic properties are not supported on inlined edges";
+  }
+
+  // User-written column lists must not contain duplicates.
+  GOOGLESQL_RETURN_IF_ERROR(ValidateColumnsAreUnique(ast_inlined_edge->join_keys()));
+  GOOGLESQL_RETURN_IF_ERROR(
+      ValidateColumnsAreUnique(ast_inlined_edge->dest_element_table_columns()));
+
+  // Re-resolve the enclosing node's base table as a regular edge would.
+  NameListPtr edge_table_scan_name_list;
+  GOOGLESQL_ASSIGN_OR_RETURN(std::unique_ptr<const ResolvedTableScan> edge_table_scan,
+                   ResolveBaseTable(ast_enclosing_node_table->name(),
+                                    edge_table_scan_name_list));
+  // Inlined edges share the same key columns as the enclosing node table.
+  GOOGLESQL_ASSIGN_OR_RETURN(auto edge_key_list,
+                   ResolveKeyColumns(
+                       ast_enclosing_node_table, GraphElementTable::Kind::kEdge,
+                       ast_enclosing_node_table->key_list(), *edge_table_scan));
+
+  // Resolve JOIN KEY (...)
+  std::vector<std::unique_ptr<const ResolvedExpr>> join_keys;
+  // JOIN KEY clause is guaranteed to be non-null by the grammar.
+  GOOGLESQL_RET_CHECK(ast_inlined_edge->join_keys() != nullptr);
+  GOOGLESQL_ASSIGN_OR_RETURN(
+      join_keys, ResolveColumnList(ast_inlined_edge->join_keys()->identifiers(),
+                                   *edge_table_scan));
+
+  GOOGLESQL_ASSIGN_OR_RETURN(
+      const ResolvedGraphElementTable* target_node_table,
+      FindNodeTable(ast_inlined_edge->referenced_table(), node_table_map));
+
+  std::vector<std::unique_ptr<const ResolvedExpr>> target_node_col_refs;
+  if (ast_inlined_edge->dest_element_table_columns() != nullptr) {
+    // User specified column list: REFERENCES <node> (cols)
+    GOOGLESQL_RET_CHECK(target_node_table->input_scan()->Is<ResolvedTableScan>());
+    const ResolvedTableScan* target_input_scan =
+        target_node_table->input_scan()->GetAs<ResolvedTableScan>();
+    GOOGLESQL_ASSIGN_OR_RETURN(
+        target_node_col_refs,
+        ResolveColumnList(
+            ast_inlined_edge->dest_element_table_columns()->identifiers(),
+            *target_input_scan));
+  } else {
+    // No user specified column list: REFERENCES <node>
+    GOOGLESQL_ASSIGN_OR_RETURN(target_node_col_refs,
+                     CopyAll(target_node_table->key_list()));
+  }
+
+  // Build both endpoint references first; the direction below decides which is
+  // source and which is destination.
+  std::unique_ptr<const ResolvedGraphNodeTableReference> source_node_ref;
+  std::unique_ptr<const ResolvedGraphNodeTableReference> dest_node_ref;
+
+  GOOGLESQL_ASSIGN_OR_RETURN(auto enclosing_edge_col_refs, CopyAll(edge_key_list));
+  GOOGLESQL_ASSIGN_OR_RETURN(auto enclosing_node_col_refs,
+                   CopyAll(enclosing_node_table->key_list()));
+
+  bool is_forwards = ast_inlined_edge->direction() != ASTGraphEdgePattern::LEFT;
+
+  GOOGLESQL_ASSIGN_OR_RETURN(
+      auto resolved_enclosing_node_ref,
+      ResolvedGraphNodeTableReferenceBuilder()
+          .set_node_table_identifier(enclosing_node_table->alias())
+          .set_node_table_column_list(std::move(enclosing_node_col_refs))
+          .set_edge_table_column_list(std::move(enclosing_edge_col_refs))
+          .Build());
+  GOOGLESQL_RETURN_IF_ERROR(ValidateNodeTableReferenceColumns(
+      ast_inlined_edge, *resolved_enclosing_node_ref));
+
+  GOOGLESQL_ASSIGN_OR_RETURN(
+      auto resolved_target_node_ref,
+      ResolvedGraphNodeTableReferenceBuilder()
+          .set_node_table_identifier(target_node_table->alias())
+          .set_node_table_column_list(std::move(target_node_col_refs))
+          .set_edge_table_column_list(std::move(join_keys))
+          .Build());
+  GOOGLESQL_RETURN_IF_ERROR(ValidateNodeTableReferenceColumns(ast_inlined_edge,
+                                                    *resolved_target_node_ref));
+
+  // FORWARDS (default): JOIN KEY columns reference the destination, so the
+  // enclosing node is the source. BACKWARDS swaps source and destination.
+  if (is_forwards) {
+    source_node_ref = std::move(resolved_enclosing_node_ref);
+    dest_node_ref = std::move(resolved_target_node_ref);
+  } else {
+    source_node_ref = std::move(resolved_target_node_ref);
+    dest_node_ref = std::move(resolved_enclosing_node_ref);
+  }
+
+  // Inlined-edge properties resolve only against the enclosing node's base
+  // table columns, since the edge shares that base table.
+  NameScope input_table_name_scope(*edge_table_scan_name_list);
+  GOOGLESQL_ASSIGN_OR_RETURN(LabelAndPropertiesList edge_label_and_properties_list,
+                   ResolveLabelAndPropertiesList(
+                       *ast_inlined_edge->label_and_properties_list(),
+                       ast_inlined_edge->default_label_options(), edge_alias,
+                       *edge_table_scan, &input_table_name_scope));
+
+  GOOGLESQL_ASSIGN_OR_RETURN(
+      std::vector<std::unique_ptr<PropertyDeclarationWithIsMeasure>>
+          property_decls,
+      BuildPropertyDeclarations(edge_label_and_properties_list.property_defs));
+
+  std::vector<std::string> edge_label_names;
+  edge_label_names.reserve(edge_label_and_properties_list.labels.size());
+  absl::c_transform(edge_label_and_properties_list.labels,
+                    std::back_inserter(edge_label_names),
+                    [](const auto& label) { return label->name(); });
+
+  GOOGLESQL_ASSIGN_OR_RETURN(
+      std::unique_ptr<const ResolvedGraphElementTable> edge_element_table,
+      ResolvedGraphElementTableBuilder()
+          .set_alias(edge_alias.ToString())
+          .set_key_list(std::move(edge_key_list))
+          .set_input_scan(std::move(edge_table_scan))
+          .set_label_name_list(std::move(edge_label_names))
+          .set_property_definition_list(
+              std::move(edge_label_and_properties_list.property_defs))
+          .set_source_node_reference(std::move(source_node_ref))
+          .set_dest_node_reference(std::move(dest_node_ref))
+          .Build());
+  edge_element_table = GetResolvedElementWithLocation(
+      std::move(edge_element_table), ast_inlined_edge->location());
+
+  return ElementTableWithLabelsAndProperties{
+      .element_table = std::move(edge_element_table),
+      .labels = std::move(edge_label_and_properties_list.labels),
+      .property_decls = std::move(property_decls),
+      // Edges cannot themselves contain inlined edges.
+      .ast_inlined_edges = {}};
 }
 
 absl::Status GraphDdlResolver::ResolveCreatePropertyGraphStmt(
@@ -1446,6 +1665,13 @@ absl::Status GraphDdlResolver::ResolveCreatePropertyGraphStmt(
 
   std::vector<std::unique_ptr<const ResolvedGraphElementTable>> node_tables;
   std::vector<std::unique_ptr<const ResolvedGraphElementTable>> edge_tables;
+  struct PendingInlinedEdge {
+    const ASTGraphInlinedEdgeDefinition* ast_inlined_edge;
+    const ASTGraphElementTable* ast_enclosing_node_table;
+    const ResolvedGraphElementTable* enclosing_node_table;
+  };
+  std::vector<PendingInlinedEdge> pending_inlined_edges;
+
   std::vector<std::unique_ptr<const ResolvedGraphElementLabel>> labels;
   std::vector<std::unique_ptr<PropertyDeclarationWithIsMeasure>> property_decls;
 
@@ -1491,19 +1717,39 @@ absl::Status GraphDdlResolver::ResolveCreatePropertyGraphStmt(
         element_table_with_labels_and_properties.element_table.get());
     node_tables.push_back(
         std::move(element_table_with_labels_and_properties.element_table));
-    GOOGLESQL_RETURN_IF_ERROR(ValidateLabelWithOptionsNotBoundInMultipleElementTables(
-        element_table_with_labels_and_properties.labels, labels_with_options));
-    labels.insert(labels.end(),
-                  std::make_move_iterator(
-                      element_table_with_labels_and_properties.labels.begin()),
-                  std::make_move_iterator(
-                      element_table_with_labels_and_properties.labels.end()));
-    property_decls.insert(
-        property_decls.end(),
-        std::make_move_iterator(
-            element_table_with_labels_and_properties.property_decls.begin()),
-        std::make_move_iterator(
-            element_table_with_labels_and_properties.property_decls.end()));
+    // Inlined edges must be resolved in a second pass, after all node tables
+    // have been resolved and added to `node_table_map`.
+    for (const auto* ast_inlined_edge :
+         element_table_with_labels_and_properties.ast_inlined_edges) {
+      pending_inlined_edges.push_back(
+          {.ast_inlined_edge = ast_inlined_edge,
+           .ast_enclosing_node_table = ast_node_table,
+           .enclosing_node_table = node_tables.back().get()});
+    }
+    GOOGLESQL_RETURN_IF_ERROR(ValidateAndRecordLabelsAndPropertyDeclarations(
+        element_table_with_labels_and_properties.labels,
+        element_table_with_labels_and_properties.property_decls,
+        labels_with_options, labels, property_decls));
+  }
+
+  // Resolve inlined edges in a second pass.
+  std::vector<std::unique_ptr<const ResolvedGraphElementTable>>
+      inlined_edge_tables;
+  std::vector<const ASTGraphInlinedEdgeDefinition*> inlined_edge_ast_locations;
+  for (const auto& pending : pending_inlined_edges) {
+    GOOGLESQL_ASSIGN_OR_RETURN(
+        ElementTableWithLabelsAndProperties
+            element_table_with_labels_and_properties,
+        ResolveInlinedEdge(pending.ast_inlined_edge,
+                           pending.ast_enclosing_node_table,
+                           pending.enclosing_node_table, node_table_map));
+    inlined_edge_tables.push_back(
+        std::move(element_table_with_labels_and_properties.element_table));
+    inlined_edge_ast_locations.push_back(pending.ast_inlined_edge);
+    GOOGLESQL_RETURN_IF_ERROR(ValidateAndRecordLabelsAndPropertyDeclarations(
+        element_table_with_labels_and_properties.labels,
+        element_table_with_labels_and_properties.property_decls,
+        labels_with_options, labels, property_decls));
   }
 
   // Resolves edge tables if specified.
@@ -1532,23 +1778,12 @@ absl::Status GraphDdlResolver::ResolveCreatePropertyGraphStmt(
               element_table_with_labels_and_properties,
           ResolveGraphElementTable(
               ast_edge_table, GraphElementTable::Kind::kEdge, node_table_map));
-      GOOGLESQL_RETURN_IF_ERROR(ValidateLabelWithOptionsNotBoundInMultipleElementTables(
-          element_table_with_labels_and_properties.labels,
-          labels_with_options));
       edge_tables.push_back(
           std::move(element_table_with_labels_and_properties.element_table));
-      labels.insert(
-          labels.end(),
-          std::make_move_iterator(
-              element_table_with_labels_and_properties.labels.begin()),
-          std::make_move_iterator(
-              element_table_with_labels_and_properties.labels.end()));
-      property_decls.insert(
-          property_decls.end(),
-          std::make_move_iterator(
-              element_table_with_labels_and_properties.property_decls.begin()),
-          std::make_move_iterator(
-              element_table_with_labels_and_properties.property_decls.end()));
+      GOOGLESQL_RETURN_IF_ERROR(ValidateAndRecordLabelsAndPropertyDeclarations(
+          element_table_with_labels_and_properties.labels,
+          element_table_with_labels_and_properties.property_decls,
+          labels_with_options, labels, property_decls));
     }
   }
 
@@ -1598,6 +1833,14 @@ absl::Status GraphDdlResolver::ResolveCreatePropertyGraphStmt(
   GOOGLESQL_RETURN_IF_ERROR(ValidateNoDuplicateElementTable(
       ast_stmt->edge_table_list(), edge_tables, GraphElementTable::Kind::kEdge,
       element_table_names));
+
+  // Check inlined-edge names against the (already-validated) node + edge
+  // names, then move them into `edge_tables` for the rest of the pipeline.
+  GOOGLESQL_RETURN_IF_ERROR(ValidateNoDuplicateElementTables(
+      absl::MakeConstSpan(inlined_edge_ast_locations), inlined_edge_tables,
+      GraphElementTable::Kind::kEdge, element_table_names));
+  absl::c_move(inlined_edge_tables, std::back_inserter(edge_tables));
+
   // Dedupe property declarations at graph level.
   GOOGLESQL_RETURN_IF_ERROR(
       Dedupe(property_decls, &PropertyDeclarationWithIsMeasure::name));
