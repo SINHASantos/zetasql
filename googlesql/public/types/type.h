@@ -32,6 +32,7 @@
 
 #include "google/protobuf/descriptor.pb.h"
 #include "googlesql/common/float_margin.h"
+#include "googlesql/public/language_options.h"
 #include "googlesql/public/options.pb.h"
 #include "googlesql/public/type.pb.h"
 #include "googlesql/public/types/timestamp_util.h"
@@ -159,6 +160,7 @@ class Type {
   bool IsGeography() const { return kind_ == TYPE_GEOGRAPHY; }
   bool IsJson() const { return kind_ == TYPE_JSON; }
   bool IsTokenList() const { return kind_ == TYPE_TOKENLIST; }
+  bool IsVariant() const { return kind_ == TYPE_VARIANT; }
   bool IsEnum() const { return kind_ == TYPE_ENUM; }
   bool IsArray() const { return kind_ == TYPE_ARRAY; }
   bool IsStruct() const { return kind_ == TYPE_STRUCT; }
@@ -761,7 +763,8 @@ class Type {
   };
 
   // Formatting options that can be provided to FormatValueContent.
-  struct FormatValueContentOptions {
+  class FormatValueContentOptions {
+   public:
     enum class Mode {
       // Should generate a string value to use for debugging purposes.
       // This mode is used by Value::DebugString: please check the comments to
@@ -796,6 +799,24 @@ class Type {
       }
     }
 
+    ABSL_DEPRECATED("Use the constructor taking LanguageOptions instead.")
+    FormatValueContentOptions() {
+      language_options_.set_product_mode(ProductMode::PRODUCT_EXTERNAL);
+    }
+    explicit FormatValueContentOptions(LanguageOptions language_options);
+    FormatValueContentOptions(LanguageOptions language_options,
+                              bool use_external_float32);
+
+    ProductMode product_mode() const {
+      return language_options_.product_mode();
+    }
+    void set_product_mode(ProductMode mode) {
+      language_options_.set_product_mode(mode);
+    }
+    const LanguageOptions& language_options() const {
+      return language_options_;
+    }
+
     // The getters below are here mostly for historical reasons: originally
     // internal googlesql::Value formatting functions were using these two flags
     // to figure out which formatting mode is requested. New types should not
@@ -803,7 +824,9 @@ class Type {
     bool as_literal() const { return mode != Mode::kSQLExpression; }
     bool add_simple_type_prefix() const { return mode != Mode::kDebug; }
 
-    ProductMode product_mode = ProductMode::PRODUCT_EXTERNAL;
+    // TODO: Complete encapsulation of these fields by updating all
+    // callers to use getters/setters.
+    // NOLINTBEGIN(readability-identifier-naming)
 
     // Setting `use_external_float32` to true will return
     // FLOAT32 as the type name for TYPE_FLOAT.
@@ -824,11 +847,15 @@ class Type {
     // If not set, TokenList attributes are printed as decimal integers.
     std::function<void(std::string&, tokens::TextAttribute)>
         format_token_attribute;
+    // NOLINTEND(readability-identifier-naming)
 
     FormatValueContentOptions IncreaseIndent();
 
     // Number of columns per indentation.
     static const int kIndentStep = 2;
+
+   private:
+    LanguageOptions language_options_;
   };
 
   // List of DebugStringImpl outputs. Used to serve as a stack in

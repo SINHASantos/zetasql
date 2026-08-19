@@ -211,16 +211,23 @@ class TumbleRewriteVisitor : public ResolvedASTRewriteVisitor {
   //
   // WITH _tumble_params AS (
   //   SELECT
-  //     IF(precomputed_raw.window_size IS NOT NULL,
-  //        IF(precomputed_raw.window_size > INTERVAL 0 DAY,
-  //           precomputed_raw.window_size,
-  //           ERROR("TUMBLE window interval must be positive")),
-  //        ERROR("TUMBLE window_size argument cannot be NULL")
-  //       ) AS window_size,
-  //     IF(precomputed_raw.origin IS NOT NULL,
-  //        precomputed_raw.origin,
-  //        ERROR("TUMBLE origin argument cannot be NULL")
-  //       ) AS origin
+  //     CASE
+  //       WHEN precomputed_raw.window_size IS NULL
+  //         THEN ERROR("Window size cannot be null.")
+  //       WHEN precomputed_raw.window_size = INTERVAL 0 DAY
+  //         THEN ERROR("Window size cannot be zero.")
+  //       WHEN precomputed_raw.window_size < INTERVAL 0 DAY
+  //         THEN ERROR("Window size cannot be negative.")
+  //       WHEN EXTRACT(MONTH FROM precomputed_raw.window_size) != 0 OR
+  //            EXTRACT(YEAR FROM precomputed_raw.window_size) != 0
+  //         THEN ERROR("Window size cannot contain MONTH or YEAR parts.")
+  //       ELSE precomputed_raw.window_size
+  //     END AS window_size,
+  //     CASE
+  //       WHEN precomputed_raw.origin IS NULL
+  //         THEN ERROR("Origin cannot be null.")
+  //       ELSE precomputed_raw.origin
+  //     END AS origin
   //   FROM (
   //     SELECT
   //       <window_size_expr> AS window_size,
@@ -267,18 +274,18 @@ class TumbleRewriteVisitor : public ResolvedASTRewriteVisitor {
     {
       auto raw_ws_ref =
           MakeResolvedColumnRef(raw_window_col.type(), raw_window_col, false);
-      // TODO: b/519609521 - The rewrite and reference implementation do not
-      // currently validate for MONTH and YEAR parts for window_size. Add
-      // validation for this.
       GOOGLESQL_ASSIGN_OR_RETURN(
           auto validated_window_size_expr,
           AnalyzeSubstitute(analyzer_options_, catalog_, type_factory_,
                             R"sql(
-              IF(raw_ws IS NOT NULL,
-                 IF(raw_ws > INTERVAL 0 DAY,
-                    raw_ws,
-                    ERROR("TUMBLE window interval must be positive")),
-                 ERROR("TUMBLE window_size argument cannot be NULL"))
+              CASE
+                WHEN raw_ws IS NULL THEN ERROR("Window size cannot be null.")
+                WHEN raw_ws = INTERVAL 0 DAY THEN ERROR("Window size cannot be zero.")
+                WHEN raw_ws < INTERVAL 0 DAY THEN ERROR("Window size cannot be negative.")
+                WHEN EXTRACT(MONTH FROM raw_ws) != 0 OR EXTRACT(YEAR FROM raw_ws) != 0
+                  THEN ERROR("Window size cannot contain MONTH or YEAR parts.")
+                ELSE raw_ws
+              END
               )sql",
                             {{"raw_ws", raw_ws_ref.get()}}),
           _.With(ExpectAnalyzeSubstituteSuccess));
@@ -297,9 +304,10 @@ class TumbleRewriteVisitor : public ResolvedASTRewriteVisitor {
           auto validated_origin_expr,
           AnalyzeSubstitute(analyzer_options_, catalog_, type_factory_,
                             R"sql(
-              IF(raw_origin IS NOT NULL,
-                 raw_origin,
-                 ERROR("TUMBLE origin argument cannot be NULL"))
+              CASE
+                WHEN raw_origin IS NULL THEN ERROR("Origin cannot be null.")
+                ELSE raw_origin
+              END
               )sql",
                             {{"raw_origin", raw_origin_ref.get()}}),
           _.With(ExpectAnalyzeSubstituteSuccess));

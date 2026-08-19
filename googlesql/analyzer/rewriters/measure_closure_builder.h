@@ -37,6 +37,8 @@
 
 namespace googlesql {
 
+class AnnotationPropagator;
+
 // Interface for providing or projecting columns for a catalog column out of the
 // measure source scan during closure column construction.
 class ColumnProvider {
@@ -87,7 +89,7 @@ class ColumnProvider {
 //
 // Returns:
 // - A map from measure name to its computed closure struct type.
-absl::StatusOr<CaseInsensitiveMap<const StructType*>>
+absl::StatusOr<CaseInsensitiveMap<AnnotatedType>>
 ComputeClosureTypesForMeasuresFromScan(const MeasureGraph& graph,
                                        const Table& table,
                                        TypeFactory& type_factory);
@@ -114,9 +116,8 @@ ComputeClosureTypesForMeasuresFromScan(const MeasureGraph& graph,
 //
 // Returns:
 // - A map from measure name to its computed closure struct type.
-absl::StatusOr<CaseInsensitiveMap<const StructType*>>
-BuildClosureTypesForTableRow(const MeasureGraph& graph, const Table& table,
-                             TypeFactory& type_factory);
+absl::StatusOr<CaseInsensitiveMap<AnnotatedType>> BuildClosureTypesForTableRow(
+    const MeasureGraph& graph, const Table& table, TypeFactory& type_factory);
 
 // Represents the computed closure columns and their required inputs at a
 // specific topological level of the measure dependency graph.
@@ -146,7 +147,6 @@ struct ComputeClosureColumnsResult {
 // - `graph`: The measure dependency graph. Must not be empty.
 // - `table`: The table containing the measures.
 // - `closure_types`: Map of pre-computed closure struct types for all measures.
-// - `type_factory`: The TypeFactory.
 // - `column_factory`: The ColumnFactory.
 // - `column_provider`: Provider to fetch or project a column.
 //
@@ -155,9 +155,9 @@ struct ComputeClosureColumnsResult {
 absl::StatusOr<ComputeClosureColumnsResult>
 ComputeClosureColumnsForMeasuresFromScan(
     const MeasureGraph& graph, const Table& table,
-    const CaseInsensitiveMap<const StructType*>& closure_types,
-    TypeFactory& type_factory, ColumnFactory& column_factory,
-    ColumnProvider& column_provider);
+    const CaseInsensitiveMap<AnnotatedType>& closure_types,
+    ColumnFactory& column_factory, ColumnProvider& column_provider,
+    AnnotationPropagator& annotation_propagator);
 
 }  // namespace googlesql
 

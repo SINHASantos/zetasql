@@ -2819,8 +2819,11 @@ absl::Status Resolver::ResolveGetRowField(
     GOOGLESQL_RETURN_IF_ERROR(type_factory()->MakeRowType(
         type->AsRowType()->table(), type->AsRowType()->table_name(), &type));
   }
-  *resolved_expr_out =
+  std::unique_ptr<ResolvedExpr> resolved_expr =
       MakeResolvedGetRowField(type, std::move(resolved_lhs), column);
+  GOOGLESQL_RETURN_IF_ERROR(CheckAndPropagateAnnotations(/*error_node=*/identifier,
+                                               resolved_expr.get()));
+  *resolved_expr_out = std::move(resolved_expr);
   return absl::OkStatus();
 }
 

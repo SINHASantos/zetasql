@@ -37,9 +37,12 @@ cc_library(
     hdrs = ["measure_test_tables.h"],
     deps = [
         ":test_driver",
+        "//googlesql/base:check",
         "//googlesql/common:internal_value",
         "//googlesql/common:measure_analysis_utils",
         "//googlesql/public:value",
+        "//googlesql/public/annotation:collation",
+        "//googlesql/public/types",
         "//googlesql/testing:test_value",
     ],
 )

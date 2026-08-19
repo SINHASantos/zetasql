@@ -2757,6 +2757,41 @@ SHARDED_TEST_F(ComplianceCodebasedTests, TestEditDistance, 1) {
   RunFunctionTestsCustom(Shard(tests), edit_distance_fn);
 }
 
+SHARDED_TEST_F(ComplianceCodebasedTests, TestJaroWinklerSimilarity, 1) {
+  SetNamePrefix("JaroWinklerSimilarity");
+  auto jarowinkler_similarity_fn = [](const FunctionTestCall& f) {
+    if (f.params.params().size() == 2) {
+      return absl::Substitute("$0(@p0, @p1)", f.function_name);
+    }
+    if (f.params.params().size() == 3) {
+      return absl::Substitute("$0(@p0, @p1, prefix_scaling_factor=>@p2)",
+                              f.function_name);
+    }
+    return absl::Substitute(
+        "$0(@p0, @p1, prefix_scaling_factor=>@p2, prefix_boost_threshold=>@p3)",
+        f.function_name);
+  };
+
+  std::vector<FunctionTestCall> tests = GetFunctionTestsJaroWinklerSimilarity();
+  for (auto& test_case : tests) {
+    test_case.params.AddRequiredFeature(FEATURE_ENABLE_JAROWINKLER_SIMILARITY);
+    if (test_case.params.params().size() >= 3) {
+      test_case.params.AddRequiredFeature(FEATURE_NAMED_ARGUMENTS);
+    }
+  }
+  std::vector<FunctionTestCall> tests_bytes =
+      GetFunctionTestsJaroWinklerSimilarityBytes();
+  for (auto& test_case : tests_bytes) {
+    test_case.params.AddRequiredFeature(FEATURE_ENABLE_JAROWINKLER_SIMILARITY);
+    if (test_case.params.params().size() >= 3) {
+      test_case.params.AddRequiredFeature(FEATURE_NAMED_ARGUMENTS);
+    }
+  }
+  tests.insert(tests.end(), tests_bytes.begin(), tests_bytes.end());
+
+  RunFunctionTestsCustom(Shard(tests), jarowinkler_similarity_fn);
+}
+
 // Wrap the proto field test cases with civil time typed values. If the type of
 // the parameter or the result of the test case is TIME or DATETIME, wrap the
 // test case so that the original expected result requires

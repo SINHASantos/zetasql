@@ -235,25 +235,41 @@ class HopRewriteVisitor : public ResolvedASTRewriteVisitor {
   //
   // WITH _hop_params AS (
   //   SELECT
-  //     IF(precomputed_raw.window_size IS NOT NULL,
-  //        precomputed_raw.window_size,
-  //        ERROR("HOP window_size argument cannot be NULL")
-  //       ) AS window_size,
-  //     IF(precomputed_raw.step_size IS NOT NULL,
-  //        IF(precomputed_raw.step_size > INTERVAL 0 DAY,
-  //           IF(precomputed_raw.step_size <= precomputed_raw.window_size,
-  //              precomputed_raw.step_size,
-  //              ERROR("Invalid HOP window_size and step_size arguments, "
-  //                    "step_size has to be smaller than or equal to "
-  //                    "window_size")),
-  //           ERROR("HOP step_size must be positive")),
-  //        ERROR("HOP step_size argument cannot be NULL")
-  //       ) AS step_size,
+  //     CASE
+  //       WHEN precomputed_raw.window_size IS NULL
+  //         THEN ERROR("Window size cannot be null.")
+  //       WHEN precomputed_raw.window_size = INTERVAL 0 DAY
+  //         THEN ERROR("Window size cannot be zero.")
+  //       WHEN precomputed_raw.window_size < INTERVAL 0 DAY
+  //         THEN ERROR("Window size cannot be negative.")
+  //       WHEN EXTRACT(MONTH FROM precomputed_raw.window_size) != 0 OR
+  //            EXTRACT(YEAR FROM precomputed_raw.window_size) != 0
+  //         THEN ERROR("Window size cannot contain MONTH or YEAR parts.")
+  //       ELSE precomputed_raw.window_size
+  //     END AS window_size,
+  //     CASE
+  //       WHEN precomputed_raw.step_size IS NULL
+  //         THEN ERROR("Step size cannot be null.")
+  //       WHEN precomputed_raw.step_size = INTERVAL 0 DAY
+  //         THEN ERROR("Step size cannot be zero.")
+  //       WHEN precomputed_raw.step_size < INTERVAL 0 DAY
+  //         THEN ERROR("Step size cannot be negative.")
+  //       WHEN EXTRACT(MONTH FROM precomputed_raw.step_size) != 0 OR
+  //            EXTRACT(YEAR FROM precomputed_raw.step_size) != 0
+  //         THEN ERROR("Step size cannot contain MONTH or YEAR parts.")
+  //       WHEN precomputed_raw.window_size IS NOT NULL AND
+  //            precomputed_raw.window_size > INTERVAL 0 DAY AND
+  //            precomputed_raw.step_size > precomputed_raw.window_size
+  //         THEN ERROR("Window size must be greater than or equal to step
+  //         size.")
+  //       ELSE precomputed_raw.step_size
+  //     END AS step_size,
   //     IntervalToNanos(precomputed_raw.step_size) AS step_nanos,
-  //     IF(precomputed_raw.origin IS NOT NULL,
-  //        precomputed_raw.origin,
-  //        ERROR("HOP origin argument cannot be NULL")
-  //       ) AS origin
+  //     CASE
+  //       WHEN precomputed_raw.origin IS NULL
+  //         THEN ERROR("Origin cannot be null.")
+  //       ELSE precomputed_raw.origin
+  //     END AS origin
   //   FROM (
   //     SELECT
   //       <window_size_expr> AS window_size,
@@ -313,9 +329,14 @@ class HopRewriteVisitor : public ResolvedASTRewriteVisitor {
           auto validated_expr,
           AnalyzeSubstitute(analyzer_options_, catalog_, type_factory_,
                             R"sql(
-              IF(raw_ws IS NOT NULL,
-                 raw_ws,
-                 ERROR("HOP window_size argument cannot be NULL"))
+              CASE
+                WHEN raw_ws IS NULL THEN ERROR("Window size cannot be null.")
+                WHEN raw_ws = INTERVAL 0 DAY THEN ERROR("Window size cannot be zero.")
+                WHEN raw_ws < INTERVAL 0 DAY THEN ERROR("Window size cannot be negative.")
+                WHEN EXTRACT(MONTH FROM raw_ws) != 0 OR EXTRACT(YEAR FROM raw_ws) != 0
+                  THEN ERROR("Window size cannot contain MONTH or YEAR parts.")
+                ELSE raw_ws
+              END
               )sql",
                             {{"raw_ws", raw_ws_ref.get()}}),
           _.With(ExpectAnalyzeSubstituteSuccess));
@@ -338,13 +359,16 @@ class HopRewriteVisitor : public ResolvedASTRewriteVisitor {
           AnalyzeSubstitute(
               analyzer_options_, catalog_, type_factory_,
               R"sql(
-              IF(raw_ss IS NOT NULL,
-                 IF(raw_ss > INTERVAL 0 DAY,
-                    IF(raw_ss <= raw_ws,
-                       raw_ss,
-                       ERROR("Invalid HOP window_size and step_size arguments, step_size has to be smaller than or equal to window_size")),
-                    ERROR("HOP step_size must be positive")),
-                 ERROR("HOP step_size argument cannot be NULL"))
+              CASE
+                WHEN raw_ss IS NULL THEN ERROR("Step size cannot be null.")
+                WHEN raw_ss = INTERVAL 0 DAY THEN ERROR("Step size cannot be zero.")
+                WHEN raw_ss < INTERVAL 0 DAY THEN ERROR("Step size cannot be negative.")
+                WHEN EXTRACT(MONTH FROM raw_ss) != 0 OR EXTRACT(YEAR FROM raw_ss) != 0
+                  THEN ERROR("Step size cannot contain MONTH or YEAR parts.")
+                WHEN raw_ws IS NOT NULL AND raw_ws > INTERVAL 0 DAY AND raw_ss > raw_ws
+                  THEN ERROR("Window size must be greater than or equal to step size.")
+                ELSE raw_ss
+              END
               )sql",
               {{"raw_ss", raw_ss_ref.get()}, {"raw_ws", raw_ws_ref.get()}}),
           _.With(ExpectAnalyzeSubstituteSuccess));
@@ -378,9 +402,10 @@ class HopRewriteVisitor : public ResolvedASTRewriteVisitor {
           auto validated_expr,
           AnalyzeSubstitute(analyzer_options_, catalog_, type_factory_,
                             R"sql(
-              IF(raw_origin IS NOT NULL,
-                 raw_origin,
-                 ERROR("HOP origin argument cannot be NULL"))
+              CASE
+                WHEN raw_origin IS NULL THEN ERROR("Origin cannot be null.")
+                ELSE raw_origin
+              END
               )sql",
                             {{"raw_origin", raw_origin_ref.get()}}),
           _.With(ExpectAnalyzeSubstituteSuccess));

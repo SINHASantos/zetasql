@@ -403,6 +403,7 @@ constexpr KeywordInfoPOD kAllKeywords[] = {
     {"using", Token::KW_USING, kReserved},
     {"value", Token::KW_VALUE},
     {"values", Token::KW_VALUES},
+    {"variant", Token::KW_VARIANT},
     {"vector", Token::KW_VECTOR},
     {"version", Token::KW_VERSION},
     {"view", Token::KW_VIEW},

@@ -49,6 +49,7 @@
 #include "googlesql/public/sql_procedure.h"
 #include "googlesql/public/sql_view.h"
 #include "googlesql/public/table_valued_function.h"
+#include "googlesql/public/templated_sql_function.h"
 #include "googlesql/public/type.h"
 #include "googlesql/resolved_ast/resolved_ast.h"
 #include "googlesql/testdata/sample_catalog.h"
@@ -561,6 +562,8 @@ TEST_F(LazyResolutionTableFunctionTest, PropagateDeprecationWarnings) {
   ASSERT_FALSE(function->NeedsResolution());
 
   const TableValuedFunction* tvf = function->ResolvedObject();
+  EXPECT_EQ(tvf->GetAs<SQLTableValuedFunctionInterface>()->resolution_catalog(),
+            sample_catalog_->catalog());
   ASSERT_EQ(tvf->NumSignatures(), 1);
 
   const FunctionSignature* concrete_signature = tvf->GetSignature(0);
@@ -581,6 +584,50 @@ TEST_F(LazyResolutionTableFunctionTest, PropagateDeprecationWarnings) {
 
   EXPECT_EQ("() -> TABLE<x INT64> (1 deprecation warning)",
             tvf_signature->DebugString(/*verbose=*/true));
+}
+
+TEST_F(LazyResolutionTableFunctionTest, SetResolutionCatalogOnConcreteTVF) {
+  const std::string sql =
+      "CREATE PUBLIC TABLE FUNCTION foo()"
+      "  RETURNS TABLE<x INT64> AS SELECT 1 x;";
+
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(std::unique_ptr<LazyResolutionTableFunction> function,
+                       CreateAndInitializeTableFunction(sql));
+  GOOGLESQL_ASSERT_OK(function->ResolveAndUpdateIfNeeded(
+      analyzer_options_, sample_catalog_->catalog(), &type_factory_));
+  const TableValuedFunction* tvf = function->ResolvedObject();
+  ASSERT_TRUE(tvf->Is<SQLTableValuedFunctionInterface>());
+  EXPECT_EQ(tvf->GetAs<SQLTableValuedFunctionInterface>()->resolution_catalog(),
+            sample_catalog_->catalog());
+}
+
+TEST_F(LazyResolutionTableFunctionTest, SetResolutionCatalogOnTemplatedTVF) {
+  const std::string filename = "test_filename";
+  const std::string sql =
+      "CREATE PUBLIC TABLE FUNCTION foo(t ANY TABLE)"
+      "  RETURNS TABLE<x INT64> AS SELECT * FROM t;";
+  std::unique_ptr<ParserOutput> parser_output;
+  GOOGLESQL_ASSERT_OK(ParseStatement(sql, parser_options_, &parser_output));
+  const auto* ast =
+      parser_output->statement()->GetAs<ASTCreateTableFunctionStatement>();
+  ParseResumeLocation templated_location =
+      ComputeExpressionResumeLocation(filename, sql, ast->query());
+
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(
+      std::unique_ptr<LazyResolutionTableFunction> function,
+      LazyResolutionTableFunction::CreateTemplatedTableFunction(
+          ParseResumeLocation::FromStringView(filename, sql),
+          templated_location, std::move(parser_output), absl::OkStatus(),
+          /*remote_tvf_factory=*/nullptr, ModuleDetails::CreateEmpty(),
+          ErrorMessageOptions{
+              .mode = ErrorMessageMode::ERROR_MESSAGE_MULTI_LINE_WITH_CARET}));
+
+  GOOGLESQL_ASSERT_OK(function->ResolveAndUpdateIfNeeded(
+      analyzer_options_, sample_catalog_->catalog(), &type_factory_));
+  const TableValuedFunction* tvf = function->ResolvedObject();
+  ASSERT_TRUE(tvf->Is<SQLTableValuedFunctionInterface>());
+  EXPECT_EQ(tvf->GetAs<SQLTableValuedFunctionInterface>()->resolution_catalog(),
+            sample_catalog_->catalog());
 }
 
 // Tests for LazyResolutionConstant.
@@ -1108,6 +1155,9 @@ TEST_F(LazyResolutionFunctionTest, ShouldNotUppercaseName) {
   GOOGLESQL_ASSERT_OK(ResolveAndUpdateFunction((*function).get()));
 
   ASSERT_THAT((*function)->ResolvedObject()->SQLName(), StrEq("Foo"));
+  EXPECT_EQ(
+      (*function)->ResolvedObject()->GetAs<SQLFunction>()->resolution_catalog(),
+      builtin_function_catalog_.get());
 }
 
 TEST_F(LazyResolutionFunctionTest, ModuleNameFromImport) {
@@ -1123,6 +1173,48 @@ TEST_F(LazyResolutionFunctionTest, ModuleNameFromImport) {
   ASSERT_THAT(
       (*function)->ResolvedObject()->function_options().module_name_from_import,
       ElementsAre("x", "y", "z"));
+  EXPECT_EQ(
+      (*function)->ResolvedObject()->GetAs<SQLFunction>()->resolution_catalog(),
+      builtin_function_catalog_.get());
+}
+
+TEST_F(LazyResolutionFunctionTest, SetResolutionCatalogOnConcreteFunction) {
+  absl::StatusOr<std::unique_ptr<LazyResolutionFunction>> function =
+      CreateAndInitializeFunction(
+          "CREATE PUBLIC FUNCTION Foo(x STRING) RETURNS STRING AS (x);",
+          FunctionEnums::SCALAR);
+  ASSERT_THAT(function.status(), IsOk());
+  GOOGLESQL_ASSERT_OK(ResolveAndUpdateFunction((*function).get()));
+  const Function* resolved = (*function)->ResolvedObject();
+  ASSERT_TRUE(resolved->Is<SQLFunction>());
+  EXPECT_EQ(resolved->GetAs<SQLFunction>()->resolution_catalog(),
+            builtin_function_catalog_.get());
+}
+
+TEST_F(LazyResolutionFunctionTest, SetResolutionCatalogOnTemplatedFunction) {
+  const std::string filename = "test_filename";
+  const std::string sql = "CREATE PUBLIC FUNCTION Foo(x ANY TYPE) AS (x);";
+  std::unique_ptr<ParserOutput> parser_output;
+  GOOGLESQL_ASSERT_OK(ParseStatement(sql, parser_options_, &parser_output));
+  const auto* ast =
+      parser_output->statement()->GetAs<ASTCreateFunctionStatement>();
+  ParseResumeLocation templated_location =
+      ComputeExpressionResumeLocation(filename, sql, ast->sql_function_body());
+
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(
+      std::unique_ptr<LazyResolutionFunction> function,
+      LazyResolutionFunction::CreateTemplatedFunction(
+          ParseResumeLocation::FromStringView(filename, sql),
+          templated_location, std::move(parser_output), absl::OkStatus(),
+          ErrorMessageOptions{
+              .mode = ErrorMessageMode::ERROR_MESSAGE_MULTI_LINE_WITH_CARET},
+          Function::SCALAR, ModuleDetails::CreateEmpty()));
+
+  GOOGLESQL_ASSERT_OK(ResolveAndUpdateFunction(function.get()));
+  const Function* resolved = function->ResolvedObject();
+  ASSERT_TRUE(resolved->Is<TemplatedSQLFunction>());
+  EXPECT_EQ(resolved->GetAs<TemplatedSQLFunction>()->resolution_catalog(),
+            builtin_function_catalog_.get());
 }
 
 class LazyResolutionViewTest : public ::testing::Test {

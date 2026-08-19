@@ -12614,6 +12614,7 @@ absl::Status Resolver::ResolveForExprInPivotClause(
   return absl::OkStatus();
 }
 
+
 absl::Status Resolver::ResolveInClauseInPivotClause(
     const ASTPivotValueList* pivot_values, const NameScope* scope,
     const Type* for_expr_type,
@@ -15861,6 +15862,7 @@ absl::Status Resolver::CheckTVFArgumentHasNoUnsupportedAnnotations(
 
         // Some temporary exemptions for non-SQL TVFs.
         // TODO: Block all other annotations
+
         if (!annotations_to_block->Empty()) {
           GOOGLESQL_RET_CHECK(ast_locations[i] != nullptr);
           return MakeSqlErrorAt(ast_locations[i])
@@ -16216,8 +16218,7 @@ absl::Status Resolver::ResolveTVF(
 
   if (language().LanguageFeatureEnabled(
           FEATURE_TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS)) {
-    if (tvf_catalog_entry->Is<SQLTableValuedFunction>() ||
-        tvf_catalog_entry->Is<TemplatedSQLTVF>()) {
+    if (tvf_catalog_entry->Is<SQLTableValuedFunctionInterface>()) {
       bool has_collation = false;
       if (tvf_signature->result_schema().is_value_table()) {
         has_collation = CollationAnnotation::ExistsIn(
@@ -17127,8 +17128,7 @@ absl::Status Resolver::PrepareTVFInputArguments(
       ast_tvf, *function_signature, tvf_catalog_entry->SQLName(),
       /*is_tvf=*/true));
 
-  bool is_sql_tvf = tvf_catalog_entry->Is<TemplatedSQLTVF>() ||
-                    tvf_catalog_entry->Is<SQLTableValuedFunction>();
+  bool is_sql_tvf = tvf_catalog_entry->Is<SQLTableValuedFunctionInterface>();
 
   GOOGLESQL_RETURN_IF_ERROR(CheckTVFArgumentHasNoUnsupportedAnnotations(
       is_sql_tvf, resolved_tvf_args, arg_locations));
@@ -17191,9 +17191,8 @@ absl::Status Resolver::PrepareTVFInputArguments(
         GOOGLESQL_RET_CHECK(result_signature->ConcreteArgument(arg_idx)
                       .type_modifiers()
                       .has_value());
-        type_modifiers = result_signature->ConcreteArgument(arg_idx)
-                             .type_modifiers()
-                             .value();
+        type_modifiers =
+            *result_signature->ConcreteArgument(arg_idx).type_modifiers();
         if (!type_modifiers.IsEmpty()) {
           if (!type_modifiers.type_parameters().IsEmpty()) {
             GOOGLESQL_RET_CHECK(language().LanguageFeatureEnabled(

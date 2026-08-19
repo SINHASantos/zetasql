@@ -133,6 +133,7 @@ const std::map<absl::string_view, TypeNameInfo>& SimpleTypeNameInfoMap() {
       {"json", {TYPE_JSON}},
       {"tokenlist", {TYPE_TOKENLIST}},
       {"uuid", {TYPE_UUID}},
+      {"variant", {TYPE_VARIANT}},
       {"column_list_spec",
        {TYPE_COLUMN_LIST_SPEC, false, FEATURE_COLUMN_LIST_SPEC}},
   };
@@ -505,6 +506,8 @@ std::string SimpleType::CapitalizedName() const {
       return "Uuid";
     case TYPE_COLUMN_LIST_SPEC:
       return "ColumnListSpec";
+    case TYPE_VARIANT:
+      return "Variant";
     default:
       ABSL_LOG(FATAL) << "Unexpected simple type kind: " << kind();
   }
@@ -772,6 +775,13 @@ absl::HashState SimpleType::HashValueContent(const ValueContent& value,
       return HashTokenList(value, std::move(state));
     case TYPE_UUID:
       return absl::HashState::combine(std::move(state), GetUuidValue(value));
+    case TYPE_VARIANT:
+      // TODO: Implement object-level comparisons for VARIANT.
+      // Object-level hashing is not supported yet as it requires deep semantic
+      // inspection of composite types, which should be implemented once a
+      // custom representation is defined. Current implementation only hashes
+      // the inline 8-byte content.
+      return absl::HashState::combine(std::move(state), value.GetAs<int64_t>());
     default:
       ABSL_LOG(ERROR) << "Unexpected type kind: " << kind();
       return state;
@@ -885,6 +895,16 @@ bool SimpleType::ValueContentEquals(
       return GetTokenListValue(x).EquivalentTo(GetTokenListValue(y));
     case TYPE_UUID:
       return ReferencedValueEquals<internal::UuidRef>(x, y);
+    case TYPE_VARIANT:
+      // TODO: Implement object-level comparisons for VARIANT.
+      // Object-level comparisons (e.g. comparing a JSON object vs a STRUCT by
+      // their logical object representation) are not supported yet as they
+      // require deep semantic inspection and handling of different underlying
+      // representations, which should be implemented once a custom
+      // representation (e.g. ValueContentRef) is defined. The current
+      // implementation only performs bitwise/numeric comparison of inline
+      // 8-byte content.
+      return ContentEquals<int64_t>(x, y);
     default:
       ABSL_LOG(FATAL) << "Unexpected simple type kind: " << kind();
   }
@@ -986,7 +1006,7 @@ std::string SimpleType::FormatValueContent(
       // is guaranteed to be valid.
       GOOGLESQL_CHECK_OK(functions::ConvertDateToString(GetDateValue(value), &s));
       return options.add_simple_type_prefix()
-                 ? AddTypePrefix(s, this, options.product_mode)
+                 ? AddTypePrefix(s, this, options.product_mode())
                  : s;
     }
     case TYPE_TIMESTAMP: {
@@ -999,38 +1019,38 @@ std::string SimpleType::FormatValueContent(
       // TODO: Update the following code once timestamp_picos
       // literal syntax is decided.
       return options.add_simple_type_prefix()
-                 ? AddTypePrefix(s, this, options.product_mode)
+                 ? AddTypePrefix(s, this, options.product_mode())
                  : s;
     }
     case TYPE_TIME: {
       std::string s = GetTimeValue(value).DebugString();
       return options.add_simple_type_prefix()
-                 ? AddTypePrefix(s, this, options.product_mode)
+                 ? AddTypePrefix(s, this, options.product_mode())
                  : s;
     }
     case TYPE_DATETIME: {
       std::string s = GetDateTimeValue(value).DebugString();
       return options.add_simple_type_prefix()
-                 ? AddTypePrefix(s, this, options.product_mode)
+                 ? AddTypePrefix(s, this, options.product_mode())
                  : s;
     }
     case TYPE_INT32:
       return options.as_literal()
                  ? absl::StrCat(value.GetAs<int32_t>())
                  : internal::GetCastExpressionString(
-                       value.GetAs<int32_t>(), this, options.product_mode);
+                       value.GetAs<int32_t>(), this, options.product_mode());
     case TYPE_UINT32:
       return options.as_literal()
                  ? absl::StrCat(value.GetAs<uint32_t>())
                  : internal::GetCastExpressionString(
-                       value.GetAs<uint32_t>(), this, options.product_mode);
+                       value.GetAs<uint32_t>(), this, options.product_mode());
     case TYPE_INT64:
       return absl::StrCat(value.GetAs<int64_t>());
     case TYPE_UINT64:
       return options.as_literal()
                  ? absl::StrCat(value.GetAs<uint64_t>())
                  : internal::GetCastExpressionString(
-                       value.GetAs<uint64_t>(), this, options.product_mode);
+                       value.GetAs<uint64_t>(), this, options.product_mode());
     case TYPE_FLOAT: {
       const float float_value = value.GetAs<float>();
 
@@ -1042,7 +1062,7 @@ std::string SimpleType::FormatValueContent(
       if (!std::isfinite(float_value)) {
         return internal::GetCastExpressionString(
             ToStringLiteral(RoundTripFloatToString(float_value)), this,
-            options.product_mode, options.use_external_float32);
+            options.product_mode(), options.use_external_float32);
       } else {
         std::string s = RoundTripFloatToString(float_value);
         // Make sure that doubles always print with a . or an 'e' so they
@@ -1053,7 +1073,7 @@ std::string SimpleType::FormatValueContent(
         }
         return options.as_literal() ? s
                                     : internal::GetCastExpressionString(
-                                          s, this, options.product_mode,
+                                          s, this, options.product_mode(),
                                           options.use_external_float32);
       }
     }
@@ -1069,7 +1089,7 @@ std::string SimpleType::FormatValueContent(
       if (!std::isfinite(double_value)) {
         return internal::GetCastExpressionString(
             ToStringLiteral(RoundTripDoubleToString(double_value)), this,
-            options.product_mode);
+            options.product_mode());
       } else {
         std::string s = RoundTripDoubleToString(double_value);
         // Make sure that doubles always print with a . or an 'e' so they
@@ -1110,7 +1130,7 @@ std::string SimpleType::FormatValueContent(
       return options.add_simple_type_prefix()
                  ? internal::GetCastExpressionString(
                        ToSingleQuotedStringLiteral(s), this,
-                       options.product_mode)
+                       options.product_mode())
                  : s;
     }
     case TYPE_TOKENLIST:

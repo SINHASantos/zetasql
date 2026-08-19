@@ -6075,6 +6075,9 @@ absl::Status Resolver::CheckSQLBodyReturnTypesAndCoerceIfNeeded(
             return MakeSqlError() << error;
           }
         }
+
+        // Some temporary exemptions for non-SQL TVFs.
+        // TODO: Block all other annotations
       }
 
       // Even if the flag is enabled, still block other annotations until we

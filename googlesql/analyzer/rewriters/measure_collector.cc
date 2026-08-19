@@ -18,6 +18,7 @@
 
 #include <string>
 
+#include "googlesql/public/types/annotation.h"
 #include "googlesql/public/types/type.h"
 #include "googlesql/resolved_ast/resolved_column.h"
 #include "googlesql/base/check.h"
@@ -85,7 +86,7 @@ absl::StatusOr<ResolvedColumn> MeasureCollector::GetClosureColumn(
   // new closure column for it.
   const std::string closure_column_name = absl::StrCat(
       "struct_for_measures_from_table_", m.table_name_id().ToStringView());
-  const Type* closure_type = measure_info.closure_struct_type;
+  AnnotatedType closure_type = measure_info.closure_struct_annotated_type;
   ResolvedColumn new_closure_column = column_factory_.MakeCol(
       m.table_name_id().ToStringView(), closure_column_name, closure_type);
   propagated_closure_columns_[m] = new_closure_column;

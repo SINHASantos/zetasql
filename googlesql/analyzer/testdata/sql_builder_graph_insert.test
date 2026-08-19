@@ -16,31 +16,32 @@ GeneralizedQueryStmt
         +-scan_list=
           +-GraphLinearScan
             +-scan_list=
+              +-GraphInsertScan
+              | +-input_scan=
+              | | +-SingleRowScan
+              | +-insert_node_list=
+              | | +-n#1 :=
+              | |   +-GraphInsertElement
+              | |     +-type=GRAPH_NODE(aml)<age UINT32, birthday DATE, data BYTES, id INT64, name STRING>
+              | |     +-property_list=
+              | |     | +-GraphDMLPropertyItem
+              | |     | | +-property_name="name"
+              | |     | | +-property=name(STRING)
+              | |     | | +-property_value=
+              | |     | |   +-Literal(type=STRING, value="John")
+              | |     | +-GraphDMLPropertyItem
+              | |     |   +-property_name="id"
+              | |     |   +-property=id(INT64)
+              | |     |   +-property_value=
+              | |     |     +-Literal(type=INT64, value=1)
+              | |     +-label_list=
+              | |     | +-GraphLabel(label=aml.Person)
+              | |     | +-GraphLabel(label=aml.HasId)
+              | |     +-element_table=Person
+              | +-path_element_list=[$element_table.n#1]
               +-FinishScan
                 +-input_scan=
-                  +-GraphInsertScan
-                    +-input_scan=
-                    | +-SingleRowScan
-                    +-insert_node_list=
-                    | +-n#1 :=
-                    |   +-GraphInsertElement
-                    |     +-type=GRAPH_NODE(aml)<age UINT32, birthday DATE, data BYTES, id INT64, name STRING>
-                    |     +-property_list=
-                    |     | +-GraphDMLPropertyItem
-                    |     | | +-property_name="name"
-                    |     | | +-property=name(STRING)
-                    |     | | +-property_value=
-                    |     | |   +-Literal(type=STRING, value="John")
-                    |     | +-GraphDMLPropertyItem
-                    |     |   +-property_name="id"
-                    |     |   +-property=id(INT64)
-                    |     |   +-property_value=
-                    |     |     +-Literal(type=INT64, value=1)
-                    |     +-label_list=
-                    |     | +-GraphLabel(label=aml.Person)
-                    |     | +-GraphLabel(label=aml.HasId)
-                    |     +-element_table=Person
-                    +-path_element_list=[$element_table.n#1]
+                  +-GraphRefScan
 
 [SQLBUILDER_TARGET_SYNTAX_MODE standard]
 [SQLBUILDER_OUTPUT]
@@ -68,31 +69,32 @@ GeneralizedQueryStmt
         +-scan_list=
           +-GraphLinearScan
             +-scan_list=
+              +-GraphInsertScan
+              | +-input_scan=
+              | | +-SingleRowScan
+              | +-insert_node_list=
+              | | +-n#1 :=
+              | |   +-GraphInsertElement
+              | |     +-type=GRAPH_NODE(aml)<age UINT32, birthday DATE, data BYTES, id INT64, name STRING>
+              | |     +-property_list=
+              | |     | +-GraphDMLPropertyItem
+              | |     | | +-property_name="name"
+              | |     | | +-property=name(STRING)
+              | |     | | +-property_value=
+              | |     | |   +-Literal(type=STRING, value="John")
+              | |     | +-GraphDMLPropertyItem
+              | |     |   +-property_name="id"
+              | |     |   +-property=id(INT64)
+              | |     |   +-property_value=
+              | |     |     +-Literal(type=INT64, value=1)
+              | |     +-label_list=
+              | |     | +-GraphLabel(label=aml.Person)
+              | |     | +-GraphLabel(label=aml.HasId)
+              | |     +-element_table=Person
+              | +-path_element_list=[$element_table.n#1]
               +-FinishScan
                 +-input_scan=
-                  +-GraphInsertScan
-                    +-input_scan=
-                    | +-SingleRowScan
-                    +-insert_node_list=
-                    | +-n#1 :=
-                    |   +-GraphInsertElement
-                    |     +-type=GRAPH_NODE(aml)<age UINT32, birthday DATE, data BYTES, id INT64, name STRING>
-                    |     +-property_list=
-                    |     | +-GraphDMLPropertyItem
-                    |     | | +-property_name="name"
-                    |     | | +-property=name(STRING)
-                    |     | | +-property_value=
-                    |     | |   +-Literal(type=STRING, value="John")
-                    |     | +-GraphDMLPropertyItem
-                    |     |   +-property_name="id"
-                    |     |   +-property=id(INT64)
-                    |     |   +-property_value=
-                    |     |     +-Literal(type=INT64, value=1)
-                    |     +-label_list=
-                    |     | +-GraphLabel(label=aml.Person)
-                    |     | +-GraphLabel(label=aml.HasId)
-                    |     +-element_table=Person
-                    +-path_element_list=[$element_table.n#1]
+                  +-GraphRefScan
 
 [SQLBUILDER_TARGET_SYNTAX_MODE standard]
 [SQLBUILDER_OUTPUT]
@@ -120,30 +122,31 @@ GeneralizedQueryStmt
         +-scan_list=
           +-GraphLinearScan
             +-scan_list=
+              +-GraphInsertScan
+              | +-input_scan=
+              | | +-SingleRowScan
+              | +-insert_node_list=
+              | | +-$insert_node#1 :=
+              | |   +-GraphInsertElement
+              | |     +-type=GRAPH_NODE(aml)<age UINT32, birthday DATE, data BYTES, id INT64, name STRING>
+              | |     +-property_list=
+              | |     | +-GraphDMLPropertyItem
+              | |     | | +-property_name="name"
+              | |     | | +-property=name(STRING)
+              | |     | | +-property_value=
+              | |     | |   +-Literal(type=STRING, value="John")
+              | |     | +-GraphDMLPropertyItem
+              | |     |   +-property_name="id"
+              | |     |   +-property=id(INT64)
+              | |     |   +-property_value=
+              | |     |     +-Literal(type=INT64, value=1)
+              | |     +-label_list=
+              | |     | +-GraphLabel(label=aml.Person)
+              | |     +-element_table=Person
+              | +-path_element_list=[$element_table.$insert_node#1]
               +-FinishScan
                 +-input_scan=
-                  +-GraphInsertScan
-                    +-input_scan=
-                    | +-SingleRowScan
-                    +-insert_node_list=
-                    | +-$insert_node#1 :=
-                    |   +-GraphInsertElement
-                    |     +-type=GRAPH_NODE(aml)<age UINT32, birthday DATE, data BYTES, id INT64, name STRING>
-                    |     +-property_list=
-                    |     | +-GraphDMLPropertyItem
-                    |     | | +-property_name="name"
-                    |     | | +-property=name(STRING)
-                    |     | | +-property_value=
-                    |     | |   +-Literal(type=STRING, value="John")
-                    |     | +-GraphDMLPropertyItem
-                    |     |   +-property_name="id"
-                    |     |   +-property=id(INT64)
-                    |     |   +-property_value=
-                    |     |     +-Literal(type=INT64, value=1)
-                    |     +-label_list=
-                    |     | +-GraphLabel(label=aml.Person)
-                    |     +-element_table=Person
-                    +-path_element_list=[$element_table.$insert_node#1]
+                  +-GraphRefScan
 
 [SQLBUILDER_TARGET_SYNTAX_MODE standard]
 [SQLBUILDER_OUTPUT]
@@ -171,49 +174,50 @@ GeneralizedQueryStmt
         +-scan_list=
           +-GraphLinearScan
             +-scan_list=
+              +-GraphInsertScan
+              | +-column_list=$element_table.[p#1, a#2]
+              | +-input_scan=
+              | | +-SingleRowScan
+              | +-insert_node_list=
+              | | +-p#1 :=
+              | | | +-GraphInsertElement
+              | | |   +-type=GRAPH_NODE(aml)<age UINT32, birthday DATE, data BYTES, id INT64, name STRING>
+              | | |   +-property_list=
+              | | |   | +-GraphDMLPropertyItem
+              | | |   |   +-property_name="id"
+              | | |   |   +-property=id(INT64)
+              | | |   |   +-property_value=
+              | | |   |     +-Literal(type=INT64, value=1)
+              | | |   +-label_list=
+              | | |   | +-GraphLabel(label=aml.Person)
+              | | |   +-element_table=Person
+              | | +-a#2 :=
+              | |   +-GraphInsertElement
+              | |     +-type=GRAPH_NODE(aml)<balance UINT64, id INT64>
+              | |     +-property_list=
+              | |     | +-GraphDMLPropertyItem
+              | |     |   +-property_name="id"
+              | |     |   +-property=id(INT64)
+              | |     |   +-property_value=
+              | |     |     +-Literal(type=INT64, value=2)
+              | |     +-label_list=
+              | |     | +-GraphLabel(label=aml.Account)
+              | |     +-element_table=Account
+              | +-insert_edge_list=
+              | | +-$insert_edge#3 :=
+              | |   +-GraphInsertElement
+              | |     +-type=GRAPH_EDGE(aml)<accountId INT64, personId INT64>
+              | |     +-label_list=
+              | |     | +-GraphLabel(label=aml.PersonOwnAccount)
+              | |     +-source_node=
+              | |     | +-ColumnRef(type=GRAPH_NODE(aml)<age UINT32, birthday DATE, data BYTES, id INT64, name STRING>, column=$element_table.p#1)
+              | |     +-dest_node=
+              | |     | +-ColumnRef(type=GRAPH_NODE(aml)<balance UINT64, id INT64>, column=$element_table.a#2)
+              | |     +-element_table=PersonOwnAccount
+              | +-path_element_list=$element_table.[p#1, $insert_edge#3, a#2]
               +-FinishScan
                 +-input_scan=
-                  +-GraphInsertScan
-                    +-column_list=$element_table.[p#1, a#2]
-                    +-input_scan=
-                    | +-SingleRowScan
-                    +-insert_node_list=
-                    | +-p#1 :=
-                    | | +-GraphInsertElement
-                    | |   +-type=GRAPH_NODE(aml)<age UINT32, birthday DATE, data BYTES, id INT64, name STRING>
-                    | |   +-property_list=
-                    | |   | +-GraphDMLPropertyItem
-                    | |   |   +-property_name="id"
-                    | |   |   +-property=id(INT64)
-                    | |   |   +-property_value=
-                    | |   |     +-Literal(type=INT64, value=1)
-                    | |   +-label_list=
-                    | |   | +-GraphLabel(label=aml.Person)
-                    | |   +-element_table=Person
-                    | +-a#2 :=
-                    |   +-GraphInsertElement
-                    |     +-type=GRAPH_NODE(aml)<balance UINT64, id INT64>
-                    |     +-property_list=
-                    |     | +-GraphDMLPropertyItem
-                    |     |   +-property_name="id"
-                    |     |   +-property=id(INT64)
-                    |     |   +-property_value=
-                    |     |     +-Literal(type=INT64, value=2)
-                    |     +-label_list=
-                    |     | +-GraphLabel(label=aml.Account)
-                    |     +-element_table=Account
-                    +-insert_edge_list=
-                    | +-$insert_edge#3 :=
-                    |   +-GraphInsertElement
-                    |     +-type=GRAPH_EDGE(aml)<accountId INT64, personId INT64>
-                    |     +-label_list=
-                    |     | +-GraphLabel(label=aml.PersonOwnAccount)
-                    |     +-source_node=
-                    |     | +-ColumnRef(type=GRAPH_NODE(aml)<age UINT32, birthday DATE, data BYTES, id INT64, name STRING>, column=$element_table.p#1)
-                    |     +-dest_node=
-                    |     | +-ColumnRef(type=GRAPH_NODE(aml)<balance UINT64, id INT64>, column=$element_table.a#2)
-                    |     +-element_table=PersonOwnAccount
-                    +-path_element_list=$element_table.[p#1, $insert_edge#3, a#2]
+                  +-GraphRefScan(column_list=$element_table.[p#1, a#2])
 
 [SQLBUILDER_TARGET_SYNTAX_MODE standard]
 [SQLBUILDER_OUTPUT]
@@ -242,25 +246,26 @@ GeneralizedQueryStmt
         +-scan_list=
           +-GraphLinearScan
             +-scan_list=
+              +-GraphInsertScan
+              | +-input_scan=
+              | | +-SingleRowScan
+              | +-insert_node_list=
+              | | +-p#1 :=
+              | |   +-GraphInsertElement
+              | |     +-type=GRAPH_NODE(aml)<age UINT32, birthday DATE, data BYTES, id INT64, name STRING>
+              | |     +-property_list=
+              | |     | +-GraphDMLPropertyItem
+              | |     |   +-property_name="name"
+              | |     |   +-property=name(STRING)
+              | |     |   +-property_value=
+              | |     |     +-Literal(type=STRING, value="A")
+              | |     +-label_list=
+              | |     | +-GraphLabel(label=aml.Person)
+              | |     +-element_table=Person
+              | +-path_element_list=$element_table.[p#1, p#1]
               +-FinishScan
                 +-input_scan=
-                  +-GraphInsertScan
-                    +-input_scan=
-                    | +-SingleRowScan
-                    +-insert_node_list=
-                    | +-p#1 :=
-                    |   +-GraphInsertElement
-                    |     +-type=GRAPH_NODE(aml)<age UINT32, birthday DATE, data BYTES, id INT64, name STRING>
-                    |     +-property_list=
-                    |     | +-GraphDMLPropertyItem
-                    |     |   +-property_name="name"
-                    |     |   +-property=name(STRING)
-                    |     |   +-property_value=
-                    |     |     +-Literal(type=STRING, value="A")
-                    |     +-label_list=
-                    |     | +-GraphLabel(label=aml.Person)
-                    |     +-element_table=Person
-                    +-path_element_list=$element_table.[p#1, p#1]
+                  +-GraphRefScan
 
 [SQLBUILDER_TARGET_SYNTAX_MODE standard]
 [SQLBUILDER_OUTPUT]
@@ -289,71 +294,72 @@ GeneralizedQueryStmt
         +-scan_list=
           +-GraphLinearScan
             +-scan_list=
+              +-GraphInsertScan
+              | +-column_list=$element_table.[p#1, a1#2, a2#4]
+              | +-input_scan=
+              | | +-SingleRowScan
+              | +-insert_node_list=
+              | | +-p#1 :=
+              | | | +-GraphInsertElement
+              | | |   +-type=GRAPH_NODE(aml)<age UINT32, birthday DATE, data BYTES, id INT64, name STRING>
+              | | |   +-property_list=
+              | | |   | +-GraphDMLPropertyItem
+              | | |   |   +-property_name="id"
+              | | |   |   +-property=id(INT64)
+              | | |   |   +-property_value=
+              | | |   |     +-Literal(type=INT64, value=1)
+              | | |   +-label_list=
+              | | |   | +-GraphLabel(label=aml.Person)
+              | | |   +-element_table=Person
+              | | +-a1#2 :=
+              | | | +-GraphInsertElement
+              | | |   +-type=GRAPH_NODE(aml)<balance UINT64, id INT64>
+              | | |   +-property_list=
+              | | |   | +-GraphDMLPropertyItem
+              | | |   |   +-property_name="id"
+              | | |   |   +-property=id(INT64)
+              | | |   |   +-property_value=
+              | | |   |     +-Literal(type=INT64, value=100)
+              | | |   +-label_list=
+              | | |   | +-GraphLabel(label=aml.Account)
+              | | |   +-element_table=Account
+              | | +-a2#4 :=
+              | |   +-GraphInsertElement
+              | |     +-type=GRAPH_NODE(aml)<balance UINT64, id INT64>
+              | |     +-property_list=
+              | |     | +-GraphDMLPropertyItem
+              | |     |   +-property_name="id"
+              | |     |   +-property=id(INT64)
+              | |     |   +-property_value=
+              | |     |     +-Literal(type=INT64, value=200)
+              | |     +-label_list=
+              | |     | +-GraphLabel(label=aml.Account)
+              | |     +-element_table=Account
+              | +-insert_edge_list=
+              | | +-e1#3 :=
+              | | | +-GraphInsertElement
+              | | |   +-type=GRAPH_EDGE(aml)<accountId INT64, personId INT64>
+              | | |   +-label_list=
+              | | |   | +-GraphLabel(label=aml.PersonOwnAccount)
+              | | |   +-source_node=
+              | | |   | +-ColumnRef(type=GRAPH_NODE(aml)<age UINT32, birthday DATE, data BYTES, id INT64, name STRING>, column=$element_table.p#1)
+              | | |   +-dest_node=
+              | | |   | +-ColumnRef(type=GRAPH_NODE(aml)<balance UINT64, id INT64>, column=$element_table.a1#2)
+              | | |   +-element_table=PersonOwnAccount
+              | | +-e2#5 :=
+              | |   +-GraphInsertElement
+              | |     +-type=GRAPH_EDGE(aml)<accountId INT64, personId INT64>
+              | |     +-label_list=
+              | |     | +-GraphLabel(label=aml.PersonOwnAccount)
+              | |     +-source_node=
+              | |     | +-ColumnRef(type=GRAPH_NODE(aml)<age UINT32, birthday DATE, data BYTES, id INT64, name STRING>, column=$element_table.p#1)
+              | |     +-dest_node=
+              | |     | +-ColumnRef(type=GRAPH_NODE(aml)<balance UINT64, id INT64>, column=$element_table.a2#4)
+              | |     +-element_table=PersonOwnAccount
+              | +-path_element_list=$element_table.[p#1, e1#3, a1#2, p#1, e2#5, a2#4]
               +-FinishScan
                 +-input_scan=
-                  +-GraphInsertScan
-                    +-column_list=$element_table.[p#1, a1#2, a2#4]
-                    +-input_scan=
-                    | +-SingleRowScan
-                    +-insert_node_list=
-                    | +-p#1 :=
-                    | | +-GraphInsertElement
-                    | |   +-type=GRAPH_NODE(aml)<age UINT32, birthday DATE, data BYTES, id INT64, name STRING>
-                    | |   +-property_list=
-                    | |   | +-GraphDMLPropertyItem
-                    | |   |   +-property_name="id"
-                    | |   |   +-property=id(INT64)
-                    | |   |   +-property_value=
-                    | |   |     +-Literal(type=INT64, value=1)
-                    | |   +-label_list=
-                    | |   | +-GraphLabel(label=aml.Person)
-                    | |   +-element_table=Person
-                    | +-a1#2 :=
-                    | | +-GraphInsertElement
-                    | |   +-type=GRAPH_NODE(aml)<balance UINT64, id INT64>
-                    | |   +-property_list=
-                    | |   | +-GraphDMLPropertyItem
-                    | |   |   +-property_name="id"
-                    | |   |   +-property=id(INT64)
-                    | |   |   +-property_value=
-                    | |   |     +-Literal(type=INT64, value=100)
-                    | |   +-label_list=
-                    | |   | +-GraphLabel(label=aml.Account)
-                    | |   +-element_table=Account
-                    | +-a2#4 :=
-                    |   +-GraphInsertElement
-                    |     +-type=GRAPH_NODE(aml)<balance UINT64, id INT64>
-                    |     +-property_list=
-                    |     | +-GraphDMLPropertyItem
-                    |     |   +-property_name="id"
-                    |     |   +-property=id(INT64)
-                    |     |   +-property_value=
-                    |     |     +-Literal(type=INT64, value=200)
-                    |     +-label_list=
-                    |     | +-GraphLabel(label=aml.Account)
-                    |     +-element_table=Account
-                    +-insert_edge_list=
-                    | +-e1#3 :=
-                    | | +-GraphInsertElement
-                    | |   +-type=GRAPH_EDGE(aml)<accountId INT64, personId INT64>
-                    | |   +-label_list=
-                    | |   | +-GraphLabel(label=aml.PersonOwnAccount)
-                    | |   +-source_node=
-                    | |   | +-ColumnRef(type=GRAPH_NODE(aml)<age UINT32, birthday DATE, data BYTES, id INT64, name STRING>, column=$element_table.p#1)
-                    | |   +-dest_node=
-                    | |   | +-ColumnRef(type=GRAPH_NODE(aml)<balance UINT64, id INT64>, column=$element_table.a1#2)
-                    | |   +-element_table=PersonOwnAccount
-                    | +-e2#5 :=
-                    |   +-GraphInsertElement
-                    |     +-type=GRAPH_EDGE(aml)<accountId INT64, personId INT64>
-                    |     +-label_list=
-                    |     | +-GraphLabel(label=aml.PersonOwnAccount)
-                    |     +-source_node=
-                    |     | +-ColumnRef(type=GRAPH_NODE(aml)<age UINT32, birthday DATE, data BYTES, id INT64, name STRING>, column=$element_table.p#1)
-                    |     +-dest_node=
-                    |     | +-ColumnRef(type=GRAPH_NODE(aml)<balance UINT64, id INT64>, column=$element_table.a2#4)
-                    |     +-element_table=PersonOwnAccount
-                    +-path_element_list=$element_table.[p#1, e1#3, a1#2, p#1, e2#5, a2#4]
+                  +-GraphRefScan(column_list=$element_table.[p#1, a1#2, a2#4])
 
 [SQLBUILDER_TARGET_SYNTAX_MODE standard]
 [SQLBUILDER_OUTPUT]
@@ -383,25 +389,26 @@ GeneralizedQueryStmt
         +-scan_list=
           +-GraphLinearScan
             +-scan_list=
+              +-GraphInsertScan
+              | +-input_scan=
+              | | +-SingleRowScan
+              | +-insert_node_list=
+              | | +-n#1 :=
+              | |   +-GraphInsertElement
+              | |     +-type=GRAPH_NODE(aml)<age UINT32, birthday DATE, data BYTES, id INT64, name STRING>
+              | |     +-property_list=
+              | |     | +-GraphDMLPropertyItem
+              | |     |   +-property_name="name"
+              | |     |   +-property=name(STRING)
+              | |     |   +-property_value=
+              | |     |     +-Literal(type=STRING, value="John")
+              | |     +-label_list=
+              | |     | +-GraphLabel(label=aml.Person)
+              | |     +-element_table=Person
+              | +-path_element_list=[$element_table.n#1]
               +-FinishScan
                 +-input_scan=
-                  +-GraphInsertScan
-                    +-input_scan=
-                    | +-SingleRowScan
-                    +-insert_node_list=
-                    | +-n#1 :=
-                    |   +-GraphInsertElement
-                    |     +-type=GRAPH_NODE(aml)<age UINT32, birthday DATE, data BYTES, id INT64, name STRING>
-                    |     +-property_list=
-                    |     | +-GraphDMLPropertyItem
-                    |     |   +-property_name="name"
-                    |     |   +-property=name(STRING)
-                    |     |   +-property_value=
-                    |     |     +-Literal(type=STRING, value="John")
-                    |     +-label_list=
-                    |     | +-GraphLabel(label=aml.Person)
-                    |     +-element_table=Person
-                    +-path_element_list=[$element_table.n#1]
+                  +-GraphRefScan
 
 [SQLBUILDER_TARGET_SYNTAX_MODE standard]
 [SQLBUILDER_OUTPUT]
@@ -562,37 +569,38 @@ GeneralizedQueryStmt
           | +-column_match_mode=CORRESPONDING
           +-GraphLinearScan
             +-scan_list=
+              +-GraphInsertScan
+              | +-column_list=[$graph_set_op.n#5, $element_table.p#6]
+              | +-input_scan=
+              | | +-GraphRefScan(column_list=[$graph_set_op.n#5])
+              | +-insert_node_list=
+              | | +-p#6 :=
+              | |   +-GraphInsertElement
+              | |     +-type=GRAPH_NODE(aml)<age UINT32, birthday DATE, data BYTES, id INT64, name STRING>
+              | |     +-property_list=
+              | |     | +-GraphDMLPropertyItem
+              | |     |   +-property_name="id"
+              | |     |   +-property=id(INT64)
+              | |     |   +-property_value=
+              | |     |     +-Literal(type=INT64, value=1)
+              | |     +-label_list=
+              | |     | +-GraphLabel(label=aml.Person)
+              | |     +-element_table=Person
+              | +-insert_edge_list=
+              | | +-e#7 :=
+              | |   +-GraphInsertElement
+              | |     +-type=GRAPH_EDGE(aml)<accountId INT64, personId INT64>
+              | |     +-label_list=
+              | |     | +-GraphLabel(label=aml.PersonOwnAccount)
+              | |     +-source_node=
+              | |     | +-ColumnRef(type=GRAPH_NODE(aml)<age UINT32, birthday DATE, data BYTES, id INT64, name STRING>, column=$element_table.p#6)
+              | |     +-dest_node=
+              | |     | +-ColumnRef(type=GRAPH_NODE(aml)<balance UINT64, id INT64>, column=$graph_set_op.n#5)
+              | |     +-element_table=PersonOwnAccount
+              | +-path_element_list=[$element_table.p#6, $element_table.e#7, $graph_set_op.n#5]
               +-FinishScan
                 +-input_scan=
-                  +-GraphInsertScan
-                    +-column_list=[$graph_set_op.n#5, $element_table.p#6]
-                    +-input_scan=
-                    | +-GraphRefScan(column_list=[$graph_set_op.n#5])
-                    +-insert_node_list=
-                    | +-p#6 :=
-                    |   +-GraphInsertElement
-                    |     +-type=GRAPH_NODE(aml)<age UINT32, birthday DATE, data BYTES, id INT64, name STRING>
-                    |     +-property_list=
-                    |     | +-GraphDMLPropertyItem
-                    |     |   +-property_name="id"
-                    |     |   +-property=id(INT64)
-                    |     |   +-property_value=
-                    |     |     +-Literal(type=INT64, value=1)
-                    |     +-label_list=
-                    |     | +-GraphLabel(label=aml.Person)
-                    |     +-element_table=Person
-                    +-insert_edge_list=
-                    | +-e#7 :=
-                    |   +-GraphInsertElement
-                    |     +-type=GRAPH_EDGE(aml)<accountId INT64, personId INT64>
-                    |     +-label_list=
-                    |     | +-GraphLabel(label=aml.PersonOwnAccount)
-                    |     +-source_node=
-                    |     | +-ColumnRef(type=GRAPH_NODE(aml)<age UINT32, birthday DATE, data BYTES, id INT64, name STRING>, column=$element_table.p#6)
-                    |     +-dest_node=
-                    |     | +-ColumnRef(type=GRAPH_NODE(aml)<balance UINT64, id INT64>, column=$graph_set_op.n#5)
-                    |     +-element_table=PersonOwnAccount
-                    +-path_element_list=[$element_table.p#6, $element_table.e#7, $graph_set_op.n#5]
+                  +-GraphRefScan(column_list=[$graph_set_op.n#5, $element_table.p#6])
 
 [SQLBUILDER_TARGET_SYNTAX_MODE standard]
 [SQLBUILDER_OUTPUT]
@@ -668,37 +676,38 @@ GeneralizedQueryStmt
               |     | +-n#3 := ColumnRef(type=GRAPH_NODE(aml)<age UINT32, birthday DATE, data BYTES, id INT64, name STRING>, column=$element_table.n#1)
               |     +-aggregate_list=
               |       +-cnt#2 := AggregateFunctionCall(GoogleSQL:$count_star() -> INT64)
+              +-GraphInsertScan
+              | +-column_list=[$graph_table.n#3, $graph_table.cnt#2, $element_table.a#4]
+              | +-input_scan=
+              | | +-GraphRefScan(column_list=$graph_table.[n#3, cnt#2])
+              | +-insert_node_list=
+              | | +-a#4 :=
+              | |   +-GraphInsertElement
+              | |     +-type=GRAPH_NODE(aml)<balance UINT64, id INT64>
+              | |     +-property_list=
+              | |     | +-GraphDMLPropertyItem
+              | |     |   +-property_name="id"
+              | |     |   +-property=id(INT64)
+              | |     |   +-property_value=
+              | |     |     +-Literal(type=INT64, value=2)
+              | |     +-label_list=
+              | |     | +-GraphLabel(label=aml.Account)
+              | |     +-element_table=Account
+              | +-insert_edge_list=
+              | | +-e#5 :=
+              | |   +-GraphInsertElement
+              | |     +-type=GRAPH_EDGE(aml)<accountId INT64, personId INT64>
+              | |     +-label_list=
+              | |     | +-GraphLabel(label=aml.PersonOwnAccount)
+              | |     +-source_node=
+              | |     | +-ColumnRef(type=GRAPH_NODE(aml)<age UINT32, birthday DATE, data BYTES, id INT64, name STRING>, column=$graph_table.n#3)
+              | |     +-dest_node=
+              | |     | +-ColumnRef(type=GRAPH_NODE(aml)<balance UINT64, id INT64>, column=$element_table.a#4)
+              | |     +-element_table=PersonOwnAccount
+              | +-path_element_list=[$graph_table.n#3, $element_table.e#5, $element_table.a#4]
               +-FinishScan
                 +-input_scan=
-                  +-GraphInsertScan
-                    +-column_list=[$graph_table.n#3, $graph_table.cnt#2, $element_table.a#4]
-                    +-input_scan=
-                    | +-GraphRefScan(column_list=$graph_table.[n#3, cnt#2])
-                    +-insert_node_list=
-                    | +-a#4 :=
-                    |   +-GraphInsertElement
-                    |     +-type=GRAPH_NODE(aml)<balance UINT64, id INT64>
-                    |     +-property_list=
-                    |     | +-GraphDMLPropertyItem
-                    |     |   +-property_name="id"
-                    |     |   +-property=id(INT64)
-                    |     |   +-property_value=
-                    |     |     +-Literal(type=INT64, value=2)
-                    |     +-label_list=
-                    |     | +-GraphLabel(label=aml.Account)
-                    |     +-element_table=Account
-                    +-insert_edge_list=
-                    | +-e#5 :=
-                    |   +-GraphInsertElement
-                    |     +-type=GRAPH_EDGE(aml)<accountId INT64, personId INT64>
-                    |     +-label_list=
-                    |     | +-GraphLabel(label=aml.PersonOwnAccount)
-                    |     +-source_node=
-                    |     | +-ColumnRef(type=GRAPH_NODE(aml)<age UINT32, birthday DATE, data BYTES, id INT64, name STRING>, column=$graph_table.n#3)
-                    |     +-dest_node=
-                    |     | +-ColumnRef(type=GRAPH_NODE(aml)<balance UINT64, id INT64>, column=$element_table.a#4)
-                    |     +-element_table=PersonOwnAccount
-                    +-path_element_list=[$graph_table.n#3, $element_table.e#5, $element_table.a#4]
+                  +-GraphRefScan(column_list=[$graph_table.n#3, $graph_table.cnt#2, $element_table.a#4])
 
 [SQLBUILDER_TARGET_SYNTAX_MODE standard]
 [SQLBUILDER_OUTPUT]
@@ -776,37 +785,38 @@ GeneralizedQueryStmt
           |           +-cnt#2 := AggregateFunctionCall(GoogleSQL:$count_star() -> INT64)
           +-GraphLinearScan
             +-scan_list=
+              +-GraphInsertScan
+              | +-column_list=[$graph_table.n#3, $graph_table.cnt#2, $element_table.a#4]
+              | +-input_scan=
+              | | +-GraphRefScan(column_list=$graph_table.[n#3, cnt#2])
+              | +-insert_node_list=
+              | | +-a#4 :=
+              | |   +-GraphInsertElement
+              | |     +-type=GRAPH_NODE(aml)<balance UINT64, id INT64>
+              | |     +-property_list=
+              | |     | +-GraphDMLPropertyItem
+              | |     |   +-property_name="id"
+              | |     |   +-property=id(INT64)
+              | |     |   +-property_value=
+              | |     |     +-Literal(type=INT64, value=2)
+              | |     +-label_list=
+              | |     | +-GraphLabel(label=aml.Account)
+              | |     +-element_table=Account
+              | +-insert_edge_list=
+              | | +-e#5 :=
+              | |   +-GraphInsertElement
+              | |     +-type=GRAPH_EDGE(aml)<accountId INT64, personId INT64>
+              | |     +-label_list=
+              | |     | +-GraphLabel(label=aml.PersonOwnAccount)
+              | |     +-source_node=
+              | |     | +-ColumnRef(type=GRAPH_NODE(aml)<age UINT32, birthday DATE, data BYTES, id INT64, name STRING>, column=$graph_table.n#3)
+              | |     +-dest_node=
+              | |     | +-ColumnRef(type=GRAPH_NODE(aml)<balance UINT64, id INT64>, column=$element_table.a#4)
+              | |     +-element_table=PersonOwnAccount
+              | +-path_element_list=[$graph_table.n#3, $element_table.e#5, $element_table.a#4]
               +-FinishScan
                 +-input_scan=
-                  +-GraphInsertScan
-                    +-column_list=[$graph_table.n#3, $graph_table.cnt#2, $element_table.a#4]
-                    +-input_scan=
-                    | +-GraphRefScan(column_list=$graph_table.[n#3, cnt#2])
-                    +-insert_node_list=
-                    | +-a#4 :=
-                    |   +-GraphInsertElement
-                    |     +-type=GRAPH_NODE(aml)<balance UINT64, id INT64>
-                    |     +-property_list=
-                    |     | +-GraphDMLPropertyItem
-                    |     |   +-property_name="id"
-                    |     |   +-property=id(INT64)
-                    |     |   +-property_value=
-                    |     |     +-Literal(type=INT64, value=2)
-                    |     +-label_list=
-                    |     | +-GraphLabel(label=aml.Account)
-                    |     +-element_table=Account
-                    +-insert_edge_list=
-                    | +-e#5 :=
-                    |   +-GraphInsertElement
-                    |     +-type=GRAPH_EDGE(aml)<accountId INT64, personId INT64>
-                    |     +-label_list=
-                    |     | +-GraphLabel(label=aml.PersonOwnAccount)
-                    |     +-source_node=
-                    |     | +-ColumnRef(type=GRAPH_NODE(aml)<age UINT32, birthday DATE, data BYTES, id INT64, name STRING>, column=$graph_table.n#3)
-                    |     +-dest_node=
-                    |     | +-ColumnRef(type=GRAPH_NODE(aml)<balance UINT64, id INT64>, column=$element_table.a#4)
-                    |     +-element_table=PersonOwnAccount
-                    +-path_element_list=[$graph_table.n#3, $element_table.e#5, $element_table.a#4]
+                  +-GraphRefScan(column_list=[$graph_table.n#3, $graph_table.cnt#2, $element_table.a#4])
 
 [SQLBUILDER_TARGET_SYNTAX_MODE standard]
 [SQLBUILDER_OUTPUT]
@@ -890,24 +900,25 @@ GeneralizedQueryStmt
               | |   +-tail=$element_table.b#2
               | +-input_scan=
               |   +-SingleRowScan
+              +-GraphInsertScan
+              | +-column_list=$element_table.[a#1, b#2]
+              | +-input_scan=
+              | | +-GraphRefScan(column_list=$element_table.[a#1, b#2])
+              | +-insert_edge_list=
+              | | +-e#3 :=
+              | |   +-GraphInsertElement
+              | |     +-type=GRAPH_EDGE(aml)<accountId INT64, personId INT64>
+              | |     +-label_list=
+              | |     | +-GraphLabel(label=aml.PersonOwnAccount)
+              | |     +-source_node=
+              | |     | +-ColumnRef(type=GRAPH_NODE(aml)<age UINT32, birthday DATE, data BYTES, id INT64, name STRING>, column=$element_table.a#1)
+              | |     +-dest_node=
+              | |     | +-ColumnRef(type=GRAPH_NODE(aml)<balance UINT64, id INT64>, column=$element_table.b#2)
+              | |     +-element_table=PersonOwnAccount
+              | +-path_element_list=$element_table.[a#1, e#3, b#2]
               +-FinishScan
                 +-input_scan=
-                  +-GraphInsertScan
-                    +-column_list=$element_table.[a#1, b#2]
-                    +-input_scan=
-                    | +-GraphRefScan(column_list=$element_table.[a#1, b#2])
-                    +-insert_edge_list=
-                    | +-e#3 :=
-                    |   +-GraphInsertElement
-                    |     +-type=GRAPH_EDGE(aml)<accountId INT64, personId INT64>
-                    |     +-label_list=
-                    |     | +-GraphLabel(label=aml.PersonOwnAccount)
-                    |     +-source_node=
-                    |     | +-ColumnRef(type=GRAPH_NODE(aml)<age UINT32, birthday DATE, data BYTES, id INT64, name STRING>, column=$element_table.a#1)
-                    |     +-dest_node=
-                    |     | +-ColumnRef(type=GRAPH_NODE(aml)<balance UINT64, id INT64>, column=$element_table.b#2)
-                    |     +-element_table=PersonOwnAccount
-                    +-path_element_list=$element_table.[a#1, e#3, b#2]
+                  +-GraphRefScan(column_list=$element_table.[a#1, b#2])
 
 [SQLBUILDER_TARGET_SYNTAX_MODE standard]
 [SQLBUILDER_OUTPUT]
@@ -965,37 +976,38 @@ GeneralizedQueryStmt
               | |   +-tail=$element_table.a#1
               | +-input_scan=
               |   +-SingleRowScan
+              +-GraphInsertScan
+              | +-column_list=$element_table.[a#1, b#2]
+              | +-input_scan=
+              | | +-GraphRefScan(column_list=[$element_table.a#1])
+              | +-insert_node_list=
+              | | +-b#2 :=
+              | |   +-GraphInsertElement
+              | |     +-type=GRAPH_NODE(aml)<balance UINT64, id INT64>
+              | |     +-property_list=
+              | |     | +-GraphDMLPropertyItem
+              | |     |   +-property_name="id"
+              | |     |   +-property=id(INT64)
+              | |     |   +-property_value=
+              | |     |     +-Literal(type=INT64, value=2)
+              | |     +-label_list=
+              | |     | +-GraphLabel(label=aml.Account)
+              | |     +-element_table=Account
+              | +-insert_edge_list=
+              | | +-e#3 :=
+              | |   +-GraphInsertElement
+              | |     +-type=GRAPH_EDGE(aml)<accountId INT64, personId INT64>
+              | |     +-label_list=
+              | |     | +-GraphLabel(label=aml.PersonOwnAccount)
+              | |     +-source_node=
+              | |     | +-ColumnRef(type=GRAPH_NODE(aml)<age UINT32, birthday DATE, data BYTES, id INT64, name STRING>, column=$element_table.a#1)
+              | |     +-dest_node=
+              | |     | +-ColumnRef(type=GRAPH_NODE(aml)<balance UINT64, id INT64>, column=$element_table.b#2)
+              | |     +-element_table=PersonOwnAccount
+              | +-path_element_list=$element_table.[a#1, e#3, b#2]
               +-FinishScan
                 +-input_scan=
-                  +-GraphInsertScan
-                    +-column_list=$element_table.[a#1, b#2]
-                    +-input_scan=
-                    | +-GraphRefScan(column_list=[$element_table.a#1])
-                    +-insert_node_list=
-                    | +-b#2 :=
-                    |   +-GraphInsertElement
-                    |     +-type=GRAPH_NODE(aml)<balance UINT64, id INT64>
-                    |     +-property_list=
-                    |     | +-GraphDMLPropertyItem
-                    |     |   +-property_name="id"
-                    |     |   +-property=id(INT64)
-                    |     |   +-property_value=
-                    |     |     +-Literal(type=INT64, value=2)
-                    |     +-label_list=
-                    |     | +-GraphLabel(label=aml.Account)
-                    |     +-element_table=Account
-                    +-insert_edge_list=
-                    | +-e#3 :=
-                    |   +-GraphInsertElement
-                    |     +-type=GRAPH_EDGE(aml)<accountId INT64, personId INT64>
-                    |     +-label_list=
-                    |     | +-GraphLabel(label=aml.PersonOwnAccount)
-                    |     +-source_node=
-                    |     | +-ColumnRef(type=GRAPH_NODE(aml)<age UINT32, birthday DATE, data BYTES, id INT64, name STRING>, column=$element_table.a#1)
-                    |     +-dest_node=
-                    |     | +-ColumnRef(type=GRAPH_NODE(aml)<balance UINT64, id INT64>, column=$element_table.b#2)
-                    |     +-element_table=PersonOwnAccount
-                    +-path_element_list=$element_table.[a#1, e#3, b#2]
+                  +-GraphRefScan(column_list=$element_table.[a#1, b#2])
 
 [SQLBUILDER_TARGET_SYNTAX_MODE standard]
 [SQLBUILDER_OUTPUT]
@@ -1027,37 +1039,38 @@ GeneralizedQueryStmt
         +-scan_list=
           +-GraphLinearScan
             +-scan_list=
+              +-GraphInsertScan
+              | +-input_scan=
+              | | +-SingleRowScan
+              | +-insert_node_list=
+              | | +-a#1 :=
+              | | | +-GraphInsertElement
+              | | |   +-type=GRAPH_NODE(aml)<age UINT32, birthday DATE, data BYTES, id INT64, name STRING>
+              | | |   +-property_list=
+              | | |   | +-GraphDMLPropertyItem
+              | | |   |   +-property_name="name"
+              | | |   |   +-property=name(STRING)
+              | | |   |   +-property_value=
+              | | |   |     +-Literal(type=STRING, value="A")
+              | | |   +-label_list=
+              | | |   | +-GraphLabel(label=aml.Person)
+              | | |   +-element_table=Person
+              | | +-b#2 :=
+              | |   +-GraphInsertElement
+              | |     +-type=GRAPH_NODE(aml)<age UINT32, birthday DATE, data BYTES, id INT64, name STRING>
+              | |     +-property_list=
+              | |     | +-GraphDMLPropertyItem
+              | |     |   +-property_name="name"
+              | |     |   +-property=name(STRING)
+              | |     |   +-property_value=
+              | |     |     +-Literal(type=STRING, value="B")
+              | |     +-label_list=
+              | |     | +-GraphLabel(label=aml.Person)
+              | |     +-element_table=Person
+              | +-path_element_list=$element_table.[a#1, b#2]
               +-FinishScan
                 +-input_scan=
-                  +-GraphInsertScan
-                    +-input_scan=
-                    | +-SingleRowScan
-                    +-insert_node_list=
-                    | +-a#1 :=
-                    | | +-GraphInsertElement
-                    | |   +-type=GRAPH_NODE(aml)<age UINT32, birthday DATE, data BYTES, id INT64, name STRING>
-                    | |   +-property_list=
-                    | |   | +-GraphDMLPropertyItem
-                    | |   |   +-property_name="name"
-                    | |   |   +-property=name(STRING)
-                    | |   |   +-property_value=
-                    | |   |     +-Literal(type=STRING, value="A")
-                    | |   +-label_list=
-                    | |   | +-GraphLabel(label=aml.Person)
-                    | |   +-element_table=Person
-                    | +-b#2 :=
-                    |   +-GraphInsertElement
-                    |     +-type=GRAPH_NODE(aml)<age UINT32, birthday DATE, data BYTES, id INT64, name STRING>
-                    |     +-property_list=
-                    |     | +-GraphDMLPropertyItem
-                    |     |   +-property_name="name"
-                    |     |   +-property=name(STRING)
-                    |     |   +-property_value=
-                    |     |     +-Literal(type=STRING, value="B")
-                    |     +-label_list=
-                    |     | +-GraphLabel(label=aml.Person)
-                    |     +-element_table=Person
-                    +-path_element_list=$element_table.[a#1, b#2]
+                  +-GraphRefScan
 
 [SQLBUILDER_TARGET_SYNTAX_MODE standard]
 [SQLBUILDER_OUTPUT]
@@ -1087,58 +1100,59 @@ GeneralizedQueryStmt
         +-scan_list=
           +-GraphLinearScan
             +-scan_list=
+              +-GraphInsertScan
+              | +-column_list=$element_table.[p#1, q#2]
+              | +-input_scan=
+              | | +-SingleRowScan
+              | +-insert_node_list=
+              | | +-p#1 :=
+              | | | +-GraphInsertElement
+              | | |   +-type=GRAPH_NODE(aml_dynamic)<code INT64, id INT64, nodeJsonProp JSON, nodeLabelCol STRING, DYNAMIC>
+              | | |   +-property_list=
+              | | |   | +-GraphDMLPropertyItem
+              | | |   |   +-property_name="name"
+              | | |   |   +-property_value=
+              | | |   |     +-Literal(type=STRING, value="Alice")
+              | | |   +-label_list=
+              | | |   | +-GraphLabel
+              | | |   |   +-label_name=
+              | | |   |     +-Literal(type=STRING, value="Person", has_explicit_type=TRUE)
+              | | |   +-element_table=DynamicGraphNode
+              | | +-q#2 :=
+              | |   +-GraphInsertElement
+              | |     +-type=GRAPH_NODE(aml_dynamic)<code INT64, id INT64, nodeJsonProp JSON, nodeLabelCol STRING, DYNAMIC>
+              | |     +-property_list=
+              | |     | +-GraphDMLPropertyItem
+              | |     |   +-property_name="name"
+              | |     |   +-property_value=
+              | |     |     +-Literal(type=STRING, value="Bob")
+              | |     +-label_list=
+              | |     | +-GraphLabel
+              | |     |   +-label_name=
+              | |     |     +-Literal(type=STRING, value="Person", has_explicit_type=TRUE)
+              | |     +-element_table=DynamicGraphNode
+              | +-insert_edge_list=
+              | | +-e#3 :=
+              | |   +-GraphInsertElement
+              | |     +-type=GRAPH_EDGE(aml_dynamic)<category STRING, dst_id INT64, edgeJsonProp JSON, edgeLabelCol STRING, id INT64, DYNAMIC>
+              | |     +-property_list=
+              | |     | +-GraphDMLPropertyItem
+              | |     |   +-property_name="detail"
+              | |     |   +-property_value=
+              | |     |     +-Literal(type=STRING, value="close")
+              | |     +-label_list=
+              | |     | +-GraphLabel
+              | |     |   +-label_name=
+              | |     |     +-Literal(type=STRING, value="Follow", has_explicit_type=TRUE)
+              | |     +-source_node=
+              | |     | +-ColumnRef(type=GRAPH_NODE(aml_dynamic)<code INT64, id INT64, nodeJsonProp JSON, nodeLabelCol STRING, DYNAMIC>, column=$element_table.p#1)
+              | |     +-dest_node=
+              | |     | +-ColumnRef(type=GRAPH_NODE(aml_dynamic)<code INT64, id INT64, nodeJsonProp JSON, nodeLabelCol STRING, DYNAMIC>, column=$element_table.q#2)
+              | |     +-element_table=DynamicGraphEdge
+              | +-path_element_list=$element_table.[p#1, e#3, q#2]
               +-FinishScan
                 +-input_scan=
-                  +-GraphInsertScan
-                    +-column_list=$element_table.[p#1, q#2]
-                    +-input_scan=
-                    | +-SingleRowScan
-                    +-insert_node_list=
-                    | +-p#1 :=
-                    | | +-GraphInsertElement
-                    | |   +-type=GRAPH_NODE(aml_dynamic)<code INT64, id INT64, nodeJsonProp JSON, nodeLabelCol STRING, DYNAMIC>
-                    | |   +-property_list=
-                    | |   | +-GraphDMLPropertyItem
-                    | |   |   +-property_name="name"
-                    | |   |   +-property_value=
-                    | |   |     +-Literal(type=STRING, value="Alice")
-                    | |   +-label_list=
-                    | |   | +-GraphLabel
-                    | |   |   +-label_name=
-                    | |   |     +-Literal(type=STRING, value="Person", has_explicit_type=TRUE)
-                    | |   +-element_table=DynamicGraphNode
-                    | +-q#2 :=
-                    |   +-GraphInsertElement
-                    |     +-type=GRAPH_NODE(aml_dynamic)<code INT64, id INT64, nodeJsonProp JSON, nodeLabelCol STRING, DYNAMIC>
-                    |     +-property_list=
-                    |     | +-GraphDMLPropertyItem
-                    |     |   +-property_name="name"
-                    |     |   +-property_value=
-                    |     |     +-Literal(type=STRING, value="Bob")
-                    |     +-label_list=
-                    |     | +-GraphLabel
-                    |     |   +-label_name=
-                    |     |     +-Literal(type=STRING, value="Person", has_explicit_type=TRUE)
-                    |     +-element_table=DynamicGraphNode
-                    +-insert_edge_list=
-                    | +-e#3 :=
-                    |   +-GraphInsertElement
-                    |     +-type=GRAPH_EDGE(aml_dynamic)<category STRING, dst_id INT64, edgeJsonProp JSON, edgeLabelCol STRING, id INT64, DYNAMIC>
-                    |     +-property_list=
-                    |     | +-GraphDMLPropertyItem
-                    |     |   +-property_name="detail"
-                    |     |   +-property_value=
-                    |     |     +-Literal(type=STRING, value="close")
-                    |     +-label_list=
-                    |     | +-GraphLabel
-                    |     |   +-label_name=
-                    |     |     +-Literal(type=STRING, value="Follow", has_explicit_type=TRUE)
-                    |     +-source_node=
-                    |     | +-ColumnRef(type=GRAPH_NODE(aml_dynamic)<code INT64, id INT64, nodeJsonProp JSON, nodeLabelCol STRING, DYNAMIC>, column=$element_table.p#1)
-                    |     +-dest_node=
-                    |     | +-ColumnRef(type=GRAPH_NODE(aml_dynamic)<code INT64, id INT64, nodeJsonProp JSON, nodeLabelCol STRING, DYNAMIC>, column=$element_table.q#2)
-                    |     +-element_table=DynamicGraphEdge
-                    +-path_element_list=$element_table.[p#1, e#3, q#2]
+                  +-GraphRefScan(column_list=$element_table.[p#1, q#2])
 
 [SQLBUILDER_TARGET_SYNTAX_MODE standard]
 [SQLBUILDER_OUTPUT]
@@ -1170,88 +1184,89 @@ GeneralizedQueryStmt
         +-scan_list=
           +-GraphLinearScan
             +-scan_list=
+              +-GraphInsertScan
+              | +-column_list=$element_table.[p#1, x#2, y#4]
+              | +-input_scan=
+              | | +-SingleRowScan
+              | +-insert_node_list=
+              | | +-p#1 :=
+              | | | +-GraphInsertElement
+              | | |   +-type=GRAPH_NODE(aml_dynamic)<code INT64, id INT64, nodeJsonProp JSON, nodeLabelCol STRING, DYNAMIC>
+              | | |   +-property_list=
+              | | |   | +-GraphDMLPropertyItem
+              | | |   |   +-property_name="name"
+              | | |   |   +-property_value=
+              | | |   |     +-Literal(type=STRING, value="Alice")
+              | | |   +-label_list=
+              | | |   | +-GraphLabel
+              | | |   |   +-label_name=
+              | | |   |     +-Literal(type=STRING, value="Person", has_explicit_type=TRUE)
+              | | |   +-element_table=DynamicGraphNode
+              | | +-x#2 :=
+              | | | +-GraphInsertElement
+              | | |   +-type=GRAPH_NODE(aml_dynamic)<code INT64, id INT64, nodeJsonProp JSON, nodeLabelCol STRING, DYNAMIC>
+              | | |   +-property_list=
+              | | |   | +-GraphDMLPropertyItem
+              | | |   |   +-property_name="name"
+              | | |   |   +-property_value=
+              | | |   |     +-Literal(type=STRING, value="Bob")
+              | | |   +-label_list=
+              | | |   | +-GraphLabel
+              | | |   |   +-label_name=
+              | | |   |     +-Literal(type=STRING, value="Person", has_explicit_type=TRUE)
+              | | |   +-element_table=DynamicGraphNode
+              | | +-y#4 :=
+              | |   +-GraphInsertElement
+              | |     +-type=GRAPH_NODE(aml_dynamic)<code INT64, id INT64, nodeJsonProp JSON, nodeLabelCol STRING, DYNAMIC>
+              | |     +-property_list=
+              | |     | +-GraphDMLPropertyItem
+              | |     |   +-property_name="name"
+              | |     |   +-property_value=
+              | |     |     +-Literal(type=STRING, value="Cindy")
+              | |     +-label_list=
+              | |     | +-GraphLabel
+              | |     |   +-label_name=
+              | |     |     +-Literal(type=STRING, value="Person", has_explicit_type=TRUE)
+              | |     +-element_table=DynamicGraphNode
+              | +-insert_edge_list=
+              | | +-e#3 :=
+              | | | +-GraphInsertElement
+              | | |   +-type=GRAPH_EDGE(aml_dynamic)<category STRING, dst_id INT64, edgeJsonProp JSON, edgeLabelCol STRING, id INT64, DYNAMIC>
+              | | |   +-property_list=
+              | | |   | +-GraphDMLPropertyItem
+              | | |   |   +-property_name="detail"
+              | | |   |   +-property_value=
+              | | |   |     +-Literal(type=STRING, value="close friend")
+              | | |   +-label_list=
+              | | |   | +-GraphLabel
+              | | |   |   +-label_name=
+              | | |   |     +-Literal(type=STRING, value="Follow", has_explicit_type=TRUE)
+              | | |   +-source_node=
+              | | |   | +-ColumnRef(type=GRAPH_NODE(aml_dynamic)<code INT64, id INT64, nodeJsonProp JSON, nodeLabelCol STRING, DYNAMIC>, column=$element_table.p#1)
+              | | |   +-dest_node=
+              | | |   | +-ColumnRef(type=GRAPH_NODE(aml_dynamic)<code INT64, id INT64, nodeJsonProp JSON, nodeLabelCol STRING, DYNAMIC>, column=$element_table.x#2)
+              | | |   +-element_table=DynamicGraphEdge
+              | | +-$insert_edge#5 :=
+              | |   +-GraphInsertElement
+              | |     +-type=GRAPH_EDGE(aml_dynamic)<category STRING, dst_id INT64, edgeJsonProp JSON, edgeLabelCol STRING, id INT64, DYNAMIC>
+              | |     +-property_list=
+              | |     | +-GraphDMLPropertyItem
+              | |     |   +-property_name="detail"
+              | |     |   +-property_value=
+              | |     |     +-Literal(type=STRING, value="professional connection")
+              | |     +-label_list=
+              | |     | +-GraphLabel
+              | |     |   +-label_name=
+              | |     |     +-Literal(type=STRING, value="Follow", has_explicit_type=TRUE)
+              | |     +-source_node=
+              | |     | +-ColumnRef(type=GRAPH_NODE(aml_dynamic)<code INT64, id INT64, nodeJsonProp JSON, nodeLabelCol STRING, DYNAMIC>, column=$element_table.p#1)
+              | |     +-dest_node=
+              | |     | +-ColumnRef(type=GRAPH_NODE(aml_dynamic)<code INT64, id INT64, nodeJsonProp JSON, nodeLabelCol STRING, DYNAMIC>, column=$element_table.y#4)
+              | |     +-element_table=DynamicGraphEdge
+              | +-path_element_list=$element_table.[p#1, e#3, x#2, p#1, $insert_edge#5, y#4]
               +-FinishScan
                 +-input_scan=
-                  +-GraphInsertScan
-                    +-column_list=$element_table.[p#1, x#2, y#4]
-                    +-input_scan=
-                    | +-SingleRowScan
-                    +-insert_node_list=
-                    | +-p#1 :=
-                    | | +-GraphInsertElement
-                    | |   +-type=GRAPH_NODE(aml_dynamic)<code INT64, id INT64, nodeJsonProp JSON, nodeLabelCol STRING, DYNAMIC>
-                    | |   +-property_list=
-                    | |   | +-GraphDMLPropertyItem
-                    | |   |   +-property_name="name"
-                    | |   |   +-property_value=
-                    | |   |     +-Literal(type=STRING, value="Alice")
-                    | |   +-label_list=
-                    | |   | +-GraphLabel
-                    | |   |   +-label_name=
-                    | |   |     +-Literal(type=STRING, value="Person", has_explicit_type=TRUE)
-                    | |   +-element_table=DynamicGraphNode
-                    | +-x#2 :=
-                    | | +-GraphInsertElement
-                    | |   +-type=GRAPH_NODE(aml_dynamic)<code INT64, id INT64, nodeJsonProp JSON, nodeLabelCol STRING, DYNAMIC>
-                    | |   +-property_list=
-                    | |   | +-GraphDMLPropertyItem
-                    | |   |   +-property_name="name"
-                    | |   |   +-property_value=
-                    | |   |     +-Literal(type=STRING, value="Bob")
-                    | |   +-label_list=
-                    | |   | +-GraphLabel
-                    | |   |   +-label_name=
-                    | |   |     +-Literal(type=STRING, value="Person", has_explicit_type=TRUE)
-                    | |   +-element_table=DynamicGraphNode
-                    | +-y#4 :=
-                    |   +-GraphInsertElement
-                    |     +-type=GRAPH_NODE(aml_dynamic)<code INT64, id INT64, nodeJsonProp JSON, nodeLabelCol STRING, DYNAMIC>
-                    |     +-property_list=
-                    |     | +-GraphDMLPropertyItem
-                    |     |   +-property_name="name"
-                    |     |   +-property_value=
-                    |     |     +-Literal(type=STRING, value="Cindy")
-                    |     +-label_list=
-                    |     | +-GraphLabel
-                    |     |   +-label_name=
-                    |     |     +-Literal(type=STRING, value="Person", has_explicit_type=TRUE)
-                    |     +-element_table=DynamicGraphNode
-                    +-insert_edge_list=
-                    | +-e#3 :=
-                    | | +-GraphInsertElement
-                    | |   +-type=GRAPH_EDGE(aml_dynamic)<category STRING, dst_id INT64, edgeJsonProp JSON, edgeLabelCol STRING, id INT64, DYNAMIC>
-                    | |   +-property_list=
-                    | |   | +-GraphDMLPropertyItem
-                    | |   |   +-property_name="detail"
-                    | |   |   +-property_value=
-                    | |   |     +-Literal(type=STRING, value="close friend")
-                    | |   +-label_list=
-                    | |   | +-GraphLabel
-                    | |   |   +-label_name=
-                    | |   |     +-Literal(type=STRING, value="Follow", has_explicit_type=TRUE)
-                    | |   +-source_node=
-                    | |   | +-ColumnRef(type=GRAPH_NODE(aml_dynamic)<code INT64, id INT64, nodeJsonProp JSON, nodeLabelCol STRING, DYNAMIC>, column=$element_table.p#1)
-                    | |   +-dest_node=
-                    | |   | +-ColumnRef(type=GRAPH_NODE(aml_dynamic)<code INT64, id INT64, nodeJsonProp JSON, nodeLabelCol STRING, DYNAMIC>, column=$element_table.x#2)
-                    | |   +-element_table=DynamicGraphEdge
-                    | +-$insert_edge#5 :=
-                    |   +-GraphInsertElement
-                    |     +-type=GRAPH_EDGE(aml_dynamic)<category STRING, dst_id INT64, edgeJsonProp JSON, edgeLabelCol STRING, id INT64, DYNAMIC>
-                    |     +-property_list=
-                    |     | +-GraphDMLPropertyItem
-                    |     |   +-property_name="detail"
-                    |     |   +-property_value=
-                    |     |     +-Literal(type=STRING, value="professional connection")
-                    |     +-label_list=
-                    |     | +-GraphLabel
-                    |     |   +-label_name=
-                    |     |     +-Literal(type=STRING, value="Follow", has_explicit_type=TRUE)
-                    |     +-source_node=
-                    |     | +-ColumnRef(type=GRAPH_NODE(aml_dynamic)<code INT64, id INT64, nodeJsonProp JSON, nodeLabelCol STRING, DYNAMIC>, column=$element_table.p#1)
-                    |     +-dest_node=
-                    |     | +-ColumnRef(type=GRAPH_NODE(aml_dynamic)<code INT64, id INT64, nodeJsonProp JSON, nodeLabelCol STRING, DYNAMIC>, column=$element_table.y#4)
-                    |     +-element_table=DynamicGraphEdge
-                    +-path_element_list=$element_table.[p#1, e#3, x#2, p#1, $insert_edge#5, y#4]
+                  +-GraphRefScan(column_list=$element_table.[p#1, x#2, y#4])
 
 [SQLBUILDER_TARGET_SYNTAX_MODE standard]
 [SQLBUILDER_OUTPUT]

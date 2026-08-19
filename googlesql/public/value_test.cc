@@ -3748,6 +3748,34 @@ TEST(MapPrintingTest, InternalExternalProductModeDiffers) {
             R"(MAP_FROM_ARRAY([(1.1, NULL), (2.2, CAST("inf" AS FLOAT64))]))");
 }
 
+TEST(MapPrintingTest, GetSQLWithLanguageOptions) {
+  Value map = test_values::Map({
+      {Value::Float(1.1), Value::NullDouble()},
+      {Value::Float(2.2),
+       Value::Double(std::numeric_limits<double>::infinity())},
+  });
+
+  // Default LanguageOptions is PRODUCT_INTERNAL
+  LanguageOptions internal_options;
+  internal_options.set_product_mode(PRODUCT_INTERNAL);
+  EXPECT_EQ(map.GetSQL(internal_options), map.GetSQL(PRODUCT_INTERNAL));
+  EXPECT_EQ(map.GetSQLLiteral(internal_options),
+            map.GetSQLLiteral(PRODUCT_INTERNAL));
+
+  // LanguageOptions configured with PRODUCT_EXTERNAL
+  LanguageOptions external_options;
+  external_options.set_product_mode(PRODUCT_EXTERNAL);
+  EXPECT_EQ(map.GetSQL(external_options), map.GetSQL(PRODUCT_EXTERNAL));
+  EXPECT_EQ(map.GetSQLLiteral(external_options),
+            map.GetSQLLiteral(PRODUCT_EXTERNAL));
+
+  // LanguageOptions with use_external_float32 = true
+  EXPECT_EQ(map.GetSQL(external_options, /*use_external_float32=*/true),
+            map.GetSQL(PRODUCT_EXTERNAL, /*use_external_float32=*/true));
+  EXPECT_EQ(map.GetSQLLiteral(external_options, /*use_external_float32=*/true),
+            map.GetSQLLiteral(PRODUCT_EXTERNAL, /*use_external_float32=*/true));
+}
+
 TEST_F(ValueTest, InternalEqualsOnDifferentSizedStructs) {
   auto struct_1 = Struct({""}, {Value::Int64(1)});
   auto struct_2 = Struct({"", ""}, {Value::Int64(1), Value::Int64(1)});

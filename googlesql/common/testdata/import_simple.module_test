@@ -81,13 +81,13 @@ Lazy_resolution_function:foo
   (INT64 a) -> INT64
 
 Non_sql_function:jsScalar1
-  (INT32 a) -> INT64
+  (INT32 a) -> INT64 rejects_collation=TRUE
 
 Non_sql_function:jsScalar2
-  (ANY TYPE a) -> INT64
+  (ANY TYPE a) -> INT64 rejects_collation=TRUE
 
 Non_sql_function:jsScalar3
-  (ANY TYPE a) -> INT64
+  (ANY TYPE a) -> INT64 rejects_collation=TRUE
 
 Lazy_resolution_function:m1
 ERROR: Function m1 is invalid [at .../googlesql/testdata/modules/simple.sqlm:24:24]

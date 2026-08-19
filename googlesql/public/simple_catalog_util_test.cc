@@ -29,7 +29,9 @@
 #include "googlesql/public/function.h"
 #include "googlesql/public/function_signature.h"
 #include "googlesql/public/options.pb.h"
+#include "googlesql/public/property_graph.h"
 #include "googlesql/public/simple_catalog.h"
+#include "googlesql/public/simple_property_graph.h"
 #include "googlesql/public/table_valued_function.h"
 #include "googlesql/public/types/type.h"
 #include "googlesql/public/value.h"
@@ -37,6 +39,7 @@
 #include "googlesql/resolved_ast/resolved_node_kind.pb.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "absl/container/flat_hash_set.h"
 #include "absl/status/status.h"
 #include "googlesql/base/status_macros.h"
 #include "absl/status/statusor.h"
@@ -506,5 +509,230 @@ INSTANTIATE_TEST_SUITE_P(
     }),
     [](const ::testing::TestParamInfo<MakeTableFromCreateTableTest::ParamType>&
            info) { return info.param.name; });
+
+TEST(SimpleCatalogUtilTest, AddPropertyGraphTypeFromCreatePropertyGraphType) {
+  SimpleCatalog catalog("simple");
+  AnalyzerOptions analyzer_options;
+  std::vector<std::unique_ptr<const AnalyzerOutput>> artifacts;
+
+  const char* create_social =
+      "CREATE PROPERTY GRAPH TYPE social\n"
+      "  NODE TYPES(\n"
+      "    Person PROPERTIES(name STRING),\n"
+      "    Account PROPERTIES(id INT64))\n"
+      "  EDGE TYPES(\n"
+      "    Knows FROM Person TO Account PROPERTIES(since DATE))";
+
+  // The statement kind must be supported.
+  EXPECT_THAT(AddPropertyGraphTypeFromCreatePropertyGraphTypeStmt(
+                  create_social, analyzer_options, artifacts, catalog),
+              Not(IsOk()));
+
+  analyzer_options.mutable_language()->AddSupportedStatementKind(
+      RESOLVED_CREATE_PROPERTY_GRAPH_TYPE_STMT);
+  GOOGLESQL_EXPECT_OK(AddPropertyGraphTypeFromCreatePropertyGraphTypeStmt(
+      create_social, analyzer_options, artifacts, catalog));
+
+  // The graph type is registered with the expected shape.
+  const PropertyGraphType* graph_type;
+  GOOGLESQL_ASSERT_OK(catalog.GetPropertyGraphType("social", graph_type));
+  ASSERT_NE(graph_type, nullptr);
+  EXPECT_EQ(graph_type->Name(), "social");
+
+  absl::flat_hash_set<const PropertyGraphNodeType*> node_types;
+  GOOGLESQL_ASSERT_OK(graph_type->GetNodeTypes(node_types));
+  EXPECT_EQ(node_types.size(), 2);
+
+  absl::flat_hash_set<const PropertyGraphEdgeType*> edge_types;
+  GOOGLESQL_ASSERT_OK(graph_type->GetEdgeTypes(edge_types));
+  ASSERT_EQ(edge_types.size(), 1);
+
+  // The edge's FROM/TO endpoints resolve to the declared node types.
+  const PropertyGraphEdgeType* knows = *edge_types.begin();
+  ASSERT_NE(knows->GetSourceNodeType(), nullptr);
+  ASSERT_NE(knows->GetDestNodeType(), nullptr);
+  EXPECT_EQ(knows->GetSourceNodeType()->Name(), "Person");
+  EXPECT_EQ(knows->GetDestNodeType()->Name(), "Account");
+
+  // Property declarations are collected once at graph-type scope (name, id,
+  // since).
+  absl::flat_hash_set<const GraphPropertyDeclaration*> property_declarations;
+  GOOGLESQL_ASSERT_OK(graph_type->GetPropertyDeclarations(property_declarations));
+  EXPECT_EQ(property_declarations.size(), 3);
+
+  // Each element type carries its default label (same name as the type), and
+  // the label exposes exactly that element's property declarations. This guards
+  // both the label-population loops and the per-label property-declaration loop
+  // in PopulatePropertyGraphType.
+  for (const PropertyGraphNodeType* node_type : node_types) {
+    absl::flat_hash_set<const GraphElementLabel*> labels;
+    GOOGLESQL_ASSERT_OK(node_type->GetLabels(labels));
+    ASSERT_EQ(labels.size(), 1);
+    const GraphElementLabel* label = *labels.begin();
+    EXPECT_EQ(label->Name(), node_type->Name());
+
+    absl::flat_hash_set<const GraphPropertyDeclaration*> label_props;
+    GOOGLESQL_ASSERT_OK(label->GetPropertyDeclarations(label_props));
+    ASSERT_EQ(label_props.size(), 1);
+    // Person -> name, Account -> id.
+    EXPECT_EQ((*label_props.begin())->Name(),
+              node_type->Name() == "Person" ? "name" : "id");
+  }
+  absl::flat_hash_set<const GraphElementLabel*> knows_labels;
+  GOOGLESQL_ASSERT_OK(knows->GetLabels(knows_labels));
+  ASSERT_EQ(knows_labels.size(), 1);
+  const GraphElementLabel* knows_label = *knows_labels.begin();
+  EXPECT_EQ(knows_label->Name(), "Knows");
+  absl::flat_hash_set<const GraphPropertyDeclaration*> knows_props;
+  GOOGLESQL_ASSERT_OK(knows_label->GetPropertyDeclarations(knows_props));
+  ASSERT_EQ(knows_props.size(), 1);
+  EXPECT_EQ((*knows_props.begin())->Name(), "since");
+
+  // The graph type exposes one default label per element type.
+  absl::flat_hash_set<const GraphElementLabel*> graph_labels;
+  GOOGLESQL_ASSERT_OK(graph_type->GetLabels(graph_labels));
+  EXPECT_EQ(graph_labels.size(), 3);  // Person, Account, Knows
+
+  // Re-adding the same graph type collides in the catalog namespace.
+  EXPECT_THAT(AddPropertyGraphTypeFromCreatePropertyGraphTypeStmt(
+                  create_social, analyzer_options, artifacts, catalog),
+              Not(IsOk()));
+
+  // CREATE OR REPLACE is NOT supported by this helper: the resolver accepts a
+  // REPLACE of the existing graph type, but registration uses the IfNotPresent
+  // variant, so re-registration fails rather than replacing the existing
+  // object. The original graph type is left intact.
+  EXPECT_THAT(AddPropertyGraphTypeFromCreatePropertyGraphTypeStmt(
+                  "CREATE OR REPLACE PROPERTY GRAPH TYPE social\n"
+                  "  NODE TYPES(Person PROPERTIES(name STRING))",
+                  analyzer_options, artifacts, catalog),
+              Not(IsOk()));
+  GOOGLESQL_ASSERT_OK(catalog.GetPropertyGraphType("social", graph_type));
+  EXPECT_EQ(graph_type->Name(), "social");
+}
+
+TEST(SimpleCatalogUtilTest, AddPropertyGraphTypeEdgeWithSingleEndpoint) {
+  SimpleCatalog catalog("simple");
+  AnalyzerOptions analyzer_options;
+  analyzer_options.mutable_language()->AddSupportedStatementKind(
+      RESOLVED_CREATE_PROPERTY_GRAPH_TYPE_STMT);
+  std::vector<std::unique_ptr<const AnalyzerOutput>> artifacts;
+
+  // An edge type may declare FROM only or TO only; the omitted endpoint then
+  // resolves to nullptr. Declare one of each so both the source and dest
+  // endpoint branches are exercised in isolation.
+  GOOGLESQL_EXPECT_OK(AddPropertyGraphTypeFromCreatePropertyGraphTypeStmt(
+      "CREATE PROPERTY GRAPH TYPE g\n"
+      "  NODE TYPES(Person PROPERTIES(name STRING))\n"
+      "  EDGE TYPES(\n"
+      "    RelFrom FROM Person PROPERTIES(since DATE),\n"
+      "    RelTo TO Person PROPERTIES(since DATE))",
+      analyzer_options, artifacts, catalog));
+
+  const PropertyGraphType* graph_type;
+  GOOGLESQL_ASSERT_OK(catalog.GetPropertyGraphType("g", graph_type));
+
+  // FROM only: source resolves, dest is null.
+  const PropertyGraphElementType* rel_from_element;
+  GOOGLESQL_ASSERT_OK(graph_type->FindElementTypeByName("RelFrom", rel_from_element));
+  const PropertyGraphEdgeType* rel_from = rel_from_element->AsEdgeType();
+  ASSERT_NE(rel_from, nullptr);
+  ASSERT_NE(rel_from->GetSourceNodeType(), nullptr);
+  EXPECT_EQ(rel_from->GetSourceNodeType()->Name(), "Person");
+  EXPECT_EQ(rel_from->GetDestNodeType(), nullptr);
+
+  // TO only: dest resolves, source is null.
+  const PropertyGraphElementType* rel_to_element;
+  GOOGLESQL_ASSERT_OK(graph_type->FindElementTypeByName("RelTo", rel_to_element));
+  const PropertyGraphEdgeType* rel_to = rel_to_element->AsEdgeType();
+  ASSERT_NE(rel_to, nullptr);
+  EXPECT_EQ(rel_to->GetSourceNodeType(), nullptr);
+  ASSERT_NE(rel_to->GetDestNodeType(), nullptr);
+  EXPECT_EQ(rel_to->GetDestNodeType()->Name(), "Person");
+}
+
+TEST(SimpleCatalogUtilTest, AddPropertyGraphTypeNameCollidesWithTable) {
+  SimpleCatalog catalog("simple");
+  catalog.AddOwnedTable(new SimpleTable("collide"));
+  AnalyzerOptions analyzer_options;
+  analyzer_options.mutable_language()->AddSupportedStatementKind(
+      RESOLVED_CREATE_PROPERTY_GRAPH_TYPE_STMT);
+  std::vector<std::unique_ptr<const AnalyzerOutput>> artifacts;
+
+  // Plain CREATE: the resolver rejects the name collision against the existing
+  // table during analysis (property graph types share the table namespace).
+  EXPECT_THAT(AddPropertyGraphTypeFromCreatePropertyGraphTypeStmt(
+                  "CREATE PROPERTY GRAPH TYPE collide\n"
+                  "  NODE TYPES(Person)",
+                  analyzer_options, artifacts, catalog),
+              Not(IsOk()));
+
+  // CREATE OR REPLACE does not rescue a cross-kind clash: REPLACE only applies
+  // to an existing graph type, so the resolver still rejects a name already
+  // used by a table. (Even if analysis were bypassed, catalog registration via
+  // AddOwnedPropertyGraphTypeIfNotPresent would reject it through the shared
+  // namespace rather than crashing on InsertOrDie.)
+  EXPECT_THAT(AddPropertyGraphTypeFromCreatePropertyGraphTypeStmt(
+                  "CREATE OR REPLACE PROPERTY GRAPH TYPE collide\n"
+                  "  NODE TYPES(Person)",
+                  analyzer_options, artifacts, catalog),
+              Not(IsOk()));
+
+  // The colliding table is left intact.
+  const Table* table;
+  GOOGLESQL_ASSERT_OK(catalog.FindTable({"collide"}, &table));
+  EXPECT_EQ(table->Name(), "collide");
+}
+
+TEST(SimpleCatalogUtilTest, AddPropertyGraphTypeEdgeWithNoEndpoint) {
+  SimpleCatalog catalog("simple");
+  AnalyzerOptions analyzer_options;
+  analyzer_options.mutable_language()->AddSupportedStatementKind(
+      RESOLVED_CREATE_PROPERTY_GRAPH_TYPE_STMT);
+  std::vector<std::unique_ptr<const AnalyzerOutput>> artifacts;
+
+  // An edge type may declare neither FROM nor TO; both endpoints then resolve
+  // to nullptr. This exercises the branch in PopulatePropertyGraphType where
+  // neither endpoint name is set.
+  GOOGLESQL_EXPECT_OK(AddPropertyGraphTypeFromCreatePropertyGraphTypeStmt(
+      "CREATE PROPERTY GRAPH TYPE g\n"
+      "  NODE TYPES(Person PROPERTIES(name STRING))\n"
+      "  EDGE TYPES(Rel PROPERTIES(since DATE))",
+      analyzer_options, artifacts, catalog));
+
+  const PropertyGraphType* graph_type;
+  GOOGLESQL_ASSERT_OK(catalog.GetPropertyGraphType("g", graph_type));
+  absl::flat_hash_set<const PropertyGraphEdgeType*> edge_types;
+  GOOGLESQL_ASSERT_OK(graph_type->GetEdgeTypes(edge_types));
+  ASSERT_EQ(edge_types.size(), 1);
+  const PropertyGraphEdgeType* rel = *edge_types.begin();
+  EXPECT_EQ(rel->GetSourceNodeType(), nullptr);
+  EXPECT_EQ(rel->GetDestNodeType(), nullptr);
+}
+
+TEST(SimpleCatalogUtilTest, AddPropertyGraphTypeNameCollidesWithGraph) {
+  SimpleCatalog catalog("simple");
+  catalog.AddOwnedPropertyGraph("collide",
+                                std::make_unique<SimplePropertyGraph>(
+                                    std::vector<std::string>{"collide"}));
+  AnalyzerOptions analyzer_options;
+  analyzer_options.mutable_language()->AddSupportedStatementKind(
+      RESOLVED_CREATE_PROPERTY_GRAPH_TYPE_STMT);
+  std::vector<std::unique_ptr<const AnalyzerOutput>> artifacts;
+
+  // Property graphs and property graph types share the catalog's global
+  // namespace, so a graph type whose name collides with an existing graph is
+  // rejected by the resolver during analysis.
+  EXPECT_THAT(AddPropertyGraphTypeFromCreatePropertyGraphTypeStmt(
+                  "CREATE PROPERTY GRAPH TYPE collide\n"
+                  "  NODE TYPES(Person)",
+                  analyzer_options, artifacts, catalog),
+              Not(IsOk()));
+
+  // The colliding graph is left intact.
+  const PropertyGraph* graph;
+  GOOGLESQL_ASSERT_OK(catalog.GetPropertyGraph("collide", graph));
+  EXPECT_EQ(graph->Name(), "collide");
+}
 
 }  // namespace googlesql

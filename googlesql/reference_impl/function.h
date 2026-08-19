@@ -576,6 +576,7 @@ enum class FunctionKind {
   kL1Norm,
   kL2Norm,
   kEditDistance,
+  kJaroWinklerSimilarity,
 
   // Vector functions
   kEncodeVector,
@@ -2495,6 +2496,14 @@ class DecodeVectorFunction : public SimpleBuiltinScalarFunction {
 };
 
 class VectorFloat32LengthFunction : public SimpleBuiltinScalarFunction {
+ public:
+  using SimpleBuiltinScalarFunction::SimpleBuiltinScalarFunction;
+  absl::StatusOr<Value> Eval(absl::Span<const TupleData* const> params,
+                             absl::Span<const Value> args,
+                             EvaluationContext* context) const override;
+};
+
+class JaroWinklerSimilarityFunction : public SimpleBuiltinScalarFunction {
  public:
   using SimpleBuiltinScalarFunction::SimpleBuiltinScalarFunction;
   absl::StatusOr<Value> Eval(absl::Span<const TupleData* const> params,

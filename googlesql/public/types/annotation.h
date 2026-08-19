@@ -401,6 +401,7 @@ class ResolvedCast;
 class ResolvedColumnRef;
 class ResolvedFunctionCallBase;
 class ResolvedGetStructField;
+class ResolvedGetRowField;
 class ResolvedMakeStruct;
 class ResolvedMakeMap;
 class ResolvedSubqueryExpr;
@@ -444,6 +445,12 @@ class AnnotationSpec {
   // <result_annotation_map>.
   virtual absl::Status CheckAndPropagateForGetStructField(
       const ResolvedGetStructField& get_struct_field,
+      AnnotationMap* result_annotation_map) = 0;
+
+  // Propagates annotation from the referenced RowType field to
+  // <result_annotation_map>.
+  virtual absl::Status CheckAndPropagateForGetRowField(
+      const ResolvedGetRowField& get_row_field,
       AnnotationMap* result_annotation_map) = 0;
 
   // Propagates annotation from the referenced struct field to

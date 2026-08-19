@@ -16,6 +16,7 @@
 
 #include "googlesql/compliance/measure_test_tables.h"
 
+#include <memory>
 #include <optional>
 #include <utility>
 #include <vector>
@@ -23,8 +24,13 @@
 #include "googlesql/common/internal_value.h"
 #include "googlesql/common/measure_analysis_utils.h"
 #include "googlesql/compliance/test_driver.h"
+#include "googlesql/public/annotation/collation.h"
+#include "googlesql/public/types/annotation.h"
+#include "googlesql/public/types/simple_value.h"
+#include "googlesql/public/types/type_factory.h"
 #include "googlesql/public/value.h"
 #include "googlesql/testing/test_value.h"
+#include "googlesql/base/check.h"
 
 namespace googlesql {
 
@@ -312,6 +318,51 @@ TestDatabase GetMeasureTablesTestDatabase(bool add_measures_with_udas) {
       .measure_column_defs = std::move(two_keys_measure_column_defs),
       .row_identity_columns = std::vector<int>{0, 1}};
   test_db.tables.insert({"MeasureTable_TwoKeys", measure_table_two_keys});
+
+  // Add MeasureTable_SingleKey_WithAnnotations for verifying propagation and
+  // correctness of measure column annotations (collation, timestamp precision).
+  Value annotated_measure_table_as_value = test_values::StructArray(
+      {"key", "col_ci", "col_ts_3"},
+      {{1ll, "a", Value::TimestampFromUnixMicros(1700000000000000ll)},
+       {2ll, "A", Value::TimestampFromUnixMicros(1700000001000000ll)},
+       {3ll, "b", Value::TimestampFromUnixMicros(1700000002000000ll)}},
+      InternalValue::kIgnoresOrder);
+
+  TypeFactory* type_factory = test_values::static_type_factory();
+
+  const AnnotationMap* col_ci_annotation_map = nullptr;
+  {
+    std::unique_ptr<AnnotationMap> annotation_map =
+        AnnotationMap::Create(types::StringType());
+    annotation_map->SetAnnotation<CollationAnnotation>(
+        SimpleValue::String("und:ci"));
+    auto status_or = type_factory->TakeOwnership(std::move(annotation_map));
+    GOOGLESQL_CHECK_OK(status_or.status());
+    col_ci_annotation_map = status_or.value();
+  }
+
+  const AnnotationMap* col_ts_3_annotation_map = nullptr;
+
+  std::vector<MeasureColumnDef> annotated_measure_column_defs = {
+      {"measure_ci", "MAX(col_ci)"},
+      {"measure_ts_3", "MAX(col_ts_3)"},
+      {"measure_distinct_count_ci", "COUNT(DISTINCT col_ci)"},
+  };
+
+  TestTable annotated_measure_table = {
+      .table_as_value = std::move(annotated_measure_table_as_value),
+      .measure_column_defs = std::move(annotated_measure_column_defs),
+      .row_identity_columns = std::vector<int>{0},
+  };
+  annotated_measure_table.options.set_column_annotations(
+      {nullptr, col_ci_annotation_map, col_ts_3_annotation_map});
+  annotated_measure_table.options.mutable_required_features()->insert(
+      FEATURE_COLLATION_SUPPORT);
+  annotated_measure_table.options.mutable_required_features()->insert(
+      FEATURE_ANNOTATION_FRAMEWORK);
+
+  test_db.tables.insert(
+      {"MeasureTable_SingleKey_WithAnnotations", annotated_measure_table});
 
   return test_db;
 }

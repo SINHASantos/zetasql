@@ -4329,6 +4329,13 @@ are allowed. If a query contains aliases in the `SELECT` clause, those aliases
 override names in the corresponding `FROM` clause. The data type of
 `expression` must be [orderable][orderable-data-types].
 
+ When using the `ORDER BY` clause with either
+[recursive][recursive-cte] or [non-recursive][non-recursive-cte] common table
+expressions (CTEs), specify the `ORDER BY` clause within the main query
+definition, and not in the CTE definition itself. This evenly distributes the
+execution of your queries as tables grow over time and prevents a single
+processing unit from having to process all query data. 
+
 **Optional Clauses**
 
 + `COLLATE`: You can use the `COLLATE` clause to refine how data is ordered

@@ -386,9 +386,9 @@ TEST(MapTest, FormatValueContentSQLLiteralMode) {
 // Note: More rigorous testing is done through GetSQL() value_test.cc
 TEST(MapTest, FormatValueContentSQLExpressionMode) {
   {
-    Type::FormatValueContentOptions options = {
-        .mode = Type::FormatValueContentOptions::Mode::kSQLExpression,
-    };
+    Type::FormatValueContentOptions options;
+    options.set_product_mode(ProductMode::PRODUCT_EXTERNAL);
+    options.mode = Type::FormatValueContentOptions::Mode::kSQLExpression;
     Value map_value =
         test_values::Map({{Value::String("foo"), Value::Int64(100)}});
     EXPECT_EQ(
@@ -397,9 +397,9 @@ TEST(MapTest, FormatValueContentSQLExpressionMode) {
   }
   // MAP with FLOATs and use_external_float32 = false
   {
-    Type::FormatValueContentOptions options = {
-        .mode = Type::FormatValueContentOptions::Mode::kSQLExpression,
-    };
+    Type::FormatValueContentOptions options;
+    options.set_product_mode(ProductMode::PRODUCT_EXTERNAL);
+    options.mode = Type::FormatValueContentOptions::Mode::kSQLExpression;
     Value map_value =
         test_values::Map({{Value::Float(1.5), Value::Double(2.5)}});
     EXPECT_EQ(
@@ -409,10 +409,10 @@ TEST(MapTest, FormatValueContentSQLExpressionMode) {
 
   // MAP with FLOATs and use_external_float32 = true
   {
-    Type::FormatValueContentOptions options = {
-        .use_external_float32 = true,
-        .mode = Type::FormatValueContentOptions::Mode::kSQLExpression,
-    };
+    Type::FormatValueContentOptions options;
+    options.set_product_mode(ProductMode::PRODUCT_EXTERNAL);
+    options.use_external_float32 = true;
+    options.mode = Type::FormatValueContentOptions::Mode::kSQLExpression;
     Value map_value =
         test_values::Map({{Value::Float(1.5), Value::Double(2.5)}});
     EXPECT_EQ(
@@ -422,9 +422,9 @@ TEST(MapTest, FormatValueContentSQLExpressionMode) {
 
   // MAP with FLOAT in nested container and use_external_float32 = false
   {
-    Type::FormatValueContentOptions options = {
-        .mode = Type::FormatValueContentOptions::Mode::kSQLExpression,
-    };
+    Type::FormatValueContentOptions options;
+    options.set_product_mode(ProductMode::PRODUCT_EXTERNAL);
+    options.mode = Type::FormatValueContentOptions::Mode::kSQLExpression;
     Value map_value = test_values::Map(
         {{Value::Float(1.5), test_values::Array({Value::Float(2.5)})}});
     EXPECT_EQ(
@@ -434,10 +434,10 @@ TEST(MapTest, FormatValueContentSQLExpressionMode) {
 
   // MAP with FLOAT in nested container and use_external_float32 = true
   {
-    Type::FormatValueContentOptions options = {
-        .use_external_float32 = true,
-        .mode = Type::FormatValueContentOptions::Mode::kSQLExpression,
-    };
+    Type::FormatValueContentOptions options;
+    options.set_product_mode(ProductMode::PRODUCT_EXTERNAL);
+    options.use_external_float32 = true;
+    options.mode = Type::FormatValueContentOptions::Mode::kSQLExpression;
     Value map_value = test_values::Map(
         {{Value::Float(1.5), test_values::Array({Value::Float(2.5)})}});
     EXPECT_EQ(
@@ -571,6 +571,12 @@ TEST(MapTest, MakeMapWithLanguageOptions) {
                                   language_map_enabled_geography_enabled),
               StatusIs(absl::StatusCode::kInvalidArgument,
                        "MAP key type GEOGRAPHY is not groupable"));
+  EXPECT_THAT(factory.MakeMapType(types::VariantType(), types::StringType(),
+                                  language_map_enabled),
+              IsOk());
+  EXPECT_THAT(factory.MakeMapType(types::StringType(), types::VariantType(),
+                                  language_map_enabled),
+              IsOk());
   EXPECT_THAT(factory.MakeMapType(types::StringType(), types::GeographyType(),
                                   language_map_enabled_geography_enabled),
               IsOk())

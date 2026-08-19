@@ -2362,4 +2362,241 @@ std::vector<FunctionTestCall> GetFunctionTestsEditDistanceBytes() {
   return tests;
 }
 
+std::vector<FunctionTestCall> GetFunctionTestsJaroWinklerSimilarity() {
+  std::vector<FunctionTestCall> tests = {
+      // NULL values
+      {"jarowinkler_similarity",
+       {values::NullString(), values::NullString()},
+       values::NullDouble()},
+      {"jarowinkler_similarity",
+       {values::NullString(), "abc"},
+       values::NullDouble()},
+      {"jarowinkler_similarity",
+       {"abc", values::NullString()},
+       values::NullDouble()},
+      {"jarowinkler_similarity",
+       {"abc", "a", values::NullDouble()},
+       values::NullDouble()},
+      {"jarowinkler_similarity",
+       {"abc", "a", values::NullDouble(), 0.95},
+       values::NullDouble()},
+      {"jarowinkler_similarity",
+       {"abc", "a", 0.1, values::NullDouble()},
+       values::NullDouble()},
+
+      // Basic scenarios (no custom parameters)
+      {"jarowinkler_similarity",
+       {"MARHTA", "MARTHA"},
+       0.961111,
+       kDistanceFloatMargin},
+      {"jarowinkler_similarity",
+       {"DWAYNE", "DUANE"},
+       0.84,
+       kDistanceFloatMargin},
+      {"jarowinkler_similarity",
+       {"DIXON", "DICKSONX"},
+       0.813333,
+       kDistanceFloatMargin},
+      {"jarowinkler_similarity", {"HELLO", "HELLO"}, 1.0, kDistanceFloatMargin},
+      {"jarowinkler_similarity", {"A", "A"}, 1.0, kDistanceFloatMargin},
+      {"jarowinkler_similarity", {"", ""}, 1.0, kDistanceFloatMargin},
+      {"jarowinkler_similarity", {"", "A"}, 0.0, kDistanceFloatMargin},
+      {"jarowinkler_similarity", {"ABC", "XYZ"}, 0.0, kDistanceFloatMargin},
+      {"jarowinkler_similarity", {"A😀B", "A😁B"}, 0.8, kDistanceFloatMargin},
+
+      // Custom parameters: prefix_scaling_factor
+      {"jarowinkler_similarity",
+       {"MARHTA", "MARTHA", 0.2},
+       0.977778,
+       kDistanceFloatMargin},
+
+      // Custom parameters: prefix_boost_threshold
+      {"jarowinkler_similarity",
+       {"MARHTA", "MARTHA", values::NullDouble(), 0.95},
+       values::NullDouble()},
+      {"jarowinkler_similarity",
+       {"MARHTA", "MARTHA", values::NullDouble(), 0.90},
+       values::NullDouble()},
+      {"jarowinkler_similarity",
+       {"MARHTA", "MARTHA", 0.1, 0.95},
+       0.944444,
+       kDistanceFloatMargin},
+      {"jarowinkler_similarity",
+       {"MARHTA", "MARTHA", 0.1, 0.90},
+       0.961111,
+       kDistanceFloatMargin},
+
+      // Custom parameters: both
+      {"jarowinkler_similarity",
+       {"MARHTA", "MARTHA", 0.2, 0.95},
+       0.944444,
+       kDistanceFloatMargin},
+      {"jarowinkler_similarity",
+       {"MARHTA", "MARTHA", 0.2, 0.90},
+       0.977778,
+       kDistanceFloatMargin},
+
+      // Invalid parameter errors: prefix_scaling_factor
+      {"jarowinkler_similarity",
+       {"MARHTA", "MARTHA", -0.01},
+       0.0,
+       absl::OutOfRangeError(
+           "prefix_scaling_factor must be in [0, 0.25] range")},
+      {"jarowinkler_similarity",
+       {"MARHTA", "MARTHA", 0.26},
+       0.0,
+       absl::OutOfRangeError(
+           "prefix_scaling_factor must be in [0, 0.25] range")},
+
+      // Invalid parameter errors: prefix_boost_threshold
+      {"jarowinkler_similarity",
+       {"MARHTA", "MARTHA", 0.1, -0.01},
+       0.0,
+       absl::OutOfRangeError("prefix_boost_threshold must be in [0, 1] range")},
+      {"jarowinkler_similarity",
+       {"MARHTA", "MARTHA", 0.1, 1.01},
+       0.0,
+       absl::OutOfRangeError("prefix_boost_threshold must be in [0, 1] range")},
+
+      // NULL semantics with invalid parameters
+      {"jarowinkler_similarity",
+       {"MARHTA", "MARTHA", values::NullDouble(), -0.01},
+       values::NullDouble()},
+      {"jarowinkler_similarity",
+       {"MARHTA", "MARTHA", values::NullDouble(), 1.01},
+       values::NullDouble()}};
+  return tests;
+}
+
+std::vector<FunctionTestCall> GetFunctionTestsJaroWinklerSimilarityBytes() {
+  std::vector<FunctionTestCall> tests = {
+      // BYTES input with NULL arguments.
+      {"jarowinkler_similarity",
+       {values::NullBytes(), values::NullBytes()},
+       values::NullDouble()},
+      {"jarowinkler_similarity",
+       {values::NullBytes(), values::Bytes("abc")},
+       values::NullDouble()},
+      {"jarowinkler_similarity",
+       {values::Bytes("abc"), values::NullBytes()},
+       values::NullDouble()},
+      {"jarowinkler_similarity",
+       {values::Bytes("abc"), values::Bytes("a"), values::NullDouble()},
+       values::NullDouble()},
+      {"jarowinkler_similarity",
+       {values::Bytes("abc"), values::Bytes("a"), values::NullDouble(), 0.95},
+       values::NullDouble()},
+      {"jarowinkler_similarity",
+       {values::Bytes("abc"), values::Bytes("a"), 0.1, values::NullDouble()},
+       values::NullDouble()},
+
+      // Basic scenarios (no custom parameters)
+      {"jarowinkler_similarity",
+       {values::Bytes("MARHTA"), values::Bytes("MARTHA")},
+       0.961111,
+       kDistanceFloatMargin},
+      {"jarowinkler_similarity",
+       {values::Bytes("DWAYNE"), values::Bytes("DUANE")},
+       0.84,
+       kDistanceFloatMargin},
+      {"jarowinkler_similarity",
+       {values::Bytes("DIXON"), values::Bytes("DICKSONX")},
+       0.813333,
+       kDistanceFloatMargin},
+      {"jarowinkler_similarity",
+       {values::Bytes("HELLO"), values::Bytes("HELLO")},
+       1.0,
+       kDistanceFloatMargin},
+      {"jarowinkler_similarity",
+       {values::Bytes("A"), values::Bytes("A")},
+       1.0,
+       kDistanceFloatMargin},
+      {"jarowinkler_similarity",
+       {values::Bytes(""), values::Bytes("")},
+       1.0,
+       kDistanceFloatMargin},
+      {"jarowinkler_similarity",
+       {values::Bytes(""), values::Bytes("A")},
+       0.0,
+       kDistanceFloatMargin},
+      {"jarowinkler_similarity",
+       {values::Bytes("ABC"), values::Bytes("XYZ")},
+       0.0,
+       kDistanceFloatMargin},
+      {"jarowinkler_similarity",
+       {values::Bytes("A\xf0\x9f\x98\x80"
+                      "B"),
+        values::Bytes("A\xf0\x9f\x98\x81"
+                      "B")},
+       0.933333,
+       kDistanceFloatMargin},
+
+      // Custom parameters: prefix_scaling_factor
+      {"jarowinkler_similarity",
+       {values::Bytes("MARHTA"), values::Bytes("MARTHA"), 0.2},
+       0.977778,
+       kDistanceFloatMargin},
+
+      // Custom parameters: prefix_boost_threshold
+      {"jarowinkler_similarity",
+       {values::Bytes("MARHTA"), values::Bytes("MARTHA"), values::NullDouble(),
+        0.95},
+       values::NullDouble()},
+      {"jarowinkler_similarity",
+       {values::Bytes("MARHTA"), values::Bytes("MARTHA"), values::NullDouble(),
+        0.90},
+       values::NullDouble()},
+      {"jarowinkler_similarity",
+       {values::Bytes("MARHTA"), values::Bytes("MARTHA"), 0.1, 0.95},
+       0.944444,
+       kDistanceFloatMargin},
+      {"jarowinkler_similarity",
+       {values::Bytes("MARHTA"), values::Bytes("MARTHA"), 0.1, 0.90},
+       0.961111,
+       kDistanceFloatMargin},
+
+      // Custom parameters: both
+      {"jarowinkler_similarity",
+       {values::Bytes("MARHTA"), values::Bytes("MARTHA"), 0.2, 0.95},
+       0.944444,
+       kDistanceFloatMargin},
+      {"jarowinkler_similarity",
+       {values::Bytes("MARHTA"), values::Bytes("MARTHA"), 0.2, 0.90},
+       0.977778,
+       kDistanceFloatMargin},
+
+      // Invalid parameter errors: prefix_scaling_factor
+      {"jarowinkler_similarity",
+       {values::Bytes("MARHTA"), values::Bytes("MARTHA"), -0.01},
+       0.0,
+       absl::OutOfRangeError(
+           "prefix_scaling_factor must be in [0, 0.25] range")},
+      {"jarowinkler_similarity",
+       {values::Bytes("MARHTA"), values::Bytes("MARTHA"), 0.26},
+       0.0,
+       absl::OutOfRangeError(
+           "prefix_scaling_factor must be in [0, 0.25] range")},
+
+      // Invalid parameter errors: prefix_boost_threshold
+      {"jarowinkler_similarity",
+       {values::Bytes("MARHTA"), values::Bytes("MARTHA"), 0.1, -0.01},
+       0.0,
+       absl::OutOfRangeError("prefix_boost_threshold must be in [0, 1] range")},
+      {"jarowinkler_similarity",
+       {values::Bytes("MARHTA"), values::Bytes("MARTHA"), 0.1, 1.01},
+       0.0,
+       absl::OutOfRangeError("prefix_boost_threshold must be in [0, 1] range")},
+
+      // NULL semantics with invalid parameters
+      {"jarowinkler_similarity",
+       {values::Bytes("MARHTA"), values::Bytes("MARTHA"), values::NullDouble(),
+        -0.01},
+       values::NullDouble()},
+      {"jarowinkler_similarity",
+       {values::Bytes("MARHTA"), values::Bytes("MARTHA"), values::NullDouble(),
+        1.01},
+       values::NullDouble()}};
+  return tests;
+}
+
 }  // namespace googlesql

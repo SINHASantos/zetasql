@@ -785,7 +785,7 @@ std::string ProtoType::FormatValueContent(
   if (!options.as_literal()) {
     return internal::GetCastExpressionString(
         ToBytesLiteral(std::string(GetCordValue(value))), this,
-        options.product_mode, options.use_external_float32);
+        options.product_mode(), options.use_external_float32);
   }
 
   google::protobuf::DynamicMessageFactory message_factory;

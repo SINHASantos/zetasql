@@ -8749,17 +8749,22 @@ absl::StatusOr<std::unique_ptr<RelationalOp>> Algebrizer::AlgebrizeTVFScan(
 
     const ResolvedScan* resolved_body = nullptr;
     bool is_value_table;
-    if (tvf->Is<SQLTableValuedFunction>()) {
-      const auto* sql_tvf = tvf->GetAs<SQLTableValuedFunction>();
-      arg_names = sql_tvf->GetArgumentNames();
-      resolved_body = sql_tvf->ResolvedStatement()->query();
-      is_value_table = sql_tvf->ResolvedStatement()->is_value_table();
-    } else {
+    if (tvf_scan->signature()->Is<TemplatedSQLTVFSignature>()) {
+      // Even if the function is not templated, it's treated as such if
+      // arguments have annotations.
       const auto* signature =
           tvf_scan->signature()->GetAs<TemplatedSQLTVFSignature>();
       arg_names = signature->GetArgumentNames();
       resolved_body = signature->resolved_templated_query()->query();
       is_value_table = signature->resolved_templated_query()->is_value_table();
+    } else {
+      GOOGLESQL_RET_CHECK(tvf->Is<SQLTableValuedFunction>());
+      GOOGLESQL_RET_CHECK(!tvf->Is<TemplatedSQLTVF>());
+
+      const auto* sql_tvf = tvf->GetAs<SQLTableValuedFunction>();
+      arg_names = sql_tvf->GetArgumentNames();
+      resolved_body = sql_tvf->ResolvedStatement()->query();
+      is_value_table = sql_tvf->ResolvedStatement()->is_value_table();
     }
 
     GOOGLESQL_RET_CHECK_EQ(arg_names.size(), arg_infos.size());

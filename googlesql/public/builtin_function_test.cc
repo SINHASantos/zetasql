@@ -16,7 +16,6 @@
 
 #include "googlesql/public/builtin_function.h"
 
-#include <map>
 #include <memory>
 #include <string>
 #include <utility>
@@ -34,13 +33,16 @@
 #include "googlesql/public/options.pb.h"
 #include "googlesql/public/table_valued_function.h"
 #include "googlesql/public/types/proto_type.h"
+#include "googlesql/public/types/type.h"
 #include "googlesql/public/types/type_factory.h"
 #include "googlesql/public/value.h"
 #include "googlesql/resolved_ast/resolved_node_kind.pb.h"
 #include "googlesql/testdata/test_schema.pb.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "absl/container/flat_hash_map.h"
 #include "absl/container/flat_hash_set.h"
+#include "googlesql/base/check.h"
 #include "absl/status/status.h"
 #include "absl/strings/str_join.h"
 #include "absl/strings/string_view.h"
@@ -973,7 +975,7 @@ TEST(SimpleFunctionTests, TestFunctionSignaturesForUnintendedCoercion) {
                      {float_type, {float_type}, FN_SIGN_FLOAT},
                      {double_type, {double_type}, FN_SIGN_DOUBLE}},
                     FunctionOptions());
-  EXPECT_TRUE(FunctionMayHaveUnintendedArgumentCoercion(&function))
+  EXPECT_TRUE(FunctionMayHaveUnintendedArgumentCoercion(function))
       << function.DebugString();
 
   // The checks work across corresponding arguments.  This fails because the
@@ -987,7 +989,7 @@ TEST(SimpleFunctionTests, TestFunctionSignaturesForUnintendedCoercion) {
        {float_type, {float_type, float_type}, nullptr /* context_ptr */},
        {double_type, {double_type, double_type}, nullptr /* context_ptr */}},
       FunctionOptions());
-  EXPECT_TRUE(FunctionMayHaveUnintendedArgumentCoercion(&function2))
+  EXPECT_TRUE(FunctionMayHaveUnintendedArgumentCoercion(function2))
       << function2.DebugString();
 
   // The check works across signatures with different numbers of arguments.
@@ -1008,7 +1010,7 @@ TEST(SimpleFunctionTests, TestFunctionSignaturesForUnintendedCoercion) {
         nullptr /* context_ptr */},
        {double_type, {double_type, double_type}, nullptr /* context_ptr */}},
       FunctionOptions());
-  EXPECT_TRUE(FunctionMayHaveUnintendedArgumentCoercion(&function3))
+  EXPECT_TRUE(FunctionMayHaveUnintendedArgumentCoercion(function3))
       << function3.DebugString();
 
   // The test function does not currently catch a potential problem in this
@@ -1022,7 +1024,7 @@ TEST(SimpleFunctionTests, TestFunctionSignaturesForUnintendedCoercion) {
                       {float_type, {float_type}, nullptr /* context_ptr */},
                       {double_type, {double_type}, nullptr /* context_ptr */}},
                      FunctionOptions());
-  EXPECT_FALSE(FunctionMayHaveUnintendedArgumentCoercion(&function4))
+  EXPECT_FALSE(FunctionMayHaveUnintendedArgumentCoercion(function4))
       << function4.DebugString();
 }
 
@@ -1058,20 +1060,16 @@ TEST(SimpleFunctionTests,
                                         type_factory, functions, types));
 
   for (const auto& function_entry : functions) {
-    const Function* function = function_entry.second.get();
+    const Function& function = *function_entry.second;
     // If this test fails, then the function must be examined closely
     // to determine whether or not its signatures are correct, and that
     // there is no unintended argument coercion being allowed (particularly
     // for unsigned integer arguments).
-    // TODO - Fix FunctionMayHaveUnintendedArgumentCoercion so that
-    // it doesn't detect false positives.
-
-    // The divide function triggers a false positive, as the method incorrectly
-    // detects an unintended coercion for the following divide signatures :
-    // (DOUBLE, DOUBLE), (INTERVAL, INT64).
-    if (function->Name() == "$divide") continue;
+    if (SkipFunctionMayHaveUnintendedArgumentCoercion(function)) {
+      continue;
+    }
     EXPECT_FALSE(FunctionMayHaveUnintendedArgumentCoercion(function))
-        << function->DebugString();
+        << function.DebugString();
   }
 }
 

@@ -264,6 +264,20 @@ absl::Status DefaultAnnotationSpec::CheckAndPropagateForGetStructField(
   return absl::OkStatus();
 }
 
+absl::Status DefaultAnnotationSpec::CheckAndPropagateForGetRowField(
+    const ResolvedGetRowField& get_row_field,
+    AnnotationMap* result_annotation_map) {
+  if (result_annotation_map == nullptr) {
+    return absl::OkStatus();
+  }
+  GOOGLESQL_RET_CHECK_EQ(get_row_field.expr()->type_annotation_map(), nullptr)
+      << "RowType cannot have annotations";
+
+  const AnnotationMap* column_annotation_map =
+      get_row_field.column()->GetTypeAnnotationMap();
+  return MergeAnnotations(column_annotation_map, *result_annotation_map);
+}
+
 absl::Status DefaultAnnotationSpec::CheckAndPropagateForMakeStruct(
     const ResolvedMakeStruct& make_struct,
     StructAnnotationMap* result_annotation_map) {

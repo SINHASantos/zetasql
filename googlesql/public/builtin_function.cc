@@ -16,6 +16,7 @@
 
 #include "googlesql/public/builtin_function.h"
 
+#include <cstdint>
 #include <map>
 #include <memory>
 #include <string>
@@ -295,31 +296,31 @@ absl::Status GetBuiltinFunctionsAndTypes(const BuiltinFunctionOptions& options,
                                      table_valued_functions);
 }
 
-bool FunctionMayHaveUnintendedArgumentCoercion(const Function* function) {
-  if (function->NumSignatures() == 0 || !function->ArgumentsAreCoercible()) {
+bool FunctionMayHaveUnintendedArgumentCoercion(const Function& function) {
+  if (function.NumSignatures() == 0 || !function.ArgumentsAreCoercible()) {
     return false;
   }
   // This only tests between signature arguments at the same argument
   // index.  It would not correctly analyze multiple signatures whose
   // corresponding arguments are not related to each other, but that
   // is not an issue at the time of the initial implementation.
-  int max_num_arguments = 0;
-  for (int signature_idx = 0; signature_idx < function->NumSignatures();
+  int64_t max_num_arguments = 0;
+  for (int signature_idx = 0; signature_idx < function.NumSignatures();
        ++signature_idx) {
-    const FunctionSignature* signature = function->GetSignature(signature_idx);
-    if (signature->arguments().size() > max_num_arguments) {
-      max_num_arguments = signature->arguments().size();
+    const FunctionSignature* signature = function.GetSignature(signature_idx);
+    int64_t num_arguments = std::ssize(signature->arguments());
+    if (num_arguments > max_num_arguments) {
+      max_num_arguments = num_arguments;
     }
   }
   for (int argument_idx = 0; argument_idx < max_num_arguments; ++argument_idx) {
     bool has_signed_arguments = false;
     bool has_unsigned_arguments = false;
     bool has_floating_point_arguments = false;
-    for (int signature_idx = 0; signature_idx < function->NumSignatures();
+    for (int signature_idx = 0; signature_idx < function.NumSignatures();
          ++signature_idx) {
-      const FunctionSignature* signature =
-          function->GetSignature(signature_idx);
-      if (argument_idx < signature->arguments().size()) {
+      const FunctionSignature* signature = function.GetSignature(signature_idx);
+      if (argument_idx < std::ssize(signature->arguments())) {
         const FunctionArgumentType& argument_type =
             signature->argument(argument_idx);
         if (argument_type.type() != nullptr) {
@@ -341,4 +342,18 @@ bool FunctionMayHaveUnintendedArgumentCoercion(const Function* function) {
   return false;
 }
 
+bool SkipFunctionMayHaveUnintendedArgumentCoercion(const Function& function) {
+  // TODO - Fix FunctionMayHaveUnintendedArgumentCoercion so that
+  // it doesn't detect false positives.
+  //
+  // Adding functions to this list should be done with caution and only after
+  // careful review.
+
+  // The divide function triggers a false positive, as the method incorrectly
+  // detects an unintended coercion for the following divide signatures :
+  // (DOUBLE, DOUBLE), (INTERVAL, INT64).
+  if (function.Name() == "$divide") return true;
+
+  return false;
+}
 }  // namespace googlesql

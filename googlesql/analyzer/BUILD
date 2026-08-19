@@ -309,7 +309,7 @@ cc_library(
         "//googlesql/public:signature_match_result",
         "//googlesql/public:simple_catalog",
         "//googlesql/public:sql_function",
-        "//googlesql/public:sql_tvf",
+        "//googlesql/public:sql_tvf_no_resolver",
         "//googlesql/public:sql_view",
         "//googlesql/public:strings",
         "//googlesql/public:templated_sql_function",

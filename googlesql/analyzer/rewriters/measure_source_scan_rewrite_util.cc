@@ -24,10 +24,12 @@
 #include <utility>
 #include <vector>
 
+#include "googlesql/analyzer/annotation_propagator.h"
 #include "googlesql/analyzer/rewriters/measure_closure_builder.h"
 #include "googlesql/analyzer/rewriters/measure_collector.h"
 #include "googlesql/analyzer/rewriters/measure_dependency_graph.h"
 #include "googlesql/public/catalog.h"
+#include "googlesql/public/types/annotation.h"
 #include "googlesql/public/types/measure_type.h"
 #include "googlesql/public/types/struct_type.h"
 #include "googlesql/public/types/type_factory.h"
@@ -85,7 +87,7 @@ struct MeasureSourceTraits<ResolvedTVFScan> {
 //   The collector is mutated to register the `MeasureInfo`s.
 absl::Status RegisterCatalogMeasureInfos(
     const MeasureGraph& graph, const Table& table,
-    const CaseInsensitiveMap<const StructType*>& closure_types,
+    const CaseInsensitiveMap<AnnotatedType>& closure_types,
     MeasureCollector& measure_collector) {
   for (const MeasureGraph::Node* node : graph.nodes()) {
     absl::btree_set<std::string, googlesql_base::CaseLess>
@@ -96,12 +98,12 @@ absl::Status RegisterCatalogMeasureInfos(
 
     auto closure_type_it = closure_types.find(node->name);
     GOOGLESQL_RET_CHECK(closure_type_it != closure_types.end());
-    const StructType* closure_struct_type = closure_type_it->second;
-    GOOGLESQL_RET_CHECK(closure_struct_type != nullptr);
+    AnnotatedType closure_annotated_type = closure_type_it->second;
+    GOOGLESQL_RET_CHECK(closure_annotated_type.type != nullptr);
     MeasureInfo measure_info = {
         .measure_expr = node->def_expr,
         .row_identity_column_names = std::move(row_identity_column_names),
-        .closure_struct_type = closure_struct_type,
+        .closure_struct_annotated_type = closure_annotated_type,
     };
     GOOGLESQL_RETURN_IF_ERROR(
         measure_collector.AddMeasureInfo(node->measure_type, measure_info));
@@ -145,7 +147,7 @@ absl::Status RegisterProjectedMeasureInfos(
         .closure_struct = closure_col,
         .measure_source_column = pm.resolved_column,
     };
-    projected_info.closure_struct_type = closure_col.type();
+    projected_info.closure_struct_annotated_type = closure_col.annotated_type();
 
     GOOGLESQL_RETURN_IF_ERROR(measure_collector.AddMeasureInfo(
         pm.resolved_column.type()->AsMeasure(), projected_info));
@@ -341,11 +343,13 @@ class MeasureSourceColumnReplacer {
   MeasureSourceColumnReplacer(std::unique_ptr<const ScanType> scan,
                               MeasureCollector& measure_collector,
                               TypeFactory& type_factory,
-                              ColumnFactory& column_factory)
+                              ColumnFactory& column_factory,
+                              AnnotationPropagator& annotation_propagator)
       : scan_(std::move(scan)),
         measure_collector_(measure_collector),
         type_factory_(type_factory),
-        column_factory_(column_factory) {}
+        column_factory_(column_factory),
+        annotation_propagator_(annotation_propagator) {}
 
   // Rewrites the input scan to replace AGG'ed measure columns with closure
   // struct columns.
@@ -362,7 +366,7 @@ class MeasureSourceColumnReplacer {
     GOOGLESQL_ASSIGN_OR_RETURN(MeasureGraph graph, BuildMeasureGraphFromScan());
 
     GOOGLESQL_ASSIGN_OR_RETURN(
-        CaseInsensitiveMap<const StructType*> closure_types,
+        CaseInsensitiveMap<AnnotatedType> closure_types,
         ComputeClosureTypesForMeasuresFromScan(graph, *table, type_factory_));
 
     // Step 2: Register these measures with `measure_collector` under their
@@ -377,8 +381,8 @@ class MeasureSourceColumnReplacer {
     ReplacerColumnProvider column_provider(*this, *table);
     GOOGLESQL_ASSIGN_OR_RETURN(ComputeClosureColumnsResult closure_result,
                      ComputeClosureColumnsForMeasuresFromScan(
-                         graph, *table, closure_types, type_factory_,
-                         column_factory_, column_provider));
+                         graph, *table, closure_types, column_factory_,
+                         column_provider, annotation_propagator_));
 
     // Step 4: Register the MeasureInfo for the projected measures. They are
     // different from the catalog measure info because ResolvedColumn::type()
@@ -444,7 +448,8 @@ class MeasureSourceColumnReplacer {
         return it->second;
       }
       ResolvedColumn new_col = replacer_.column_factory_.MakeCol(
-          table_.Name(), column->Name(), column->GetType());
+          table_.Name(), column->Name(),
+          AnnotatedType(column->GetType(), column->GetTypeAnnotationMap()));
       missing_non_measure_columns_[column->Name()] = new_col;
       return new_col;
     }
@@ -553,16 +558,20 @@ class MeasureSourceColumnReplacer {
   TypeFactory& type_factory_;
   // Used to generate new resolved columns.
   ColumnFactory& column_factory_;
+  // Annotation propagator for attaching annotations bottom-up.
+  AnnotationPropagator& annotation_propagator_;
 };
 
 class MeasureSourceCollector : public ResolvedASTRewriteVisitor {
  public:
   MeasureSourceCollector(MeasureCollector& measure_collector,
                          TypeFactory& type_factory,
-                         ColumnFactory& column_factory)
+                         ColumnFactory& column_factory,
+                         AnnotationPropagator& annotation_propagator)
       : measure_collector_(measure_collector),
         type_factory_(type_factory),
-        column_factory_(column_factory) {}
+        column_factory_(column_factory),
+        annotation_propagator_(annotation_propagator) {}
 
  protected:
   // Row field access of a measure-typed column is a source of a measure.
@@ -609,7 +618,7 @@ class MeasureSourceCollector : public ResolvedASTRewriteVisitor {
     MeasureGraph graph;
     GOOGLESQL_RETURN_IF_ERROR(graph.AddIfNotPresent(*measure_column, *table).status());
     GOOGLESQL_ASSIGN_OR_RETURN(
-        CaseInsensitiveMap<const StructType*> closure_types,
+        CaseInsensitiveMap<AnnotatedType> closure_types,
         BuildClosureTypesForTableRow(graph, *table, type_factory_));
     GOOGLESQL_RETURN_IF_ERROR(RegisterCatalogMeasureInfos(graph, *table, closure_types,
                                                 measure_collector_));
@@ -622,7 +631,7 @@ class MeasureSourceCollector : public ResolvedASTRewriteVisitor {
       std::unique_ptr<const ResolvedTableScan> scan) override {
     return MeasureSourceColumnReplacer<ResolvedTableScan>(
                std::move(scan), measure_collector_, type_factory_,
-               column_factory_)
+               column_factory_, annotation_propagator_)
         .Replace();
   }
 
@@ -630,7 +639,7 @@ class MeasureSourceCollector : public ResolvedASTRewriteVisitor {
       std::unique_ptr<const ResolvedTVFScan> scan) override {
     return MeasureSourceColumnReplacer<ResolvedTVFScan>(
                std::move(scan), measure_collector_, type_factory_,
-               column_factory_)
+               column_factory_, annotation_propagator_)
         .Replace();
   }
 
@@ -638,6 +647,7 @@ class MeasureSourceCollector : public ResolvedASTRewriteVisitor {
   MeasureCollector& measure_collector_;
   TypeFactory& type_factory_;
   ColumnFactory& column_factory_;
+  AnnotationPropagator& annotation_propagator_;
 };
 
 }  // namespace
@@ -647,9 +657,10 @@ class MeasureSourceCollector : public ResolvedASTRewriteVisitor {
 absl::StatusOr<std::unique_ptr<const ResolvedNode>> AddClosures(
     MeasureCollector& measure_collector,
     std::unique_ptr<const ResolvedNode> resolved_ast, TypeFactory& type_factory,
-    ColumnFactory& column_factory) {
+    ColumnFactory& column_factory,
+    AnnotationPropagator& annotation_propagator) {
   MeasureSourceCollector visitor(measure_collector, type_factory,
-                                 column_factory);
+                                 column_factory, annotation_propagator);
   return visitor.VisitAll(std::move(resolved_ast));
 }
 

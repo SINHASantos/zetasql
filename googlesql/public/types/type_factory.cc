@@ -134,6 +134,7 @@ static const auto* StaticTypeSet() {
       types::TokenListType(),
       types::UuidType(),
       types::ColumnListSpecType(),
+      types::VariantType(),
   };
   return kStaticTypeSet;
 }
@@ -260,6 +261,8 @@ const Type* TypeFactory::get_uuid() { return types::UuidType(); }
 const Type* TypeFactory::get_column_list_spec() {
   return types::ColumnListSpecType();
 }
+
+const Type* TypeFactory::get_variant() { return types::VariantType(); }
 
 const Type* TypeFactory::MakeSimpleType(TypeKind kind) {
   ABSL_CHECK(Type::IsSimpleType(kind))
@@ -1296,6 +1299,12 @@ static const Type* s_column_list_spec_type() {
   return s_column_list_spec_type;
 }
 
+static const Type* s_variant_type() {
+  static const Type* s_variant_type =
+      new SimpleType(s_type_factory(), TYPE_VARIANT);
+  return s_variant_type;
+}
+
 static const EnumType* GetArrayFindModeEnumType() {
   static const EnumType* s_array_find_mode_enum_type = [] {
     const EnumType* enum_type;
@@ -1492,6 +1501,12 @@ static const ArrayType* s_uuid_array_type() {
   return s_uuid_array_type;
 }
 
+static const ArrayType* s_variant_array_type() {
+  static const ArrayType* s_variant_array_type =
+      MakeArrayType(s_type_factory()->get_variant());
+  return s_variant_array_type;
+}
+
 static const EnumType* GetArrayZipModeEnumType() {
   static const EnumType* s_array_zip_mode_enum_type = [] {
     const EnumType* enum_type;
@@ -1588,6 +1603,7 @@ const EnumType* UnsupportedFieldsEnumType() {
 }
 const Type* UuidType() { return s_uuid_type(); }
 const Type* ColumnListSpecType() { return s_column_list_spec_type(); }
+const Type* VariantType() { return s_variant_type(); }
 
 const ArrayType* Int32ArrayType() { return s_int32_array_type(); }
 const ArrayType* Int64ArrayType() { return s_int64_array_type(); }
@@ -1620,6 +1636,7 @@ const ArrayType* JsonArrayType() { return s_json_array_type(); }
 const ArrayType* TokenListArrayType() { return s_tokenlist_array_type(); }
 
 const ArrayType* UuidArrayType() { return s_uuid_array_type(); }
+const ArrayType* VariantArrayType() { return s_variant_array_type(); }
 
 const Type* TypeFromSimpleTypeKind(TypeKind type_kind) {
   switch (type_kind) {
@@ -1665,6 +1682,8 @@ const Type* TypeFromSimpleTypeKind(TypeKind type_kind) {
       return UuidType();
     case TYPE_COLUMN_LIST_SPEC:
       return ColumnListSpecType();
+    case TYPE_VARIANT:
+      return VariantType();
     default:
       GOOGLESQL_VLOG(1) << "Could not build static Type from type: "
               << Type::TypeKindToString(type_kind, PRODUCT_INTERNAL);
@@ -1715,6 +1734,8 @@ const ArrayType* ArrayTypeFromSimpleTypeKind(TypeKind type_kind) {
       return TokenListArrayType();
     case TYPE_UUID:
       return UuidArrayType();
+    case TYPE_VARIANT:
+      return VariantArrayType();
     default:
       GOOGLESQL_VLOG(1) << "Could not build static ArrayType from type: "
               << Type::TypeKindToString(type_kind, PRODUCT_INTERNAL);

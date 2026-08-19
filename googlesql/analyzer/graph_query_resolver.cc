@@ -3713,12 +3713,10 @@ GraphTableQueryResolver::ResolveGqlOperatorList(
   }
 
   if (gql_ops.back()->node_kind() == AST_GQL_INSERT) {
-    std::unique_ptr<const ResolvedScan> last_scan = std::move(scan_list.back());
-    scan_list.pop_back();
     GOOGLESQL_ASSIGN_OR_RETURN(std::unique_ptr<const ResolvedFinishScan> finish_scan,
                      ResolvedFinishScanBuilder()
                          .set_column_list({})
-                         .set_input_scan(std::move(last_scan))
+                         .set_input_scan(std::move(op_inputs.resolved_node))
                          .Build());
     scan_list.push_back(std::move(finish_scan));
     op_inputs.graph_name_lists.singleton_name_list =

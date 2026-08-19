@@ -20,18 +20,9 @@ ARRAY<STRUCT<ts_col TIMESTAMP>>[
 ]
 ==
 [prepare_database]
-CREATE TABLE TableWithStructAndProto AS (
+CREATE TABLE TableWithProto AS (
   SELECT
     1 AS key,
-    STRUCT(
-      1 AS ambiguous_field,
-      'abc' AS other_field,
-      NEW googlesql_test.TestHopAndTumblePB(
-        100 AS int32_val,
-        TO_PROTO(TIMESTAMP '2025-01-01 00:00:00 UTC') AS timestamp_val,
-        TIMESTAMP '2025-01-01 00:00:00 UTC' AS annotated_timestamp_val
-      ) AS proto_field
-    ) AS StructWithProto,
     NEW googlesql_test.TestHopAndTumblePB(
       200 AS int32_val,
       TO_PROTO(TIMESTAMP '2025-01-01 00:00:00 UTC') AS timestamp_val,
@@ -41,23 +32,9 @@ CREATE TABLE TableWithStructAndProto AS (
 --
 ARRAY<STRUCT<
         key INT64,
-        StructWithProto STRUCT<
-               ambiguous_field INT64,
-               other_field STRING,
-               proto_field PROTO<googlesql_test.TestHopAndTumblePB>
-             >,
         ProtoColumn PROTO<googlesql_test.TestHopAndTumblePB>
       >>
 [{1,
-  {1,
-   "abc",
-   {
-     int32_val: 100
-     timestamp_val {
-       seconds: 1735689600
-     }
-     annotated_timestamp_val: 1735689600000
-   }},
   {
     int32_val: 200
     timestamp_val {
@@ -65,24 +42,6 @@ ARRAY<STRUCT<
     }
     annotated_timestamp_val: 1735689600000
   }}]
-==
-[prepare_database]
-CREATE TABLE TableWithNestedFields AS (
-  SELECT STRUCT(TIMESTAMP '2025-01-01 00:00:00' AS ts) AS struct_col
-  UNION ALL
-  SELECT STRUCT(TIMESTAMP '2025-01-02 00:00:00' AS ts) AS struct_col
-  UNION ALL
-  SELECT STRUCT(TIMESTAMP '2025-01-03 00:00:00' AS ts) AS struct_col
-  UNION ALL
-  SELECT STRUCT(TIMESTAMP '2025-01-04 00:00:00' AS ts) AS struct_col
-);
---
-ARRAY<STRUCT<struct_col STRUCT<ts TIMESTAMP>>>[
-  {{2025-01-01 08:00:00+00}},
-  {{2025-01-02 08:00:00+00}},
-  {{2025-01-03 08:00:00+00}},
-  {{2025-01-04 08:00:00+00}}
-]
 ==
 [required_features=INTERVAL_TYPE,TABLE_VALUED_FUNCTIONS,TUMBLE_HOP_TVFS]
 [name=default_origin]
@@ -373,6 +332,18 @@ SELECT * FROM tumble(TABLE TableWithTimestampColumn, "ts_col", CAST(NULL AS INTE
 --
 ERROR: generic::out_of_range: Window size cannot be null.
 ==
+[required_features=INTERVAL_TYPE,TABLE_VALUED_FUNCTIONS,TUMBLE_HOP_TVFS]
+[name=month_window_size]
+SELECT * FROM tumble(TABLE TableWithTimestampColumn, "ts_col", INTERVAL 1 MONTH);
+--
+ERROR: generic::out_of_range: Window size cannot contain MONTH or YEAR parts.
+==
+[required_features=INTERVAL_TYPE,TABLE_VALUED_FUNCTIONS,TUMBLE_HOP_TVFS]
+[name=year_window_size]
+SELECT * FROM tumble(TABLE TableWithTimestampColumn, "ts_col", INTERVAL 1 YEAR);
+--
+ERROR: generic::out_of_range: Window size cannot contain MONTH or YEAR parts.
+==
 [required_features=INTERVAL_TYPE,TABLE_VALUED_FUNCTIONS,TUMBLE_HOP_TVFS,NAMED_ARGUMENTS]
 [name=null_origin]
 SELECT * FROM tumble(TABLE TableWithTimestampColumn, "ts_col", INTERVAL 1 DAY, origin => NULL);
@@ -470,8 +441,17 @@ ARRAY<STRUCT<
                }]
 ==
 [required_features=INTERVAL_TYPE,TABLE_VALUED_FUNCTIONS,TUMBLE_HOP_TVFS]
-[name=tumble_sql_table_nested_struct_fields]
-SELECT * FROM tumble(TABLE TableWithNestedFields, "struct_col.ts", INTERVAL 1 DAY);
+[name=tumble_cte_struct_fields]
+WITH CteWithStruct AS (
+  SELECT STRUCT(TIMESTAMP '2025-01-01 00:00:00' AS ts) AS struct_col
+  UNION ALL
+  SELECT STRUCT(TIMESTAMP '2025-01-02 00:00:00' AS ts) AS struct_col
+  UNION ALL
+  SELECT STRUCT(TIMESTAMP '2025-01-03 00:00:00' AS ts) AS struct_col
+  UNION ALL
+  SELECT STRUCT(TIMESTAMP '2025-01-04 00:00:00' AS ts) AS struct_col
+)
+SELECT * FROM tumble(TABLE CteWithStruct, "struct_col.ts", INTERVAL 1 DAY);
 --
 ARRAY<STRUCT<
         struct_col STRUCT<ts TIMESTAMP>,
@@ -479,24 +459,24 @@ ARRAY<STRUCT<
         WINDOW_END TIMESTAMP
       >>
 [unknown order:{
-                 {2025-01-02 08:00:00+00},
-                 2025-01-02 00:00:00+00,
-                 2025-01-03 00:00:00+00
-               },
-               {
                  {2025-01-04 08:00:00+00},
                  2025-01-04 00:00:00+00,
                  2025-01-05 00:00:00+00
                },
                {
-                 {2025-01-01 08:00:00+00},
-                 2025-01-01 00:00:00+00,
-                 2025-01-02 00:00:00+00
-               },
-               {
                  {2025-01-03 08:00:00+00},
                  2025-01-03 00:00:00+00,
                  2025-01-04 00:00:00+00
+               },
+               {
+                 {2025-01-02 08:00:00+00},
+                 2025-01-02 00:00:00+00,
+                 2025-01-03 00:00:00+00
+               },
+               {
+                 {2025-01-01 08:00:00+00},
+                 2025-01-01 00:00:00+00,
+                 2025-01-02 00:00:00+00
                }]
 ==
 [required_features=INTERVAL_TYPE,TABLE_VALUED_FUNCTIONS,TUMBLE_HOP_TVFS]
@@ -556,29 +536,15 @@ ARRAY<STRUCT<
 ==
 [required_features=INTERVAL_TYPE,TABLE_VALUED_FUNCTIONS,TUMBLE_HOP_TVFS]
 [name=tumble_proto_annotated_timestamp_val]
-SELECT * FROM tumble(TABLE TableWithStructAndProto, "ProtoColumn.annotated_timestamp_val", INTERVAL 1 DAY);
+SELECT * FROM tumble(TABLE TableWithProto, "ProtoColumn.annotated_timestamp_val", INTERVAL 1 DAY);
 --
 ARRAY<STRUCT<
         key INT64,
-        StructWithProto STRUCT<
-               ambiguous_field INT64,
-               other_field STRING,
-               proto_field PROTO<googlesql_test.TestHopAndTumblePB>
-             >,
         ProtoColumn PROTO<googlesql_test.TestHopAndTumblePB>,
         WINDOW_START TIMESTAMP,
         WINDOW_END TIMESTAMP
       >>
 [{1,
-  {1,
-   "abc",
-   {
-     int32_val: 100
-     timestamp_val {
-       seconds: 1735689600
-     }
-     annotated_timestamp_val: 1735689600000
-   }},
   {
     int32_val: 200
     timestamp_val {
@@ -591,29 +557,15 @@ ARRAY<STRUCT<
 ==
 [required_features=INTERVAL_TYPE,TABLE_VALUED_FUNCTIONS,TUMBLE_HOP_TVFS]
 [name=tumble_proto_timestamp_val]
-SELECT * FROM tumble(TABLE TableWithStructAndProto, "ProtoColumn.timestamp_val", INTERVAL 1 DAY);
+SELECT * FROM tumble(TABLE TableWithProto, "ProtoColumn.timestamp_val", INTERVAL 1 DAY);
 --
 ARRAY<STRUCT<
         key INT64,
-        StructWithProto STRUCT<
-               ambiguous_field INT64,
-               other_field STRING,
-               proto_field PROTO<googlesql_test.TestHopAndTumblePB>
-             >,
         ProtoColumn PROTO<googlesql_test.TestHopAndTumblePB>,
         WINDOW_START TIMESTAMP,
         WINDOW_END TIMESTAMP
       >>
 [{1,
-  {1,
-   "abc",
-   {
-     int32_val: 100
-     timestamp_val {
-       seconds: 1735689600
-     }
-     annotated_timestamp_val: 1735689600000
-   }},
   {
     int32_val: 200
     timestamp_val {
@@ -626,6 +578,24 @@ ARRAY<STRUCT<
 ==
 [required_features=INTERVAL_TYPE,TABLE_VALUED_FUNCTIONS,TUMBLE_HOP_TVFS]
 [name=tumble_struct_proto_timestamp_val]
+WITH TableWithStructAndProto AS (
+  SELECT
+    1 AS key,
+    STRUCT(
+      1 AS ambiguous_field,
+      'abc' AS other_field,
+      NEW googlesql_test.TestHopAndTumblePB(
+        100 AS int32_val,
+        TO_PROTO(TIMESTAMP '2025-01-01 00:00:00 UTC') AS timestamp_val,
+        TIMESTAMP '2025-01-01 00:00:00 UTC' AS annotated_timestamp_val
+      ) AS proto_field
+    ) AS StructWithProto,
+    NEW googlesql_test.TestHopAndTumblePB(
+      200 AS int32_val,
+      TO_PROTO(TIMESTAMP '2025-01-01 00:00:00 UTC') AS timestamp_val,
+      TIMESTAMP '2025-01-01 00:00:00 UTC' AS annotated_timestamp_val
+    ) AS ProtoColumn
+)
 SELECT * FROM tumble(TABLE TableWithStructAndProto, "StructWithProto.proto_field.timestamp_val", INTERVAL 1 DAY);
 --
 ARRAY<STRUCT<

@@ -20,6 +20,7 @@
 #include <utility>
 #include <vector>
 
+#include "googlesql/analyzer/annotation_propagator.h"
 #include "googlesql/analyzer/rewriters/measure_collector.h"
 #include "googlesql/analyzer/rewriters/measure_type_rewriter_util.h"
 #include "googlesql/common/type_visitors.h"
@@ -85,11 +86,11 @@ namespace {
 // We can't use `TypeRewriter` directly because it creates new MeasureTypes, and
 // the measure type rewriter rely on the original pointer identity of the
 // MeasureType to work.
-class MeasureTypeReplacer {
+class MeasureTypeReplacer : public TypeRewriter {
  public:
   MeasureTypeReplacer(const MeasureCollector& measure_collector,
                       TypeFactory& type_factory)
-      : measure_collector_(measure_collector), type_factory_(type_factory) {}
+      : TypeRewriter(type_factory), measure_collector_(measure_collector) {}
   MeasureTypeReplacer(const MeasureTypeReplacer&) = delete;
   MeasureTypeReplacer& operator=(const MeasureTypeReplacer&) = delete;
 
@@ -113,55 +114,24 @@ class MeasureTypeReplacer {
     return result;
   }
 
-  // Computes the closure type for `type` by replacing AGG'ed measures with
-  // their closure struct types.
-  absl::StatusOr<const Type*> ComputeClosureType(const Type* type) {
-    auto it = replacement_cache_.find(type);
-    if (it != replacement_cache_.end()) {
-      return it->second;
-    }
-
-    const Type* replacement = type;
-
+  absl::StatusOr<AnnotatedType> PostVisit(
+      AnnotatedType annotated_type) override {
+    const Type* type = annotated_type.type;
     if (type->IsMeasureType()) {
       if (measure_collector_.IsAgged(type->AsMeasure())) {
         GOOGLESQL_ASSIGN_OR_RETURN(MeasureInfo info,
                          measure_collector_.GetMeasureInfo(type->AsMeasure()));
-        replacement = info.closure_struct_type;
-      }
-    } else if (type->IsStruct()) {
-      std::vector<StructField> new_fields;
-      new_fields.reserve(type->AsStruct()->fields().size());
-      bool fields_changed = false;
-      for (const StructField& field : type->AsStruct()->fields()) {
-        GOOGLESQL_ASSIGN_OR_RETURN(const Type* new_field_type,
-                         ComputeClosureType(field.type));
-        if (new_field_type != field.type) {
-          fields_changed = true;
-        }
-        new_fields.push_back(StructField(field.name, new_field_type));
-      }
-
-      if (fields_changed) {
-        const StructType* new_struct_type = nullptr;
-        GOOGLESQL_RETURN_IF_ERROR(
-            type_factory_.MakeStructType(new_fields, &new_struct_type));
-        replacement = new_struct_type;
+        return info.closure_struct_annotated_type;
       }
     }
-
-    replacement_cache_[type] = replacement;
-    return replacement;
+    return annotated_type;
   }
 
  private:
   const MeasureCollector& measure_collector_;
-  TypeFactory& type_factory_;
 
   // Caches results of `IsOrContainsAggedMeasure`.
   absl::flat_hash_map<const Type*, bool> is_or_contains_cache_;
-  // Caches results of `ComputeClosureType`.
-  absl::flat_hash_map<const Type*, const Type*> replacement_cache_;
 
   // Visitor to check if a type is or contains AGG'ed measures, while validating
   // that struct is the only composite type that can contain measures.
@@ -270,13 +240,15 @@ class MeasureColumnRewriter : public ResolvedASTRewriteVisitor {
                         FunctionCallBuilder& function_call_builder,
                         const LanguageOptions& language_options,
                         ColumnFactory& column_factory,
-                        TypeFactory& type_factory)
+                        TypeFactory& type_factory,
+                        AnnotationPropagator& annotation_propagator)
       : measure_collector_(measure_collector),
         any_value_fn_(any_value_fn),
         function_call_builder_(function_call_builder),
         language_options_(language_options),
         column_factory_(column_factory),
         type_factory_(type_factory),
+        annotation_propagator_(annotation_propagator),
         measure_type_replacer_(measure_collector, type_factory) {}
 
  protected:
@@ -333,13 +305,15 @@ class MeasureColumnRewriter : public ResolvedASTRewriteVisitor {
     GOOGLESQL_ASSIGN_OR_RETURN(const ResolvedColumnRef* closure_struct_ref,
                      ComputeClosureStructRef(arg, temp_closure_struct_ref));
     GOOGLESQL_RET_CHECK(closure_struct_ref != nullptr);
-    GOOGLESQL_RET_CHECK(closure_struct_ref->type() == measure_info.closure_struct_type);
+    GOOGLESQL_RET_CHECK(closure_struct_ref->type() ==
+              measure_info.closure_struct_annotated_type.type);
 
     GOOGLESQL_ASSIGN_OR_RETURN(
         RewriteMeasureExprResult result,
         RewriteMeasureExpr(measure_type, closure_struct_ref, measure_collector_,
                            any_value_fn_, function_call_builder_,
-                           language_options_, column_factory_, type_factory_));
+                           language_options_, column_factory_, type_factory_,
+                           annotation_propagator_));
     for (auto& cc : result.closure_computed_columns) {
       pending_computed_columns_stack_.back().push_back(std::move(cc));
     }
@@ -425,9 +399,8 @@ class MeasureColumnRewriter : public ResolvedASTRewriteVisitor {
   absl::StatusOr<AnnotatedType> PostVisitAnnotatedType(
       const Type* type,
       std::optional<const AnnotationMap*> annotation_map) override {
-    GOOGLESQL_ASSIGN_OR_RETURN(const Type* new_type,
-                     measure_type_replacer_.ComputeClosureType(type));
-    return AnnotatedType(new_type, annotation_map.value_or(nullptr));
+    AnnotatedType annotated_type(type, annotation_map.value_or(nullptr));
+    return measure_type_replacer_.Visit(annotated_type);
   }
 
   // If AGG(m) calls are present under `node`, this function rewrites `node`
@@ -571,11 +544,10 @@ class MeasureColumnRewriter : public ResolvedASTRewriteVisitor {
   // Updates the type of `column` to the closure struct type.
   absl::StatusOr<ResolvedColumn> ReplaceMeasureColumnTypeToClosureStruct(
       const ResolvedColumn& column) {
-    GOOGLESQL_ASSIGN_OR_RETURN(const Type* new_type,
-                     measure_type_replacer_.ComputeClosureType(column.type()));
-    return ResolvedColumn(
-        column.column_id(), column.table_name_id(), column.name_id(),
-        AnnotatedType(new_type, column.type_annotation_map()));
+    GOOGLESQL_ASSIGN_OR_RETURN(AnnotatedType new_annotated_type,
+                     measure_type_replacer_.Visit(column.annotated_type()));
+    return ResolvedColumn(column.column_id(), column.table_name_id(),
+                          column.name_id(), new_annotated_type);
   }
 
   // Builds the closure struct expression for a measure `m` which comes from
@@ -617,6 +589,8 @@ class MeasureColumnRewriter : public ResolvedASTRewriteVisitor {
 
     std::unique_ptr<ResolvedMakeStruct> closure_struct = MakeResolvedMakeStruct(
         closure_struct_type, std::move(closure_struct_fields));
+    GOOGLESQL_RETURN_IF_ERROR(annotation_propagator_.CheckAndPropagateAnnotations(
+        nullptr, closure_struct.get()));
 
     // Since `row_expr` can be copied multiple times (here for the null check,
     // and later for field extraction), we use `RowTypeAllocatingCopier` to
@@ -656,9 +630,13 @@ class MeasureColumnRewriter : public ResolvedASTRewriteVisitor {
     // By wrapping it in `IF(t2 IS NULL, NULL, STRUCT(t2.price))`, the closure
     // evaluates to `NULL` (struct), and `NULL IS NOT NULL` is FALSE, correctly
     // filtering out the unmatched row.
-    return function_call_builder_.If(std::move(row_is_null),
-                                     std::move(null_closure_struct),
-                                     std::move(closure_struct));
+    GOOGLESQL_ASSIGN_OR_RETURN(std::unique_ptr<ResolvedFunctionCall> if_call,
+                     function_call_builder_.If(std::move(row_is_null),
+                                               std::move(null_closure_struct),
+                                               std::move(closure_struct)));
+    GOOGLESQL_RETURN_IF_ERROR(annotation_propagator_.CheckAndPropagateAnnotations(
+        nullptr, if_call.get()));
+    return if_call;
   }
 
   // Builds the closure struct expression for a measure `m` which comes from
@@ -715,7 +693,11 @@ class MeasureColumnRewriter : public ResolvedASTRewriteVisitor {
             MakeResolvedGetRowField(type, std::move(row_expr_copy), column));
       }
     }
-    return MakeResolvedMakeStruct(target_struct_type, std::move(fields));
+    std::unique_ptr<ResolvedMakeStruct> make_struct =
+        MakeResolvedMakeStruct(target_struct_type, std::move(fields));
+    GOOGLESQL_RETURN_IF_ERROR(annotation_propagator_.CheckAndPropagateAnnotations(
+        nullptr, make_struct.get()));
+    return make_struct;
   }
 
   MeasureCollector& measure_collector_;
@@ -724,6 +706,7 @@ class MeasureColumnRewriter : public ResolvedASTRewriteVisitor {
   const LanguageOptions& language_options_;
   ColumnFactory& column_factory_;
   TypeFactory& type_factory_;
+  AnnotationPropagator& annotation_propagator_;
   MeasureTypeReplacer measure_type_replacer_;
 
   // The measure type of argument of the current AGG call being visited.
@@ -785,10 +768,10 @@ absl::StatusOr<std::unique_ptr<const ResolvedNode>> RewriteMeasureColumns(
     MeasureCollector& measure_collector, const Function* any_value_fn,
     FunctionCallBuilder& function_call_builder,
     const LanguageOptions& language_options, ColumnFactory& column_factory,
-    TypeFactory& type_factory) {
-  MeasureColumnRewriter rewriter(measure_collector, any_value_fn,
-                                 function_call_builder, language_options,
-                                 column_factory, type_factory);
+    TypeFactory& type_factory, AnnotationPropagator& annotation_propagator) {
+  MeasureColumnRewriter rewriter(
+      measure_collector, any_value_fn, function_call_builder, language_options,
+      column_factory, type_factory, annotation_propagator);
   return rewriter.VisitAll(std::move(resolved_ast));
 }
 

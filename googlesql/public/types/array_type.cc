@@ -519,7 +519,7 @@ void ArrayType::FormatValueContentSqlModeImpl(
 
   if (options.mode == Type::FormatValueContentOptions::Mode::kSQLExpression) {
     absl::StrAppend(
-        result, TypeName(options.product_mode, options.use_external_float32));
+        result, TypeName(options.product_mode(), options.use_external_float32));
   }
   absl::StrAppend(result, "[");
 

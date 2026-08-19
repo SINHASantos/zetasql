@@ -400,7 +400,7 @@ constexpr TypeKindInfoList MakeTypeKindInfoList() {
       .name = "VARIANT",
       .cost = 39,
       .specificity = 39,
-      .simple = false,
+      .simple = true,
   };
 
   return kinds;
@@ -486,6 +486,15 @@ std::string Type::TypeListToString(TypeListView types, ProductMode mode,
   }
   return absl::StrJoin(type_strings, ", ");
 }
+
+Type::FormatValueContentOptions::FormatValueContentOptions(
+    LanguageOptions language_options)
+    : language_options_(std::move(language_options)) {}
+
+Type::FormatValueContentOptions::FormatValueContentOptions(
+    LanguageOptions language_options, bool use_external_float32)
+    : use_external_float32(use_external_float32),
+      language_options_(std::move(language_options)) {}
 
 Type::FormatValueContentOptions
 Type::FormatValueContentOptions::IncreaseIndent() {
@@ -721,7 +730,7 @@ bool Type::SupportsPartitioningImpl(const LanguageOptions& language_options,
                                     const Type** no_partitioning_type) const {
   bool supports_partitioning =
       !this->IsGeography() && !this->IsFloatingPoint() &&
-      !this->IsTokenList() && !this->IsColumnListSpec();
+      !this->IsTokenList() && !this->IsColumnListSpec() && !this->IsVariant();
   if (this->IsJson()) {
     supports_partitioning =
         language_options.LanguageFeatureEnabled(FEATURE_JSON_TYPE_COMPARISON);
@@ -736,7 +745,7 @@ bool Type::SupportsPartitioningImpl(const LanguageOptions& language_options,
 bool Type::SupportsOrdering(const LanguageOptions& language_options,
                             std::string* type_description) const {
   bool supports_ordering =
-      !IsGeography() && !IsTokenList() && !IsColumnListSpec();
+      !IsGeography() && !IsTokenList() && !IsColumnListSpec() && !IsVariant();
 
   if (this->IsJson()) {
     supports_ordering =

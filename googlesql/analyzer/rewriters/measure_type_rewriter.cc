@@ -21,6 +21,7 @@
 #include <utility>
 #include <vector>
 
+#include "googlesql/analyzer/annotation_propagator.h"
 #include "googlesql/analyzer/rewriters/measure_collector.h"
 #include "googlesql/analyzer/rewriters/measure_reference_rewrite_util.h"
 #include "googlesql/analyzer/rewriters/measure_source_scan_rewrite_util.h"
@@ -210,24 +211,27 @@ class MeasureTypeRewriter : public Rewriter {
     // corresponding struct closure columns to propagate the struct closure.
 
     MeasureCollector measure_collector(column_factory);
+    AnnotationPropagator annotation_propagator(options, type_factory);
 
     // Step 1: Find AGG(measure) calls and mark measures as AGG'ed.
     GOOGLESQL_RETURN_IF_ERROR(MarkAggedMeasures(input.get(), measure_collector));
 
     // Step 2: Identify the measure source columns.
-    GOOGLESQL_ASSIGN_OR_RETURN(std::unique_ptr<const ResolvedNode> node,
-                     AddClosures(measure_collector, std::move(input),
-                                 type_factory, column_factory));
+    GOOGLESQL_ASSIGN_OR_RETURN(
+        std::unique_ptr<const ResolvedNode> node,
+        AddClosures(measure_collector, std::move(input), type_factory,
+                    column_factory, annotation_propagator));
 
     // All required measure information has been collected. Perform the final
     // correctness check.
     GOOGLESQL_RETURN_IF_ERROR(measure_collector.Validate());
 
     // Step 3: Rewrite the measure column references.
-    GOOGLESQL_ASSIGN_OR_RETURN(node, RewriteMeasureColumns(
-                               std::move(node), measure_collector, any_value_fn,
-                               function_call_builder, options.language(),
-                               column_factory, type_factory));
+    GOOGLESQL_ASSIGN_OR_RETURN(
+        node, RewriteMeasureColumns(std::move(node), measure_collector,
+                                    any_value_fn, function_call_builder,
+                                    options.language(), column_factory,
+                                    type_factory, annotation_propagator));
 
     // Step 4: Remove ColumnRefs on parameter_list that are not accessed.
     //

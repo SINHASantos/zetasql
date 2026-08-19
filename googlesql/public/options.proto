@@ -124,8 +124,8 @@ message LanguageFeatureOptions {
 // Next ID: 185
 enum LanguageFeature {
   reserved 3 to 4, 36 to 39, 44 to 46, 48, 54, 55, 74, 99, 107, 108, 110, 124,
-      132, 134, 140, 13003, 13046, 14001, 14012, 14022, 14024, 14040, 14061,
-      14077, 14081, 14082, 14085, 14129, 999003, 999004, 999005;
+      132, 134, 140, 163, 13003, 13046, 14001, 14012, 14022, 14024, 14040,
+      14061, 14077, 14081, 14082, 14085, 14129, 999003, 999004, 999005;
 
   // CROSS-VERSION FEATURES
   //
@@ -941,11 +941,6 @@ enum LanguageFeature {
   // See (broken link).
   FEATURE_VIEWS_IN_MODULES = 155;
 
-  // Enable the GoogleSQL standard version of the AI.IF function.
-  // Prevents naming conflicts since some engines already have their own version
-  // of AI.IF.
-  FEATURE_AI_IF = 163;
-
   // Enable the ALIGN Operator ((broken link)).
   // TODO: b/451574497 - Remove in_development flag.
   FEATURE_ALIGN_OPERATOR = 165
@@ -993,12 +988,10 @@ enum LanguageFeature {
       [(language_feature_options).ideally_enabled = false];
 
   // Enables BIT_CAST functions for BYTES <-> integer and float types.
-  FEATURE_BIT_CAST_BYTES_FUNCTIONS = 180
-      [(language_feature_options).in_development = true];
+  FEATURE_BIT_CAST_BYTES_FUNCTIONS = 180;
 
   // Enable CAST operators. See (broken link):cast-operator for details.
-  FEATURE_CAST_OPERATORS = 181
-      [(language_feature_options).in_development = true];
+  FEATURE_CAST_OPERATORS = 181;
 
   // Enables support for inline edges in property graphs.
   FEATURE_PROPERTY_GRAPH_INLINE_EDGES = 184
@@ -2162,6 +2155,13 @@ enum LanguageFeature {
   //
   // See (broken link) for more details.
   FEATURE_DERIVED_MEASURE = 14134 [
+    (language_feature_options).language_version = VERSION_1_5,
+    (language_feature_options).in_development = true
+  ];
+
+  // Enable JAROWINKLER_SIMILARITY(STRING, STRING) and
+  // JAROWINKLER_SIMILARITY(BYTES, BYTES) signatures.
+  FEATURE_ENABLE_JAROWINKLER_SIMILARITY = 14136 [
     (language_feature_options).language_version = VERSION_1_5,
     (language_feature_options).in_development = true
   ];

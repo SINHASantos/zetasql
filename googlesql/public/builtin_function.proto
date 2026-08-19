@@ -39,7 +39,7 @@ enum FunctionSignatureId {
   // in ranges:
   //
   // 0002-0999 Non-standard function calls    (NextId: 354)
-  // 1000-1099 String functions               (NextId: 1086)
+  // 1000-1099 String functions               (NextId: 1088)
   // 1100-1199 Control flow functions         (NextId: 1109)
   // 1200-1299 Time functions                 (Fully used)
   // 1300-1399 Math functions                 (Fully used)
@@ -65,7 +65,7 @@ enum FunctionSignatureId {
   // 3500-3599 Vector functions               (NextId: 3502)
   // 4000-4099 Table valued functions         (NextId: 4006)
   // 5000-5023 AI functions                   (Fully used)
-  // 5024-5049 Table valued functions II      (NextId: 5035)
+  // 5024-5049 Table valued functions II      (NextId: 5041)
   // 5050-5099 AI functions II                (NextId: 5062)
 
   // enum value                       // Related function name
@@ -384,6 +384,11 @@ enum FunctionSignatureId {
       1084;  // regexp_extract_groups(string, string) -> struct
   FN_REGEXP_EXTRACT_GROUPS_BYTES =
       1085;  // regexp_extract_groups(bytes, bytes) -> struct
+  FN_JAROWINKLER_SIMILARITY = 1086;  // jarowinkler_similarity(string, string[,
+                                     // double[, double]]) -> double
+  FN_JAROWINKLER_SIMILARITY_BYTES =
+      1087;  // jarowinkler_similarity(bytes, bytes[, double[, double]]) ->
+             // double
 
   // Control flow functions
   FN_IF = 1100;  // if
@@ -1868,6 +1873,28 @@ enum FunctionSignatureId {
       5034;  // HYBRID_VECTOR_SEARCH(table, string, table, string,
              // array<string>, string, int64, string, double, json) -> ANY
              // TABLE
+
+  FN_HYBRID_SINGLE_VECTOR_SEARCH_TVF_FLOAT_ARRAY_WITH_PROTO_OPTIONS =
+      5035;  // HYBRID_VECTOR_SEARCH(table, string, array<float>,
+             // array<string>, string, int64, string, double, proto) -> ANY
+             // TABLE
+  FN_HYBRID_SINGLE_VECTOR_SEARCH_TVF_FLOAT_ARRAY_WITH_JSON_OPTIONS =
+      5036;  // HYBRID_VECTOR_SEARCH(table, string, array<float>,
+             // array<string>, string, int64, string, double, json) -> ANY TABLE
+  FN_HYBRID_SINGLE_VECTOR_SEARCH_TVF_DOUBLE_ARRAY_WITH_PROTO_OPTIONS =
+      5037;  // HYBRID_VECTOR_SEARCH(table, string, array<double>,
+             // array<string>, string, int64, string, double, proto) -> ANY
+             // TABLE
+  FN_HYBRID_SINGLE_VECTOR_SEARCH_TVF_DOUBLE_ARRAY_WITH_JSON_OPTIONS =
+      5038;  // HYBRID_VECTOR_SEARCH(table, string, array<double>,
+             // array<string>, string, int64, string, double, json) -> ANY TABLE
+  FN_HYBRID_SINGLE_VECTOR_SEARCH_TVF_STRING_WITH_PROTO_OPTIONS =
+      5039;  // HYBRID_VECTOR_SEARCH(table, string, string,
+             // array<string>, string, int64, string, double, proto) -> ANY
+             // TABLE
+  FN_HYBRID_SINGLE_VECTOR_SEARCH_TVF_STRING_WITH_JSON_OPTIONS =
+      5040;  // HYBRID_VECTOR_SEARCH(table, string, string,
+             // array<string>, string, int64, string, double, json) -> ANY TABLE
 
   // AI functions
   // Signature ids for AI.IF(prompt). This must be the minimal signature for

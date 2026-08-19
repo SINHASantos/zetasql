@@ -2217,3 +2217,59 @@ INSERT REPLACE SELECT 1
 ERROR: Syntax error: Unexpected keyword SELECT [at 1:16]
 INSERT REPLACE SELECT 1
                ^
+==
+
+SELECT variant FROM variant;
+--
+QueryStatement [0-27] [SELECT variant FROM variant]
+  Query [0-27] [SELECT variant FROM variant]
+    Select [0-27] [SELECT variant FROM variant]
+      SelectList [7-14] [variant]
+        SelectColumn [7-14] [variant]
+          PathExpression [7-14] [variant]
+            Identifier(variant) [7-14] [variant]
+      FromClause [15-27] [FROM variant]
+        TablePathExpression [20-27] [variant]
+          PathExpression [20-27] [variant]
+            Identifier(variant) [20-27] [variant]
+--
+SELECT
+  variant
+FROM
+  variant
+==
+
+SELECT 1 AS variant;
+--
+QueryStatement [0-19] [SELECT 1 AS variant]
+  Query [0-19] [SELECT 1 AS variant]
+    Select [0-19] [SELECT 1 AS variant]
+      SelectList [7-19] [1 AS variant]
+        SelectColumn [7-19] [1 AS variant]
+          IntLiteral(1) [7-8] [1]
+          Alias [9-19] [AS variant]
+            Identifier(variant) [12-19] [variant]
+--
+SELECT
+  1 AS variant
+==
+
+SELECT table.variant FROM table;
+--
+QueryStatement [0-31] [SELECT table...FROM table]
+  Query [0-31] [SELECT table...FROM table]
+    Select [0-31] [SELECT table...FROM table]
+      SelectList [7-20] [table.variant]
+        SelectColumn [7-20] [table.variant]
+          PathExpression [7-20] [table.variant]
+            Identifier(table) [7-12] [table]
+            Identifier(variant) [13-20] [variant]
+      FromClause [21-31] [FROM table]
+        TablePathExpression [26-31] [table]
+          PathExpression [26-31] [table]
+            Identifier(table) [26-31] [table]
+--
+SELECT
+  table.variant
+FROM
+  table

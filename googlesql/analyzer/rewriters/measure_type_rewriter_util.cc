@@ -22,6 +22,7 @@
 #include <utility>
 #include <vector>
 
+#include "googlesql/analyzer/annotation_propagator.h"
 #include "googlesql/analyzer/rewriters/measure_collector.h"
 #include "googlesql/analyzer/rewriters/measure_dependency_graph.h"
 #include "googlesql/common/measure_utils.h"
@@ -29,6 +30,7 @@
 #include "googlesql/public/catalog.h"
 #include "googlesql/public/function.h"
 #include "googlesql/public/function_signature.h"
+#include "googlesql/public/types/annotation.h"
 #include "googlesql/public/types/measure_type.h"
 #include "googlesql/public/types/struct_type.h"
 #include "googlesql/public/types/type.h"
@@ -226,6 +228,8 @@ absl::Status HasUnsupportedQueryShape(const ResolvedNode* input,
   return UnsupportedQueryShapeFinder::HasUnsupportedQueryShape(
       input, language_options);
 }
+
+namespace {
 
 // Validates the struct field names in `key_columns_struct_type` are the same
 // as those in `row_identity_column_names`.
@@ -562,9 +566,11 @@ class MultiLevelAggregateRewriter : public ResolvedASTRewriteVisitor {
 class StructColumnReferenceRewriter : public ResolvedASTDeepCopyVisitor {
  public:
   StructColumnReferenceRewriter(ResolvedColumn struct_column,
-                                bool struct_column_refs_are_correlated)
+                                bool struct_column_refs_are_correlated,
+                                AnnotationPropagator& annotation_propagator)
       : struct_column_(struct_column),
-        struct_column_refs_are_correlated_(struct_column_refs_are_correlated) {}
+        struct_column_refs_are_correlated_(struct_column_refs_are_correlated),
+        annotation_propagator_(annotation_propagator) {}
   StructColumnReferenceRewriter(const StructColumnReferenceRewriter&) = delete;
   StructColumnReferenceRewriter& operator=(
       const StructColumnReferenceRewriter&) = delete;
@@ -601,7 +607,7 @@ class StructColumnReferenceRewriter : public ResolvedASTDeepCopyVisitor {
             .add_struct_column_to_parameter_list) {
       std::unique_ptr<ResolvedColumnRef> struct_column_ref =
           MakeResolvedColumnRef(
-              struct_column_.type(), struct_column_,
+              struct_column_,
               /*is_correlated=*/
               correlated_parameter_info_list_.back().is_correlated);
       subquery_expr_builder.add_parameter_list(std::move(struct_column_ref));
@@ -635,7 +641,7 @@ class StructColumnReferenceRewriter : public ResolvedASTDeepCopyVisitor {
             .add_struct_column_to_parameter_list) {
       std::unique_ptr<ResolvedColumnRef> struct_column_ref =
           MakeResolvedColumnRef(
-              struct_column_.type(), struct_column_,
+              struct_column_,
               /*is_correlated=*/
               correlated_parameter_info_list_.back().is_correlated);
       lambda_builder.add_parameter_list(std::move(struct_column_ref));
@@ -666,7 +672,7 @@ class StructColumnReferenceRewriter : public ResolvedASTDeepCopyVisitor {
     // )
     std::unique_ptr<ResolvedColumnRef> struct_column_ref =
         MakeResolvedColumnRef(
-            struct_column_.type(), struct_column_,
+            struct_column_,
             /*is_correlated=*/struct_column_refs_are_correlated_ ||
                 !correlated_parameter_info_list_.empty());
     // +-GetStructField
@@ -686,6 +692,8 @@ class StructColumnReferenceRewriter : public ResolvedASTDeepCopyVisitor {
         MakeResolvedGetStructField(referenced_columns_field.type,
                                    std::move(struct_column_ref),
                                    kReferencedColumnsFieldIndex);
+    GOOGLESQL_RETURN_IF_ERROR(annotation_propagator_.CheckAndPropagateAnnotations(
+        nullptr, get_struct_field_expr.get()));
 
     // +-GetStructField
     //  +-type=<output_type>
@@ -704,8 +712,12 @@ class StructColumnReferenceRewriter : public ResolvedASTDeepCopyVisitor {
     GOOGLESQL_RET_CHECK(field != nullptr);
     GOOGLESQL_RET_CHECK(!is_ambiguous);
     GOOGLESQL_RET_CHECK(field_index >= 0);
-    PushNodeToStack(MakeResolvedGetStructField(
-        field->type, std::move(get_struct_field_expr), field_index));
+    std::unique_ptr<ResolvedGetStructField> get_field_expr =
+        MakeResolvedGetStructField(
+            field->type, std::move(get_struct_field_expr), field_index);
+    GOOGLESQL_RETURN_IF_ERROR(annotation_propagator_.CheckAndPropagateAnnotations(
+        nullptr, get_field_expr.get()));
+    PushNodeToStack(std::move(get_field_expr));
     return absl::OkStatus();
   }
 
@@ -723,6 +735,7 @@ class StructColumnReferenceRewriter : public ResolvedASTDeepCopyVisitor {
   // measure column is being invoked in a correlated context;
   // e.g. AGG(correlated_reference_to_measure_column).
   bool struct_column_refs_are_correlated_;
+  AnnotationPropagator& annotation_propagator_;
   std::vector<CorrelatedParameterInfo> correlated_parameter_info_list_;
 };
 
@@ -731,9 +744,11 @@ class StructColumnReferenceRewriter : public ResolvedASTDeepCopyVisitor {
 //
 // Returns the rewritten expression.
 static absl::StatusOr<std::unique_ptr<const ResolvedExpr>> RewriteReferences(
-    const ResolvedExpr* expr, const ResolvedColumnRef* closure_struct_ref) {
+    const ResolvedExpr* expr, const ResolvedColumnRef* closure_struct_ref,
+    AnnotationPropagator& annotation_propagator) {
   StructColumnReferenceRewriter rewriter(closure_struct_ref->column(),
-                                         closure_struct_ref->is_correlated());
+                                         closure_struct_ref->is_correlated(),
+                                         annotation_propagator);
   GOOGLESQL_RETURN_IF_ERROR(expr->Accept(&rewriter));
 
   return rewriter.ConsumeRootNode<ResolvedExpr>();
@@ -803,6 +818,8 @@ static absl::StatusOr<std::unique_ptr<const ResolvedExpr>> SubstituteColumnRefs(
   return substitution_visitor.VisitAll<ResolvedExpr>(std::move(expr));
 }
 
+}  // namespace
+
 // TODO: Add caching to avoid exponential AST size bloat.
 // Currently, the function does not do any caching, so the same AGG(dep_m) calls
 // can be rewritten multiple times. This includes:
@@ -824,7 +841,7 @@ absl::StatusOr<RewriteMeasureExprResult> RewriteMeasureExpr(
     const MeasureCollector& measure_collector, const Function* any_value_fn,
     FunctionCallBuilder& function_call_builder,
     const LanguageOptions& language_options, ColumnFactory& column_factory,
-    TypeFactory& type_factory) {
+    TypeFactory& type_factory, AnnotationPropagator& annotation_propagator) {
   GOOGLESQL_ASSIGN_OR_RETURN(MeasureInfo measure_info,
                    measure_collector.GetMeasureInfo(measure_type));
 
@@ -881,7 +898,8 @@ absl::StatusOr<RewriteMeasureExprResult> RewriteMeasureExpr(
       // aggregate functions, so the expression here is guaranteed to not
       // contain any nested AGG calls.
       GOOGLESQL_ASSIGN_OR_RETURN(std::unique_ptr<const ResolvedExpr> expr,
-                       RewriteReferences(builder.expr(), closure_struct_ref));
+                       RewriteReferences(builder.expr(), closure_struct_ref,
+                                         annotation_propagator));
       GOOGLESQL_ASSIGN_OR_RETURN(
           expr, GrainLock(std::move(expr), closure_struct_ref,
                           measure_info.row_identity_column_names, any_value_fn,
@@ -960,17 +978,18 @@ absl::StatusOr<RewriteMeasureExprResult> RewriteMeasureExpr(
       // `STRUCT(closure_struct_ref.referenced_columns.dep_m AS f).f`, which
       // evaluates to the closure expression of `dep_m`.
       GOOGLESQL_ASSIGN_OR_RETURN(std::unique_ptr<const ResolvedExpr> dep_closure_expr,
-                       RewriteReferences(agg_arg, closure_struct_ref));
+                       RewriteReferences(agg_arg, closure_struct_ref,
+                                         annotation_propagator));
 
       // Create a local ResolvedComputedColumn to hold the closure struct
       // expression of `dep_m`.
       ResolvedColumn dep_closure_column = column_factory.MakeCol(
-          "$aggregate", "dep_closure", dep_closure_expr->type());
+          "$aggregate", "dep_closure", dep_closure_expr->annotated_type());
       auto dep_closure_computed_column = MakeResolvedComputedColumn(
           dep_closure_column, std::move(dep_closure_expr));
 
       auto sub_closure_ref = MakeResolvedColumnRef(
-          dep_closure_column.type(), dep_closure_column,
+          dep_closure_column,
           // The created ResolvedComputedColumn will be added to a ProjectScan
           // that wraps the `input_scan` of the AggregateScan, so for the AGG
           // call this column reference is always local.
@@ -981,10 +1000,10 @@ absl::StatusOr<RewriteMeasureExprResult> RewriteMeasureExpr(
 
       GOOGLESQL_ASSIGN_OR_RETURN(
           RewriteMeasureExprResult sub_result,
-          RewriteMeasureExpr(dep_measure_type, sub_closure_ref.get(),
-                             measure_collector, any_value_fn,
-                             function_call_builder, language_options,
-                             column_factory, type_factory));
+          RewriteMeasureExpr(
+              dep_measure_type, sub_closure_ref.get(), measure_collector,
+              any_value_fn, function_call_builder, language_options,
+              column_factory, type_factory, annotation_propagator));
 
       for (auto& cc : sub_result.closure_computed_columns) {
         closure_computed_columns.push_back(std::move(cc));

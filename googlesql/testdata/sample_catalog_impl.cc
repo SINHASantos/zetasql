@@ -669,6 +669,15 @@ SampleCatalogImpl::LoadDefaultSuppliedTypes(
   options_copy.argument_types[{
       FN_BATCH_HYBRID_VECTOR_SEARCH_TVF_WITH_PROTO_OPTIONS, 6}] =
       approx_distance_function_options_proto_type;
+  options_copy.argument_types[{
+      FN_HYBRID_SINGLE_VECTOR_SEARCH_TVF_FLOAT_ARRAY_WITH_PROTO_OPTIONS, 5}] =
+      approx_distance_function_options_proto_type;
+  options_copy.argument_types[{
+      FN_HYBRID_SINGLE_VECTOR_SEARCH_TVF_DOUBLE_ARRAY_WITH_PROTO_OPTIONS, 5}] =
+      approx_distance_function_options_proto_type;
+  options_copy.argument_types[{
+      FN_HYBRID_SINGLE_VECTOR_SEARCH_TVF_STRING_WITH_PROTO_OPTIONS, 5}] =
+      approx_distance_function_options_proto_type;
   return options_copy;
 }
 

@@ -29,6 +29,7 @@
 #include "googlesql/public/function_signature.h"
 #include "googlesql/public/types/annotation.h"
 #include "googlesql/public/types/collation.h"
+#include "googlesql/public/types/measure_type.h"
 #include "googlesql/public/types/simple_value.h"
 #include "googlesql/public/types/type.h"
 #include "googlesql/resolved_ast/resolved_ast.h"
@@ -238,6 +239,14 @@ CollationAnnotation::GetCollationFromFunctionArguments(
       argi_type = argi_type->AsArray()->element_type();
       if (argi_annotation_map != nullptr) {
         GOOGLESQL_RET_CHECK(argi_annotation_map->IsArrayMap());
+        argi_annotation_map = argi_annotation_map->AsStructMap()->field(0);
+      }
+    } else if (signature.context_id() == FN_AGG) {
+      GOOGLESQL_RET_CHECK(argi_type->IsMeasureType());
+      argi_type = argi_type->AsMeasure()->result_type();
+      if (argi_annotation_map != nullptr) {
+        GOOGLESQL_RET_CHECK(argi_annotation_map->IsStructMap());
+        GOOGLESQL_RET_CHECK_EQ(argi_annotation_map->AsStructMap()->num_fields(), 1);
         argi_annotation_map = argi_annotation_map->AsStructMap()->field(0);
       }
     }

@@ -20,7 +20,6 @@
 #include <map>
 #include <memory>
 #include <string>
-#include <utility>
 
 #include "googlesql/proto/options.pb.h"
 #include "googlesql/public/builtin_function.pb.h"
@@ -151,7 +150,14 @@ std::string FunctionSignatureIdToName(FunctionSignatureId id);
 //
 // Note that this function does not take into consideration any argument
 // constraints that might be present.
-bool FunctionMayHaveUnintendedArgumentCoercion(const Function* function);
+bool FunctionMayHaveUnintendedArgumentCoercion(const Function& function);
+
+// Returns true if the function should be skipped when checking for unintended
+// argument coercions.
+//
+// This is used together with `FunctionMayHaveUnintendedArgumentCoercion` as a
+// workaround for false positives, and should only be used in tests.
+bool SkipFunctionMayHaveUnintendedArgumentCoercion(const Function& function);
 
 // DEPRECATED: Use GetBuiltinFunctionsAndTypes
 //

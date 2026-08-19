@@ -4356,7 +4356,10 @@ absl::Status SQLBuilder::SetPathForColumnsInScan(const ResolvedScan* scan,
                                                  const std::string& alias) {
   if (scan->node_kind() == RESOLVED_TABLE_SCAN) {
     const auto* table_scan = scan->GetAs<ResolvedTableScan>();
-    if (table_scan->table()->IsValueTable()) {
+    // Value Table columns should be read using the table alias, since the
+    // column name is not meaningful. Tables with `read_as_row_type()==true`
+    // behave like Value Tables.
+    if (table_scan->table()->IsValueTable() || table_scan->read_as_row_type()) {
       if (scan->column_list_size() > 0) {
         // This code is wrong.  See http://b/37291554.
         const Table* table = table_scan->table();
@@ -11268,13 +11271,13 @@ absl::Status SQLBuilder::ProcessResolvedGqlLinearOp(
   const ResolvedScan* last_scan = node->scan_list().back().get();
   if (last_scan->Is<ResolvedFinishScan>()) {
     // A ResolvedFinishScan does not have GQL syntax and represents a terminal
-    // GQL DML operation with no output columns. Thus, we only append the SQL
-    // for the DML operation.
+    // GQL DML operation with no output columns. The DML operation was already
+    // processed in ProcessResolvedGqlLinearScanIgnoringLastReturn.
     const ResolvedFinishScan* finish_scan =
         last_scan->GetAs<ResolvedFinishScan>();
-    GOOGLESQL_ASSIGN_OR_RETURN(std::unique_ptr<QueryFragment> input_fragment,
-                     ProcessNode(finish_scan->input_scan()));
-    absl::StrAppend(&sql, input_fragment->GetSQL());
+    finish_scan->MarkFieldsAccessed();
+    GOOGLESQL_RET_CHECK(finish_scan->input_scan()->Is<ResolvedGraphRefScan>());
+    finish_scan->input_scan()->MarkFieldsAccessed();
   } else {
     // Otherwise, collapse the trailing scans to produce a RETURN (or WITH)
     // clause with output column aliases.

@@ -669,6 +669,123 @@ absl::Status AddPropertyGraphFromCreatePropertyGraphStmt(
   return absl::OkStatus();
 }
 
+static absl::StatusOr<std::unique_ptr<SimplePropertyGraphType>>
+PopulatePropertyGraphType(
+    const ResolvedCreatePropertyGraphTypeStmt* create_graph_type_stmt) {
+  auto graph_type = std::make_unique<SimplePropertyGraphType>(
+      create_graph_type_stmt->name_path());
+
+  for (const auto& resolved_property_decl :
+       create_graph_type_stmt->property_declaration_list()) {
+    graph_type->AddPropertyDeclaration(
+        std::make_unique<SimpleGraphPropertyDeclaration>(
+            resolved_property_decl->name(), graph_type->NamePath(),
+            resolved_property_decl->type(),
+            resolved_property_decl->type_annotation_map(),
+            GraphPropertyDeclaration::Kind::kScalar));
+  }
+
+  // Add all labels, resolving each label's property declaration names against
+  // the declarations added above.
+  for (const auto& resolved_label : create_graph_type_stmt->label_list()) {
+    absl::flat_hash_set<const GraphPropertyDeclaration*> property_declarations;
+    for (const auto& property_name :
+         resolved_label->property_declaration_name_list()) {
+      const GraphPropertyDeclaration* property_declaration;
+      GOOGLESQL_RETURN_IF_ERROR(graph_type->FindPropertyDeclarationByName(
+          property_name, property_declaration));
+      property_declarations.insert(property_declaration);
+    }
+    graph_type->AddLabel(std::make_unique<SimpleGraphElementLabel>(
+        resolved_label->name(), graph_type->NamePath(), property_declarations));
+  }
+
+  // Add node types first so that edge FROM/TO endpoints can be resolved against
+  // them below.
+  for (const auto& resolved_node_type :
+       create_graph_type_stmt->node_type_list()) {
+    absl::flat_hash_set<const GraphElementLabel*> labels;
+    for (const std::string& label_name :
+         resolved_node_type->label_name_list()) {
+      const GraphElementLabel* label;
+      GOOGLESQL_RETURN_IF_ERROR(graph_type->FindLabelByName(label_name, label));
+      labels.insert(label);
+    }
+    graph_type->AddNodeType(std::make_unique<SimplePropertyGraphNodeType>(
+        resolved_node_type->name(), graph_type->NamePath(), labels));
+  }
+
+  // Add edge types, resolving both their labels and their FROM/TO node type
+  // endpoints.
+  for (const auto& resolved_edge_type :
+       create_graph_type_stmt->edge_type_list()) {
+    absl::flat_hash_set<const GraphElementLabel*> labels;
+    for (const std::string& label_name :
+         resolved_edge_type->label_name_list()) {
+      const GraphElementLabel* label;
+      GOOGLESQL_RETURN_IF_ERROR(graph_type->FindLabelByName(label_name, label));
+      labels.insert(label);
+    }
+
+    // FROM/TO name the source/dest node types, or are empty if unspecified. The
+    // resolver has already validated that any endpoint names a declared node
+    // type, and node types were added above, so the lookups below succeed.
+    const PropertyGraphNodeType* source_node_type = nullptr;
+    if (!resolved_edge_type->source_node_type().empty()) {
+      const PropertyGraphElementType* element_type;
+      GOOGLESQL_RETURN_IF_ERROR(graph_type->FindElementTypeByName(
+          resolved_edge_type->source_node_type(), element_type));
+      source_node_type = element_type->AsNodeType();
+      GOOGLESQL_RET_CHECK_NE(source_node_type, nullptr);
+    }
+    const PropertyGraphNodeType* dest_node_type = nullptr;
+    if (!resolved_edge_type->dest_node_type().empty()) {
+      const PropertyGraphElementType* element_type;
+      GOOGLESQL_RETURN_IF_ERROR(graph_type->FindElementTypeByName(
+          resolved_edge_type->dest_node_type(), element_type));
+      dest_node_type = element_type->AsNodeType();
+      GOOGLESQL_RET_CHECK_NE(dest_node_type, nullptr);
+    }
+
+    graph_type->AddEdgeType(std::make_unique<SimplePropertyGraphEdgeType>(
+        resolved_edge_type->name(), graph_type->NamePath(), labels,
+        source_node_type, dest_node_type));
+  }
+
+  return std::move(graph_type);
+}
+
+absl::Status AddPropertyGraphTypeFromCreatePropertyGraphTypeStmt(
+    absl::string_view create_property_graph_type_stmt,
+    const AnalyzerOptions& analyzer_options,
+    std::vector<std::unique_ptr<const AnalyzerOutput>>& artifacts,
+    SimpleCatalog& catalog) {
+  GOOGLESQL_RET_CHECK(analyzer_options.language().SupportsStatementKind(
+      RESOLVED_CREATE_PROPERTY_GRAPH_TYPE_STMT));
+  auto& analyzer_output = artifacts.emplace_back();
+  GOOGLESQL_RETURN_IF_ERROR(AnalyzeStatement(create_property_graph_type_stmt,
+                                   analyzer_options, &catalog,
+                                   catalog.type_factory(), &analyzer_output))
+      << create_property_graph_type_stmt;
+  const ResolvedStatement* resolved = analyzer_output->resolved_statement();
+  GOOGLESQL_RET_CHECK(resolved->Is<ResolvedCreatePropertyGraphTypeStmt>());
+  const auto* resolved_create =
+      resolved->GetAs<ResolvedCreatePropertyGraphTypeStmt>();
+  GOOGLESQL_ASSIGN_OR_RETURN(std::unique_ptr<SimplePropertyGraphType> graph_type,
+                   PopulatePropertyGraphType(resolved_create));
+
+  // Register under the graph type name. AddOwnedPropertyGraphTypeIfNotPresent
+  // checks the catalog's shared namespace (`global_names_`, covering tables,
+  // property graphs and property graph types), so a collision returns false
+  // cleanly rather than crashing on InsertOrDie.
+  std::string graph_type_name = graph_type->Name();
+  GOOGLESQL_RET_CHECK(catalog.AddOwnedPropertyGraphTypeIfNotPresent(
+      std::move(graph_type_name), std::move(graph_type)))
+      << absl::StrJoin(resolved_create->name_path(), ".");
+
+  return absl::OkStatus();
+}
+
 absl::Status AddConstantFromCreateConstant(
     absl::string_view create_constant_stmt,
     const AnalyzerOptions& analyzer_options,

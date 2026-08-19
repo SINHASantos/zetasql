@@ -30,6 +30,8 @@
 
 namespace googlesql {
 
+class AnnotationPropagator;
+
 // Traverses `resolved_ast` and marks measures as AGG'ed in `measure_collector`
 // if they are invoked in an AGG() call.
 absl::Status MarkAggedMeasures(const ResolvedNode* resolved_ast,
@@ -48,7 +50,7 @@ absl::StatusOr<std::unique_ptr<const ResolvedNode>> RewriteMeasureColumns(
     MeasureCollector& measure_collector, const Function* any_value_fn,
     FunctionCallBuilder& function_call_builder,
     const LanguageOptions& language_options, ColumnFactory& column_factory,
-    TypeFactory& type_factory);
+    TypeFactory& type_factory, AnnotationPropagator& annotation_propagator);
 
 }  // namespace googlesql
 

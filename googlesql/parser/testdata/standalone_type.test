@@ -1128,3 +1128,60 @@ MapType [0-56] [MAP<STRING..., BOOL>>>>]
             Identifier(BOOL) [48-52] [BOOL]
 --
 MAP< STRING, MAP< STRING, MAP< STRING, MAP< STRING, BOOL > > > >
+==
+
+VARIANT
+--
+SimpleType [0-7] [VARIANT]
+  PathExpression [0-7] [VARIANT]
+    Identifier(VARIANT) [0-7] [VARIANT]
+--
+VARIANT
+==
+
+STRUCT<VARIANT>
+--
+StructType [0-15] [STRUCT<VARIANT>]
+  StructField [7-14] [VARIANT]
+    SimpleType [7-14] [VARIANT]
+      PathExpression [7-14] [VARIANT]
+        Identifier(VARIANT) [7-14] [VARIANT]
+--
+STRUCT< VARIANT >
+==
+
+ARRAY<VARIANT>
+--
+ArrayType [0-14] [ARRAY<VARIANT>]
+  SimpleType [6-13] [VARIANT]
+    PathExpression [6-13] [VARIANT]
+      Identifier(VARIANT) [6-13] [VARIANT]
+--
+ARRAY< VARIANT >
+==
+
+MAP<STRING, VARIANT>
+--
+MapType [0-20] [MAP<STRING, VARIANT>]
+  SimpleType [4-10] [STRING]
+    PathExpression [4-10] [STRING]
+      Identifier(STRING) [4-10] [STRING]
+  SimpleType [12-19] [VARIANT]
+    PathExpression [12-19] [VARIANT]
+      Identifier(VARIANT) [12-19] [VARIANT]
+--
+MAP< STRING, VARIANT >
+==
+
+MAP<VARIANT, STRING>
+--
+MapType [0-20] [MAP<VARIANT, STRING>]
+  SimpleType [4-11] [VARIANT]
+    PathExpression [4-11] [VARIANT]
+      Identifier(VARIANT) [4-11] [VARIANT]
+  SimpleType [13-19] [STRING]
+    PathExpression [13-19] [STRING]
+      Identifier(STRING) [13-19] [STRING]
+--
+MAP< VARIANT, STRING >
+

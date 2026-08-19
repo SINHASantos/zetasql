@@ -116,11 +116,11 @@ class InternalValue {
   static std::string FormatInternal(const Value& x,
                                     bool include_array_ordereness
   ) {
-    return x.FormatInternal({
-        .force_type_at_top_level = true,
-        .include_array_ordereness = include_array_ordereness,
-        .indent = 0,
-    });
+    FormatValueContentOptions options;
+    options.force_type_at_top_level = true;
+    options.include_array_ordereness = include_array_ordereness;
+    options.indent = 0;
+    return x.FormatInternal(options);
   }
 
   // Creates a measure value of the specified `measure_type`.

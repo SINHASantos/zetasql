@@ -1148,6 +1148,7 @@ absl::Status LazyResolutionTableFunction::ResolveAndUpdateIfNeeded(
       std::unique_ptr<SQLTableValuedFunction> sql_tvf;
       GOOGLESQL_RETURN_IF_ERROR(
           SQLTableValuedFunction::Create(this->ResolvedStatement(), &sql_tvf));
+      sql_tvf->set_resolution_catalog(catalog);
       resolved_table_function = std::move(sql_tvf);
     }
   }

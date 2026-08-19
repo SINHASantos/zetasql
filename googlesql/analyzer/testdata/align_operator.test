@@ -2613,3 +2613,81 @@ QueryStmt
     +-column_list=t.[Key#1, Value#2]
     +-input_scan=
       +-RelationArgumentScan(column_list=t.[Key#1, Value#2], name="t")
+
+==
+
+[language_features=NONE,+ALIGN_OPERATOR,+INTERVAL_TYPE,+ANALYTIC_FUNCTIONS]
+# FIRST_VALUE and LAST_VALUE as estimator functions
+SELECT * FROM TimeseriesTable ALIGN (
+  TIMESTAMP ts_col
+  PERIOD INTERVAL 1 MINUTE
+  ORIGIN TIMESTAMP('2000-01-01')
+  PARTITION BY borg_job AS b
+  METRICS FIRST_VALUE(requests) WITHIN (1 PERIOD PRECEDING) AS fv,
+          LAST_VALUE(requests) WITHIN (1 PERIOD FOLLOWING) as lv
+)
+--
+QueryStmt
++-output_column_list=
+| +-$align.b#6 AS b [STRING]
+| +-$align.fv#9 AS fv [INT64]
+| +-$align.lv#11 AS lv [INT64]
+| +-$align.aligned_timestamp#7 AS ts_col [TIMESTAMP]
++-query=
+  +-ProjectScan
+    +-column_list=$align.[b#6, fv#9, lv#11, aligned_timestamp#7]
+    +-input_scan=
+      +-ProjectScan
+        +-column_list=[$align.b#6, $align.aligned_timestamp#7, $estimator.$estimator1#8, $estimator.$estimator2#10, $align.fv#9, $align.lv#11]
+        +-expr_list=
+        | +-fv#9 := ColumnRef(type=INT64, column=$estimator.$estimator1#8)
+        | +-lv#11 := ColumnRef(type=INT64, column=$estimator.$estimator2#10)
+        +-input_scan=
+          +-AlignScan
+            +-column_list=[$align.b#6, $align.aligned_timestamp#7, $estimator.$estimator1#8, $estimator.$estimator2#10]
+            +-input_scan=
+            | +-ProjectScan
+            |   +-column_list=[TimeseriesTable.borg_job#1, TimeseriesTable.ts_col#3, TimeseriesTable.requests#5, $align.b#6]
+            |   +-expr_list=
+            |   | +-b#6 := ColumnRef(type=STRING, column=TimeseriesTable.borg_job#1)
+            |   +-input_scan=
+            |     +-TableScan(column_list=TimeseriesTable.[borg_job#1, ts_col#3, requests#5], table=TimeseriesTable, column_index_list=[0, 2, 4])
+            +-timestamp_column=
+            | +-ColumnRef(type=TIMESTAMP, column=TimeseriesTable.ts_col#3)
+            +-period=
+            | +-FunctionCall(GoogleSQL:$interval(INT64, ENUM<googlesql.functions.DateTimestampPart>) -> INTERVAL)
+            |   +-Literal(type=INT64, value=1)
+            |   +-Literal(type=ENUM<googlesql.functions.DateTimestampPart>, value=MINUTE)
+            +-origin=
+            | +-FunctionCall(GoogleSQL:timestamp(STRING, optional(0) STRING) -> TIMESTAMP)
+            |   +-Literal(type=STRING, value="2000-01-01")
+            +-output_within=
+            | +-WithinBounds
+            |   +-lower_bound=
+            |   | +-WithinBoundExpr(within_bound_kind=UNBOUNDED PRECEDING)
+            |   +-upper_bound=
+            |     +-WithinBoundExpr(within_bound_kind=ANCHOR TIMESTAMP)
+            +-partition_by_list=
+            | +-ColumnRef(type=STRING, column=$align.b#6)
+            +-aligned_timestamp_column=$align.aligned_timestamp#7
+            +-estimator_function_list=
+              +-$estimator1#8 :=
+              | +-EstimatorFunctionCall(GoogleSQL:first_value(INT64) -> INT64)
+              |   +-ColumnRef(type=INT64, column=TimeseriesTable.requests#5)
+              |   +-within_bounds=
+              |     +-WithinBounds
+              |       +-lower_bound=
+              |       | +-WithinBoundExpr(within_bound_kind=PERIOD PRECEDING)
+              |       |   +-Literal(type=INT64, value=1)
+              |       +-upper_bound=
+              |         +-WithinBoundExpr(within_bound_kind=ANCHOR TIMESTAMP)
+              +-$estimator2#10 :=
+                +-EstimatorFunctionCall(GoogleSQL:last_value(INT64) -> INT64)
+                  +-ColumnRef(type=INT64, column=TimeseriesTable.requests#5)
+                  +-within_bounds=
+                    +-WithinBounds
+                      +-lower_bound=
+                      | +-WithinBoundExpr(within_bound_kind=ANCHOR TIMESTAMP)
+                      +-upper_bound=
+                        +-WithinBoundExpr(within_bound_kind=PERIOD FOLLOWING)
+                          +-Literal(type=INT64, value=1)

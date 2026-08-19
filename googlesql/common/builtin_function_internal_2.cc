@@ -2363,11 +2363,13 @@ void GetAnalyticFunctions(TypeFactory* type_factory,
                  {{ARG_KIND_EXPR_ANY_1,
                    {{ARG_KIND_EXPR_ANY_1, non_null}},
                    FN_FIRST_VALUE}},
-                 required_order_allowed_frame_and_null_handling);
+                 FunctionOptions(required_order_allowed_frame_and_null_handling)
+                     .set_supports_within_clause(true));
   InsertFunction(
       functions, options, "last_value", ANALYTIC,
       {{ARG_KIND_EXPR_ANY_1, {{ARG_KIND_EXPR_ANY_1, non_null}}, FN_LAST_VALUE}},
-      required_order_allowed_frame_and_null_handling);
+      FunctionOptions(required_order_allowed_frame_and_null_handling)
+          .set_supports_within_clause(true));
   InsertFunction(
       functions, options, "nth_value", ANALYTIC,
       {{ARG_KIND_EXPR_ANY_1,

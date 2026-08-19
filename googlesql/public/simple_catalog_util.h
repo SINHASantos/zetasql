@@ -163,6 +163,36 @@ absl::Status AddPropertyGraphFromCreatePropertyGraphStmt(
     std::vector<std::unique_ptr<const AnalyzerOutput>>& artifacts,
     SimpleCatalog& catalog);
 
+// Adds a `PropertyGraphType` object to `catalog` for the property graph type
+// defined by `create_property_graph_type_stmt`.
+//
+// Unlike AddPropertyGraphFromCreatePropertyGraphStmt this registers a purely
+// logical graph type: element types, their default labels and property
+// declarations, with no physical table bindings and hence no
+// property-definition analysis pass.
+//
+// Registration uses the IfNotPresent variant, so this helper does NOT support
+// CREATE OR REPLACE against an already-registered graph type of the same name:
+// analysis would accept the REPLACE, but re-registration is a no-op that this
+// function reports as an internal error rather than replacing the existing
+// object. (This matches the other Add*FromCreate* builders here.)
+//
+// - `create_property_graph_type_stmt`: Must be a CREATE PROPERTY GRAPH TYPE
+//   statement.
+// - `analyzer_options`: Analyzer options used to analyze
+//   `create_property_graph_type_stmt`. `analyzer_options.language()` must
+//   support `RESOLVED_CREATE_PROPERTY_GRAPH_TYPE_STMT`.
+// - `artifacts`: Accumulates the AnalyzerOutput produced here. Its lifetime
+// must
+//   exceed the lifetime of `catalog`.
+// - `catalog`: A SimpleCatalog that will own the created PropertyGraphType*
+//   object.
+absl::Status AddPropertyGraphTypeFromCreatePropertyGraphTypeStmt(
+    absl::string_view create_property_graph_type_stmt,
+    const AnalyzerOptions& analyzer_options,
+    std::vector<std::unique_ptr<const AnalyzerOutput>>& artifacts,
+    SimpleCatalog& catalog);
+
 // Adds a `Constant` object to `catalog` for the constant defined by
 // `create_constant_stmt`.
 //

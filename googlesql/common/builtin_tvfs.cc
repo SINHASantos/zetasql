@@ -69,6 +69,11 @@ static constexpr int kSingleVectorSearchTVFOptionsArgIdx = 3;
 // Type to be defined through BuiltinFunctionOptions.
 static constexpr int kHybridBatchVectorSearchTVFOptionsArgIdx = 6;
 
+// This constant represents the index of the `options` argument of
+// hybrid single VECTOR_SEARCH TVF. Only the `options` argument allows a
+// Type to be defined through BuiltinFunctionOptions.
+static constexpr int kHybridSingleVectorSearchTVFOptionsArgIdx = 5;
+
 // Reused for hybrid vector search since there is commonality.
 absl::Status CheckVectorSearchPostResolutionArguments(
     const FunctionSignature& signature,
@@ -82,7 +87,22 @@ absl::Status CheckVectorSearchPostResolutionArguments(
              signature.context_id() ==
                  FN_BATCH_HYBRID_VECTOR_SEARCH_TVF_WITH_JSON_OPTIONS) {
     GOOGLESQL_RET_CHECK_EQ(arguments.size(), 10);
+  } else if (
+      signature.context_id() ==
+          FN_HYBRID_SINGLE_VECTOR_SEARCH_TVF_FLOAT_ARRAY_WITH_PROTO_OPTIONS ||
+      signature.context_id() ==
+          FN_HYBRID_SINGLE_VECTOR_SEARCH_TVF_FLOAT_ARRAY_WITH_JSON_OPTIONS ||
+      signature.context_id() ==
+          FN_HYBRID_SINGLE_VECTOR_SEARCH_TVF_DOUBLE_ARRAY_WITH_PROTO_OPTIONS ||
+      signature.context_id() ==
+          FN_HYBRID_SINGLE_VECTOR_SEARCH_TVF_DOUBLE_ARRAY_WITH_JSON_OPTIONS ||
+      signature.context_id() ==
+          FN_HYBRID_SINGLE_VECTOR_SEARCH_TVF_STRING_WITH_PROTO_OPTIONS ||
+      signature.context_id() ==
+          FN_HYBRID_SINGLE_VECTOR_SEARCH_TVF_STRING_WITH_JSON_OPTIONS) {
+    GOOGLESQL_RET_CHECK_EQ(arguments.size(), 9);
   } else {
+    // Single VECTOR_SEARCH TVF.
     GOOGLESQL_RET_CHECK_EQ(arguments.size(), 7);
   }
   return absl::OkStatus();
@@ -519,6 +539,92 @@ absl::Status GetBatchHybridVectorSearchSignatures(
   return absl::OkStatus();
 }
 
+absl::Status GetHybridSingleVectorSearchSignatures(
+    TypeFactory* type_factory, const GoogleSQLBuiltinFunctionOptions& options,
+    NameToTableValuedFunctionMap* table_valued_functions,
+    BuiltinsOutputProperties& output_properties,
+    std::vector<FunctionSignatureOnHeap>& signatures) {
+  for (const auto& [query_type, proto_signature_id, json_signature_id] :
+       std::vector<std::tuple<const googlesql::Type*, FunctionSignatureId,
+                              FunctionSignatureId>>{
+           {googlesql::types::FloatArrayType(),
+            FN_HYBRID_SINGLE_VECTOR_SEARCH_TVF_FLOAT_ARRAY_WITH_PROTO_OPTIONS,
+            FN_HYBRID_SINGLE_VECTOR_SEARCH_TVF_FLOAT_ARRAY_WITH_JSON_OPTIONS},
+           {googlesql::types::DoubleArrayType(),
+            FN_HYBRID_SINGLE_VECTOR_SEARCH_TVF_DOUBLE_ARRAY_WITH_PROTO_OPTIONS,
+            FN_HYBRID_SINGLE_VECTOR_SEARCH_TVF_DOUBLE_ARRAY_WITH_JSON_OPTIONS},
+           {googlesql::types::StringType(),
+            FN_HYBRID_SINGLE_VECTOR_SEARCH_TVF_STRING_WITH_PROTO_OPTIONS,
+            FN_HYBRID_SINGLE_VECTOR_SEARCH_TVF_STRING_WITH_JSON_OPTIONS},
+       }) {
+    for (const auto& [proto_options, signature_id] :
+         std::vector<std::pair<bool, FunctionSignatureId>>{
+             {true, proto_signature_id}, {false, json_signature_id}}) {
+      std::vector<googlesql::FunctionArgumentType>
+          common_vector_search_arguments = CommonVectorSearchArguments();
+      GOOGLESQL_RET_CHECK_EQ(common_vector_search_arguments.size(), 5);
+      FunctionArgumentTypeList hybrid_single_vector_search_arguments = {
+          // Base table.
+          common_vector_search_arguments[0],
+          // Column to search.
+          common_vector_search_arguments[1],
+          // Query value.
+          googlesql::FunctionArgumentType(
+              query_type,
+              googlesql::FunctionArgumentTypeOptions()
+                  .set_argument_name("query_value", googlesql::kNamedOnly)
+                  .set_must_be_non_null()),
+          // lexical_search_columns.
+          googlesql::FunctionArgumentType(
+              googlesql::types::StringArrayType(),
+              googlesql::FunctionArgumentTypeOptions()
+                  .set_argument_name("lexical_search_columns",
+                                     googlesql::kNamedOnly)
+                  .set_must_be_non_null()),
+          // lexical_search_query_value.
+          googlesql::FunctionArgumentType(
+              googlesql::types::StringType(),
+              googlesql::FunctionArgumentTypeOptions()
+                  .set_argument_name("lexical_search_query_value",
+                                     googlesql::kNamedOnly)
+                  .set_must_be_non_null()),
+      };
+
+      if (proto_options) {
+        GOOGLESQL_RETURN_IF_ERROR(MaybeAddVectorSearchTVFProtoOptionsArgument(
+            options, "hybrid_vector_search", signature_id, output_properties,
+            hybrid_single_vector_search_arguments,
+            kHybridSingleVectorSearchTVFOptionsArgIdx));
+      } else {
+        hybrid_single_vector_search_arguments.push_back(
+            {googlesql::FunctionArgumentType(
+                googlesql::types::JsonType(),
+                googlesql::FunctionArgumentTypeOptions()
+                    .set_cardinality(googlesql::FunctionArgumentType::OPTIONAL)
+                    .set_argument_name("options", googlesql::kNamedOnly)
+                    .set_must_be_immutable_constant())});
+      }
+
+      // top_k
+      hybrid_single_vector_search_arguments.push_back(
+          common_vector_search_arguments[2]);
+      // distance_type
+      hybrid_single_vector_search_arguments.push_back(
+          common_vector_search_arguments[3]);
+      // max_distance
+      hybrid_single_vector_search_arguments.push_back(
+          common_vector_search_arguments[4]);
+
+      signatures.push_back(FunctionSignatureOnHeap(
+          /*result_type=*/googlesql::FunctionArgumentType::AnyRelation(),
+          /*arguments=*/hybrid_single_vector_search_arguments,
+          /*context_id=*/
+          signature_id));
+    }
+  }
+  return absl::OkStatus();
+}
+
 absl::Status InsertVectorSearchTVFSignatures(
     TypeFactory* type_factory, const GoogleSQLBuiltinFunctionOptions& options,
     NameToTableValuedFunctionMap* table_valued_functions,
@@ -548,8 +654,11 @@ absl::Status InsertHybridVectorSearchTVFSignatures(
     NameToTableValuedFunctionMap* table_valued_functions,
     BuiltinsOutputProperties& output_properties) {
   std::vector<FunctionSignatureOnHeap> signatures;
-  signatures.reserve(2);
+  signatures.reserve(8);
   GOOGLESQL_RETURN_IF_ERROR(GetBatchHybridVectorSearchSignatures(
+      type_factory, options, table_valued_functions, output_properties,
+      signatures));
+  GOOGLESQL_RETURN_IF_ERROR(GetHybridSingleVectorSearchSignatures(
       type_factory, options, table_valued_functions, output_properties,
       signatures));
 

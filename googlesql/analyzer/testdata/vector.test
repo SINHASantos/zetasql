@@ -867,6 +867,94 @@ QueryStmt
       +-SingleRowScan
 ==
 
+##########
+# TYPEOF #
+##########
+
+# Simple TYPEOF with a VECTOR.
+[enabled_ast_rewrites=DEFAULTS]
+SELECT TYPEOF(ENCODE_VECTOR([1.0, 2.0]))
+--
+QueryStmt
++-output_column_list=
+| +-$query.$col1#1 AS `$col1` [STRING]
++-query=
+  +-ProjectScan
+    +-column_list=[$query.$col1#1]
+    +-expr_list=
+    | +-$col1#1 :=
+    |   +-FunctionCall(GoogleSQL:typeof(VECTOR) -> STRING)
+    |     +-FunctionCall(GoogleSQL:encode_vector(ARRAY<FLOAT>, optional(0) INT64, optional(0) STRING) -> VECTOR)
+    |       +-Literal(type=ARRAY<FLOAT>, value=[1, 2])
+    +-input_scan=
+      +-SingleRowScan
+
+[REWRITTEN AST]
+QueryStmt
++-output_column_list=
+| +-$query.$col1#1 AS `$col1` [STRING]
++-query=
+  +-ProjectScan
+    +-column_list=[$query.$col1#1]
+    +-expr_list=
+    | +-$col1#1 :=
+    |   +-FunctionCall(GoogleSQL:if(BOOL, STRING, STRING) -> STRING)
+    |     +-Literal(type=BOOL, value=true, has_explicit_type=TRUE)
+    |     +-Literal(type=STRING, value="VECTOR", has_explicit_type=TRUE)
+    |     +-Cast(BOOL -> STRING)
+    |       +-FunctionCall(GoogleSQL:$is_null(VECTOR) -> BOOL)
+    |         +-FunctionCall(GoogleSQL:encode_vector(ARRAY<FLOAT>, optional(0) INT64, optional(0) STRING) -> VECTOR)
+    |           +-Literal(type=ARRAY<FLOAT>, value=[1, 2])
+    +-input_scan=
+      +-SingleRowScan
+==
+
+# TYPEOF with a parameterized VECTOR type.
+[allow_undeclared_parameters]
+[enabled_ast_rewrites=DEFAULTS]
+SELECT TYPEOF(ENCODE_VECTOR(@p, 3, "FLOAT32"))
+--
+QueryStmt
++-output_column_list=
+| +-$query.$col1#1 AS `$col1` [STRING]
++-query=
+  +-ProjectScan
+    +-column_list=[$query.$col1#1]
+    +-expr_list=
+    | +-$col1#1 :=
+    |   +-FunctionCall(GoogleSQL:typeof(VECTOR) -> STRING)
+    |     +-FunctionCall(GoogleSQL:encode_vector(ARRAY<FLOAT>, optional(1) INT64, optional(1) STRING) -> VECTOR)
+    |       +-Parameter(parse_location=28-30, type=ARRAY<FLOAT>, name="p")
+    |       +-Literal(type=INT64, value=3)
+    |       +-Literal(type=STRING, value="FLOAT32")
+    +-input_scan=
+      +-SingleRowScan
+
+[UNDECLARED_PARAMETERS]
+p: ARRAY<FLOAT>
+
+[REWRITTEN AST]
+QueryStmt
++-output_column_list=
+| +-$query.$col1#1 AS `$col1` [STRING]
++-query=
+  +-ProjectScan
+    +-column_list=[$query.$col1#1]
+    +-expr_list=
+    | +-$col1#1 :=
+    |   +-FunctionCall(GoogleSQL:if(BOOL, STRING, STRING) -> STRING)
+    |     +-Literal(type=BOOL, value=true, has_explicit_type=TRUE)
+    |     +-Literal(type=STRING, value="VECTOR", has_explicit_type=TRUE)
+    |     +-Cast(BOOL -> STRING)
+    |       +-FunctionCall(GoogleSQL:$is_null(VECTOR) -> BOOL)
+    |         +-FunctionCall(GoogleSQL:encode_vector(ARRAY<FLOAT>, optional(1) INT64, optional(1) STRING) -> VECTOR)
+    |           +-Parameter(parse_location=28-30, type=ARRAY<FLOAT>, name="p")
+    |           +-Literal(type=INT64, value=3)
+    |           +-Literal(type=STRING, value="FLOAT32")
+    +-input_scan=
+      +-SingleRowScan
+==
+
 ########
 # CAST #
 ########

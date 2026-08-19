@@ -1409,6 +1409,183 @@ TEST(FromProtoCrossDescriptorTest, IncompatibleDescriptorParseFailure) {
           "to google.protobuf.Timestamp"));
 }
 
+TEST(JaroWinklerSimilarityFunctionTest, ReferenceImplEval) {
+  LanguageOptions language_options;
+  EvaluationContext context{/*options=*/{}};
+
+  // Test STRING version
+  {
+    GOOGLESQL_ASSERT_OK_AND_ASSIGN(auto arg0_val,
+                         ConstExpr::Create(Value::String("A\xf0\x9f\x98\x80"
+                                                         "B")));
+    GOOGLESQL_ASSERT_OK_AND_ASSIGN(auto arg1_val,
+                         ConstExpr::Create(Value::String("A\xf0\x9f\x98\x81"
+                                                         "B")));
+
+    std::vector<std::unique_ptr<ValueExpr>> args;
+    args.push_back(std::move(arg0_val));
+    args.push_back(std::move(arg1_val));
+
+    GOOGLESQL_ASSERT_OK_AND_ASSIGN(auto call_expr,
+                         BuiltinScalarFunction::CreateCall(
+                             FunctionKind::kJaroWinklerSimilarity,
+                             language_options, types::DoubleType(),
+                             ConvertValueExprsToAlgebraArgs(std::move(args))));
+
+    Value result;
+    absl::Status status;
+    std::shared_ptr<TupleSlot::SharedProtoState> shared_proto_state;
+    VirtualTupleSlot slot(&result, &shared_proto_state);
+    ASSERT_TRUE(call_expr->Eval({}, &context, &slot, &status));
+    GOOGLESQL_ASSERT_OK(status);
+    EXPECT_NEAR(result.double_value(), 0.8, 1e-6);
+  }
+
+  // Test BYTES version
+  {
+    GOOGLESQL_ASSERT_OK_AND_ASSIGN(auto arg0_val,
+                         ConstExpr::Create(Value::Bytes("A\xf0\x9f\x98\x80"
+                                                        "B")));
+    GOOGLESQL_ASSERT_OK_AND_ASSIGN(auto arg1_val,
+                         ConstExpr::Create(Value::Bytes("A\xf0\x9f\x98\x81"
+                                                        "B")));
+
+    std::vector<std::unique_ptr<ValueExpr>> args;
+    args.push_back(std::move(arg0_val));
+    args.push_back(std::move(arg1_val));
+
+    GOOGLESQL_ASSERT_OK_AND_ASSIGN(auto call_expr,
+                         BuiltinScalarFunction::CreateCall(
+                             FunctionKind::kJaroWinklerSimilarity,
+                             language_options, types::DoubleType(),
+                             ConvertValueExprsToAlgebraArgs(std::move(args))));
+
+    Value result;
+    absl::Status status;
+    std::shared_ptr<TupleSlot::SharedProtoState> shared_proto_state;
+    VirtualTupleSlot slot(&result, &shared_proto_state);
+    ASSERT_TRUE(call_expr->Eval({}, &context, &slot, &status));
+    GOOGLESQL_ASSERT_OK(status);
+    EXPECT_NEAR(result.double_value(), 0.933333, 1e-6);
+  }
+
+  // Test custom parameters (4 arguments)
+  {
+    GOOGLESQL_ASSERT_OK_AND_ASSIGN(auto arg0_val,
+                         ConstExpr::Create(Value::String("MARHTA")));
+    GOOGLESQL_ASSERT_OK_AND_ASSIGN(auto arg1_val,
+                         ConstExpr::Create(Value::String("MARTHA")));
+    GOOGLESQL_ASSERT_OK_AND_ASSIGN(auto arg2_val, ConstExpr::Create(Value::Double(0.2)));
+    GOOGLESQL_ASSERT_OK_AND_ASSIGN(auto arg3_val, ConstExpr::Create(Value::Double(0.90)));
+
+    std::vector<std::unique_ptr<ValueExpr>> args;
+    args.push_back(std::move(arg0_val));
+    args.push_back(std::move(arg1_val));
+    args.push_back(std::move(arg2_val));
+    args.push_back(std::move(arg3_val));
+
+    GOOGLESQL_ASSERT_OK_AND_ASSIGN(auto call_expr,
+                         BuiltinScalarFunction::CreateCall(
+                             FunctionKind::kJaroWinklerSimilarity,
+                             language_options, types::DoubleType(),
+                             ConvertValueExprsToAlgebraArgs(std::move(args))));
+
+    Value result;
+    absl::Status status;
+    std::shared_ptr<TupleSlot::SharedProtoState> shared_proto_state;
+    VirtualTupleSlot slot(&result, &shared_proto_state);
+    ASSERT_TRUE(call_expr->Eval({}, &context, &slot, &status));
+    GOOGLESQL_ASSERT_OK(status);
+    EXPECT_NEAR(result.double_value(), 0.977778, 1e-5);
+  }
+
+  // Test custom parameters (3 arguments: prefix_scaling_factor)
+  {
+    GOOGLESQL_ASSERT_OK_AND_ASSIGN(auto arg0_val,
+                         ConstExpr::Create(Value::String("MARHTA")));
+    GOOGLESQL_ASSERT_OK_AND_ASSIGN(auto arg1_val,
+                         ConstExpr::Create(Value::String("MARTHA")));
+    GOOGLESQL_ASSERT_OK_AND_ASSIGN(auto arg2_val, ConstExpr::Create(Value::Double(0.2)));
+
+    std::vector<std::unique_ptr<ValueExpr>> args;
+    args.push_back(std::move(arg0_val));
+    args.push_back(std::move(arg1_val));
+    args.push_back(std::move(arg2_val));
+
+    GOOGLESQL_ASSERT_OK_AND_ASSIGN(auto call_expr,
+                         BuiltinScalarFunction::CreateCall(
+                             FunctionKind::kJaroWinklerSimilarity,
+                             language_options, types::DoubleType(),
+                             ConvertValueExprsToAlgebraArgs(std::move(args))));
+
+    Value result;
+    absl::Status status;
+    std::shared_ptr<TupleSlot::SharedProtoState> shared_proto_state;
+    VirtualTupleSlot slot(&result, &shared_proto_state);
+    ASSERT_TRUE(call_expr->Eval({}, &context, &slot, &status));
+    GOOGLESQL_ASSERT_OK(status);
+    EXPECT_NEAR(result.double_value(), 0.977778, 1e-5);
+  }
+
+  // Test custom parameters (4 arguments: prefix_scaling_factor is null, custom
+  // threshold)
+  {
+    GOOGLESQL_ASSERT_OK_AND_ASSIGN(auto arg0_val,
+                         ConstExpr::Create(Value::String("MARHTA")));
+    GOOGLESQL_ASSERT_OK_AND_ASSIGN(auto arg1_val,
+                         ConstExpr::Create(Value::String("MARTHA")));
+    GOOGLESQL_ASSERT_OK_AND_ASSIGN(auto arg2_val, ConstExpr::Create(Value::NullDouble()));
+    GOOGLESQL_ASSERT_OK_AND_ASSIGN(auto arg3_val, ConstExpr::Create(Value::Double(0.90)));
+
+    std::vector<std::unique_ptr<ValueExpr>> args;
+    args.push_back(std::move(arg0_val));
+    args.push_back(std::move(arg1_val));
+    args.push_back(std::move(arg2_val));
+    args.push_back(std::move(arg3_val));
+
+    GOOGLESQL_ASSERT_OK_AND_ASSIGN(auto call_expr,
+                         BuiltinScalarFunction::CreateCall(
+                             FunctionKind::kJaroWinklerSimilarity,
+                             language_options, types::DoubleType(),
+                             ConvertValueExprsToAlgebraArgs(std::move(args))));
+
+    Value result;
+    absl::Status status;
+    std::shared_ptr<TupleSlot::SharedProtoState> shared_proto_state;
+    VirtualTupleSlot slot(&result, &shared_proto_state);
+    ASSERT_TRUE(call_expr->Eval({}, &context, &slot, &status));
+    GOOGLESQL_ASSERT_OK(status);
+    EXPECT_TRUE(result.is_null());
+  }
+
+  // Test invalid parameters range error
+  {
+    GOOGLESQL_ASSERT_OK_AND_ASSIGN(auto arg0_val,
+                         ConstExpr::Create(Value::String("MARHTA")));
+    GOOGLESQL_ASSERT_OK_AND_ASSIGN(auto arg1_val,
+                         ConstExpr::Create(Value::String("MARTHA")));
+    GOOGLESQL_ASSERT_OK_AND_ASSIGN(auto arg2_val, ConstExpr::Create(Value::Double(0.26)));
+
+    std::vector<std::unique_ptr<ValueExpr>> args;
+    args.push_back(std::move(arg0_val));
+    args.push_back(std::move(arg1_val));
+    args.push_back(std::move(arg2_val));
+
+    GOOGLESQL_ASSERT_OK_AND_ASSIGN(auto call_expr,
+                         BuiltinScalarFunction::CreateCall(
+                             FunctionKind::kJaroWinklerSimilarity,
+                             language_options, types::DoubleType(),
+                             ConvertValueExprsToAlgebraArgs(std::move(args))));
+
+    Value result;
+    absl::Status status;
+    std::shared_ptr<TupleSlot::SharedProtoState> shared_proto_state;
+    VirtualTupleSlot slot(&result, &shared_proto_state);
+    EXPECT_FALSE(call_expr->Eval({}, &context, &slot, &status));
+    EXPECT_THAT(status, StatusIs(absl::StatusCode::kOutOfRange));
+  }
+}
+
 }  // namespace
 
 }  // namespace googlesql

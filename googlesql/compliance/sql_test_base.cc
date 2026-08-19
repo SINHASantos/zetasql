@@ -2995,10 +2995,11 @@ std::string SQLTestBase::ToString(
     } else {
       ABSL_CHECK(!value.is_null());
       if (format_value_content_options_ == nullptr) {
-        result_string = InternalValue::FormatInternal(
-            value, {.force_type_at_top_level = true,
-                    .include_array_ordereness = absl::GetFlag(
-                        FLAGS_googlesql_compliance_print_array_orderedness)});
+        InternalValue::FormatValueContentOptions options;
+        options.force_type_at_top_level = true;
+        options.include_array_ordereness =
+            absl::GetFlag(FLAGS_googlesql_compliance_print_array_orderedness);
+        result_string = InternalValue::FormatInternal(value, options);
       } else {
         result_string = InternalValue::FormatInternal(
             value, *format_value_content_options_);

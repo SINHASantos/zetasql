@@ -693,10 +693,12 @@ bool Function::SupportsOverClause() const {
 }
 
 bool Function::SupportsWithinClause() const {
-  // Currently, only aggregate functions support the WITHIN clause. This will
-  // change in the future when we add new functions of mode
-  // FunctionEnums::ESTIMATOR.
-  return IsAggregate();
+  // Currently, aggregate functions and analytic functions with the
+  // `supports_within_clause` option enabled support the WITHIN clause.
+  // This will change in the future when we add support for estimator functions
+  // (having mode FunctionEnums::ESTIMATOR).
+  return IsAggregate() ||
+         (IsAnalytic() && function_options_.supports_within_clause);
 }
 
 bool Function::SupportsWindowOrdering() const {

@@ -74,6 +74,20 @@ statement.
     
     <tr>
       <td>2</td>
+      <td><code>::</code></td>
+      <td>All</td>
+      <td>Cast operator</td>
+      <td>Binary</td>
+    </tr>
+    <tr>
+      <td>&nbsp;</td>
+      <td><code>?::</code></td>
+      <td>All</td>
+      <td>Safe cast operator</td>
+      <td>Binary</td>
+    </tr>
+    <tr>
+      <td>3</td>
       <td><code>+</code></td>
       <td>All numeric types</td>
       <td>Unary plus</td>
@@ -94,7 +108,7 @@ statement.
       <td>Unary</td>
     </tr>
     <tr>
-      <td>3</td>
+      <td>4</td>
       <td><code>*</code></td>
       <td>All numeric types</td>
       <td>Multiplication</td>
@@ -117,7 +131,7 @@ statement.
     </tr>
     
     <tr>
-      <td>4</td>
+      <td>5</td>
       <td><code>+</code></td>
       <td>
         All numeric types, <code>DATE</code> with
@@ -139,7 +153,7 @@ statement.
       <td>Binary</td>
     </tr>
     <tr>
-      <td>5</td>
+      <td>6</td>
       <td><code>&lt;&lt;</code></td>
       <td>Integer or <code>BYTES</code></td>
       <td>Bitwise left-shift</td>
@@ -153,28 +167,28 @@ statement.
       <td>Binary</td>
     </tr>
     <tr>
-      <td>6</td>
+      <td>7</td>
       <td><code>&amp;</code></td>
       <td>Integer or <code>BYTES</code></td>
       <td>Bitwise and</td>
       <td>Binary</td>
     </tr>
     <tr>
-      <td>7</td>
+      <td>8</td>
       <td><code>^</code></td>
       <td>Integer or <code>BYTES</code></td>
       <td>Bitwise xor</td>
       <td>Binary</td>
     </tr>
     <tr>
-      <td>8</td>
+      <td>9</td>
       <td><code>|</code></td>
       <td>Integer or <code>BYTES</code></td>
       <td>Bitwise or</td>
       <td>Binary</td>
     </tr>
     <tr>
-      <td>9 (Comparison Operators)</td>
+      <td>10 (Comparison Operators)</td>
       <td><code>=</code></td>
       <td>Any comparable type. See
       <a href="https://github.com/google/googlesql/blob/master/docs/data-types.md">Data Types</a>
@@ -302,21 +316,21 @@ statement.
       <td>Unary</td>
     </tr>
     <tr>
-      <td>10</td>
+      <td>11</td>
       <td><code>NOT</code></td>
       <td><code>BOOL</code></td>
       <td>Logical <code>NOT</code></td>
       <td>Unary</td>
     </tr>
     <tr>
-      <td>11</td>
+      <td>12</td>
       <td><code>AND</code></td>
       <td><code>BOOL</code></td>
       <td>Logical <code>AND</code></td>
       <td>Binary</td>
     </tr>
     <tr>
-      <td>12</td>
+      <td>13</td>
       <td><code>OR</code></td>
       <td><code>BOOL</code></td>
       <td>Logical <code>OR</code></td>
@@ -408,6 +422,12 @@ ambiguity. For example:
   <td><a href="#array_el_field_operator">Array elements field access operator</a>
 </td>
   <td>Traverses through the levels of a nested data type inside an array.</td>
+</tr>
+
+<tr>
+  <td><a href="#cast_operators">Cast operators</a>
+</td>
+  <td>Casts an expression to a type.</td>
 </tr>
 
 <tr>
@@ -1482,6 +1502,94 @@ SELECT names FROM AlbumList, UNNEST(albums_array.album_name) AS names
 [operators-link-to-unnest]: https://github.com/google/googlesql/blob/master/docs/query-syntax.md#unnest_operator
 
 [operators-link-to-from-clause]: https://github.com/google/googlesql/blob/master/docs/query-syntax.md#from_clause
+
+### Cast operators 
+<a id="cast_operators"></a>
+
+```googlesql
+expression :: type
+expression ?:: type
+```
+
+**Description**
+
+Casts the result of an expression to the given type.
+
+Input values:
+
+*   `expression`: The expression to cast. This can be any expression.
+*   `type`: The data type to cast to.
+*   `::`: Casts an expression to a specific type. If the cast fails, the query
+    produces an error. This syntax is equivalent to `CAST(expression AS type)`.
+*   `?::`: Safely casts an expression to a specific type. If the cast fails, the
+    query returns `NULL` instead of producing an error. This syntax is
+    equivalent to `SAFE_CAST(expression AS type)`.
+
+Details:
+
+The `::` and `?::` cast operators have higher precedence than unary operators
+like `-` or `+`, but have lower precedence than field access or subscript
+operators.
+
+These operators don't support formatting and collation options. For example,
+`expression :: type FORMAT ...` and `expression :: type COLLATE ...` aren't
+supported.
+
+**Unary minus**
+
+Because `::` and `?::` have higher precedence than unary minus, `-expression ::
+type` evaluates as `-(expression :: type)` instead of `(-expression) :: type`.
+
+However, when the expression is an integer or floating-point literal,
+`-literal :: type` evaluates as `(-literal) :: type`.
+
+For example, consider the following scenarios:
+
+*   `-9223372036854775808::INT64` succeeds because it evaluates as
+    `(-9223372036854775808)::INT64`. If it were evaluated as
+    `-(9223372036854775808::INT64)`, the positive literal `9223372036854775808`
+    would overflow `INT64` before the unary minus could be applied.
+*   `-5::STRING` evaluates as `(-5)::STRING`, which casts the negative integer
+    literal to a string without requiring parentheses.
+
+**Return type**
+
+The data type specified by `type`.
+
+**Examples**
+
+In the following example, the `::` operator explicitly casts a string literal to
+`INT64`. The `?::` operator safely casts a string literal to `INT64`, returning
+`NULL` when the cast fails:
+
+```googlesql
+SELECT
+  '123'::INT64 AS explicit_cast,
+  'abc'?::INT64 AS safe_cast
+
+/*---------------+-----------+
+ | explicit_cast | safe_cast |
+ +---------------+-----------+
+ | 123           | NULL      |
+ +---------------+-----------*/
+```
+
+The following example uses cast operators with addition, field access, chained
+casts, and struct types to demonstrate operator precedence:
+
+```googlesql
+SELECT
+  1 + 2::DOUBLE AS addition,
+  STRUCT(1 AS id, 'val' AS name).id::STRING AS field_access,
+  '123'::INT64::DOUBLE AS chained_casts,
+  STRUCT('1' AS a, '2' AS b)::STRUCT<a INT64, b INT64> AS struct_cast
+
+/*----------+--------------+---------------+--------------+
+ | addition | field_access | chained_casts | struct_cast  |
+ +----------+--------------+---------------+--------------+
+ | 3.0      | 1            | 123.0         | {a: 1, b: 2} |
+ +----------+--------------+---------------+--------------*/
+```
 
 ### Arithmetic operators 
 <a id="arithmetic_operators"></a>

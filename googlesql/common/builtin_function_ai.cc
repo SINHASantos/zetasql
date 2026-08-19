@@ -183,15 +183,16 @@ std::vector<FunctionArgumentTypeList> GenerateAiIfSignatureArgs() {
 absl::Status GetAIFunctions(TypeFactory* /*type_factory*/,
                             const GoogleSQLBuiltinFunctionOptions& options,
                             NameToFunctionMap* functions) {
+  // TODO: Remove this check once engine catalogs are compatible
+  // with the GoogleSQL built-in AI.IF function.
+  if (options.language_options.LanguageFeatureEnabled(FEATURE_DISABLE_AI_IF)) {
+    return absl::OkStatus();
+  }
   // Volatile because AI functions will have non-deterministic results; the
   // results depend on the LLM chosen.
-
-  // TODO: Remove FEATURE_AI_IF as a required language feature once
-  // AI.IF is disabled for Spanner via FEATURE_DISABLE_AI_IF.
   FunctionOptions function_options =
       FunctionOptions()
           .set_volatility(FunctionEnums::VOLATILE)
-          .AddRequiredLanguageFeature(FEATURE_AI_IF)
           .set_post_resolution_argument_constraint(ValidateStructPrompt);
 
   // Generate all AI.IF signature argument combinations first.
@@ -213,12 +214,8 @@ absl::Status GetAIFunctions(TypeFactory* /*type_factory*/,
                                 /*context_id=*/enum_id});
   }
 
-  // TODO: Remove this check once engine catalogs are compatible
-  // with the GoogleSQL built-in AI.IF function.
-  if (!options.language_options.LanguageFeatureEnabled(FEATURE_DISABLE_AI_IF)) {
-    InsertNamespaceFunction(functions, options, "ai", "if", Function::SCALAR,
-                            ai_if_signatures, function_options);
-  }
+  InsertNamespaceFunction(functions, options, "ai", "if", Function::SCALAR,
+                          ai_if_signatures, function_options);
 
   return absl::OkStatus();
 }

@@ -214,4 +214,7 @@
         {{/statements}}
       </div>
     </main>
-    {{> inline_js}}
+    <script>
+      var goog = goog || { module: function() {} };
+      {{> inline_js}}
+    </script>

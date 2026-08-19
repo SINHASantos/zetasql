@@ -1432,7 +1432,7 @@ std::string Value::DebugString(bool verbose) const {
     result = "NULL";
   } else {
     Type::FormatValueContentOptions options;
-    options.product_mode = ProductMode::PRODUCT_INTERNAL;
+    options.set_product_mode(ProductMode::PRODUCT_INTERNAL);
     options.mode = Type::FormatValueContentOptions::Mode::kDebug;
     options.verbose = verbose;
 
@@ -1450,29 +1450,52 @@ std::string Value::DebugString(bool verbose) const {
 
 // Format will wrap arrays and structs.
 std::string Value::Format(bool print_top_level_type) const {
-  return FormatInternal(
-      {.force_type_at_top_level = print_top_level_type, .indent = 0});
+  Type::FormatValueContentOptions options;
+  options.force_type_at_top_level = print_top_level_type;
+  options.indent = 0;
+  return FormatInternal(options);
 }
 
 // NOTE: There is a similar method in ../resolved_ast/sql_builder.cc.
-//
-// This is also basically the same as GetSQLLiteral below, except this adds
-// CASTs and explicit type names so the exact value comes back out.
+std::string Value::GetSQL(const LanguageOptions& language_options) const {
+  return GetSQL(language_options, /*use_external_float32=*/false);
+}
+
+std::string Value::GetSQL(const LanguageOptions& language_options,
+                          bool use_external_float32) const {
+  return GetSQLInternal<false, true>(language_options, use_external_float32);
+}
+
 std::string Value::GetSQL(ProductMode mode, bool use_external_float32) const {
-  return GetSQLInternal<false, true>(mode, use_external_float32);
+  LanguageOptions language_options;
+  language_options.set_product_mode(mode);
+  return GetSQL(language_options, use_external_float32);
 }
 
 // This is basically the same as GetSQL() above, except this doesn't add CASTs
 // or explicit type names if the literal would be valid without them.
+std::string Value::GetSQLLiteral(
+    const LanguageOptions& language_options) const {
+  return GetSQLLiteral(language_options, /*use_external_float32=*/false);
+}
+
+std::string Value::GetSQLLiteral(const LanguageOptions& language_options,
+                                 bool use_external_float32) const {
+  return GetSQLInternal<true, true>(language_options, use_external_float32);
+}
+
 std::string Value::GetSQLLiteral(ProductMode mode,
                                  bool use_external_float32) const {
-  return GetSQLInternal<true, true>(mode, use_external_float32);
+  LanguageOptions language_options;
+  language_options.set_product_mode(mode);
+  return GetSQLLiteral(language_options, use_external_float32);
 }
 
 template <bool as_literal, bool maybe_add_simple_type_prefix>
-std::string Value::GetSQLInternal(ProductMode mode,
+std::string Value::GetSQLInternal(const LanguageOptions& language_options,
                                   bool use_external_float32) const {
   const Type* type = this->type();
+  const ProductMode mode = language_options.product_mode();
 
   if (is_null()) {
     return as_literal
@@ -1481,8 +1504,7 @@ std::string Value::GetSQLInternal(ProductMode mode,
                               type->TypeName(mode, use_external_float32), ")");
   }
 
-  Type::FormatValueContentOptions options;
-  options.product_mode = mode;
+  Type::FormatValueContentOptions options(language_options);
   options.use_external_float32 = use_external_float32;
   if (as_literal) {
     options.mode = maybe_add_simple_type_prefix

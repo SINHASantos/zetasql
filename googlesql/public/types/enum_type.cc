@@ -344,7 +344,7 @@ std::string EnumType::FormatValueContent(
       return absl::StrCat(enum_value);
     }
     return internal::GetCastExpressionString(absl::StrCat(enum_value), this,
-                                             options.product_mode);
+                                             options.product_mode());
   }
 
   if (options.mode == FormatValueContentOptions::Mode::kDebug) {
@@ -355,7 +355,7 @@ std::string EnumType::FormatValueContent(
   std::string literal = ToStringLiteral(enum_name);
   return options.as_literal() ? literal
                               : internal::GetCastExpressionString(
-                                    literal, this, options.product_mode);
+                                    literal, this, options.product_mode());
 }
 
 absl::Status EnumType::SerializeValueContent(const ValueContent& value,

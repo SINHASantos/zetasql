@@ -614,7 +614,7 @@ void StructType::FormatValueContentSqlModeImpl(
     const FormatValueContentOptions& options, std::string* result) const {
   if (options.mode == Type::FormatValueContentOptions::Mode::kSQLExpression) {
     absl::StrAppend(
-        result, TypeName(options.product_mode, options.use_external_float32));
+        result, TypeName(options.product_mode(), options.use_external_float32));
   } else if (num_fields() <= 1) {
     absl::StrAppend(result, "STRUCT");
   }

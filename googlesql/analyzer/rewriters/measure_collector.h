@@ -20,6 +20,7 @@
 #include <string>
 #include <vector>
 
+#include "googlesql/public/types/annotation.h"
 #include "googlesql/public/types/measure_type.h"
 #include "googlesql/public/types/type.h"
 #include "googlesql/resolved_ast/column_factory.h"
@@ -49,8 +50,8 @@ struct MeasureInfo {
   absl::btree_set<std::string, googlesql_base::CaseLess>
       row_identity_column_names;
 
-  // The type of the closure struct corresponding to the measure.
-  const Type* closure_struct_type;
+  // The annotated type of the closure struct corresponding to the measure.
+  AnnotatedType closure_struct_annotated_type;
 
   struct ClosureColumn {
     // A struct-typed column containing values needed for measure expansion into

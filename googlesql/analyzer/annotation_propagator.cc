@@ -102,6 +102,11 @@ static absl::Status CheckAndPropagateAnnotationsImpl(
         GOOGLESQL_RETURN_IF_ERROR(annotation_spec->CheckAndPropagateForGetStructField(
             *get_struct_field, annotation_map));
       } break;
+      case RESOLVED_GET_ROW_FIELD: {
+        auto* get_row_field = resolved_node->GetAs<ResolvedGetRowField>();
+        GOOGLESQL_RETURN_IF_ERROR(annotation_spec->CheckAndPropagateForGetRowField(
+            *get_row_field, annotation_map));
+      } break;
       case RESOLVED_MAKE_STRUCT: {
         GOOGLESQL_RET_CHECK(annotation_map->IsStructMap());
         auto* make_struct = resolved_node->GetAs<ResolvedMakeStruct>();

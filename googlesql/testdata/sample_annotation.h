@@ -53,6 +53,10 @@ class SampleAnnotation : public AnnotationSpec {
       const ResolvedGetStructField& get_struct_field,
       AnnotationMap* result_annotation_map) override;
 
+  absl::Status CheckAndPropagateForGetRowField(
+      const ResolvedGetRowField& get_row_field,
+      AnnotationMap* result_annotation_map) override;
+
   absl::Status CheckAndPropagateForMakeStruct(
       const ResolvedMakeStruct& make_struct,
       StructAnnotationMap* result_annotation_map) override {

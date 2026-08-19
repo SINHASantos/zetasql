@@ -131,7 +131,7 @@ class ContainerType : public Type {
       return options.as_literal()
                  ? "NULL"
                  : absl::StrCat("CAST(NULL AS ",
-                                type->TypeName(options.product_mode,
+                                type->TypeName(options.product_mode(),
                                                options.use_external_float32),
                                 ")");
     }
@@ -142,7 +142,7 @@ class ContainerType : public Type {
   // printing ValueContent in error messages.
   FormatValueContentOptions DebugFormatValueContentOptions() const {
     Type::FormatValueContentOptions format_options;
-    format_options.product_mode = ProductMode::PRODUCT_INTERNAL;
+    format_options.set_product_mode(ProductMode::PRODUCT_INTERNAL);
     format_options.mode = Type::FormatValueContentOptions::Mode::kDebug;
     return format_options;
   }

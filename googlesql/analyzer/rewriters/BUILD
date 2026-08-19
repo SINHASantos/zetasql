@@ -394,6 +394,7 @@ cc_library(
     ],
     deps = [
         ":measure_dependency_graph",
+        "//googlesql/analyzer:annotation_propagator",
         "//googlesql/base:check",
         "//googlesql/base:ret_check",
         "//googlesql/base:status",

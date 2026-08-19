@@ -25,9 +25,9 @@ gen_string_constant_header_file(
 )
 
 gen_string_constant_header_file(
-    name = "inline_js_h",
-    src = "inline_js.html",
-    variable = "kInlineJS",
+    name = "rewrite_steps_js_h",
+    src = "rewrite_steps.js",
+    variable = "kRewriteStepsJS",
 )
 
 gen_string_constant_header_file(
@@ -52,9 +52,9 @@ cc_library(
     name = "embedded_resources",
     srcs = [
         "embedded_resources.cc",
-        "inline_js.html.h",
         "page_body.html.h",
         "page_template.html.h",
+        "rewrite_steps.js.h",
         "style.css.h",
         "table.html.h",
     ],

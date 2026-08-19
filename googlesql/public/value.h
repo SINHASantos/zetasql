@@ -35,6 +35,7 @@
 #include "googlesql/public/civil_time.h"
 #include "googlesql/public/interval_value.h"
 #include "googlesql/public/json_value.h"
+#include "googlesql/public/language_options.h"
 #include "googlesql/public/numeric_value.h"
 #include "googlesql/public/options.pb.h"
 #include "googlesql/public/timestamp_picos_value.h"
@@ -609,11 +610,17 @@ class Value {
   // FLOAT32 as the type name for TYPE_FLOAT, for PRODUCT_EXTERNAL mode.
   // TODO: Remove `use_external_float32` once all engines are
   // updated.
+  std::string GetSQL(const LanguageOptions& language_options) const;
+  std::string GetSQL(const LanguageOptions& language_options,
+                     bool use_external_float32) const;
+  // TODO: Migrate callers to the LanguageOptions overload.
+  ABSL_DEPRECATED("Use signature taking LanguageOptions.")
   std::string GetSQL(ProductMode mode, bool use_external_float32) const;
+  ABSL_DEPRECATED("Use signature taking LanguageOptions.")
   std::string GetSQL(ProductMode mode) const {
     return GetSQL(mode, /*use_external_float32=*/false);
   }
-  ABSL_DEPRECATED("Use signature taking ProductMode.")
+  ABSL_DEPRECATED("Use signature taking LanguageOptions.")
   std::string GetSQL() const {
     return GetSQL(PRODUCT_EXTERNAL, /*use_external_float32=*/false);
   }
@@ -627,11 +634,17 @@ class Value {
   // FLOAT32 as the type name for TYPE_FLOAT, for PRODUCT_EXTERNAL mode.
   // TODO: Remove `use_external_float32` once all engines are
   // updated.
+  std::string GetSQLLiteral(const LanguageOptions& language_options) const;
+  std::string GetSQLLiteral(const LanguageOptions& language_options,
+                            bool use_external_float32) const;
+  // TODO: Migrate callers to the LanguageOptions overload.
+  ABSL_DEPRECATED("Use signature taking LanguageOptions.")
   std::string GetSQLLiteral(ProductMode mode, bool use_external_float32) const;
+  ABSL_DEPRECATED("Use signature taking LanguageOptions.")
   std::string GetSQLLiteral(ProductMode mode) const {
     return GetSQLLiteral(mode, /*use_external_float32=*/false);
   }
-  ABSL_DEPRECATED("Use signature taking ProductMode.")
+  ABSL_DEPRECATED("Use signature taking LanguageOptions.")
   std::string GetSQLLiteral() const {
     return GetSQLLiteral(PRODUCT_EXTERNAL, /*use_external_float32=*/false);
   }
@@ -1133,7 +1146,8 @@ class Value {
   FRIEND_TEST(ValueTest, DeclarativeTimeAndDatetimeRoundTrip);
 
   template <bool as_literal, bool maybe_add_simple_type_prefix>
-  std::string GetSQLInternal(ProductMode mode, bool use_external_float32) const;
+  std::string GetSQLInternal(const LanguageOptions& language_options,
+                             bool use_external_float32) const;
 
   template <typename H>
   H HashValueInternal(H h) const;

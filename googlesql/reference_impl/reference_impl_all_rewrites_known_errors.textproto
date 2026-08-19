@@ -491,3 +491,9 @@ known_errors {
   label: "collation_in_sql_functions_test:collation_in_tvf_with_any_string_explicit_args"
   label: "call_sql_udf_test:call_tvf_table"
 }
+
+known_errors {
+  mode: ALLOW_UNIMPLEMENTED
+  reason: "TVF arguments that reference columns are not supported"
+  label: "annotations_in_sql_functions_test:tokenlist_in_concrete_tvf"
+}

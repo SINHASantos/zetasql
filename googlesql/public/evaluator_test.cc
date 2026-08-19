@@ -102,8 +102,8 @@ class UDFEvalTest : public ::testing::Test {
     catalog_ = std::make_unique<SimpleCatalog>("udf_catalog");
     catalog_->AddBuiltinFunctions(
         BuiltinFunctionOptions::AllReleasedFunctions());
-    GOOGLESQL_ASSERT_OK(analyzer_options_.AddQueryParameter(
-        "param", types::StringType()));
+    GOOGLESQL_ASSERT_OK(
+        analyzer_options_.AddQueryParameter("param", types::StringType()));
   }
 
   SimpleCatalog* catalog() const { return catalog_.get(); }
@@ -125,9 +125,7 @@ class UDAEvalTest : public ::testing::Test {
         analyzer_options_.AddQueryParameter("param", types::StringType()));
   }
 
-  SimpleCatalog* catalog() const {
-    return catalog_.get();
-  }
+  SimpleCatalog* catalog() const { return catalog_.get(); }
 
   std::unique_ptr<SimpleCatalog> catalog_;
   AnalyzerOptions analyzer_options_;
@@ -466,9 +464,8 @@ TEST(EvaluatorTest, ExpressionFromArray) {
 }
 
 TEST(EvaluatorTest, ArrayExpressionOnHeap) {
-  PreparedExpression* expr =
-      new PreparedExpression(
-          "ARRAY(SELECT AS STRUCT 1,2 UNION ALL SELECT AS STRUCT 3,4)");
+  PreparedExpression* expr = new PreparedExpression(
+      "ARRAY(SELECT AS STRUCT 1,2 UNION ALL SELECT AS STRUCT 3,4)");
   EXPECT_EQ(StructArray({"", ""}, {{1ll, 2ll}, {3ll, 4ll}}),
             expr->Execute().value());
   delete expr;
@@ -826,9 +823,8 @@ TEST(EvaluatorTest, PrepareExecuteMissingQueryParameter) {
   AnalyzerOptions options;
   GOOGLESQL_ASSERT_OK(options.AddExpressionColumn("col", types::Int64Type()));
   EXPECT_THAT(expr.Prepare(options),
-      StatusIs(
-          absl::StatusCode::kInvalidArgument,
-          HasSubstr("Query parameter 'param' not found")));
+              StatusIs(absl::StatusCode::kInvalidArgument,
+                       HasSubstr("Query parameter 'param' not found")));
 }
 
 TEST(EvaluatorTest, PrepareExecuteAllowUndeclaredQueryParameters) {
@@ -841,10 +837,9 @@ TEST(EvaluatorTest, PrepareExecuteAllowUndeclaredQueryParameters) {
                        expr.GetReferencedParameters());
   EXPECT_THAT(params, testing::ElementsAre("param"));
   EXPECT_TRUE(types::Int64Type()->Equals(expr.output_type()));
-  GOOGLESQL_ASSERT_OK_AND_ASSIGN(
-      Value result,
-      expr.ExecuteAfterPrepare(
-          {{"col", Value::Int64(5)}}, {{"param", Value::Int64(6)}}));
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(Value result,
+                       expr.ExecuteAfterPrepare({{"col", Value::Int64(5)}},
+                                                {{"param", Value::Int64(6)}}));
   EXPECT_EQ(result, Value::Int64(11));
 }
 
@@ -858,24 +853,21 @@ TEST(EvaluatorTest, PrepareExecuteAllowUndeclaredQueryParametersResolvedExpr) {
   TypeFactory type_factory;
 
   std::unique_ptr<const AnalyzerOutput> analyzer_output;
-  GOOGLESQL_ASSERT_OK(AnalyzeExpression(
-      "@param + col", analyzer_options,
-      catalog.get(), &type_factory, &analyzer_output));
+  GOOGLESQL_ASSERT_OK(AnalyzeExpression("@param + col", analyzer_options, catalog.get(),
+                              &type_factory, &analyzer_output));
 
   EvaluatorOptions evaluator_options;
-  PreparedExpression expr(analyzer_output->resolved_expr(),
-                          evaluator_options);
+  PreparedExpression expr(analyzer_output->resolved_expr(), evaluator_options);
   GOOGLESQL_ASSERT_OK(expr.Prepare(analyzer_options));
   GOOGLESQL_ASSERT_OK_AND_ASSIGN(std::vector<std::string> params,
                        expr.GetReferencedParameters());
   EXPECT_THAT(params, testing::ElementsAre("param"));
   EXPECT_TRUE(types::Int64Type()->Equals(expr.output_type()));
   EXPECT_THAT(
-      expr.ExecuteAfterPrepare(
-          {{"col", Value::Int64(5)}}, {{"param", Value::Int64(6)}}),
-      StatusIs(
-          absl::StatusCode::kInternal,
-          HasSubstr("Expected type not found for variable param")));
+      expr.ExecuteAfterPrepare({{"col", Value::Int64(5)}},
+                               {{"param", Value::Int64(6)}}),
+      StatusIs(absl::StatusCode::kInternal,
+               HasSubstr("Expected type not found for variable param")));
 }
 
 TEST(EvaluatorTest, PrepareExecuteWrongQueryParameterType) {
@@ -885,8 +877,9 @@ TEST(EvaluatorTest, PrepareExecuteWrongQueryParameterType) {
   GOOGLESQL_ASSERT_OK(options.AddExpressionColumn("col", types::Int64Type()));
   GOOGLESQL_ASSERT_OK(expr.Prepare(options));
   EXPECT_TRUE(types::Int64Type()->Equals(expr.output_type()));
-  absl::Status status = expr.Execute(
-      {{"col", Value::Int64(5)}}, {{"param", Value::String("foo")}}).status();
+  absl::Status status = expr.Execute({{"col", Value::Int64(5)}},
+                                     {{"param", Value::String("foo")}})
+                            .status();
   EXPECT_THAT(
       status,
       StatusIs(
@@ -900,9 +893,8 @@ TEST(EvaluatorTest, PrepareExecuteMissingPositionalQueryParameter) {
   options.set_parameter_mode(PARAMETER_POSITIONAL);
   GOOGLESQL_ASSERT_OK(options.AddExpressionColumn("col", types::Int64Type()));
   EXPECT_THAT(expr.Prepare(options),
-      StatusIs(
-          absl::StatusCode::kInvalidArgument,
-          HasSubstr("Query parameter number 1 is not defined")));
+              StatusIs(absl::StatusCode::kInvalidArgument,
+                       HasSubstr("Query parameter number 1 is not defined")));
 }
 
 TEST(EvaluatorTest, PrepareExecuteAllowUndeclaredPositionalQueryParameters) {
@@ -915,11 +907,10 @@ TEST(EvaluatorTest, PrepareExecuteAllowUndeclaredPositionalQueryParameters) {
   EXPECT_TRUE(types::StringType()->Equals(expr.output_type()));
   GOOGLESQL_ASSERT_OK_AND_ASSIGN(int count, expr.GetPositionalParameterCount());
   EXPECT_EQ(2, count);
-  GOOGLESQL_ASSERT_OK_AND_ASSIGN(
-      Value result,
-      expr.ExecuteAfterPrepareWithPositionalParams(
-          {{"col", Value::Int64(5)}}, {Value::Int64(6),
-                                        Value::StringValue("foo")}));
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(Value result,
+                       expr.ExecuteAfterPrepareWithPositionalParams(
+                           {{"col", Value::Int64(5)}},
+                           {Value::Int64(6), Value::StringValue("foo")}));
   EXPECT_EQ(result, Value::StringValue("11foo"));
 }
 
@@ -935,9 +926,9 @@ TEST(EvaluatorTest,
   TypeFactory type_factory;
 
   std::unique_ptr<const AnalyzerOutput> analyzer_output;
-  GOOGLESQL_ASSERT_OK(AnalyzeExpression(
-      "CONCAT(CAST((? + col) AS STRING), ?)", analyzer_options,
-      catalog.get(), &type_factory, &analyzer_output));
+  GOOGLESQL_ASSERT_OK(AnalyzeExpression("CONCAT(CAST((? + col) AS STRING), ?)",
+                              analyzer_options, catalog.get(), &type_factory,
+                              &analyzer_output));
 
   EvaluatorOptions evaluator_options;
   PreparedExpression expr(analyzer_output->resolved_expr(), evaluator_options);
@@ -947,8 +938,8 @@ TEST(EvaluatorTest,
   EXPECT_EQ(2, count);
   EXPECT_THAT(
       expr.ExecuteAfterPrepareWithPositionalParams(
-          {{"col", Value::Int64(5)}}, {Value::Int64(6),
-                                        Value::StringValue("foo")}),
+          {{"col", Value::Int64(5)}},
+          {Value::Int64(6), Value::StringValue("foo")}),
       StatusIs(absl::StatusCode::kInternal,
                HasSubstr("Mismatch in number of analyzer parameters versus "
                          "algebrizer parameters")));
@@ -1072,8 +1063,8 @@ TEST(EvaluatorTest, PrepareExecuteMismatchedPositionalQueryParameterCount) {
 }
 
 TEST(EvaluatorTest, PrepareExecuteSubexpressionsWithPositionalQueryParameters) {
-  const ParameterValueList positional_parameters =
-      {Value::Int64(1), Value::Int64(2), Value::Int64(4), Value::Int64(8)};
+  const ParameterValueList positional_parameters = {
+      Value::Int64(1), Value::Int64(2), Value::Int64(4), Value::Int64(8)};
 
   AnalyzerOptions analyzer_options;
   analyzer_options.set_parameter_mode(PARAMETER_POSITIONAL);
@@ -1110,15 +1101,16 @@ TEST(EvaluatorTest, PrepareExecuteSubexpressionsWithPositionalQueryParameters) {
 }
 
 TEST(EvaluatorTest, PrepareExecuteSubexpressionsWithNamedQueryParameters) {
-  const ParameterValueMap parameters =
-      {{"param1", Value::Int64(1)}, {"param2", Value::Int64(2)},
-       {"param4", Value::Int64(4)}, {"param8", Value::Int64(8)}};
+  const ParameterValueMap parameters = {{"param1", Value::Int64(1)},
+                                        {"param2", Value::Int64(2)},
+                                        {"param4", Value::Int64(4)},
+                                        {"param8", Value::Int64(8)}};
 
   AnalyzerOptions analyzer_options;
   analyzer_options.set_parameter_mode(PARAMETER_NAMED);
   for (const auto& entry : parameters) {
-    GOOGLESQL_ASSERT_OK(analyzer_options.AddQueryParameter(
-        entry.first, entry.second.type()));
+    GOOGLESQL_ASSERT_OK(
+        analyzer_options.AddQueryParameter(entry.first, entry.second.type()));
   }
   auto catalog = std::make_unique<SimpleCatalog>("foo");
   catalog->AddBuiltinFunctions(BuiltinFunctionOptions::AllReleasedFunctions());
@@ -1157,8 +1149,9 @@ TEST(EvaluatorTest, PrepareExecuteWrongColumnParameterType) {
   GOOGLESQL_ASSERT_OK(options.AddExpressionColumn("col", types::Int64Type()));
   GOOGLESQL_ASSERT_OK(expr.Prepare(options));
   EXPECT_TRUE(types::Int64Type()->Equals(expr.output_type()));
-  absl::Status status = expr.Execute(
-      {{"col", Value::String("foo")}}, {{"param", Value::Int64(1)}}).status();
+  absl::Status status = expr.Execute({{"col", Value::String("foo")}},
+                                     {{"param", Value::Int64(1)}})
+                            .status();
   EXPECT_THAT(
       status,
       StatusIs(
@@ -1258,8 +1251,8 @@ TEST(EvaluatorTest, GetReferencedParametersAsProperSubset) {
   EXPECT_THAT(std::move(status_or_parameters).value(),
               UnorderedElementsAre("param1", "param2"));
 
-  GOOGLESQL_ASSERT_OK(expr.Execute({}, {{"param1", values::Int64(1)},
-        {"param2", values::Int64(2)}}));
+  GOOGLESQL_ASSERT_OK(expr.Execute(
+      {}, {{"param1", values::Int64(1)}, {"param2", values::Int64(2)}}));
 }
 
 TEST(EvaluatorTest, GetPositionalParameterCount) {
@@ -1317,8 +1310,8 @@ TEST(EvaluatorTest, GetReferencedColumnsAsProperSubset) {
   EXPECT_THAT(std::move(status_or_columns).value(),
               UnorderedElementsAre("col0", "col1"));
 
-  auto status_or_value = expr.Execute({{"col0", values::Int64(1)},
-    {"col1", values::Int64(2)}});
+  auto status_or_value =
+      expr.Execute({{"col0", values::Int64(1)}, {"col1", values::Int64(2)}});
   GOOGLESQL_ASSERT_OK(status_or_value);
 }
 
@@ -1472,8 +1465,8 @@ TEST(EvaluatorTest, GetReferencedColumnsFromConstantExpression) {
 
 TEST(EvaluatorTest, GetReferencedColumnsAfterExecute) {
   PreparedExpression expr("col1 + col2");
-  GOOGLESQL_ASSERT_OK(expr.Execute(
-      {{"col1", values::Int64(1)}, {"col2", values::Int64(2)}}));
+  GOOGLESQL_ASSERT_OK(
+      expr.Execute({{"col1", values::Int64(1)}, {"col2", values::Int64(2)}}));
 
   auto status_or_columns = expr.GetReferencedColumns();
   GOOGLESQL_ASSERT_OK(status_or_columns);
@@ -1518,8 +1511,7 @@ TEST(EvaluatorTest, ExpressionValueColumn) {
 
   // Test using an anonymous in-scope expression column.
   {
-    PreparedExpression expr(
-        "int64_key_1 + int64_key_2 + if(has_date, 0, 100)");
+    PreparedExpression expr("int64_key_1 + int64_key_2 + if(has_date, 0, 100)");
 
     AnalyzerOptions options;
     GOOGLESQL_ASSERT_OK(options.SetInScopeExpressionColumn("", proto_type));
@@ -2043,10 +2035,10 @@ TEST_F(UDFEvalTest, OkUDFEvaluator) {
     // Returns string length as int64.
     return Value::Int64(args[0].string_value().size());
   });
-  catalog()->AddOwnedFunction(new Function(
-      "MyUdf", "udf", Function::SCALAR,
-      {{types::Int64Type(), {types::StringType()}, kFunctionId}},
-      function_options_));
+  catalog()->AddOwnedFunction(
+      new Function("MyUdf", "udf", Function::SCALAR,
+                   {{types::Int64Type(), {types::StringType()}, kFunctionId}},
+                   function_options_));
   PreparedExpression expr("1 + myudf(@param)");
   GOOGLESQL_ASSERT_OK(expr.Prepare(analyzer_options_, catalog()));
   Value result = expr.Execute({}, {{"param", Value::String("foo")}}).value();
@@ -2721,9 +2713,9 @@ TEST_F(UDFEvalTest, UndefinedUDF) {
 }
 
 TEST_F(UDFEvalTest, NoUDFEvaluator) {
-  catalog()->AddOwnedFunction(new Function(
-      "MyUdf", "udf", Function::SCALAR,
-      {{types::Int64Type(), {types::StringType()}, kFunctionId}}));
+  catalog()->AddOwnedFunction(
+      new Function("MyUdf", "udf", Function::SCALAR,
+                   {{types::Int64Type(), {types::StringType()}, kFunctionId}}));
   PreparedExpression expr("1 + myudf(@param)");
   absl::Status status = expr.Prepare(analyzer_options_, catalog());
   EXPECT_THAT(status, StatusIs(absl::StatusCode::kInvalidArgument,
@@ -2744,10 +2736,10 @@ TEST_F(UDFEvalTest, UDFEvaluatorRuntimeErrors) {
         }
         return Value::Int64(arg.size());
       });
-  catalog()->AddOwnedFunction(new Function(
-      "MyUdf", "udf", Function::SCALAR,
-      {{types::Int64Type(), {types::StringType()}, kFunctionId}},
-      function_options_));
+  catalog()->AddOwnedFunction(
+      new Function("MyUdf", "udf", Function::SCALAR,
+                   {{types::Int64Type(), {types::StringType()}, kFunctionId}},
+                   function_options_));
   PreparedExpression expr("1 + myudf(@param)");
   GOOGLESQL_ASSERT_OK(expr.Prepare(analyzer_options_, catalog()));
 
@@ -2757,19 +2749,17 @@ TEST_F(UDFEvalTest, UDFEvaluatorRuntimeErrors) {
 
   // Runtime errors.
   absl::Status status;
-  status = expr.Execute(
-      {}, {{"param", Value::String("not found")}}).status();
+  status = expr.Execute({}, {{"param", Value::String("not found")}}).status();
   EXPECT_THAT(status,
               StatusIs(absl::StatusCode::kNotFound, HasSubstr("Wrong number")));
 
-  status = expr.Execute(
-      {}, {{"param", Value::String("invalid")}}).status();
+  status = expr.Execute({}, {{"param", Value::String("invalid")}}).status();
   EXPECT_THAT(status, StatusIs(absl::StatusCode::kInternal,
                                HasSubstr("Uninitialized value")));
 
   if (GOOGLESQL_DEBUG_MODE) {
-    status = expr.Execute(
-        {}, {{"param", Value::String("wrong return type")}}).status();
+    status = expr.Execute({}, {{"param", Value::String("wrong return type")}})
+                 .status();
     EXPECT_THAT(status, StatusIs(absl::StatusCode::kInternal,
                                  HasSubstr("Expected value of type: INT64")));
   } else {
@@ -2980,8 +2970,7 @@ TEST(PreparedQuery, FromTable) {
 }
 
 TEST(PreparedQuery, PrepareExecuteMissingQueryParameter) {
-  SimpleTable test_table(
-      "TestTable", {{"col", types::Int64Type()}});
+  SimpleTable test_table("TestTable", {{"col", types::Int64Type()}});
   test_table.SetContents({{Int64(5)}});
 
   SimpleCatalog catalog("TestCatalog");
@@ -2991,14 +2980,12 @@ TEST(PreparedQuery, PrepareExecuteMissingQueryParameter) {
   EvaluatorOptions evaluator_options;
   PreparedQuery query("SELECT @param + col FROM TestTable", evaluator_options);
   EXPECT_THAT(query.Prepare(AnalyzerOptions(), &catalog),
-      StatusIs(
-          absl::StatusCode::kInvalidArgument,
-          HasSubstr("Query parameter 'param' not found")));
+              StatusIs(absl::StatusCode::kInvalidArgument,
+                       HasSubstr("Query parameter 'param' not found")));
 }
 
 TEST(PreparedQuery, PrepareExecuteAllowUndeclaredQueryParameters) {
-  SimpleTable test_table(
-      "TestTable", {{"col", types::Int64Type()}});
+  SimpleTable test_table("TestTable", {{"col", types::Int64Type()}});
   test_table.SetContents({{Int64(5)}});
 
   SimpleCatalog catalog("TestCatalog");
@@ -3024,8 +3011,7 @@ TEST(PreparedQuery, PrepareExecuteAllowUndeclaredQueryParameters) {
 }
 
 TEST(PreparedQuery, PrepareExecuteAllowUndeclaredQueryParametersResolvedStmt) {
-  SimpleTable test_table(
-      "TestTable", {{"col", types::Int64Type()}});
+  SimpleTable test_table("TestTable", {{"col", types::Int64Type()}});
   test_table.SetContents({{Int64(5)}});
 
   SimpleCatalog catalog("TestCatalog");
@@ -3051,15 +3037,14 @@ TEST(PreparedQuery, PrepareExecuteAllowUndeclaredQueryParametersResolvedStmt) {
   GOOGLESQL_ASSERT_OK_AND_ASSIGN(std::vector<std::string> params,
                        query.GetReferencedParameters());
   EXPECT_THAT(params, testing::ElementsAre("param"));
-  EXPECT_THAT(query.Execute({{"param", Value::Int64(6)}}),
-      StatusIs(
-          absl::StatusCode::kInternal,
-          HasSubstr("Expected type not found for variable param")));
+  EXPECT_THAT(
+      query.Execute({{"param", Value::Int64(6)}}),
+      StatusIs(absl::StatusCode::kInternal,
+               HasSubstr("Expected type not found for variable param")));
 }
 
 TEST(PreparedQuery, PrepareExecuteMissingPositionalQueryParameter) {
-  SimpleTable test_table(
-      "TestTable", {{"col", types::Int64Type()}});
+  SimpleTable test_table("TestTable", {{"col", types::Int64Type()}});
   test_table.SetContents({{Int64(5)}});
 
   SimpleCatalog catalog("TestCatalog");
@@ -3071,14 +3056,12 @@ TEST(PreparedQuery, PrepareExecuteMissingPositionalQueryParameter) {
   AnalyzerOptions options;
   options.set_parameter_mode(PARAMETER_POSITIONAL);
   EXPECT_THAT(query.Prepare(options, &catalog),
-      StatusIs(
-          absl::StatusCode::kInvalidArgument,
-          HasSubstr("Query parameter number 1 is not defined")));
+              StatusIs(absl::StatusCode::kInvalidArgument,
+                       HasSubstr("Query parameter number 1 is not defined")));
 }
 
 TEST(PreparedQuery, PrepareExecuteAllowUndeclaredPositionalQueryParameters) {
-  SimpleTable test_table(
-      "TestTable", {{"col", types::Int64Type()}});
+  SimpleTable test_table("TestTable", {{"col", types::Int64Type()}});
   test_table.SetContents({{Int64(5)}});
 
   SimpleCatalog catalog("TestCatalog");
@@ -3095,10 +3078,9 @@ TEST(PreparedQuery, PrepareExecuteAllowUndeclaredPositionalQueryParameters) {
   GOOGLESQL_ASSERT_OK(query.Prepare(analyzer_options, &catalog));
   GOOGLESQL_ASSERT_OK_AND_ASSIGN(int count, query.GetPositionalParameterCount());
   EXPECT_EQ(2, count);
-  GOOGLESQL_ASSERT_OK_AND_ASSIGN(
-      std::unique_ptr<EvaluatorTableIterator> iter,
-      query.ExecuteWithPositionalParams({Value::Int64(6),
-        Value::StringValue("foo")}));
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(std::unique_ptr<EvaluatorTableIterator> iter,
+                       query.ExecuteWithPositionalParams(
+                           {Value::Int64(6), Value::StringValue("foo")}));
   EXPECT_EQ(1, iter->NumColumns());
   ASSERT_TRUE(iter->NextRow());
   EXPECT_EQ(Value::StringValue("11foo"), iter->GetValue(0));
@@ -3108,8 +3090,7 @@ TEST(PreparedQuery, PrepareExecuteAllowUndeclaredPositionalQueryParameters) {
 
 TEST(PreparedQuery,
      PrepareExecuteAllowUndeclaredPositionalQueryParametersResolvedStmt) {
-  SimpleTable test_table(
-      "TestTable", {{"col", types::Int64Type()}});
+  SimpleTable test_table("TestTable", {{"col", types::Int64Type()}});
   test_table.SetContents({{Int64(5)}});
 
   SimpleCatalog catalog("TestCatalog");
@@ -3124,8 +3105,7 @@ TEST(PreparedQuery,
   TypeFactory type_factory;
   GOOGLESQL_ASSERT_OK(AnalyzeStatement(
       "SELECT CONCAT(CAST((? + col) AS STRING), ?) FROM TestTable",
-      analyzer_options, &catalog, &type_factory,
-      &analyzer_output));
+      analyzer_options, &catalog, &type_factory, &analyzer_output));
   ASSERT_TRUE(analyzer_output->resolved_statement()->Is<ResolvedQueryStmt>());
 
   EvaluatorOptions evaluator_options;
@@ -3396,8 +3376,8 @@ class PreparedModifyTest : public ::testing::Test {
         std::vector<SimpleTable::NameAndType>{
             {"int_val", types::Int64Type()}, {"str_val", types::StringType()}});
     test_table->SetContents({{Int64(1), String("one")},
-                            {Int64(2), String("two")},
-                            {Int64(4), String("four")}});
+                             {Int64(2), String("two")},
+                             {Int64(4), String("four")}});
     GOOGLESQL_ASSERT_OK(test_table->SetPrimaryKey({0}));
     catalog_.AddOwnedTable(std::move(test_table));
   }
@@ -3517,7 +3497,7 @@ TEST_F(PreparedModifyTest, ExecutesInsertToValueTable) {
 
 TEST_F(PreparedModifyTest, ExecutesDelete) {
   PreparedModify modify("delete test_table where int_val in (2, 4)",
-                      EvaluatorOptions());
+                        EvaluatorOptions());
   GOOGLESQL_ASSERT_OK(modify.Prepare(analyzer_options(), catalog()));
   ASSERT_EQ(modify.resolved_statement()->node_kind(), RESOLVED_DELETE_STMT);
   GOOGLESQL_ASSERT_OK_AND_ASSIGN(std::unique_ptr<EvaluatorTableModifyIterator> iter,
@@ -3712,8 +3692,7 @@ TEST_F(PreparedModifyTest, UndeclaredNamedParameterResolvedStmt) {
   TypeFactory type_factory;
   GOOGLESQL_ASSERT_OK(AnalyzeStatement(
       "insert test_table(int_val, str_val) values(@param1, @param2)",
-      analyzer_options, catalog(), &type_factory,
-      &analyzer_output));
+      analyzer_options, catalog(), &type_factory, &analyzer_output));
 
   PreparedModify modify(analyzer_output->resolved_statement(),
                         EvaluatorOptions());
@@ -3724,9 +3703,8 @@ TEST_F(PreparedModifyTest, UndeclaredNamedParameterResolvedStmt) {
 
   EXPECT_THAT(
       modify.Execute({{"param1", Int64(3)}, {"param2", String("three")}}),
-      StatusIs(
-          absl::StatusCode::kInternal,
-          HasSubstr("Expected type not found for variable param1")));
+      StatusIs(absl::StatusCode::kInternal,
+               HasSubstr("Expected type not found for variable param1")));
 }
 
 TEST_F(PreparedModifyTest, PositionalParameter) {
@@ -3813,10 +3791,9 @@ TEST_F(PreparedModifyTest, UndeclaredPositionalParameterResolvedStmt) {
 
   EXPECT_THAT(
       modify.ExecuteWithPositionalParams({Int64(3), String("three")}),
-      StatusIs(
-          absl::StatusCode::kInternal,
-          HasSubstr("Mismatch in number of analyzer parameters versus "
-                    "algebrizer parameters")));
+      StatusIs(absl::StatusCode::kInternal,
+               HasSubstr("Mismatch in number of analyzer parameters versus "
+                         "algebrizer parameters")));
 }
 
 TEST_F(PreparedModifyTest, ExecuteAfterPrepareWithOrderedParamsWithParameter) {
@@ -3861,7 +3838,7 @@ TEST_F(PreparedModifyTest, ExecuteAfterPrepareWithOrderedParamsWithParameter) {
 }
 
 TEST_F(PreparedModifyTest,
-     ExecuteAfterPreparedWithOrderedParamsWithPositionalParameter) {
+       ExecuteAfterPreparedWithOrderedParamsWithPositionalParameter) {
   PreparedModify modify("insert test_table(int_val, str_val) values(?, ?)",
                         EvaluatorOptions());
 
@@ -3909,14 +3886,6 @@ TEST_F(PreparedModifyTest, ExplainAfterPrepareWithoutPrepare) {
   EXPECT_THAT(modify.ExplainAfterPrepare(),
               StatusIs(absl::StatusCode::kInternal,
                        HasSubstr("Prepare must be called first")));
-}
-
-TEST_F(PreparedModifyTest, AiIfDisabledForPreparedModify) {
-  PreparedModify modify("DELETE from test_table WHERE AI.IF('prompt')",
-                        EvaluatorOptions());
-  EXPECT_THAT(modify.Prepare(analyzer_options(), catalog()),
-              StatusIs(absl::StatusCode::kInvalidArgument,
-                       HasSubstr("Function not found: AI.`IF`")));
 }
 
 // This test suite runs DML Returning statements using version 2 Execute API,
@@ -5396,9 +5365,9 @@ TEST(PreparedQuery, ExecuteAfterPrepareWithOrderedParamsWithParameter) {
               IsOkAndHolds(ElementsAre("p1", "p2")));
   EXPECT_THAT(query.GetPositionalParameterCount(), IsOkAndHolds(0));
 
-  GOOGLESQL_ASSERT_OK_AND_ASSIGN(std::unique_ptr<EvaluatorTableIterator> iter,
-                       query.ExecuteAfterPrepare(
-                           {values::Int64(123), values::String("abc")}));
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(
+      std::unique_ptr<EvaluatorTableIterator> iter,
+      query.ExecuteAfterPrepare({values::Int64(123), values::String("abc")}));
   ASSERT_TRUE(iter->NextRow());
   EXPECT_EQ(Int64(123), iter->GetValue(0));
   EXPECT_EQ(String("abc"), iter->GetValue(1));
@@ -5415,10 +5384,9 @@ TEST(PreparedQuery, ExecuteAfterPrepareWithOrderedParamsWithParameter) {
   GOOGLESQL_EXPECT_OK(iter->Status());
 
   iter.reset();
-  EXPECT_THAT(
-      query.ExecuteAfterPrepare({values::NullString()}),
-      StatusIs(absl::StatusCode::kInvalidArgument,
-               HasSubstr("Incorrect number of named parameters")));
+  EXPECT_THAT(query.ExecuteAfterPrepare({values::NullString()}),
+              StatusIs(absl::StatusCode::kInvalidArgument,
+                       HasSubstr("Incorrect number of named parameters")));
 }
 
 TEST(PreparedQuery,
@@ -5436,9 +5404,8 @@ TEST(PreparedQuery,
   EXPECT_THAT(query.GetReferencedParameters(), IsOkAndHolds(IsEmpty()));
   EXPECT_THAT(query.GetPositionalParameterCount(), IsOkAndHolds(2));
 
-  GOOGLESQL_ASSERT_OK_AND_ASSIGN(
-      std::unique_ptr<EvaluatorTableIterator> iter,
-      query.ExecuteAfterPrepare({Int64(123), String("abc")}));
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(std::unique_ptr<EvaluatorTableIterator> iter,
+                       query.ExecuteAfterPrepare({Int64(123), String("abc")}));
   ASSERT_TRUE(iter->NextRow());
   EXPECT_EQ(Int64(123), iter->GetValue(0));
   EXPECT_EQ(String("abc"), iter->GetValue(1));
@@ -5576,15 +5543,6 @@ TEST_F(PreparedQueryTest, ReadZeroColumnsWithPruningUnusedColumnsEnabled) {
   GOOGLESQL_ASSERT_OK(iter->Status());
 
   EXPECT_THAT(num_rows, Eq(3));
-}
-
-TEST_F(PreparedQueryTest, AiIfDisabledForPreparedQuery) {
-  const std::string query("SELECT AI.IF('prompt')");
-
-  // AI.IF is disabled by default without any user-specified AnalyzerOptions.
-  PreparedQuery pq(query, EvaluatorOptions());
-  EXPECT_THAT(pq.Execute(), StatusIs(absl::StatusCode::kInvalidArgument,
-                                     HasSubstr("Function not found: AI.`IF`")));
 }
 
 // Test fixture for end-to-end tests of reading all fields from a proto in one
@@ -7479,25 +7437,6 @@ TEST_F(PreparedStatementTest, PipeForkWithFinish) {
               PreparedStatementBase::StmtKind::kTerminalQuery);
     EXPECT_EQ(results[1]->table_iterator, nullptr);
   }
-}
-
-TEST_F(PreparedStatementTest, AiIfDisabledForPreparedStatement) {
-  const std::string query("SELECT AI.IF('prompt')");
-
-  // AI.IF is disabled by default without any user-specified AnalyzerOptions.
-  PreparedStatement ps(query, EvaluatorOptions());
-  EXPECT_THAT(ps.Execute(), StatusIs(absl::StatusCode::kInvalidArgument,
-                                     HasSubstr("Function not found: AI.`IF`")));
-}
-
-TEST(EvaluatorTest, AiIfDisabledForPreparedExpression) {
-  const std::string query("AI.IF('prompt')");
-
-  // AI.IF is disabled by default without any user-specified AnalyzerOptions.
-  PreparedExpression expr(query);
-  EXPECT_THAT(expr.Execute(),
-              StatusIs(absl::StatusCode::kInvalidArgument,
-                       HasSubstr("Function not found: AI.`IF`")));
 }
 
 }  // namespace

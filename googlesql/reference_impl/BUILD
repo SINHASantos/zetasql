@@ -244,6 +244,7 @@ cc_library(
         "//googlesql/public/functions:date_time_util",
         "//googlesql/public/functions:datetime_cc_proto",
         "//googlesql/public/functions:distance",
+        "//googlesql/public/functions:jaro_winkler",
         "//googlesql/public/functions:string_format",
         "//googlesql/public/functions:generate_array",
         "//googlesql/public/functions:json",

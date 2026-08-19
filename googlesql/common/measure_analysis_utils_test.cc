@@ -18,11 +18,15 @@
 
 #include <memory>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "googlesql/base/testing/status_matchers.h"
 #include "googlesql/public/analyzer_options.h"
+#include "googlesql/public/annotation/collation.h"
 #include "googlesql/public/simple_catalog.h"
+#include "googlesql/public/types/annotation.h"
+#include "googlesql/public/types/simple_value.h"
 #include "googlesql/public/types/struct_type.h"
 #include "googlesql/public/types/type.h"
 #include "googlesql/public/types/type_factory.h"
@@ -918,6 +922,116 @@ TEST_F(AddMeasureColumnsToTableTest,
                        "Expression columns in a measure expression can only be "
                        "referenced within an aggregate function call: "
                        "SUM(x) + (SELECT AGG(b) FROM UNNEST([1]))"));
+}
+
+TEST_F(AddMeasureColumnsToTableTest, AddMeasureWithCollationAnnotation) {
+  options_.mutable_language()->EnableLanguageFeature(FEATURE_COLLATION_SUPPORT);
+  options_.mutable_language()->EnableLanguageFeature(
+      FEATURE_ANNOTATION_FRAMEWORK);
+
+  const AnnotationMap* collation_ci_map = nullptr;
+  {
+    std::unique_ptr<AnnotationMap> map =
+        AnnotationMap::Create(type_factory_.get_string());
+    map->SetAnnotation<CollationAnnotation>(SimpleValue::String("und:ci"));
+    GOOGLESQL_ASSERT_OK_AND_ASSIGN(collation_ci_map,
+                         type_factory_.TakeOwnership(std::move(map)));
+  }
+
+  auto table_with_annotation = std::make_unique<SimpleTable>(
+      "AnnotatedTable",
+      std::vector<const Column*>{new SimpleColumn(
+          "AnnotatedTable", "str_col",
+          AnnotatedType(type_factory_.get_string(), collation_ci_map))},
+      /*take_ownership=*/true);
+
+  std::vector<MeasureColumnDef> measures = {
+      {.name = "m_ci", .expression = "MAX(str_col)"},
+  };
+
+  auto status_or_outputs =
+      AddMeasureColumnsToTable(*table_with_annotation, measures, type_factory_,
+                               *catalog_->catalog(), options_);
+  GOOGLESQL_ASSERT_OK(status_or_outputs.status());
+  ASSERT_EQ(status_or_outputs.value().size(), 1);
+
+  const Column* m_ci_col = table_with_annotation->FindColumnByName("m_ci");
+  ASSERT_NE(m_ci_col, nullptr);
+  EXPECT_TRUE(m_ci_col->GetType()->IsMeasureType());
+  ASSERT_NE(m_ci_col->GetTypeAnnotationMap(), nullptr);
+  const StructAnnotationMap* struct_map =
+      m_ci_col->GetTypeAnnotationMap()->AsStructMap();
+  ASSERT_NE(struct_map, nullptr);
+  ASSERT_NE(struct_map->field(0), nullptr);
+  EXPECT_TRUE(CollationAnnotation::ExistsIn(struct_map->field(0)));
+}
+
+// Tests that adding a measure to a struct value table correctly propagates
+// field-level type annotations from the struct value column.
+TEST_F(AddMeasureColumnsToTableTest,
+       AddMeasureToStructValueTableWithFieldAnnotations) {
+  options_.mutable_language()->EnableLanguageFeature(FEATURE_COLLATION_SUPPORT);
+  options_.mutable_language()->EnableLanguageFeature(
+      FEATURE_ANNOTATION_FRAMEWORK);
+
+  const StructType* struct_type = nullptr;
+  GOOGLESQL_ASSERT_OK(
+      type_factory_.MakeStructType({{"str_field", type_factory_.get_string()},
+                                    {"int_field", type_factory_.get_int64()}},
+                                   &struct_type));
+
+  const AnnotationMap* struct_annotation_map = nullptr;
+  {
+    std::unique_ptr<AnnotationMap> struct_map =
+        AnnotationMap::Create(struct_type);
+    struct_map->AsStructMap()
+        ->mutable_field(0)
+        ->SetAnnotation<CollationAnnotation>(SimpleValue::String("und:ci"));
+    GOOGLESQL_ASSERT_OK_AND_ASSIGN(struct_annotation_map,
+                         type_factory_.TakeOwnership(std::move(struct_map)));
+  }
+
+  auto value_table = std::make_unique<SimpleTable>(
+      "StructValueTable",
+      std::vector<const Column*>{
+          new SimpleColumn("StructValueTable", "value",
+                           AnnotatedType(struct_type, struct_annotation_map))},
+      /*take_ownership=*/true);
+  value_table->set_is_value_table(true);
+
+  std::vector<MeasureColumnDef> measures = {
+      {.name = "measure_max_str",
+       .expression = "MAX(str_field)",
+       .is_pseudo_column = true},
+  };
+
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(auto outputs, AddMeasureColumnsToTable(
+                                         *value_table, measures, type_factory_,
+                                         *catalog_->catalog(), options_));
+  EXPECT_EQ(outputs.size(), 1);
+
+  const Column* measure_col = value_table->FindColumnByName("measure_max_str");
+  ASSERT_NE(measure_col, nullptr);
+  EXPECT_TRUE(measure_col->GetType()->IsMeasureType());
+  ASSERT_NE(measure_col->GetTypeAnnotationMap(), nullptr);
+  const StructAnnotationMap* struct_map =
+      measure_col->GetTypeAnnotationMap()->AsStructMap();
+  ASSERT_NE(struct_map, nullptr);
+  ASSERT_NE(struct_map->field(0), nullptr);
+  EXPECT_TRUE(CollationAnnotation::ExistsIn(struct_map->field(0)));
+
+  ExpectColumnExpressionAST(
+      *value_table, "measure_max_str",
+      R"(AggregateFunctionCall(GoogleSQL:max(STRING) -> STRING)
++-type_annotation_map={Collation:"und:ci"}
++-GetStructField
+| +-type=STRING
+| +-type_annotation_map={Collation:"und:ci"}
+| +-expr=
+| | +-ExpressionColumn(type=STRUCT<str_field STRING, int_field INT64>, type_annotation_map=<{Collation:"und:ci"},_>, name="value")
+| +-field_idx=0
++-collation_list=[und:ci]
+)");
 }
 
 }  // namespace

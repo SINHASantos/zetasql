@@ -806,6 +806,7 @@ KW_QUALIFY_NONRESERVED {absl::string_view}: /qualify/
 "UPDATE" (KW_UPDATE) {absl::string_view}: /update/
 "VALUE" (KW_VALUE) {absl::string_view}: /value/
 "VALUES" (KW_VALUES) {absl::string_view}: /values/
+"VARIANT" (KW_VARIANT) {absl::string_view}: /variant/
 "VERSION" (KW_VERSION) {absl::string_view}: /version/
 "VECTOR" (KW_VECTOR) {absl::string_view}: /vector/
 "VOLATILE" (KW_VOLATILE) {absl::string_view}: /volatile/
@@ -12246,6 +12247,7 @@ system_variable_expression {ASTExpression*}:
   | "UPDATE"
   | "VALUE"
   | "VALUES"
+  | "VARIANT"
   | "VERSION"
   | "VECTOR"
   | "VIEW"

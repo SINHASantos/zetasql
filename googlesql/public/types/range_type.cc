@@ -217,7 +217,7 @@ std::string RangeType::FormatValueContent(
 
     return boundaries;
   }
-  return absl::StrCat(TypeName(options.product_mode), " ",
+  return absl::StrCat(TypeName(options.product_mode()), " ",
                       ToStringLiteral(boundaries));
 }
 

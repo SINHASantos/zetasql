@@ -513,13 +513,13 @@ void MapType::FormatValueContentSqlModeImpl(
   //    here, because there are no array entries to infer the type from.
   if (options.mode == Type::FormatValueContentOptions::Mode::kSQLExpression ||
       value_content_map->num_elements() == 0) {
-    absl::StrAppend(
-        result, "ARRAY<STRUCT<",
-        key_type_->TypeName(options.product_mode, options.use_external_float32),
-        ", ",
-        value_type_->TypeName(options.product_mode,
-                              options.use_external_float32),
-        ">>");
+    absl::StrAppend(result, "ARRAY<STRUCT<",
+                    key_type_->TypeName(options.product_mode(),
+                                        options.use_external_float32),
+                    ", ",
+                    value_type_->TypeName(options.product_mode(),
+                                          options.use_external_float32),
+                    ">>");
   }
 
   absl::StrAppend(

@@ -149,13 +149,20 @@ class RunModulesTest : public ::testing::Test {
     // Force a blank line at the start of every test case.
     absl::SetFlag(&FLAGS_file_based_test_driver_insert_leading_blank_lines, 1);
 
+    LanguageOptions* language_options = analyzer_options_.mutable_language();
+    language_options->EnableLanguageFeature(FEATURE_ANNOTATION_FRAMEWORK);
+    language_options->EnableLanguageFeature(FEATURE_COLLATION_SUPPORT);
+    language_options->EnableLanguageFeature(
+        FEATURE_TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS);
+    language_options->EnableLanguageFeature(
+        FEATURE_ALL_TYPE_ANNOTATIONS_ON_SQL_FUNCTION_ARGUMENTS);
+
     // Set up constant evaluator.
     constant_evaluator_ = std::make_unique<PreparedExpressionConstantEvaluator>(
         /*options=*/EvaluatorOptions{.type_factory = &type_factory_},
         analyzer_options_.language());
 
     // Make sure that the CREATE statements found in modules are enabled.
-    LanguageOptions* language_options = analyzer_options_.mutable_language();
     language_options->SetSupportsAllStatementKinds();
     language_options->EnableMaximumLanguageFeatures();
     // Manually enable any in_development features we want to test. Module tests

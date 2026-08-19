@@ -73,9 +73,19 @@ absl::StatusOr<std::unique_ptr<SimpleColumn>> CreateMeasureColumn(
           Column::ExpressionAttributes::ExpressionKind::MEASURE_EXPRESSION,
           std::string(measure_expr), &resolved_measure_expr,
           std::move(row_identity_column_indices)));
+  const AnnotationMap* owned_measure_annotation_map = nullptr;
+  if (resolved_measure_expr.type_annotation_map() != nullptr) {
+    std::unique_ptr<AnnotationMap> measure_annotation_map =
+        AnnotationMap::Create(measure_type);
+    GOOGLESQL_RETURN_IF_ERROR(measure_annotation_map->AsStructMap()->CloneIntoField(
+        0, resolved_measure_expr.type_annotation_map()));
+    GOOGLESQL_ASSIGN_OR_RETURN(
+        owned_measure_annotation_map,
+        type_factory.TakeOwnership(std::move(measure_annotation_map)));
+  }
   return std::make_unique<SimpleColumn>(
       table_name, measure_name,
-      AnnotatedType(measure_type, /*annotation_map=*/nullptr),
+      AnnotatedType(measure_type, owned_measure_annotation_map),
       /*attributes=*/
       SimpleColumn::Attributes{
           .is_pseudo_column = is_pseudo_column,
@@ -125,8 +135,18 @@ absl::StatusOr<bool> WrapExpressionColumnWithStructFieldAccess(
   GOOGLESQL_RET_CHECK(!struct_field->type->IsMeasureType());
   GOOGLESQL_RET_CHECK(struct_field_index >= 0 &&
             struct_field_index < struct_type->num_fields());
-  resolved_expr_out = MakeResolvedGetStructField(
+  const AnnotationMap* field_annotation_map = nullptr;
+  if (expression_column->type_annotation_map() != nullptr) {
+    field_annotation_map =
+        expression_column->type_annotation_map()->AsStructMap()->field(
+            struct_field_index);
+  }
+  auto get_struct_field = MakeResolvedGetStructField(
       struct_field->type, std::move(expression_column), struct_field_index);
+  if (field_annotation_map != nullptr) {
+    get_struct_field->set_type_annotation_map(field_annotation_map);
+  }
+  resolved_expr_out = std::move(get_struct_field);
   return true;
 }
 
@@ -192,6 +212,10 @@ absl::Status ResolveValueTableColumnForMeasureExpression(
     std::unique_ptr<ResolvedExpressionColumn> expression_column =
         MakeResolvedExpressionColumn(struct_or_proto_type,
                                      value_table_column->Name());
+    if (value_table_column->GetTypeAnnotationMap() != nullptr) {
+      expression_column->set_type_annotation_map(
+          value_table_column->GetTypeAnnotationMap());
+    }
     if (struct_or_proto_type->IsStruct()) {
       GOOGLESQL_ASSIGN_OR_RETURN(
           found_field,
@@ -237,8 +261,12 @@ absl::Status ResolveValueTableColumnForMeasureExpression(
     }
     // Case 4
     GOOGLESQL_RET_CHECK(column->GetType() != nullptr);
-    resolved_expr_out =
+    auto resolved_column =
         MakeResolvedExpressionColumn(column->GetType(), column_name);
+    if (column->GetTypeAnnotationMap() != nullptr) {
+      resolved_column->set_type_annotation_map(column->GetTypeAnnotationMap());
+    }
+    resolved_expr_out = std::move(resolved_column);
     return absl::OkStatus();
   }
 }
@@ -263,8 +291,13 @@ absl::Status ResolveColumnForMeasureExpression(
     const Column* column = table.FindColumnByName(std::string(column_name));
     if (column != nullptr) {
       GOOGLESQL_RET_CHECK(column->GetType() != nullptr);
-      resolved_expr_out =
+      auto resolved_column =
           MakeResolvedExpressionColumn(column->GetType(), column_name);
+      if (column->GetTypeAnnotationMap() != nullptr) {
+        resolved_column->set_type_annotation_map(
+            column->GetTypeAnnotationMap());
+      }
+      resolved_expr_out = std::move(resolved_column);
     }
   } else {
     // Value table case. For value tables, the lookup can only reference:

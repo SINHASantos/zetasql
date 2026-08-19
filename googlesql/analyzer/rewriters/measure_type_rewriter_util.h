@@ -24,6 +24,7 @@
 #include "googlesql/analyzer/rewriters/measure_dependency_graph.h"
 #include "googlesql/public/catalog.h"
 #include "googlesql/public/language_options.h"
+#include "googlesql/public/types/annotation.h"
 #include "googlesql/public/types/type_factory.h"
 #include "googlesql/resolved_ast/column_factory.h"
 #include "googlesql/resolved_ast/resolved_ast.h"
@@ -36,6 +37,8 @@
 #include "absl/status/statusor.h"
 
 namespace googlesql {
+
+class AnnotationPropagator;
 
 // Returns whether `expr` is a builtin function `AGG(MEASURE<T>) => T`.
 bool IsMeasureAggFunction(const ResolvedExpr* expr);
@@ -51,6 +54,7 @@ absl::StatusOr<ResolvedColumn> GetInvokedMeasureColumn(
 // the measure type rewriter.
 absl::Status HasUnsupportedQueryShape(const ResolvedNode* input,
                                       const LanguageOptions& language_options);
+
 class MeasureCollector;
 class MeasureType;
 
@@ -112,7 +116,7 @@ absl::StatusOr<RewriteMeasureExprResult> RewriteMeasureExpr(
     const MeasureCollector& measure_collector, const Function* any_value_fn,
     FunctionCallBuilder& function_call_builder,
     const LanguageOptions& language_options, ColumnFactory& column_factory,
-    TypeFactory& type_factory);
+    TypeFactory& type_factory, AnnotationPropagator& annotation_propagator);
 
 }  // namespace googlesql
 

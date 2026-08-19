@@ -1109,6 +1109,19 @@ cc_test(
 )
 
 cc_library(
+    name = "jaro_winkler",
+    srcs = ["jaro_winkler.cc"],
+    hdrs = ["jaro_winkler.h"],
+    deps = [
+        "//googlesql/base:status",
+        "@com_google_absl//absl/status",
+        "@com_google_absl//absl/status:statusor",
+        "@com_google_absl//absl/strings",
+        "@icu//:headers",
+    ],
+)
+
+cc_library(
     name = "distance",
     srcs = ["distance.cc"],
     hdrs = ["distance.h"],
@@ -1148,6 +1161,18 @@ cc_test(
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/types:span",
+    ],
+)
+
+cc_test(
+    name = "jaro_winkler_test",
+    srcs = ["jaro_winkler_test.cc"],
+    deps = [
+        ":jaro_winkler",
+        "//googlesql/base/testing:googlesql_gtest_main",
+        "//googlesql/base/testing:status_matchers",
+        "@com_google_absl//absl/status",
+        "@com_google_absl//absl/strings",
     ],
 )
 

@@ -944,6 +944,24 @@ SELECT
   CAST("1" AS int32)
 ==
 
+select cast(x as variant);
+--
+QueryStatement [0-25] [select cast(x as variant)]
+  Query [0-25] [select cast(x as variant)]
+    Select [0-25] [select cast(x as variant)]
+      SelectList [7-25] [cast(x as variant)]
+        SelectColumn [7-25] [cast(x as variant)]
+          CastExpression [7-25] [cast(x as variant)]
+            PathExpression [12-13] [x]
+              Identifier(x) [12-13] [x]
+            SimpleType [17-24] [variant]
+              PathExpression [17-24] [variant]
+                Identifier(variant) [17-24] [variant]
+--
+SELECT
+  CAST(x AS variant)
+==
+
 select cast(x as string(10));
 --
 QueryStatement [0-28] [select cast(x as string(10))]

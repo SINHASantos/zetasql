@@ -374,6 +374,8 @@ std::vector<FunctionTestCall> GetFunctionTestsL1Norm();
 std::vector<FunctionTestCall> GetFunctionTestsL2Norm();
 std::vector<FunctionTestCall> GetFunctionTestsEditDistance();
 std::vector<FunctionTestCall> GetFunctionTestsEditDistanceBytes();
+std::vector<FunctionTestCall> GetFunctionTestsJaroWinklerSimilarity();
+std::vector<FunctionTestCall> GetFunctionTestsJaroWinklerSimilarityBytes();
 std::vector<FunctionTestCall> GetFunctionTestsSplitSubstr(
     bool skip_collation = false);
 

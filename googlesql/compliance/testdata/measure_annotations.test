@@ -1,0 +1,65 @@
+[default required_features=ENABLE_MEASURES,ANNOTATION_FRAMEWORK,COLLATION_SUPPORT]
+[prepare_database]
+CREATE TABLE PlaceholderTable AS SELECT 1 AS key;
+--
+ARRAY<STRUCT<key INT64>>[{1}]
+==
+
+[name=measure_collation_propagation_comparison]
+SELECT key, AGG(measure_ci) = 'A' AS eq_A, AGG(measure_ci) = 'a' AS eq_a
+FROM MeasureTable_SingleKey_WithAnnotations
+GROUP BY key
+ORDER BY key;
+--
+ARRAY<STRUCT<key INT64, eq_A BOOL, eq_a BOOL>>[known order:
+  {1, true, true},
+  {2, true, true},
+  {3, false, false}
+]
+==
+
+[name=measure_collation_propagation_group_by]
+WITH t AS (
+  SELECT key, AGG(measure_ci) AS val
+  FROM MeasureTable_SingleKey_WithAnnotations
+  GROUP BY key
+)
+SELECT UPPER(val) AS upper_val, COUNT(*) AS count
+FROM t
+GROUP BY val
+ORDER BY upper_val;
+--
+ARRAY<STRUCT<upper_val STRING, count INT64>>[known order:{"A", 2}, {"B", 1}]
+==
+
+[name=measure_collation_propagation_distinct]
+WITH t AS (
+  SELECT DISTINCT AGG(measure_ci) AS val
+  FROM MeasureTable_SingleKey_WithAnnotations
+  GROUP BY key
+)
+SELECT UPPER(val) AS upper_val, COUNT(*) AS count
+FROM t
+GROUP BY upper_val
+ORDER BY upper_val;
+--
+ARRAY<STRUCT<upper_val STRING, count INT64>>[known order:{"A", 1}, {"B", 1}]
+==
+
+[name=measure_evaluation_distinct_count]
+SELECT AGG(measure_distinct_count_ci)
+FROM MeasureTable_SingleKey_WithAnnotations;
+--
+ARRAY<STRUCT<INT64>>[{2}]
+==
+
+[name=measure_join_inner_before_agg]
+SELECT T1.key AS t1_key, AGG(T1.measure_ci) = 'A' AS eq_A, AGG(T1.measure_ci) AS val
+FROM MeasureTable_SingleKey_WithAnnotations AS T1
+INNER JOIN (SELECT 1 AS key UNION ALL SELECT 4 AS key) AS T2
+  ON T1.key = T2.key
+GROUP BY T1.key
+ORDER BY T1.key;
+--
+ARRAY<STRUCT<t1_key INT64, eq_A BOOL, val STRING>>[{1, true, "a"}]
+==

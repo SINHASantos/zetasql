@@ -27,6 +27,8 @@
 
 namespace googlesql {
 
+class AnnotationPropagator;
+
 // Rewrites `resolved_ast` to replace the AGG'ed measure columns with their
 // corresponding closure struct columns and registers measure metadata in
 // `measure_collector`.
@@ -67,7 +69,7 @@ namespace googlesql {
 absl::StatusOr<std::unique_ptr<const ResolvedNode>> AddClosures(
     MeasureCollector& measure_collector,
     std::unique_ptr<const ResolvedNode> resolved_ast, TypeFactory& type_factory,
-    ColumnFactory& column_factory);
+    ColumnFactory& column_factory, AnnotationPropagator& annotation_propagator);
 
 }  // namespace googlesql
 

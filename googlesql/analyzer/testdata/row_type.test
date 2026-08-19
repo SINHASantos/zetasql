@@ -252,8 +252,6 @@ QueryStmt
 
 # This shows we get the same output for Lazy or FindOnly tables.
 # Later tests just use one or the other where output would be the same.
-# TODO: Fix SQL Builder and enable for this test case.
-[no_run_sqlbuilder]
 FROM KeyValue{{Lazy|FindOnly}} kv
 |> WHERE kv.value is not null
 |> SELECT kv.key
@@ -395,8 +393,6 @@ QueryStmt
 
 # Test deduplication of columns in the rewrite struct for columns referenced
 # multiple times.
-# TODO: Fix SQL Builder and enable for this test case.
-[no_run_sqlbuilder]
 FROM KeyValueLazy kv
 |> WHERE kv.value IS NOT NULL
 |> WHERE kv.key * kv.key > 100
@@ -3427,8 +3423,68 @@ QueryStmt
                   +-WithRefScan(column_list=[cte.$my_row$scanrow#15], with_query_name="cte")
 ==
 
+# RowType can propagate through SampleScan.
+SELECT kv.key
+FROM KeyValueFindOnly AS kv TABLESAMPLE BERNOULLI (0 PERCENT)
+--
+QueryStmt
++-output_column_list=
+| +-$query.key#2 AS key [INT64]
++-query=
+  +-ProjectScan
+    +-column_list=[$query.key#2]
+    +-expr_list=
+    | +-key#2 :=
+    |   +-GetRowField
+    |     +-type=INT64
+    |     +-expr=
+    |     | +-ColumnRef(type=ROW<KeyValueFindOnly>, column=KeyValueFindOnly.$row#1)
+    |     +-column=KeyValueFindOnly.Key
+    +-input_scan=
+      +-SampleScan
+        +-column_list=[KeyValueFindOnly.$row#1]
+        +-input_scan=
+        | +-TableScan(column_list=[KeyValueFindOnly.$row#1], table=KeyValueFindOnly, alias="kv", read_as_row_type=TRUE)
+        +-method="bernoulli"
+        +-size=
+        | +-Literal(type=INT64, value=0)
+        +-unit=PERCENT
+
+[REWRITTEN AST]
+QueryStmt
++-output_column_list=
+| +-$query.key#2 AS key [INT64]
++-query=
+  +-ProjectScan
+    +-column_list=[$query.key#2]
+    +-expr_list=
+    | +-key#2 :=
+    |   +-GetStructField
+    |     +-type=INT64
+    |     +-expr=
+    |     | +-ColumnRef(type=STRUCT<Key INT64>, column=KeyValueFindOnly.$row$scanrow#3)
+    |     +-field_idx=0
+    +-input_scan=
+      +-SampleScan
+        +-column_list=[KeyValueFindOnly.$row$scanrow#3]
+        +-input_scan=
+        | +-ProjectScan
+        |   +-column_list=[KeyValueFindOnly.$row$scanrow#3]
+        |   +-expr_list=
+        |   | +-$row$scanrow#3 :=
+        |   |   +-MakeStruct
+        |   |     +-type=STRUCT<Key INT64>
+        |   |     +-field_list=
+        |   |       +-ColumnRef(type=INT64, column=KeyValueFindOnly.Key#4)
+        |   +-input_scan=
+        |     +-TableScan(column_list=[KeyValueFindOnly.Key#4], table=KeyValueFindOnly, alias="kv", table_column_list=[KeyValueFindOnly.Key])
+        +-method="bernoulli"
+        +-size=
+        | +-Literal(type=INT64, value=0)
+        +-unit=PERCENT
+==
+
 # Collated STRING from RowType.
-# TODO: Fix to produce the correct AST, preserving annotations.
 # TODO: Update the RowType rewriter to handle annotations.
 [language_features=MAXIMUM,+ROW_TYPE,+ANNOTATION_FRAMEWORK,+COLLATION_SUPPORT]
 [enabled_ast_rewrites=NONE]
@@ -3437,14 +3493,15 @@ FROM CollatedTableLazy
 --
 QueryStmt
 +-output_column_list=
-| +-$pipe_select.string_ci#2 AS string_ci [STRING]
+| +-$pipe_select.string_ci#2{Collation:"und:ci"} AS string_ci [STRING]
 +-query=
   +-ProjectScan
-    +-column_list=[$pipe_select.string_ci#2]
+    +-column_list=[$pipe_select.string_ci#2{Collation:"und:ci"}]
     +-expr_list=
     | +-string_ci#2 :=
     |   +-GetRowField
     |     +-type=STRING
+    |     +-type_annotation_map={Collation:"und:ci"}
     |     +-expr=
     |     | +-ColumnRef(type=ROW<CollatedTableLazy>, column=CollatedTableLazy.$row#1)
     |     +-column=CollatedTable.string_ci
@@ -3453,7 +3510,6 @@ QueryStmt
 ==
 
 # STRUCT with collated STRING from RowType.
-# TODO: Fix to produce the correct result, preserving annotations.
 # TODO: Update the RowType rewriter to handle annotations.
 [language_features=MAXIMUM,+ROW_TYPE,+ANNOTATION_FRAMEWORK,+COLLATION_SUPPORT]
 [enabled_ast_rewrites=NONE]
@@ -3462,14 +3518,15 @@ FROM CollatedTableLazy
 --
 QueryStmt
 +-output_column_list=
-| +-$pipe_select.struct_with_string_ci#2 AS struct_with_string_ci [STRUCT<a INT32, b STRING>]
+| +-$pipe_select.struct_with_string_ci#2<_,{Collation:"und:ci"}> AS struct_with_string_ci [STRUCT<a INT32, b STRING>]
 +-query=
   +-ProjectScan
-    +-column_list=[$pipe_select.struct_with_string_ci#2]
+    +-column_list=[$pipe_select.struct_with_string_ci#2<_,{Collation:"und:ci"}>]
     +-expr_list=
     | +-struct_with_string_ci#2 :=
     |   +-GetRowField
     |     +-type=STRUCT<a INT32, b STRING>
+    |     +-type_annotation_map=<_,{Collation:"und:ci"}>
     |     +-expr=
     |     | +-ColumnRef(type=ROW<CollatedTableLazy>, column=CollatedTableLazy.$row#1)
     |     +-column=CollatedTable.struct_with_string_ci
@@ -3478,7 +3535,6 @@ QueryStmt
 ==
 
 # ARRAY with collated STRING from RowType.
-# TODO: Fix to produce the correct result, preserving annotations.
 # TODO: Update the RowType rewriter to handle annotations.
 [language_features=MAXIMUM,+ROW_TYPE,+ANNOTATION_FRAMEWORK,+COLLATION_SUPPORT]
 [enabled_ast_rewrites=NONE]
@@ -3487,14 +3543,15 @@ FROM CollatedTableLazy
 --
 QueryStmt
 +-output_column_list=
-| +-$pipe_select.array_with_string_ci#2 AS array_with_string_ci [ARRAY<STRING>]
+| +-$pipe_select.array_with_string_ci#2<{Collation:"und:ci"}> AS array_with_string_ci [ARRAY<STRING>]
 +-query=
   +-ProjectScan
-    +-column_list=[$pipe_select.array_with_string_ci#2]
+    +-column_list=[$pipe_select.array_with_string_ci#2<{Collation:"und:ci"}>]
     +-expr_list=
     | +-array_with_string_ci#2 :=
     |   +-GetRowField
     |     +-type=ARRAY<STRING>
+    |     +-type_annotation_map=<{Collation:"und:ci"}>
     |     +-expr=
     |     | +-ColumnRef(type=ROW<CollatedTableLazy>, column=CollatedTableLazy.$row#1)
     |     +-column=CollatedTable.array_with_string_ci

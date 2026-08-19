@@ -72,6 +72,7 @@
 #include "googlesql/public/functions/differential_privacy.pb.h"
 #include "googlesql/public/functions/distance.h"
 #include "googlesql/public/functions/endianness.pb.h"
+#include "googlesql/public/functions/jaro_winkler.h"
 #include "googlesql/public/functions/rank_type.pb.h"
 #include "googlesql/public/functions/rounding_mode.pb.h"
 #include "googlesql/public/interval_value.h"
@@ -1207,6 +1208,8 @@ FunctionMap::FunctionMap() {
                      "VectorFloat32Length");
     RegisterFunction(FunctionKind::kEditDistance, "edit_distance",
                      "EditDistance");
+    RegisterFunction(FunctionKind::kJaroWinklerSimilarity,
+                     "jarowinkler_similarity", "JaroWinklerSimilarity");
     RegisterFunction(FunctionKind::kArrayZip, "array_zip", "ArrayZip");
     RegisterFunction(FunctionKind::kElementwiseSum, "elementwise_sum",
                      "ElementwiseSum");
@@ -1821,8 +1824,9 @@ absl::StatusOr<JSONValueConstRef> GetJSONValueConstRef(
   return json_storage.GetConstRef();
 }
 
-// Returns an error if the given `interval` is not a positive interval.
-absl::Status ValidateIntervalArgumentPositive(
+// Returns an error if the given `interval` is not a positive interval or if it
+// contains MONTH or YEAR parts.
+absl::Status ValidateTumbleHopInterval(
     absl::string_view arg_name, const googlesql::IntervalValue& arg_value) {
   if (arg_value == googlesql::IntervalValue()) {
     return absl::OutOfRangeError(absl::StrCat(arg_name, " cannot be zero."));
@@ -1830,6 +1834,10 @@ absl::Status ValidateIntervalArgumentPositive(
   if (arg_value < googlesql::IntervalValue()) {
     return absl::OutOfRangeError(
         absl::StrCat(arg_name, " cannot be negative."));
+  }
+  if (arg_value.get_months() != 0) {
+    return absl::OutOfRangeError(
+        absl::StrCat(arg_name, " cannot contain MONTH or YEAR parts."));
   }
   return absl::OkStatus();
 }
@@ -2879,6 +2887,8 @@ BuiltinScalarFunction::CreateValidatedRaw(
       return new DecodeVectorFunction(kind, output_type);
     case FunctionKind::kVectorFloat32Length:
       return new VectorFloat32LengthFunction(kind, output_type);
+    case FunctionKind::kJaroWinklerSimilarity:
+      return new JaroWinklerSimilarityFunction(kind, output_type);
     case FunctionKind::kArrayZip: {
       GOOGLESQL_ASSIGN_OR_RETURN(const InlineLambdaExpr* inline_lambda_expr,
                        GetLambdaArgumentForArrayZip(arguments));
@@ -13746,6 +13756,54 @@ absl::StatusOr<Value> VectorFloat32LengthFunction::Eval(
   return Value::Int64(decoded_array.num_elements());
 }
 
+static absl::Status JaroWinklerSimilarityResultConverter(
+    const absl::Status& original_status) {
+  if (!original_status.ok()) {
+    return absl::OutOfRangeError(original_status.message());
+  }
+  return original_status;
+}
+
+absl::StatusOr<Value> JaroWinklerSimilarityFunction::Eval(
+    absl::Span<const TupleData* const> params, absl::Span<const Value> args,
+    EvaluationContext* context) const {
+  GOOGLESQL_RET_CHECK_GE(args.size(), 2);
+  GOOGLESQL_RET_CHECK_LE(args.size(), 4);
+  if (HasNulls(args)) {
+    return Value::Null(output_type());
+  }
+  GOOGLESQL_RET_CHECK((args[0].type()->IsString() && args[1].type()->IsString()) ||
+            (args[0].type()->IsBytes() && args[1].type()->IsBytes()));
+  bool is_string = args[0].type()->IsString();
+  absl::string_view s0 = args[0].type()->IsBytes() ? args[0].bytes_value()
+                                                   : args[0].string_value();
+  absl::string_view s1 = args[1].type()->IsBytes() ? args[1].bytes_value()
+                                                   : args[1].string_value();
+
+  std::optional<double> prefix_scaling_factor;
+  if (args.size() > 2) {
+    prefix_scaling_factor = args[2].double_value();
+  }
+  std::optional<double> prefix_boost_threshold;
+  if (args.size() > 3) {
+    prefix_boost_threshold = args[3].double_value();
+  }
+
+  double result = 0.0;
+  if (is_string) {
+    GOOGLESQL_ASSIGN_OR_RETURN(result,
+                     functions::JaroWinklerSimilarity(
+                         s0, s1, prefix_scaling_factor, prefix_boost_threshold),
+                     _.With(&JaroWinklerSimilarityResultConverter));
+  } else {
+    GOOGLESQL_ASSIGN_OR_RETURN(result,
+                     functions::JaroWinklerSimilarityBytes(
+                         s0, s1, prefix_scaling_factor, prefix_boost_threshold),
+                     _.With(&JaroWinklerSimilarityResultConverter));
+  }
+
+  return Value::Double(result);
+}
 // Returns true if the all elements of the given `array` are equal, or if the
 // array is empty/contains only a single element. `array.type()->IsArray()` must
 // be true.
@@ -14142,7 +14200,7 @@ TumbleTVF::CreateEvaluator(
     return absl::OutOfRangeError("Window size cannot be null.");
   }
   googlesql::IntervalValue window_size = args[2].value->interval_value();
-  GOOGLESQL_RETURN_IF_ERROR(ValidateIntervalArgumentPositive("Window size", window_size));
+  GOOGLESQL_RETURN_IF_ERROR(ValidateTumbleHopInterval("Window size", window_size));
 
   GOOGLESQL_RET_CHECK(args[3].value.has_value());
   if (args[3].value->is_null()) {
@@ -14306,7 +14364,7 @@ absl::StatusOr<std::unique_ptr<EvaluatorTableIterator>> HopTVF::CreateEvaluator(
     return absl::OutOfRangeError("Window size cannot be null.");
   }
   googlesql::IntervalValue window_size = args[2].value->interval_value();
-  GOOGLESQL_RETURN_IF_ERROR(ValidateIntervalArgumentPositive("Window size", window_size));
+  GOOGLESQL_RETURN_IF_ERROR(ValidateTumbleHopInterval("Window size", window_size));
 
   GOOGLESQL_RET_CHECK(args[0].relation);
   std::unique_ptr<EvaluatorTableIterator> input_iterator =
@@ -14336,7 +14394,7 @@ absl::StatusOr<std::unique_ptr<EvaluatorTableIterator>> HopTVF::CreateEvaluator(
     return absl::OutOfRangeError("Step size cannot be null.");
   }
   googlesql::IntervalValue step_size = args[3].value->interval_value();
-  GOOGLESQL_RETURN_IF_ERROR(ValidateIntervalArgumentPositive("Step size", step_size));
+  GOOGLESQL_RETURN_IF_ERROR(ValidateTumbleHopInterval("Step size", step_size));
 
   if (window_size < step_size) {
     return absl::OutOfRangeError(

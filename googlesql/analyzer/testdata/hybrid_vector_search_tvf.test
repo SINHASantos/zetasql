@@ -523,6 +523,91 @@ QueryStmt
         +-function_call_signature=(ANY TABLE, STRING column_to_search, ANY TABLE, ARRAY<STRING> lexical_search_columns, optional(1) STRING query_column_to_search, optional(1) STRING lexical_search_query_column, optional(1) JSON options, optional(1) INT64 top_k, optional(1) STRING distance_type, optional(1) DOUBLE max_distance) -> ANY TABLE
 ==
 
+# Call with options as a parse_json argument (immutable constant)
+SELECT * FROM hybrid_vector_search(
+  TABLE base_table,
+  'embedding',
+  TABLE query_table,
+  lexical_search_columns => ['string_col'],
+  query_column_to_search => 'query_embedding',
+  lexical_search_query_column => 'string_query_col',
+  top_k => 5,
+  distance_type => 'COSINE',
+  max_distance => 0.8,
+  options => parse_json('{"key1": 1, "key2": "value2"}')
+)
+--
+QueryStmt
++-output_column_list=
+| +-hybrid_vector_search.query#17 AS query [STRUCT<id INT64, query_embedding ARRAY<DOUBLE>, embedding ARRAY<DOUBLE>, float_embedding ARRAY<FLOAT>, string_query_col STRING>]
+| +-hybrid_vector_search.base#18 AS base [STRUCT<id INT64, embedding ARRAY<DOUBLE>, string_col STRING>]
+| +-hybrid_vector_search.distance#19 AS distance [DOUBLE]
++-query=
+  +-ProjectScan
+    +-column_list=hybrid_vector_search.[query#17, base#18, distance#19]
+    +-input_scan=
+      +-TVFScan
+        +-column_list=hybrid_vector_search.[query#17, base#18, distance#19]
+        +-tvf=GoogleSQL:hybrid_vector_search
+        +-signature=(TABLE<id INT64, embedding ARRAY<DOUBLE>, string_col STRING>, literal STRING, TABLE<id INT64, query_embedding ARRAY<DOUBLE>, embedding ARRAY<DOUBLE>, float_embedding ARRAY<FLOAT>, string_query_col STRING>, ARRAY<STRING>, literal STRING, literal STRING, JSON, literal INT64, literal STRING, literal DOUBLE) -> TABLE<query STRUCT<id INT64, query_embedding ARRAY<DOUBLE>, embedding ARRAY<DOUBLE>, float_embedding ARRAY<FLOAT>, string_query_col STRING>, base STRUCT<id INT64, embedding ARRAY<DOUBLE>, string_col STRING>, distance DOUBLE>
+        +-argument_list=
+        | +-FunctionArgument
+        | | +-scan=
+        | | | +-TableScan(column_list=base_table.[id#9, embedding#10, string_col#11], node_source="table_clause", table=base_table, column_index_list=[0, 1, 2])
+        | | +-argument_column_list=base_table.[id#9, embedding#10, string_col#11]
+        | +-FunctionArgument
+        | | +-expr=
+        | |   +-Literal(type=STRING, value="embedding")
+        | +-FunctionArgument
+        | | +-scan=
+        | | | +-TableScan(column_list=query_table.[id#12, query_embedding#13, embedding#14, float_embedding#15, string_query_col#16], node_source="table_clause", table=query_table, column_index_list=[0, 1, 2, 3, 4])
+        | | +-argument_column_list=query_table.[id#12, query_embedding#13, embedding#14, float_embedding#15, string_query_col#16]
+        | +-FunctionArgument
+        | | +-expr=
+        | |   +-Literal(type=ARRAY<STRING>, value=["string_col"])
+        | +-FunctionArgument
+        | | +-expr=
+        | |   +-Literal(type=STRING, value="query_embedding")
+        | +-FunctionArgument
+        | | +-expr=
+        | |   +-Literal(type=STRING, value="string_query_col")
+        | +-FunctionArgument
+        | | +-expr=
+        | |   +-FunctionCall(GoogleSQL:parse_json(STRING, optional(1) STRING wide_number_mode) -> JSON)
+        | |     +-Literal(type=STRING, value='{"key1": 1, "key2": "value2"}')
+        | |     +-Literal(type=STRING, value="exact")
+        | +-FunctionArgument
+        | | +-expr=
+        | |   +-Literal(type=INT64, value=5)
+        | +-FunctionArgument
+        | | +-expr=
+        | |   +-Literal(type=STRING, value="COSINE")
+        | +-FunctionArgument
+        |   +-expr=
+        |     +-Literal(type=DOUBLE, value=0.8, float_literal_id=2)
+        +-column_index_list=[0, 1, 2]
+        +-function_call_signature=(ANY TABLE, STRING column_to_search, ANY TABLE, ARRAY<STRING> lexical_search_columns, optional(1) STRING query_column_to_search, optional(1) STRING lexical_search_query_column, optional(1) JSON options, optional(1) INT64 top_k, optional(1) STRING distance_type, optional(1) DOUBLE max_distance) -> ANY TABLE
+==
+
+# Call with options as a non-immutable-constant query parameter
+SELECT * FROM hybrid_vector_search(
+  TABLE base_table,
+  'embedding',
+  TABLE query_table,
+  lexical_search_columns => ['string_col'],
+  query_column_to_search => 'query_embedding',
+  lexical_search_query_column => 'string_query_col',
+  top_k => 5,
+  distance_type => 'COSINE',
+  max_distance => 0.8,
+  options => @test_param_json
+)
+--
+ERROR: Argument 'options' to table-valued function HYBRID_VECTOR_SEARCH must be an immutable constant [at 11:3]
+  options => @test_param_json
+  ^
+==
+
 # options argument is not a proto or JSON
 SELECT * FROM hybrid_vector_search(
   TABLE base_table,
@@ -532,7 +617,7 @@ SELECT * FROM hybrid_vector_search(
   options => CAST(1 AS STRING)
 )
 --
-ERROR: No matching signature for table valued function : HYBRID_VECTOR_SEARCH. Supported Signatures: HYBRID_VECTOR_SEARCH(TABLE, column_to_search => STRING, TABLE, lexical_search_columns => ARRAY<STRING>, [query_column_to_search => STRING], [lexical_search_query_column => STRING], [options => googlesql_test.TestApproxDistanceFunctionOptionsProto], [top_k => INT64], [distance_type => STRING], [max_distance => DOUBLE]); HYBRID_VECTOR_SEARCH(TABLE, column_to_search => STRING, TABLE, lexical_search_columns => ARRAY<STRING>, [query_column_to_search => STRING], [lexical_search_query_column => STRING], [options => JSON], [top_k => INT64], [distance_type => STRING], [max_distance => DOUBLE]) [at 1:15]
+ERROR: No matching signature for table valued function : HYBRID_VECTOR_SEARCH. Supported Signatures: HYBRID_VECTOR_SEARCH(TABLE, column_to_search => STRING, TABLE, lexical_search_columns => ARRAY<STRING>, [query_column_to_search => STRING], [lexical_search_query_column => STRING], [options => googlesql_test.TestApproxDistanceFunctionOptionsProto], [top_k => INT64], [distance_type => STRING], [max_distance => DOUBLE]); HYBRID_VECTOR_SEARCH(TABLE, column_to_search => STRING, TABLE, lexical_search_columns => ARRAY<STRING>, [query_column_to_search => STRING], [lexical_search_query_column => STRING], [options => JSON], [top_k => INT64], [distance_type => STRING], [max_distance => DOUBLE]); HYBRID_VECTOR_SEARCH(TABLE, column_to_search => STRING, query_value => ARRAY<FLOAT>, lexical_search_columns => ARRAY<STRING>, lexical_search_query_value => STRING, [options => googlesql_test.TestApproxDistanceFunctionOptionsProto], [top_k => INT64], [distance_type => STRING], [max_distance => DOUBLE]); HYBRID_VECTOR_SEARCH(TABLE, column_to_search => STRING, query_value => ARRAY<FLOAT>, lexical_search_columns => ARRAY<STRING>, lexical_search_query_value => STRING, [options => JSON], [top_k => INT64], [distance_type => STRING], [max_distance => DOUBLE]); HYBRID_VECTOR_SEARCH(TABLE, column_to_search => STRING, query_value => ARRAY<DOUBLE>, lexical_search_columns => ARRAY<STRING>, lexical_search_query_value => STRING, [options => googlesql_test.TestApproxDistanceFunctionOptionsProto], [top_k => INT64], [distance_type => STRING], [max_distance => DOUBLE]); HYBRID_VECTOR_SEARCH(TABLE, column_to_search => STRING, query_value => ARRAY<DOUBLE>, lexical_search_columns => ARRAY<STRING>, lexical_search_query_value => STRING, [options => JSON], [top_k => INT64], [distance_type => STRING], [max_distance => DOUBLE]); HYBRID_VECTOR_SEARCH(TABLE, column_to_search => STRING, query_value => STRING, lexical_search_columns => ARRAY<STRING>, lexical_search_query_value => STRING, [options => googlesql_test.TestApproxDistanceFunctionOptionsProto], [top_k => INT64], [distance_type => STRING], [max_distance => DOUBLE]); HYBRID_VECTOR_SEARCH(TABLE, column_to_search => STRING, query_value => STRING, lexical_search_columns => ARRAY<STRING>, lexical_search_query_value => STRING, [options => JSON], [top_k => INT64], [distance_type => STRING], [max_distance => DOUBLE]) [at 1:15]
 SELECT * FROM hybrid_vector_search(
               ^
 ==
@@ -552,6 +637,22 @@ SELECT * FROM hybrid_vector_search(
 ERROR: Could not cast literal "invalid" to type googlesql_test.TestApproxDistanceFunctionOptionsProto (Error parsing proto: Message type "googlesql_test.TestApproxDistanceFunctionOptionsProto" has no field named "invalid". [1:8]) [at 8:14]
   options => 'invalid'
              ^
+==
+
+# Invalid JSON literal options value
+SELECT * FROM hybrid_vector_search(
+  TABLE base_table,
+  'embedding',
+  TABLE query_table,
+  lexical_search_columns => ['string_col'],
+  query_column_to_search => 'query_embedding',
+  lexical_search_query_column => 'string_query_col',
+  options => JSON '{"top_k": 5'
+)
+--
+ERROR: No matching signature for table valued function : HYBRID_VECTOR_SEARCH. Supported Signatures: HYBRID_VECTOR_SEARCH(TABLE, column_to_search => STRING, TABLE, lexical_search_columns => ARRAY<STRING>, [query_column_to_search => STRING], [lexical_search_query_column => STRING], [options => googlesql_test.TestApproxDistanceFunctionOptionsProto], [top_k => INT64], [distance_type => STRING], [max_distance => DOUBLE]); HYBRID_VECTOR_SEARCH(TABLE, column_to_search => STRING, TABLE, lexical_search_columns => ARRAY<STRING>, [query_column_to_search => STRING], [lexical_search_query_column => STRING], [options => JSON], [top_k => INT64], [distance_type => STRING], [max_distance => DOUBLE]); HYBRID_VECTOR_SEARCH(TABLE, column_to_search => STRING, query_value => ARRAY<FLOAT>, lexical_search_columns => ARRAY<STRING>, lexical_search_query_value => STRING, [options => googlesql_test.TestApproxDistanceFunctionOptionsProto], [top_k => INT64], [distance_type => STRING], [max_distance => DOUBLE]); HYBRID_VECTOR_SEARCH(TABLE, column_to_search => STRING, query_value => ARRAY<FLOAT>, lexical_search_columns => ARRAY<STRING>, lexical_search_query_value => STRING, [options => JSON], [top_k => INT64], [distance_type => STRING], [max_distance => DOUBLE]); HYBRID_VECTOR_SEARCH(TABLE, column_to_search => STRING, query_value => ARRAY<DOUBLE>, lexical_search_columns => ARRAY<STRING>, lexical_search_query_value => STRING, [options => googlesql_test.TestApproxDistanceFunctionOptionsProto], [top_k => INT64], [distance_type => STRING], [max_distance => DOUBLE]); HYBRID_VECTOR_SEARCH(TABLE, column_to_search => STRING, query_value => ARRAY<DOUBLE>, lexical_search_columns => ARRAY<STRING>, lexical_search_query_value => STRING, [options => JSON], [top_k => INT64], [distance_type => STRING], [max_distance => DOUBLE]); HYBRID_VECTOR_SEARCH(TABLE, column_to_search => STRING, query_value => STRING, lexical_search_columns => ARRAY<STRING>, lexical_search_query_value => STRING, [options => googlesql_test.TestApproxDistanceFunctionOptionsProto], [top_k => INT64], [distance_type => STRING], [max_distance => DOUBLE]); HYBRID_VECTOR_SEARCH(TABLE, column_to_search => STRING, query_value => STRING, lexical_search_columns => ARRAY<STRING>, lexical_search_query_value => STRING, [options => JSON], [top_k => INT64], [distance_type => STRING], [max_distance => DOUBLE]) [at 1:15]
+SELECT * FROM hybrid_vector_search(
+              ^
 ==
 
 # NULL column_to_search argument
@@ -781,7 +882,7 @@ SELECT * FROM hybrid_vector_search(
   new googlesql_test.TestApproxDistanceFunctionOptionsProto(1 as key, "value2" as value)
 )
 --
-ERROR: No matching signature for table valued function : HYBRID_VECTOR_SEARCH. Supported Signatures: HYBRID_VECTOR_SEARCH(TABLE, column_to_search => STRING, TABLE, lexical_search_columns => ARRAY<STRING>, [query_column_to_search => STRING], [lexical_search_query_column => STRING], [options => googlesql_test.TestApproxDistanceFunctionOptionsProto], [top_k => INT64], [distance_type => STRING], [max_distance => DOUBLE]); HYBRID_VECTOR_SEARCH(TABLE, column_to_search => STRING, TABLE, lexical_search_columns => ARRAY<STRING>, [query_column_to_search => STRING], [lexical_search_query_column => STRING], [options => JSON], [top_k => INT64], [distance_type => STRING], [max_distance => DOUBLE]) [at 1:15]
+ERROR: No matching signature for table valued function : HYBRID_VECTOR_SEARCH. Supported Signatures: HYBRID_VECTOR_SEARCH(TABLE, column_to_search => STRING, TABLE, lexical_search_columns => ARRAY<STRING>, [query_column_to_search => STRING], [lexical_search_query_column => STRING], [options => googlesql_test.TestApproxDistanceFunctionOptionsProto], [top_k => INT64], [distance_type => STRING], [max_distance => DOUBLE]); HYBRID_VECTOR_SEARCH(TABLE, column_to_search => STRING, TABLE, lexical_search_columns => ARRAY<STRING>, [query_column_to_search => STRING], [lexical_search_query_column => STRING], [options => JSON], [top_k => INT64], [distance_type => STRING], [max_distance => DOUBLE]); HYBRID_VECTOR_SEARCH(TABLE, column_to_search => STRING, query_value => ARRAY<FLOAT>, lexical_search_columns => ARRAY<STRING>, lexical_search_query_value => STRING, [options => googlesql_test.TestApproxDistanceFunctionOptionsProto], [top_k => INT64], [distance_type => STRING], [max_distance => DOUBLE]); HYBRID_VECTOR_SEARCH(TABLE, column_to_search => STRING, query_value => ARRAY<FLOAT>, lexical_search_columns => ARRAY<STRING>, lexical_search_query_value => STRING, [options => JSON], [top_k => INT64], [distance_type => STRING], [max_distance => DOUBLE]); HYBRID_VECTOR_SEARCH(TABLE, column_to_search => STRING, query_value => ARRAY<DOUBLE>, lexical_search_columns => ARRAY<STRING>, lexical_search_query_value => STRING, [options => googlesql_test.TestApproxDistanceFunctionOptionsProto], [top_k => INT64], [distance_type => STRING], [max_distance => DOUBLE]); HYBRID_VECTOR_SEARCH(TABLE, column_to_search => STRING, query_value => ARRAY<DOUBLE>, lexical_search_columns => ARRAY<STRING>, lexical_search_query_value => STRING, [options => JSON], [top_k => INT64], [distance_type => STRING], [max_distance => DOUBLE]); HYBRID_VECTOR_SEARCH(TABLE, column_to_search => STRING, query_value => STRING, lexical_search_columns => ARRAY<STRING>, lexical_search_query_value => STRING, [options => googlesql_test.TestApproxDistanceFunctionOptionsProto], [top_k => INT64], [distance_type => STRING], [max_distance => DOUBLE]); HYBRID_VECTOR_SEARCH(TABLE, column_to_search => STRING, query_value => STRING, lexical_search_columns => ARRAY<STRING>, lexical_search_query_value => STRING, [options => JSON], [top_k => INT64], [distance_type => STRING], [max_distance => DOUBLE]) [at 1:15]
 SELECT * FROM hybrid_vector_search(
               ^
 ==
@@ -888,7 +989,7 @@ SELECT * FROM hybrid_vector_search(
   ['string_col']
 )
 --
-ERROR: No matching signature for table valued function : HYBRID_VECTOR_SEARCH. Supported Signatures: HYBRID_VECTOR_SEARCH(TABLE, column_to_search => STRING, TABLE, lexical_search_columns => ARRAY<STRING>, [query_column_to_search => STRING], [lexical_search_query_column => STRING], [options => googlesql_test.TestApproxDistanceFunctionOptionsProto], [top_k => INT64], [distance_type => STRING], [max_distance => DOUBLE]); HYBRID_VECTOR_SEARCH(TABLE, column_to_search => STRING, TABLE, lexical_search_columns => ARRAY<STRING>, [query_column_to_search => STRING], [lexical_search_query_column => STRING], [options => JSON], [top_k => INT64], [distance_type => STRING], [max_distance => DOUBLE]) [at 1:15]
+ERROR: No matching signature for table valued function : HYBRID_VECTOR_SEARCH. Supported Signatures: HYBRID_VECTOR_SEARCH(TABLE, column_to_search => STRING, TABLE, lexical_search_columns => ARRAY<STRING>, [query_column_to_search => STRING], [lexical_search_query_column => STRING], [options => googlesql_test.TestApproxDistanceFunctionOptionsProto], [top_k => INT64], [distance_type => STRING], [max_distance => DOUBLE]); HYBRID_VECTOR_SEARCH(TABLE, column_to_search => STRING, TABLE, lexical_search_columns => ARRAY<STRING>, [query_column_to_search => STRING], [lexical_search_query_column => STRING], [options => JSON], [top_k => INT64], [distance_type => STRING], [max_distance => DOUBLE]); HYBRID_VECTOR_SEARCH(TABLE, column_to_search => STRING, query_value => ARRAY<FLOAT>, lexical_search_columns => ARRAY<STRING>, lexical_search_query_value => STRING, [options => googlesql_test.TestApproxDistanceFunctionOptionsProto], [top_k => INT64], [distance_type => STRING], [max_distance => DOUBLE]); HYBRID_VECTOR_SEARCH(TABLE, column_to_search => STRING, query_value => ARRAY<FLOAT>, lexical_search_columns => ARRAY<STRING>, lexical_search_query_value => STRING, [options => JSON], [top_k => INT64], [distance_type => STRING], [max_distance => DOUBLE]); HYBRID_VECTOR_SEARCH(TABLE, column_to_search => STRING, query_value => ARRAY<DOUBLE>, lexical_search_columns => ARRAY<STRING>, lexical_search_query_value => STRING, [options => googlesql_test.TestApproxDistanceFunctionOptionsProto], [top_k => INT64], [distance_type => STRING], [max_distance => DOUBLE]); HYBRID_VECTOR_SEARCH(TABLE, column_to_search => STRING, query_value => ARRAY<DOUBLE>, lexical_search_columns => ARRAY<STRING>, lexical_search_query_value => STRING, [options => JSON], [top_k => INT64], [distance_type => STRING], [max_distance => DOUBLE]); HYBRID_VECTOR_SEARCH(TABLE, column_to_search => STRING, query_value => STRING, lexical_search_columns => ARRAY<STRING>, lexical_search_query_value => STRING, [options => googlesql_test.TestApproxDistanceFunctionOptionsProto], [top_k => INT64], [distance_type => STRING], [max_distance => DOUBLE]); HYBRID_VECTOR_SEARCH(TABLE, column_to_search => STRING, query_value => STRING, lexical_search_columns => ARRAY<STRING>, lexical_search_query_value => STRING, [options => JSON], [top_k => INT64], [distance_type => STRING], [max_distance => DOUBLE]) [at 1:15]
 SELECT * FROM hybrid_vector_search(
               ^
 ==
@@ -902,7 +1003,7 @@ SELECT * FROM hybrid_vector_search(
   'query_embedding'
 )
 --
-ERROR: No matching signature for table valued function : HYBRID_VECTOR_SEARCH. Supported Signatures: HYBRID_VECTOR_SEARCH(TABLE, column_to_search => STRING, TABLE, lexical_search_columns => ARRAY<STRING>, [query_column_to_search => STRING], [lexical_search_query_column => STRING], [options => googlesql_test.TestApproxDistanceFunctionOptionsProto], [top_k => INT64], [distance_type => STRING], [max_distance => DOUBLE]); HYBRID_VECTOR_SEARCH(TABLE, column_to_search => STRING, TABLE, lexical_search_columns => ARRAY<STRING>, [query_column_to_search => STRING], [lexical_search_query_column => STRING], [options => JSON], [top_k => INT64], [distance_type => STRING], [max_distance => DOUBLE]) [at 1:15]
+ERROR: No matching signature for table valued function : HYBRID_VECTOR_SEARCH. Supported Signatures: HYBRID_VECTOR_SEARCH(TABLE, column_to_search => STRING, TABLE, lexical_search_columns => ARRAY<STRING>, [query_column_to_search => STRING], [lexical_search_query_column => STRING], [options => googlesql_test.TestApproxDistanceFunctionOptionsProto], [top_k => INT64], [distance_type => STRING], [max_distance => DOUBLE]); HYBRID_VECTOR_SEARCH(TABLE, column_to_search => STRING, TABLE, lexical_search_columns => ARRAY<STRING>, [query_column_to_search => STRING], [lexical_search_query_column => STRING], [options => JSON], [top_k => INT64], [distance_type => STRING], [max_distance => DOUBLE]); HYBRID_VECTOR_SEARCH(TABLE, column_to_search => STRING, query_value => ARRAY<FLOAT>, lexical_search_columns => ARRAY<STRING>, lexical_search_query_value => STRING, [options => googlesql_test.TestApproxDistanceFunctionOptionsProto], [top_k => INT64], [distance_type => STRING], [max_distance => DOUBLE]); HYBRID_VECTOR_SEARCH(TABLE, column_to_search => STRING, query_value => ARRAY<FLOAT>, lexical_search_columns => ARRAY<STRING>, lexical_search_query_value => STRING, [options => JSON], [top_k => INT64], [distance_type => STRING], [max_distance => DOUBLE]); HYBRID_VECTOR_SEARCH(TABLE, column_to_search => STRING, query_value => ARRAY<DOUBLE>, lexical_search_columns => ARRAY<STRING>, lexical_search_query_value => STRING, [options => googlesql_test.TestApproxDistanceFunctionOptionsProto], [top_k => INT64], [distance_type => STRING], [max_distance => DOUBLE]); HYBRID_VECTOR_SEARCH(TABLE, column_to_search => STRING, query_value => ARRAY<DOUBLE>, lexical_search_columns => ARRAY<STRING>, lexical_search_query_value => STRING, [options => JSON], [top_k => INT64], [distance_type => STRING], [max_distance => DOUBLE]); HYBRID_VECTOR_SEARCH(TABLE, column_to_search => STRING, query_value => STRING, lexical_search_columns => ARRAY<STRING>, lexical_search_query_value => STRING, [options => googlesql_test.TestApproxDistanceFunctionOptionsProto], [top_k => INT64], [distance_type => STRING], [max_distance => DOUBLE]); HYBRID_VECTOR_SEARCH(TABLE, column_to_search => STRING, query_value => STRING, lexical_search_columns => ARRAY<STRING>, lexical_search_query_value => STRING, [options => JSON], [top_k => INT64], [distance_type => STRING], [max_distance => DOUBLE]) [at 1:15]
 SELECT * FROM hybrid_vector_search(
               ^
 ==
@@ -917,7 +1018,7 @@ SELECT * FROM hybrid_vector_search(
   'string_query_col'
 )
 --
-ERROR: No matching signature for table valued function : HYBRID_VECTOR_SEARCH. Supported Signatures: HYBRID_VECTOR_SEARCH(TABLE, column_to_search => STRING, TABLE, lexical_search_columns => ARRAY<STRING>, [query_column_to_search => STRING], [lexical_search_query_column => STRING], [options => googlesql_test.TestApproxDistanceFunctionOptionsProto], [top_k => INT64], [distance_type => STRING], [max_distance => DOUBLE]); HYBRID_VECTOR_SEARCH(TABLE, column_to_search => STRING, TABLE, lexical_search_columns => ARRAY<STRING>, [query_column_to_search => STRING], [lexical_search_query_column => STRING], [options => JSON], [top_k => INT64], [distance_type => STRING], [max_distance => DOUBLE]) [at 1:15]
+ERROR: No matching signature for table valued function : HYBRID_VECTOR_SEARCH. Supported Signatures: HYBRID_VECTOR_SEARCH(TABLE, column_to_search => STRING, TABLE, lexical_search_columns => ARRAY<STRING>, [query_column_to_search => STRING], [lexical_search_query_column => STRING], [options => googlesql_test.TestApproxDistanceFunctionOptionsProto], [top_k => INT64], [distance_type => STRING], [max_distance => DOUBLE]); HYBRID_VECTOR_SEARCH(TABLE, column_to_search => STRING, TABLE, lexical_search_columns => ARRAY<STRING>, [query_column_to_search => STRING], [lexical_search_query_column => STRING], [options => JSON], [top_k => INT64], [distance_type => STRING], [max_distance => DOUBLE]); HYBRID_VECTOR_SEARCH(TABLE, column_to_search => STRING, query_value => ARRAY<FLOAT>, lexical_search_columns => ARRAY<STRING>, lexical_search_query_value => STRING, [options => googlesql_test.TestApproxDistanceFunctionOptionsProto], [top_k => INT64], [distance_type => STRING], [max_distance => DOUBLE]); HYBRID_VECTOR_SEARCH(TABLE, column_to_search => STRING, query_value => ARRAY<FLOAT>, lexical_search_columns => ARRAY<STRING>, lexical_search_query_value => STRING, [options => JSON], [top_k => INT64], [distance_type => STRING], [max_distance => DOUBLE]); HYBRID_VECTOR_SEARCH(TABLE, column_to_search => STRING, query_value => ARRAY<DOUBLE>, lexical_search_columns => ARRAY<STRING>, lexical_search_query_value => STRING, [options => googlesql_test.TestApproxDistanceFunctionOptionsProto], [top_k => INT64], [distance_type => STRING], [max_distance => DOUBLE]); HYBRID_VECTOR_SEARCH(TABLE, column_to_search => STRING, query_value => ARRAY<DOUBLE>, lexical_search_columns => ARRAY<STRING>, lexical_search_query_value => STRING, [options => JSON], [top_k => INT64], [distance_type => STRING], [max_distance => DOUBLE]); HYBRID_VECTOR_SEARCH(TABLE, column_to_search => STRING, query_value => STRING, lexical_search_columns => ARRAY<STRING>, lexical_search_query_value => STRING, [options => googlesql_test.TestApproxDistanceFunctionOptionsProto], [top_k => INT64], [distance_type => STRING], [max_distance => DOUBLE]); HYBRID_VECTOR_SEARCH(TABLE, column_to_search => STRING, query_value => STRING, lexical_search_columns => ARRAY<STRING>, lexical_search_query_value => STRING, [options => JSON], [top_k => INT64], [distance_type => STRING], [max_distance => DOUBLE]) [at 1:15]
 SELECT * FROM hybrid_vector_search(
               ^
 ==
@@ -1079,8 +1180,1073 @@ CreateFunctionStmt
                   +-ColumnRef(type=DOUBLE, column=HYBRID_VECTOR_SEARCH.distance#11)
 ==
 
-[language_features=DEV, -SINGLE_HYBRID_VECTOR_SEARCH_TVF]
-# SINGLE_HYBRID_VECTOR_SEARCH_TVF language feature disabled
+# Basic hybrid single vector search call with query_value ARRAY<DOUBLE>
+SELECT * FROM hybrid_vector_search(TABLE base_table, 'embedding', query_value => ARRAY<DOUBLE>[1.0, 2.0, 3.0], lexical_search_columns => ['string_col'], lexical_search_query_value => 'query_string')
+--
+
+QueryStmt
++-output_column_list=
+| +-hybrid_vector_search.base#16 AS base [STRUCT<id INT64, embedding ARRAY<DOUBLE>, string_col STRING>]
+| +-hybrid_vector_search.distance#17 AS distance [DOUBLE]
++-query=
+  +-ProjectScan
+    +-column_list=hybrid_vector_search.[base#16, distance#17]
+    +-input_scan=
+      +-TVFScan
+        +-column_list=hybrid_vector_search.[base#16, distance#17]
+        +-tvf=GoogleSQL:hybrid_vector_search
+        +-signature=(TABLE<id INT64, embedding ARRAY<DOUBLE>, string_col STRING>, literal STRING, ARRAY<DOUBLE>, ARRAY<STRING>, literal STRING, null PROTO<googlesql_test.TestApproxDistanceFunctionOptionsProto>, literal INT64, literal STRING, null DOUBLE) -> TABLE<base STRUCT<id INT64, embedding ARRAY<DOUBLE>, string_col STRING>, distance DOUBLE>
+        +-argument_list=
+        | +-FunctionArgument
+        | | +-scan=
+        | | | +-TableScan(column_list=base_table.[id#13, embedding#14, string_col#15], node_source="table_clause", table=base_table, column_index_list=[0, 1, 2])
+        | | +-argument_column_list=base_table.[id#13, embedding#14, string_col#15]
+        | +-FunctionArgument
+        | | +-expr=
+        | |   +-Literal(type=STRING, value="embedding")
+        | +-FunctionArgument
+        | | +-expr=
+        | |   +-Literal(type=ARRAY<DOUBLE>, value=[1, 2, 3], has_explicit_type=TRUE)
+        | +-FunctionArgument
+        | | +-expr=
+        | |   +-Literal(type=ARRAY<STRING>, value=["string_col"])
+        | +-FunctionArgument
+        | | +-expr=
+        | |   +-Literal(type=STRING, value="query_string")
+        | +-FunctionArgument
+        | | +-expr=
+        | |   +-Literal(type=PROTO<googlesql_test.TestApproxDistanceFunctionOptionsProto>, value=NULL, preserve_in_literal_remover=TRUE)
+        | +-FunctionArgument
+        | | +-expr=
+        | |   +-Literal(type=INT64, value=10)
+        | +-FunctionArgument
+        | | +-expr=
+        | |   +-Literal(type=STRING, value="EUCLIDEAN")
+        | +-FunctionArgument
+        |   +-expr=
+        |     +-Literal(type=DOUBLE, value=NULL)
+        +-column_index_list=[0, 1]
+        +-function_call_signature=(ANY TABLE, STRING column_to_search, ARRAY<DOUBLE> query_value, ARRAY<STRING> lexical_search_columns, STRING lexical_search_query_value, optional(1) PROTO<googlesql_test.TestApproxDistanceFunctionOptionsProto> options, optional(1) INT64 top_k, optional(1) STRING distance_type, optional(1) DOUBLE max_distance) -> ANY TABLE
+==
+
+# Basic hybrid single vector search call with query_value ARRAY<FLOAT>
+SELECT * FROM hybrid_vector_search(TABLE base_table, 'embedding', query_value => ARRAY<FLOAT>[1.0, 2.0, 3.0], lexical_search_columns => ['string_col'], lexical_search_query_value => 'query_string')
+--
+
+QueryStmt
++-output_column_list=
+| +-hybrid_vector_search.base#10 AS base [STRUCT<id INT64, embedding ARRAY<DOUBLE>, string_col STRING>]
+| +-hybrid_vector_search.distance#11 AS distance [DOUBLE]
++-query=
+  +-ProjectScan
+    +-column_list=hybrid_vector_search.[base#10, distance#11]
+    +-input_scan=
+      +-TVFScan
+        +-column_list=hybrid_vector_search.[base#10, distance#11]
+        +-tvf=GoogleSQL:hybrid_vector_search
+        +-signature=(TABLE<id INT64, embedding ARRAY<DOUBLE>, string_col STRING>, literal STRING, ARRAY<FLOAT>, ARRAY<STRING>, literal STRING, null PROTO<googlesql_test.TestApproxDistanceFunctionOptionsProto>, literal INT64, literal STRING, null DOUBLE) -> TABLE<base STRUCT<id INT64, embedding ARRAY<DOUBLE>, string_col STRING>, distance DOUBLE>
+        +-argument_list=
+        | +-FunctionArgument
+        | | +-scan=
+        | | | +-TableScan(column_list=base_table.[id#7, embedding#8, string_col#9], node_source="table_clause", table=base_table, column_index_list=[0, 1, 2])
+        | | +-argument_column_list=base_table.[id#7, embedding#8, string_col#9]
+        | +-FunctionArgument
+        | | +-expr=
+        | |   +-Literal(type=STRING, value="embedding")
+        | +-FunctionArgument
+        | | +-expr=
+        | |   +-Literal(type=ARRAY<FLOAT>, value=[1, 2, 3], has_explicit_type=TRUE)
+        | +-FunctionArgument
+        | | +-expr=
+        | |   +-Literal(type=ARRAY<STRING>, value=["string_col"])
+        | +-FunctionArgument
+        | | +-expr=
+        | |   +-Literal(type=STRING, value="query_string")
+        | +-FunctionArgument
+        | | +-expr=
+        | |   +-Literal(type=PROTO<googlesql_test.TestApproxDistanceFunctionOptionsProto>, value=NULL, preserve_in_literal_remover=TRUE)
+        | +-FunctionArgument
+        | | +-expr=
+        | |   +-Literal(type=INT64, value=10)
+        | +-FunctionArgument
+        | | +-expr=
+        | |   +-Literal(type=STRING, value="EUCLIDEAN")
+        | +-FunctionArgument
+        |   +-expr=
+        |     +-Literal(type=DOUBLE, value=NULL)
+        +-column_index_list=[0, 1]
+        +-function_call_signature=(ANY TABLE, STRING column_to_search, ARRAY<FLOAT> query_value, ARRAY<STRING> lexical_search_columns, STRING lexical_search_query_value, optional(1) PROTO<googlesql_test.TestApproxDistanceFunctionOptionsProto> options, optional(1) INT64 top_k, optional(1) STRING distance_type, optional(1) DOUBLE max_distance) -> ANY TABLE
+==
+
+# Basic hybrid single vector search call with query_value STRING
+SELECT * FROM hybrid_vector_search(TABLE base_table, 'embedding', query_value => 'query_vector', lexical_search_columns => ['string_col'], lexical_search_query_value => 'query_string')
+--
+
+QueryStmt
++-output_column_list=
+| +-hybrid_vector_search.base#22 AS base [STRUCT<id INT64, embedding ARRAY<DOUBLE>, string_col STRING>]
+| +-hybrid_vector_search.distance#23 AS distance [DOUBLE]
++-query=
+  +-ProjectScan
+    +-column_list=hybrid_vector_search.[base#22, distance#23]
+    +-input_scan=
+      +-TVFScan
+        +-column_list=hybrid_vector_search.[base#22, distance#23]
+        +-tvf=GoogleSQL:hybrid_vector_search
+        +-signature=(TABLE<id INT64, embedding ARRAY<DOUBLE>, string_col STRING>, literal STRING, literal STRING, ARRAY<STRING>, literal STRING, null PROTO<googlesql_test.TestApproxDistanceFunctionOptionsProto>, literal INT64, literal STRING, null DOUBLE) -> TABLE<base STRUCT<id INT64, embedding ARRAY<DOUBLE>, string_col STRING>, distance DOUBLE>
+        +-argument_list=
+        | +-FunctionArgument
+        | | +-scan=
+        | | | +-TableScan(column_list=base_table.[id#19, embedding#20, string_col#21], node_source="table_clause", table=base_table, column_index_list=[0, 1, 2])
+        | | +-argument_column_list=base_table.[id#19, embedding#20, string_col#21]
+        | +-FunctionArgument
+        | | +-expr=
+        | |   +-Literal(type=STRING, value="embedding")
+        | +-FunctionArgument
+        | | +-expr=
+        | |   +-Literal(type=STRING, value="query_vector")
+        | +-FunctionArgument
+        | | +-expr=
+        | |   +-Literal(type=ARRAY<STRING>, value=["string_col"])
+        | +-FunctionArgument
+        | | +-expr=
+        | |   +-Literal(type=STRING, value="query_string")
+        | +-FunctionArgument
+        | | +-expr=
+        | |   +-Literal(type=PROTO<googlesql_test.TestApproxDistanceFunctionOptionsProto>, value=NULL, preserve_in_literal_remover=TRUE)
+        | +-FunctionArgument
+        | | +-expr=
+        | |   +-Literal(type=INT64, value=10)
+        | +-FunctionArgument
+        | | +-expr=
+        | |   +-Literal(type=STRING, value="EUCLIDEAN")
+        | +-FunctionArgument
+        |   +-expr=
+        |     +-Literal(type=DOUBLE, value=NULL)
+        +-column_index_list=[0, 1]
+        +-function_call_signature=(ANY TABLE, STRING column_to_search, STRING query_value, ARRAY<STRING> lexical_search_columns, STRING lexical_search_query_value, optional(1) PROTO<googlesql_test.TestApproxDistanceFunctionOptionsProto> options, optional(1) INT64 top_k, optional(1) STRING distance_type, optional(1) DOUBLE max_distance) -> ANY TABLE
+==
+
+# Call with all arguments
+SELECT * FROM hybrid_vector_search(
+  TABLE base_table,
+  'embedding',
+  query_value => ARRAY<DOUBLE>[1.0, 2.0, 3.0],
+  lexical_search_columns => ['string_col'],
+  lexical_search_query_value => 'query_string',
+  top_k => 5,
+  distance_type => 'COSINE',
+  max_distance => 0.8,
+  options => new googlesql_test.TestApproxDistanceFunctionOptionsProto(1 as key, "value2" as value)
+)
+--
+QueryStmt
++-output_column_list=
+| +-hybrid_vector_search.base#16 AS base [STRUCT<id INT64, embedding ARRAY<DOUBLE>, string_col STRING>]
+| +-hybrid_vector_search.distance#17 AS distance [DOUBLE]
++-query=
+  +-ProjectScan
+    +-column_list=hybrid_vector_search.[base#16, distance#17]
+    +-input_scan=
+      +-TVFScan
+        +-column_list=hybrid_vector_search.[base#16, distance#17]
+        +-tvf=GoogleSQL:hybrid_vector_search
+        +-signature=(TABLE<id INT64, embedding ARRAY<DOUBLE>, string_col STRING>, literal STRING, ARRAY<DOUBLE>, ARRAY<STRING>, literal STRING, PROTO<googlesql_test.TestApproxDistanceFunctionOptionsProto>, literal INT64, literal STRING, literal DOUBLE) -> TABLE<base STRUCT<id INT64, embedding ARRAY<DOUBLE>, string_col STRING>, distance DOUBLE>
+        +-argument_list=
+        | +-FunctionArgument
+        | | +-scan=
+        | | | +-TableScan(column_list=base_table.[id#13, embedding#14, string_col#15], node_source="table_clause", table=base_table, column_index_list=[0, 1, 2])
+        | | +-argument_column_list=base_table.[id#13, embedding#14, string_col#15]
+        | +-FunctionArgument
+        | | +-expr=
+        | |   +-Literal(type=STRING, value="embedding")
+        | +-FunctionArgument
+        | | +-expr=
+        | |   +-Literal(type=ARRAY<DOUBLE>, value=[1, 2, 3], has_explicit_type=TRUE)
+        | +-FunctionArgument
+        | | +-expr=
+        | |   +-Literal(type=ARRAY<STRING>, value=["string_col"])
+        | +-FunctionArgument
+        | | +-expr=
+        | |   +-Literal(type=STRING, value="query_string")
+        | +-FunctionArgument
+        | | +-expr=
+        | |   +-MakeProto
+        | |     +-type=PROTO<googlesql_test.TestApproxDistanceFunctionOptionsProto>
+        | |     +-field_list=
+        | |       +-key := Literal(type=INT64, value=1)
+        | |       +-value := Literal(type=STRING, value="value2")
+        | +-FunctionArgument
+        | | +-expr=
+        | |   +-Literal(type=INT64, value=5)
+        | +-FunctionArgument
+        | | +-expr=
+        | |   +-Literal(type=STRING, value="COSINE")
+        | +-FunctionArgument
+        |   +-expr=
+        |     +-Literal(type=DOUBLE, value=0.8, float_literal_id=12)
+        +-column_index_list=[0, 1]
+        +-function_call_signature=(ANY TABLE, STRING column_to_search, ARRAY<DOUBLE> query_value, ARRAY<STRING> lexical_search_columns, STRING lexical_search_query_value, optional(1) PROTO<googlesql_test.TestApproxDistanceFunctionOptionsProto> options, optional(1) INT64 top_k, optional(1) STRING distance_type, optional(1) DOUBLE max_distance) -> ANY TABLE
+==
+
+# Call with options as a parse_json argument (immutable constant)
+SELECT * FROM hybrid_vector_search(
+  TABLE base_table,
+  'embedding',
+  query_value => ARRAY<DOUBLE>[1.0, 2.0, 3.0],
+  lexical_search_columns => ['string_col'],
+  lexical_search_query_value => 'query_string',
+  top_k => 5,
+  distance_type => 'COSINE',
+  max_distance => 0.8,
+  options => parse_json('{"key1": 1, "key2": "value2"}')
+)
+--
+QueryStmt
++-output_column_list=
+| +-hybrid_vector_search.base#19 AS base [STRUCT<id INT64, embedding ARRAY<DOUBLE>, string_col STRING>]
+| +-hybrid_vector_search.distance#20 AS distance [DOUBLE]
++-query=
+  +-ProjectScan
+    +-column_list=hybrid_vector_search.[base#19, distance#20]
+    +-input_scan=
+      +-TVFScan
+        +-column_list=hybrid_vector_search.[base#19, distance#20]
+        +-tvf=GoogleSQL:hybrid_vector_search
+        +-signature=(TABLE<id INT64, embedding ARRAY<DOUBLE>, string_col STRING>, literal STRING, ARRAY<DOUBLE>, ARRAY<STRING>, literal STRING, JSON, literal INT64, literal STRING, literal DOUBLE) -> TABLE<base STRUCT<id INT64, embedding ARRAY<DOUBLE>, string_col STRING>, distance DOUBLE>
+        +-argument_list=
+        | +-FunctionArgument
+        | | +-scan=
+        | | | +-TableScan(column_list=base_table.[id#16, embedding#17, string_col#18], node_source="table_clause", table=base_table, column_index_list=[0, 1, 2])
+        | | +-argument_column_list=base_table.[id#16, embedding#17, string_col#18]
+        | +-FunctionArgument
+        | | +-expr=
+        | |   +-Literal(type=STRING, value="embedding")
+        | +-FunctionArgument
+        | | +-expr=
+        | |   +-Literal(type=ARRAY<DOUBLE>, value=[1, 2, 3], has_explicit_type=TRUE)
+        | +-FunctionArgument
+        | | +-expr=
+        | |   +-Literal(type=ARRAY<STRING>, value=["string_col"])
+        | +-FunctionArgument
+        | | +-expr=
+        | |   +-Literal(type=STRING, value="query_string")
+        | +-FunctionArgument
+        | | +-expr=
+        | |   +-FunctionCall(GoogleSQL:parse_json(STRING, optional(1) STRING wide_number_mode) -> JSON)
+        | |     +-Literal(type=STRING, value='{"key1": 1, "key2": "value2"}')
+        | |     +-Literal(type=STRING, value="exact")
+        | +-FunctionArgument
+        | | +-expr=
+        | |   +-Literal(type=INT64, value=5)
+        | +-FunctionArgument
+        | | +-expr=
+        | |   +-Literal(type=STRING, value="COSINE")
+        | +-FunctionArgument
+        |   +-expr=
+        |     +-Literal(type=DOUBLE, value=0.8, float_literal_id=16)
+        +-column_index_list=[0, 1]
+        +-function_call_signature=(ANY TABLE, STRING column_to_search, ARRAY<DOUBLE> query_value, ARRAY<STRING> lexical_search_columns, STRING lexical_search_query_value, optional(1) JSON options, optional(1) INT64 top_k, optional(1) STRING distance_type, optional(1) DOUBLE max_distance) -> ANY TABLE
+==
+
+# Call with options as a non-immutable-constant query parameter
+SELECT * FROM hybrid_vector_search(
+  TABLE base_table,
+  'embedding',
+  query_value => ARRAY<DOUBLE>[1.0, 2.0, 3.0],
+  lexical_search_columns => ['string_col'],
+  lexical_search_query_value => 'query_string',
+  top_k => 5,
+  distance_type => 'COSINE',
+  max_distance => 0.8,
+  options => @test_param_json
+)
+--
+ERROR: Argument 'options' to table-valued function HYBRID_VECTOR_SEARCH must be an immutable constant [at 10:3]
+  options => @test_param_json
+  ^
+==
+
+# Call with alias
+
+WITH base_table AS (
+  SELECT 1 AS _INDEX_LEAF_ID, ARRAY<FLOAT>[1.0, 2.0, 3.0] AS EmbeddingColumn, 'text_base' AS StrCol
+)
+SELECT base._INDEX_LEAF_ID, distance
+FROM HYBRID_VECTOR_SEARCH(
+   (
+    SELECT _INDEX_LEAF_ID, EmbeddingColumn AS embedding, StrCol AS string_col
+    FROM base_table
+  ), -- Inlined base_table
+  'embedding',
+  query_value => ARRAY<FLOAT>[0.1, 0.2, 0.3],
+  lexical_search_columns => ['string_col'],
+  lexical_search_query_value => 'text_query',
+  top_k => 10 /* @top_k */,
+  distance_type => 'DOT_PRODUCT')
+--
+QueryStmt
++-output_column_list=
+| +-$query._INDEX_LEAF_ID#15 AS _INDEX_LEAF_ID [INT64]
+| +-HYBRID_VECTOR_SEARCH.distance#14 AS distance [DOUBLE]
++-query=
+  +-WithScan
+    +-column_list=[$query._INDEX_LEAF_ID#15, HYBRID_VECTOR_SEARCH.distance#14]
+    +-with_entry_list=
+    | +-WithEntry
+    |   +-with_query_name="base_table"
+    |   +-with_subquery=
+    |     +-ProjectScan
+    |       +-column_list=base_table.[_INDEX_LEAF_ID#1, EmbeddingColumn#2, StrCol#3]
+    |       +-expr_list=
+    |       | +-_INDEX_LEAF_ID#1 := Literal(type=INT64, value=1)
+    |       | +-EmbeddingColumn#2 := Literal(type=ARRAY<FLOAT>, value=[1, 2, 3], has_explicit_type=TRUE)
+    |       | +-StrCol#3 := Literal(type=STRING, value="text_base")
+    |       +-input_scan=
+    |         +-SingleRowScan
+    +-query=
+      +-ProjectScan
+        +-column_list=[$query._INDEX_LEAF_ID#15, HYBRID_VECTOR_SEARCH.distance#14]
+        +-expr_list=
+        | +-_INDEX_LEAF_ID#15 :=
+        |   +-GetStructField
+        |     +-type=INT64
+        |     +-expr=
+        |     | +-ColumnRef(type=STRUCT<_INDEX_LEAF_ID INT64, embedding ARRAY<FLOAT>, string_col STRING>, column=HYBRID_VECTOR_SEARCH.base#13)
+        |     +-field_idx=0
+        +-input_scan=
+          +-TVFScan
+            +-column_list=HYBRID_VECTOR_SEARCH.[base#13, distance#14]
+            +-tvf=GoogleSQL:hybrid_vector_search
+            +-signature=(TABLE<_INDEX_LEAF_ID INT64, embedding ARRAY<FLOAT>, string_col STRING>, literal STRING, ARRAY<FLOAT>, ARRAY<STRING>, literal STRING, null PROTO<googlesql_test.TestApproxDistanceFunctionOptionsProto>, literal INT64, literal STRING, null DOUBLE) -> TABLE<base STRUCT<_INDEX_LEAF_ID INT64, embedding ARRAY<FLOAT>, string_col STRING>, distance DOUBLE>
+            +-argument_list=
+            | +-FunctionArgument
+            | | +-scan=
+            | | | +-ProjectScan
+            | | |   +-column_list=base_table.[_INDEX_LEAF_ID#10, EmbeddingColumn#11, StrCol#12]
+            | | |   +-input_scan=
+            | | |     +-WithRefScan(column_list=base_table.[_INDEX_LEAF_ID#10, EmbeddingColumn#11, StrCol#12], with_query_name="base_table")
+            | | +-argument_column_list=base_table.[_INDEX_LEAF_ID#10, EmbeddingColumn#11, StrCol#12]
+            | +-FunctionArgument
+            | | +-expr=
+            | |   +-Literal(type=STRING, value="embedding")
+            | +-FunctionArgument
+            | | +-expr=
+            | |   +-Literal(type=ARRAY<FLOAT>, value=[0.1, 0.2, 0.3], has_explicit_type=TRUE)
+            | +-FunctionArgument
+            | | +-expr=
+            | |   +-Literal(type=ARRAY<STRING>, value=["string_col"])
+            | +-FunctionArgument
+            | | +-expr=
+            | |   +-Literal(type=STRING, value="text_query")
+            | +-FunctionArgument
+            | | +-expr=
+            | |   +-Literal(type=PROTO<googlesql_test.TestApproxDistanceFunctionOptionsProto>, value=NULL, preserve_in_literal_remover=TRUE)
+            | +-FunctionArgument
+            | | +-expr=
+            | |   +-Literal(type=INT64, value=10)
+            | +-FunctionArgument
+            | | +-expr=
+            | |   +-Literal(type=STRING, value="DOT_PRODUCT")
+            | +-FunctionArgument
+            |   +-expr=
+            |     +-Literal(type=DOUBLE, value=NULL)
+            +-column_index_list=[0, 1]
+            +-function_call_signature=(ANY TABLE, STRING column_to_search, ARRAY<FLOAT> query_value, ARRAY<STRING> lexical_search_columns, STRING lexical_search_query_value, optional(1) PROTO<googlesql_test.TestApproxDistanceFunctionOptionsProto> options, optional(1) INT64 top_k, optional(1) STRING distance_type, optional(1) DOUBLE max_distance) -> ANY TABLE
+==
+
+# Call with query parameter for query_value
+SELECT * FROM hybrid_vector_search(
+  TABLE base_table,
+  'embedding',
+  query_value => @test_param_array_double,
+  lexical_search_columns => ['string_col'],
+  lexical_search_query_value => 'query_string'
+)
+--
+QueryStmt
++-output_column_list=
+| +-hybrid_vector_search.base#16 AS base [STRUCT<id INT64, embedding ARRAY<DOUBLE>, string_col STRING>]
+| +-hybrid_vector_search.distance#17 AS distance [DOUBLE]
++-query=
+  +-ProjectScan
+    +-column_list=hybrid_vector_search.[base#16, distance#17]
+    +-input_scan=
+      +-TVFScan
+        +-column_list=hybrid_vector_search.[base#16, distance#17]
+        +-tvf=GoogleSQL:hybrid_vector_search
+        +-signature=(TABLE<id INT64, embedding ARRAY<DOUBLE>, string_col STRING>, literal STRING, ARRAY<DOUBLE>, ARRAY<STRING>, literal STRING, null PROTO<googlesql_test.TestApproxDistanceFunctionOptionsProto>, literal INT64, literal STRING, null DOUBLE) -> TABLE<base STRUCT<id INT64, embedding ARRAY<DOUBLE>, string_col STRING>, distance DOUBLE>
+        +-argument_list=
+        | +-FunctionArgument
+        | | +-scan=
+        | | | +-TableScan(column_list=base_table.[id#13, embedding#14, string_col#15], node_source="table_clause", table=base_table, column_index_list=[0, 1, 2])
+        | | +-argument_column_list=base_table.[id#13, embedding#14, string_col#15]
+        | +-FunctionArgument
+        | | +-expr=
+        | |   +-Literal(type=STRING, value="embedding")
+        | +-FunctionArgument
+        | | +-expr=
+        | |   +-Parameter(type=ARRAY<DOUBLE>, name="test_param_array_double")
+        | +-FunctionArgument
+        | | +-expr=
+        | |   +-Literal(type=ARRAY<STRING>, value=["string_col"])
+        | +-FunctionArgument
+        | | +-expr=
+        | |   +-Literal(type=STRING, value="query_string")
+        | +-FunctionArgument
+        | | +-expr=
+        | |   +-Literal(type=PROTO<googlesql_test.TestApproxDistanceFunctionOptionsProto>, value=NULL, preserve_in_literal_remover=TRUE)
+        | +-FunctionArgument
+        | | +-expr=
+        | |   +-Literal(type=INT64, value=10)
+        | +-FunctionArgument
+        | | +-expr=
+        | |   +-Literal(type=STRING, value="EUCLIDEAN")
+        | +-FunctionArgument
+        |   +-expr=
+        |     +-Literal(type=DOUBLE, value=NULL)
+        +-column_index_list=[0, 1]
+        +-function_call_signature=(ANY TABLE, STRING column_to_search, ARRAY<DOUBLE> query_value, ARRAY<STRING> lexical_search_columns, STRING lexical_search_query_value, optional(1) PROTO<googlesql_test.TestApproxDistanceFunctionOptionsProto> options, optional(1) INT64 top_k, optional(1) STRING distance_type, optional(1) DOUBLE max_distance) -> ANY TABLE
+==
+
+# Call with query parameter for lexical_search_columns and lexical_search_query_value
+SELECT * FROM hybrid_vector_search(
+  TABLE base_table,
+  'embedding',
+  query_value => ARRAY<DOUBLE>[1.0, 2.0, 3.0],
+  lexical_search_columns => ['string_col', @test_param_string],
+  lexical_search_query_value => @test_param_string
+)
+--
+QueryStmt
++-output_column_list=
+| +-hybrid_vector_search.base#16 AS base [STRUCT<id INT64, embedding ARRAY<DOUBLE>, string_col STRING>]
+| +-hybrid_vector_search.distance#17 AS distance [DOUBLE]
++-query=
+  +-ProjectScan
+    +-column_list=hybrid_vector_search.[base#16, distance#17]
+    +-input_scan=
+      +-TVFScan
+        +-column_list=hybrid_vector_search.[base#16, distance#17]
+        +-tvf=GoogleSQL:hybrid_vector_search
+        +-signature=(TABLE<id INT64, embedding ARRAY<DOUBLE>, string_col STRING>, literal STRING, ARRAY<DOUBLE>, ARRAY<STRING>, STRING, null PROTO<googlesql_test.TestApproxDistanceFunctionOptionsProto>, literal INT64, literal STRING, null DOUBLE) -> TABLE<base STRUCT<id INT64, embedding ARRAY<DOUBLE>, string_col STRING>, distance DOUBLE>
+        +-argument_list=
+        | +-FunctionArgument
+        | | +-scan=
+        | | | +-TableScan(column_list=base_table.[id#13, embedding#14, string_col#15], node_source="table_clause", table=base_table, column_index_list=[0, 1, 2])
+        | | +-argument_column_list=base_table.[id#13, embedding#14, string_col#15]
+        | +-FunctionArgument
+        | | +-expr=
+        | |   +-Literal(type=STRING, value="embedding")
+        | +-FunctionArgument
+        | | +-expr=
+        | |   +-Literal(type=ARRAY<DOUBLE>, value=[1, 2, 3], has_explicit_type=TRUE)
+        | +-FunctionArgument
+        | | +-expr=
+        | |   +-FunctionCall(GoogleSQL:$make_array(repeated(2) STRING) -> ARRAY<STRING>)
+        | |     +-Literal(type=STRING, value="string_col")
+        | |     +-Parameter(type=STRING, name="test_param_string")
+        | +-FunctionArgument
+        | | +-expr=
+        | |   +-Parameter(type=STRING, name="test_param_string")
+        | +-FunctionArgument
+        | | +-expr=
+        | |   +-Literal(type=PROTO<googlesql_test.TestApproxDistanceFunctionOptionsProto>, value=NULL, preserve_in_literal_remover=TRUE)
+        | +-FunctionArgument
+        | | +-expr=
+        | |   +-Literal(type=INT64, value=10)
+        | +-FunctionArgument
+        | | +-expr=
+        | |   +-Literal(type=STRING, value="EUCLIDEAN")
+        | +-FunctionArgument
+        |   +-expr=
+        |     +-Literal(type=DOUBLE, value=NULL)
+        +-column_index_list=[0, 1]
+        +-function_call_signature=(ANY TABLE, STRING column_to_search, ARRAY<DOUBLE> query_value, ARRAY<STRING> lexical_search_columns, STRING lexical_search_query_value, optional(1) PROTO<googlesql_test.TestApproxDistanceFunctionOptionsProto> options, optional(1) INT64 top_k, optional(1) STRING distance_type, optional(1) DOUBLE max_distance) -> ANY TABLE
+==
+
+# options argument is a JSON literal
+SELECT * FROM hybrid_vector_search(
+  TABLE base_table,
+  'embedding',
+  query_value => ARRAY<DOUBLE>[1.0, 2.0, 3.0],
+  lexical_search_columns => ['string_col'],
+  lexical_search_query_value => 'query_string',
+  options => IFNULL(NULL, JSON '{"key1": 1, "key2": 2}')
+)
+--
+QueryStmt
++-output_column_list=
+| +-hybrid_vector_search.base#19 AS base [STRUCT<id INT64, embedding ARRAY<DOUBLE>, string_col STRING>]
+| +-hybrid_vector_search.distance#20 AS distance [DOUBLE]
++-query=
+  +-ProjectScan
+    +-column_list=hybrid_vector_search.[base#19, distance#20]
+    +-input_scan=
+      +-TVFScan
+        +-column_list=hybrid_vector_search.[base#19, distance#20]
+        +-tvf=GoogleSQL:hybrid_vector_search
+        +-signature=(TABLE<id INT64, embedding ARRAY<DOUBLE>, string_col STRING>, literal STRING, ARRAY<DOUBLE>, ARRAY<STRING>, literal STRING, JSON, literal INT64, literal STRING, null DOUBLE) -> TABLE<base STRUCT<id INT64, embedding ARRAY<DOUBLE>, string_col STRING>, distance DOUBLE>
+        +-argument_list=
+        | +-FunctionArgument
+        | | +-scan=
+        | | | +-TableScan(column_list=base_table.[id#16, embedding#17, string_col#18], node_source="table_clause", table=base_table, column_index_list=[0, 1, 2])
+        | | +-argument_column_list=base_table.[id#16, embedding#17, string_col#18]
+        | +-FunctionArgument
+        | | +-expr=
+        | |   +-Literal(type=STRING, value="embedding")
+        | +-FunctionArgument
+        | | +-expr=
+        | |   +-Literal(type=ARRAY<DOUBLE>, value=[1, 2, 3], has_explicit_type=TRUE)
+        | +-FunctionArgument
+        | | +-expr=
+        | |   +-Literal(type=ARRAY<STRING>, value=["string_col"])
+        | +-FunctionArgument
+        | | +-expr=
+        | |   +-Literal(type=STRING, value="query_string")
+        | +-FunctionArgument
+        | | +-expr=
+        | |   +-FunctionCall(GoogleSQL:ifnull(JSON, JSON) -> JSON)
+        | |     +-Literal(type=JSON, value=NULL)
+        | |     +-Literal(type=JSON, value={"key1":1,"key2":2}, has_explicit_type=TRUE)
+        | +-FunctionArgument
+        | | +-expr=
+        | |   +-Literal(type=INT64, value=10)
+        | +-FunctionArgument
+        | | +-expr=
+        | |   +-Literal(type=STRING, value="EUCLIDEAN")
+        | +-FunctionArgument
+        |   +-expr=
+        |     +-Literal(type=DOUBLE, value=NULL)
+        +-column_index_list=[0, 1]
+        +-function_call_signature=(ANY TABLE, STRING column_to_search, ARRAY<DOUBLE> query_value, ARRAY<STRING> lexical_search_columns, STRING lexical_search_query_value, optional(1) JSON options, optional(1) INT64 top_k, optional(1) STRING distance_type, optional(1) DOUBLE max_distance) -> ANY TABLE
+==
+
+# options argument is not a proto or JSON
+SELECT * FROM hybrid_vector_search(
+  TABLE base_table,
+  'embedding',
+  query_value => ARRAY<DOUBLE>[1.0, 2.0, 3.0],
+  lexical_search_columns => ['string_col'],
+  lexical_search_query_value => 'query_string',
+  options => CAST(1 AS STRING)
+)
+--
+ERROR: No matching signature for table valued function : HYBRID_VECTOR_SEARCH. Supported Signatures: HYBRID_VECTOR_SEARCH(TABLE, column_to_search => STRING, TABLE, lexical_search_columns => ARRAY<STRING>, [query_column_to_search => STRING], [lexical_search_query_column => STRING], [options => googlesql_test.TestApproxDistanceFunctionOptionsProto], [top_k => INT64], [distance_type => STRING], [max_distance => DOUBLE]); HYBRID_VECTOR_SEARCH(TABLE, column_to_search => STRING, TABLE, lexical_search_columns => ARRAY<STRING>, [query_column_to_search => STRING], [lexical_search_query_column => STRING], [options => JSON], [top_k => INT64], [distance_type => STRING], [max_distance => DOUBLE]); HYBRID_VECTOR_SEARCH(TABLE, column_to_search => STRING, query_value => ARRAY<FLOAT>, lexical_search_columns => ARRAY<STRING>, lexical_search_query_value => STRING, [options => googlesql_test.TestApproxDistanceFunctionOptionsProto], [top_k => INT64], [distance_type => STRING], [max_distance => DOUBLE]); HYBRID_VECTOR_SEARCH(TABLE, column_to_search => STRING, query_value => ARRAY<FLOAT>, lexical_search_columns => ARRAY<STRING>, lexical_search_query_value => STRING, [options => JSON], [top_k => INT64], [distance_type => STRING], [max_distance => DOUBLE]); HYBRID_VECTOR_SEARCH(TABLE, column_to_search => STRING, query_value => ARRAY<DOUBLE>, lexical_search_columns => ARRAY<STRING>, lexical_search_query_value => STRING, [options => googlesql_test.TestApproxDistanceFunctionOptionsProto], [top_k => INT64], [distance_type => STRING], [max_distance => DOUBLE]); HYBRID_VECTOR_SEARCH(TABLE, column_to_search => STRING, query_value => ARRAY<DOUBLE>, lexical_search_columns => ARRAY<STRING>, lexical_search_query_value => STRING, [options => JSON], [top_k => INT64], [distance_type => STRING], [max_distance => DOUBLE]); HYBRID_VECTOR_SEARCH(TABLE, column_to_search => STRING, query_value => STRING, lexical_search_columns => ARRAY<STRING>, lexical_search_query_value => STRING, [options => googlesql_test.TestApproxDistanceFunctionOptionsProto], [top_k => INT64], [distance_type => STRING], [max_distance => DOUBLE]); HYBRID_VECTOR_SEARCH(TABLE, column_to_search => STRING, query_value => STRING, lexical_search_columns => ARRAY<STRING>, lexical_search_query_value => STRING, [options => JSON], [top_k => INT64], [distance_type => STRING], [max_distance => DOUBLE]) [at 1:15]
+SELECT * FROM hybrid_vector_search(
+              ^
+==
+
+# Invalid options value
+SELECT * FROM hybrid_vector_search(
+  TABLE base_table,
+  'embedding',
+  query_value => ARRAY<DOUBLE>[1.0, 2.0, 3.0],
+  lexical_search_columns => ['string_col'],
+  lexical_search_query_value => 'query_string',
+  options => 'invalid_json'
+)
+--
+ERROR: Could not cast literal "invalid_json" to type googlesql_test.TestApproxDistanceFunctionOptionsProto (Error parsing proto: Message type "googlesql_test.TestApproxDistanceFunctionOptionsProto" has no field named "invalid_json". [1:13]) [at 7:14]
+  options => 'invalid_json'
+             ^
+==
+
+# Invalid JSON literal options value
+SELECT * FROM hybrid_vector_search(
+  TABLE base_table,
+  'embedding',
+  query_value => ARRAY<DOUBLE>[1.0, 2.0, 3.0],
+  lexical_search_columns => ['string_col'],
+  lexical_search_query_value => 'query_string',
+  options => JSON '{"top_k": 5'
+)
+--
+ERROR: No matching signature for table valued function : HYBRID_VECTOR_SEARCH. Supported Signatures: HYBRID_VECTOR_SEARCH(TABLE, column_to_search => STRING, TABLE, lexical_search_columns => ARRAY<STRING>, [query_column_to_search => STRING], [lexical_search_query_column => STRING], [options => googlesql_test.TestApproxDistanceFunctionOptionsProto], [top_k => INT64], [distance_type => STRING], [max_distance => DOUBLE]); HYBRID_VECTOR_SEARCH(TABLE, column_to_search => STRING, TABLE, lexical_search_columns => ARRAY<STRING>, [query_column_to_search => STRING], [lexical_search_query_column => STRING], [options => JSON], [top_k => INT64], [distance_type => STRING], [max_distance => DOUBLE]); HYBRID_VECTOR_SEARCH(TABLE, column_to_search => STRING, query_value => ARRAY<FLOAT>, lexical_search_columns => ARRAY<STRING>, lexical_search_query_value => STRING, [options => googlesql_test.TestApproxDistanceFunctionOptionsProto], [top_k => INT64], [distance_type => STRING], [max_distance => DOUBLE]); HYBRID_VECTOR_SEARCH(TABLE, column_to_search => STRING, query_value => ARRAY<FLOAT>, lexical_search_columns => ARRAY<STRING>, lexical_search_query_value => STRING, [options => JSON], [top_k => INT64], [distance_type => STRING], [max_distance => DOUBLE]); HYBRID_VECTOR_SEARCH(TABLE, column_to_search => STRING, query_value => ARRAY<DOUBLE>, lexical_search_columns => ARRAY<STRING>, lexical_search_query_value => STRING, [options => googlesql_test.TestApproxDistanceFunctionOptionsProto], [top_k => INT64], [distance_type => STRING], [max_distance => DOUBLE]); HYBRID_VECTOR_SEARCH(TABLE, column_to_search => STRING, query_value => ARRAY<DOUBLE>, lexical_search_columns => ARRAY<STRING>, lexical_search_query_value => STRING, [options => JSON], [top_k => INT64], [distance_type => STRING], [max_distance => DOUBLE]); HYBRID_VECTOR_SEARCH(TABLE, column_to_search => STRING, query_value => STRING, lexical_search_columns => ARRAY<STRING>, lexical_search_query_value => STRING, [options => googlesql_test.TestApproxDistanceFunctionOptionsProto], [top_k => INT64], [distance_type => STRING], [max_distance => DOUBLE]); HYBRID_VECTOR_SEARCH(TABLE, column_to_search => STRING, query_value => STRING, lexical_search_columns => ARRAY<STRING>, lexical_search_query_value => STRING, [options => JSON], [top_k => INT64], [distance_type => STRING], [max_distance => DOUBLE]) [at 1:15]
+SELECT * FROM hybrid_vector_search(
+              ^
+==
+
+# NULL column_to_search argument
+SELECT * FROM hybrid_vector_search(
+  TABLE base_table,
+  NULL,
+  query_value => ARRAY<DOUBLE>[1.0, 2.0, 3.0],
+  lexical_search_columns => ['string_col'],
+  lexical_search_query_value => 'query_string'
+)
+--
+ERROR: Argument 2 to table-valued function HYBRID_VECTOR_SEARCH must be non-NULL [at 3:3]
+  NULL,
+  ^
+==
+
+# NULL query_value argument
+SELECT * FROM hybrid_vector_search(
+  TABLE base_table,
+  'embedding',
+  query_value => NULL,
+  lexical_search_columns => ['string_col'],
+  lexical_search_query_value => 'query_string'
+)
+--
+ERROR: Argument 'query_value' to table-valued function HYBRID_VECTOR_SEARCH must be non-NULL [at 4:3]
+  query_value => NULL,
+  ^
+==
+
+# NULL lexical_search_columns argument
+SELECT * FROM hybrid_vector_search(
+  TABLE base_table,
+  'embedding',
+  query_value => ARRAY<DOUBLE>[1.0, 2.0, 3.0],
+  lexical_search_columns => NULL,
+  lexical_search_query_value => 'query_string'
+)
+--
+ERROR: Argument 'lexical_search_columns' to table-valued function HYBRID_VECTOR_SEARCH must be non-NULL [at 5:3]
+  lexical_search_columns => NULL,
+  ^
+==
+
+# NULL lexical_search_query_value argument
+SELECT * FROM hybrid_vector_search(
+  TABLE base_table,
+  'embedding',
+  query_value => ARRAY<DOUBLE>[1.0, 2.0, 3.0],
+  lexical_search_columns => ['string_col'],
+  lexical_search_query_value => NULL
+)
+--
+ERROR: Argument 'lexical_search_query_value' to table-valued function HYBRID_VECTOR_SEARCH must be non-NULL [at 6:3]
+  lexical_search_query_value => NULL
+  ^
+==
+
+# column_to_search argument is not constant
+SELECT * FROM hybrid_vector_search(
+  TABLE base_table,
+  CONCAT('a', 'b'),
+  query_value => ARRAY<DOUBLE>[1.0, 2.0, 3.0],
+  lexical_search_columns => ['string_col'],
+  lexical_search_query_value => 'query_string'
+)
+--
+QueryStmt
++-output_column_list=
+| +-hybrid_vector_search.base#16 AS base [STRUCT<id INT64, embedding ARRAY<DOUBLE>, string_col STRING>]
+| +-hybrid_vector_search.distance#17 AS distance [DOUBLE]
++-query=
+  +-ProjectScan
+    +-column_list=hybrid_vector_search.[base#16, distance#17]
+    +-input_scan=
+      +-TVFScan
+        +-column_list=hybrid_vector_search.[base#16, distance#17]
+        +-tvf=GoogleSQL:hybrid_vector_search
+        +-signature=(TABLE<id INT64, embedding ARRAY<DOUBLE>, string_col STRING>, STRING, ARRAY<DOUBLE>, ARRAY<STRING>, literal STRING, null PROTO<googlesql_test.TestApproxDistanceFunctionOptionsProto>, literal INT64, literal STRING, null DOUBLE) -> TABLE<base STRUCT<id INT64, embedding ARRAY<DOUBLE>, string_col STRING>, distance DOUBLE>
+        +-argument_list=
+        | +-FunctionArgument
+        | | +-scan=
+        | | | +-TableScan(column_list=base_table.[id#13, embedding#14, string_col#15], node_source="table_clause", table=base_table, column_index_list=[0, 1, 2])
+        | | +-argument_column_list=base_table.[id#13, embedding#14, string_col#15]
+        | +-FunctionArgument
+        | | +-expr=
+        | |   +-FunctionCall(GoogleSQL:concat(STRING, repeated(1) STRING) -> STRING)
+        | |     +-Literal(type=STRING, value="a")
+        | |     +-Literal(type=STRING, value="b")
+        | +-FunctionArgument
+        | | +-expr=
+        | |   +-Literal(type=ARRAY<DOUBLE>, value=[1, 2, 3], has_explicit_type=TRUE)
+        | +-FunctionArgument
+        | | +-expr=
+        | |   +-Literal(type=ARRAY<STRING>, value=["string_col"])
+        | +-FunctionArgument
+        | | +-expr=
+        | |   +-Literal(type=STRING, value="query_string")
+        | +-FunctionArgument
+        | | +-expr=
+        | |   +-Literal(type=PROTO<googlesql_test.TestApproxDistanceFunctionOptionsProto>, value=NULL, preserve_in_literal_remover=TRUE)
+        | +-FunctionArgument
+        | | +-expr=
+        | |   +-Literal(type=INT64, value=10)
+        | +-FunctionArgument
+        | | +-expr=
+        | |   +-Literal(type=STRING, value="EUCLIDEAN")
+        | +-FunctionArgument
+        |   +-expr=
+        |     +-Literal(type=DOUBLE, value=NULL)
+        +-column_index_list=[0, 1]
+        +-function_call_signature=(ANY TABLE, STRING column_to_search, ARRAY<DOUBLE> query_value, ARRAY<STRING> lexical_search_columns, STRING lexical_search_query_value, optional(1) PROTO<googlesql_test.TestApproxDistanceFunctionOptionsProto> options, optional(1) INT64 top_k, optional(1) STRING distance_type, optional(1) DOUBLE max_distance) -> ANY TABLE
+==
+
+# top_k argument is not a literal or query parameter
+SELECT * FROM hybrid_vector_search(
+  TABLE base_table,
+  'embedding',
+  query_value => ARRAY<DOUBLE>[1.0, 2.0, 3.0],
+  lexical_search_columns => ['string_col'],
+  lexical_search_query_value => 'query_string',
+  top_k => 5 + 6,
+  distance_type => 'COSINE',
+  max_distance => 0.8,
+  options => new googlesql_test.TestApproxDistanceFunctionOptionsProto(1 as key, "value2" as value)
+)
+--
+QueryStmt
++-output_column_list=
+| +-hybrid_vector_search.base#16 AS base [STRUCT<id INT64, embedding ARRAY<DOUBLE>, string_col STRING>]
+| +-hybrid_vector_search.distance#17 AS distance [DOUBLE]
++-query=
+  +-ProjectScan
+    +-column_list=hybrid_vector_search.[base#16, distance#17]
+    +-input_scan=
+      +-TVFScan
+        +-column_list=hybrid_vector_search.[base#16, distance#17]
+        +-tvf=GoogleSQL:hybrid_vector_search
+        +-signature=(TABLE<id INT64, embedding ARRAY<DOUBLE>, string_col STRING>, literal STRING, ARRAY<DOUBLE>, ARRAY<STRING>, literal STRING, PROTO<googlesql_test.TestApproxDistanceFunctionOptionsProto>, INT64, literal STRING, literal DOUBLE) -> TABLE<base STRUCT<id INT64, embedding ARRAY<DOUBLE>, string_col STRING>, distance DOUBLE>
+        +-argument_list=
+        | +-FunctionArgument
+        | | +-scan=
+        | | | +-TableScan(column_list=base_table.[id#13, embedding#14, string_col#15], node_source="table_clause", table=base_table, column_index_list=[0, 1, 2])
+        | | +-argument_column_list=base_table.[id#13, embedding#14, string_col#15]
+        | +-FunctionArgument
+        | | +-expr=
+        | |   +-Literal(type=STRING, value="embedding")
+        | +-FunctionArgument
+        | | +-expr=
+        | |   +-Literal(type=ARRAY<DOUBLE>, value=[1, 2, 3], has_explicit_type=TRUE)
+        | +-FunctionArgument
+        | | +-expr=
+        | |   +-Literal(type=ARRAY<STRING>, value=["string_col"])
+        | +-FunctionArgument
+        | | +-expr=
+        | |   +-Literal(type=STRING, value="query_string")
+        | +-FunctionArgument
+        | | +-expr=
+        | |   +-MakeProto
+        | |     +-type=PROTO<googlesql_test.TestApproxDistanceFunctionOptionsProto>
+        | |     +-field_list=
+        | |       +-key := Literal(type=INT64, value=1)
+        | |       +-value := Literal(type=STRING, value="value2")
+        | +-FunctionArgument
+        | | +-expr=
+        | |   +-FunctionCall(GoogleSQL:$add(INT64, INT64) -> INT64)
+        | |     +-Literal(type=INT64, value=5)
+        | |     +-Literal(type=INT64, value=6)
+        | +-FunctionArgument
+        | | +-expr=
+        | |   +-Literal(type=STRING, value="COSINE")
+        | +-FunctionArgument
+        |   +-expr=
+        |     +-Literal(type=DOUBLE, value=0.8, float_literal_id=12)
+        +-column_index_list=[0, 1]
+        +-function_call_signature=(ANY TABLE, STRING column_to_search, ARRAY<DOUBLE> query_value, ARRAY<STRING> lexical_search_columns, STRING lexical_search_query_value, optional(1) PROTO<googlesql_test.TestApproxDistanceFunctionOptionsProto> options, optional(1) INT64 top_k, optional(1) STRING distance_type, optional(1) DOUBLE max_distance) -> ANY TABLE
+==
+
+# max_distance argument is not a literal or query parameter
+SELECT * FROM hybrid_vector_search(
+  TABLE base_table,
+  'embedding',
+  query_value => ARRAY<DOUBLE>[1.0, 2.0, 3.0],
+  lexical_search_columns => ['string_col'],
+  lexical_search_query_value => 'query_string',
+  max_distance => 0.8 + 0.9,
+  distance_type => 'COSINE',
+  options => new googlesql_test.TestApproxDistanceFunctionOptionsProto(1 as key, "value2" as value)
+)
+--
+QueryStmt
++-output_column_list=
+| +-hybrid_vector_search.base#16 AS base [STRUCT<id INT64, embedding ARRAY<DOUBLE>, string_col STRING>]
+| +-hybrid_vector_search.distance#17 AS distance [DOUBLE]
++-query=
+  +-ProjectScan
+    +-column_list=hybrid_vector_search.[base#16, distance#17]
+    +-input_scan=
+      +-TVFScan
+        +-column_list=hybrid_vector_search.[base#16, distance#17]
+        +-tvf=GoogleSQL:hybrid_vector_search
+        +-signature=(TABLE<id INT64, embedding ARRAY<DOUBLE>, string_col STRING>, literal STRING, ARRAY<DOUBLE>, ARRAY<STRING>, literal STRING, PROTO<googlesql_test.TestApproxDistanceFunctionOptionsProto>, literal INT64, literal STRING, DOUBLE) -> TABLE<base STRUCT<id INT64, embedding ARRAY<DOUBLE>, string_col STRING>, distance DOUBLE>
+        +-argument_list=
+        | +-FunctionArgument
+        | | +-scan=
+        | | | +-TableScan(column_list=base_table.[id#13, embedding#14, string_col#15], node_source="table_clause", table=base_table, column_index_list=[0, 1, 2])
+        | | +-argument_column_list=base_table.[id#13, embedding#14, string_col#15]
+        | +-FunctionArgument
+        | | +-expr=
+        | |   +-Literal(type=STRING, value="embedding")
+        | +-FunctionArgument
+        | | +-expr=
+        | |   +-Literal(type=ARRAY<DOUBLE>, value=[1, 2, 3], has_explicit_type=TRUE)
+        | +-FunctionArgument
+        | | +-expr=
+        | |   +-Literal(type=ARRAY<STRING>, value=["string_col"])
+        | +-FunctionArgument
+        | | +-expr=
+        | |   +-Literal(type=STRING, value="query_string")
+        | +-FunctionArgument
+        | | +-expr=
+        | |   +-MakeProto
+        | |     +-type=PROTO<googlesql_test.TestApproxDistanceFunctionOptionsProto>
+        | |     +-field_list=
+        | |       +-key := Literal(type=INT64, value=1)
+        | |       +-value := Literal(type=STRING, value="value2")
+        | +-FunctionArgument
+        | | +-expr=
+        | |   +-Literal(type=INT64, value=10)
+        | +-FunctionArgument
+        | | +-expr=
+        | |   +-Literal(type=STRING, value="COSINE")
+        | +-FunctionArgument
+        |   +-expr=
+        |     +-FunctionCall(GoogleSQL:$add(DOUBLE, DOUBLE) -> DOUBLE)
+        |       +-Literal(type=DOUBLE, value=0.8, float_literal_id=14)
+        |       +-Literal(type=DOUBLE, value=0.9, float_literal_id=15)
+        +-column_index_list=[0, 1]
+        +-function_call_signature=(ANY TABLE, STRING column_to_search, ARRAY<DOUBLE> query_value, ARRAY<STRING> lexical_search_columns, STRING lexical_search_query_value, optional(1) PROTO<googlesql_test.TestApproxDistanceFunctionOptionsProto> options, optional(1) INT64 top_k, optional(1) STRING distance_type, optional(1) DOUBLE max_distance) -> ANY TABLE
+==
+
+# Single HYBRID_VECTOR_SEARCH, options proto not passed with named argument
+SELECT * FROM hybrid_vector_search(
+  TABLE base_table,
+  'embedding',
+  query_value => ARRAY<DOUBLE>[1.0, 2.0, 3.0],
+  lexical_search_columns => ['string_col'],
+  lexical_search_query_value => 'query_string',
+  new googlesql_test.TestApproxDistanceFunctionOptionsProto(1 as key, "value2" as value),
+  max_distance => 0.8,
+  distance_type => 'COSINE'
+)
+--
+ERROR: No matching signature for table valued function : HYBRID_VECTOR_SEARCH. Supported Signatures: HYBRID_VECTOR_SEARCH(TABLE, column_to_search => STRING, TABLE, lexical_search_columns => ARRAY<STRING>, [query_column_to_search => STRING], [lexical_search_query_column => STRING], [options => googlesql_test.TestApproxDistanceFunctionOptionsProto], [top_k => INT64], [distance_type => STRING], [max_distance => DOUBLE]); HYBRID_VECTOR_SEARCH(TABLE, column_to_search => STRING, TABLE, lexical_search_columns => ARRAY<STRING>, [query_column_to_search => STRING], [lexical_search_query_column => STRING], [options => JSON], [top_k => INT64], [distance_type => STRING], [max_distance => DOUBLE]); HYBRID_VECTOR_SEARCH(TABLE, column_to_search => STRING, query_value => ARRAY<FLOAT>, lexical_search_columns => ARRAY<STRING>, lexical_search_query_value => STRING, [options => googlesql_test.TestApproxDistanceFunctionOptionsProto], [top_k => INT64], [distance_type => STRING], [max_distance => DOUBLE]); HYBRID_VECTOR_SEARCH(TABLE, column_to_search => STRING, query_value => ARRAY<FLOAT>, lexical_search_columns => ARRAY<STRING>, lexical_search_query_value => STRING, [options => JSON], [top_k => INT64], [distance_type => STRING], [max_distance => DOUBLE]); HYBRID_VECTOR_SEARCH(TABLE, column_to_search => STRING, query_value => ARRAY<DOUBLE>, lexical_search_columns => ARRAY<STRING>, lexical_search_query_value => STRING, [options => googlesql_test.TestApproxDistanceFunctionOptionsProto], [top_k => INT64], [distance_type => STRING], [max_distance => DOUBLE]); HYBRID_VECTOR_SEARCH(TABLE, column_to_search => STRING, query_value => ARRAY<DOUBLE>, lexical_search_columns => ARRAY<STRING>, lexical_search_query_value => STRING, [options => JSON], [top_k => INT64], [distance_type => STRING], [max_distance => DOUBLE]); HYBRID_VECTOR_SEARCH(TABLE, column_to_search => STRING, query_value => STRING, lexical_search_columns => ARRAY<STRING>, lexical_search_query_value => STRING, [options => googlesql_test.TestApproxDistanceFunctionOptionsProto], [top_k => INT64], [distance_type => STRING], [max_distance => DOUBLE]); HYBRID_VECTOR_SEARCH(TABLE, column_to_search => STRING, query_value => STRING, lexical_search_columns => ARRAY<STRING>, lexical_search_query_value => STRING, [options => JSON], [top_k => INT64], [distance_type => STRING], [max_distance => DOUBLE]) [at 1:15]
+SELECT * FROM hybrid_vector_search(
+              ^
+==
+
+# query_value not passed with named argument
+SELECT * FROM hybrid_vector_search(
+  TABLE base_table,
+  'embedding',
+  ARRAY<DOUBLE>[1.0, 2.0, 3.0],
+  lexical_search_columns => ['string_col'],
+  lexical_search_query_value => 'query_string'
+)
+--
+ERROR: No matching signature for table valued function : HYBRID_VECTOR_SEARCH. Supported Signatures: HYBRID_VECTOR_SEARCH(TABLE, column_to_search => STRING, TABLE, lexical_search_columns => ARRAY<STRING>, [query_column_to_search => STRING], [lexical_search_query_column => STRING], [options => googlesql_test.TestApproxDistanceFunctionOptionsProto], [top_k => INT64], [distance_type => STRING], [max_distance => DOUBLE]); HYBRID_VECTOR_SEARCH(TABLE, column_to_search => STRING, TABLE, lexical_search_columns => ARRAY<STRING>, [query_column_to_search => STRING], [lexical_search_query_column => STRING], [options => JSON], [top_k => INT64], [distance_type => STRING], [max_distance => DOUBLE]); HYBRID_VECTOR_SEARCH(TABLE, column_to_search => STRING, query_value => ARRAY<FLOAT>, lexical_search_columns => ARRAY<STRING>, lexical_search_query_value => STRING, [options => googlesql_test.TestApproxDistanceFunctionOptionsProto], [top_k => INT64], [distance_type => STRING], [max_distance => DOUBLE]); HYBRID_VECTOR_SEARCH(TABLE, column_to_search => STRING, query_value => ARRAY<FLOAT>, lexical_search_columns => ARRAY<STRING>, lexical_search_query_value => STRING, [options => JSON], [top_k => INT64], [distance_type => STRING], [max_distance => DOUBLE]); HYBRID_VECTOR_SEARCH(TABLE, column_to_search => STRING, query_value => ARRAY<DOUBLE>, lexical_search_columns => ARRAY<STRING>, lexical_search_query_value => STRING, [options => googlesql_test.TestApproxDistanceFunctionOptionsProto], [top_k => INT64], [distance_type => STRING], [max_distance => DOUBLE]); HYBRID_VECTOR_SEARCH(TABLE, column_to_search => STRING, query_value => ARRAY<DOUBLE>, lexical_search_columns => ARRAY<STRING>, lexical_search_query_value => STRING, [options => JSON], [top_k => INT64], [distance_type => STRING], [max_distance => DOUBLE]); HYBRID_VECTOR_SEARCH(TABLE, column_to_search => STRING, query_value => STRING, lexical_search_columns => ARRAY<STRING>, lexical_search_query_value => STRING, [options => googlesql_test.TestApproxDistanceFunctionOptionsProto], [top_k => INT64], [distance_type => STRING], [max_distance => DOUBLE]); HYBRID_VECTOR_SEARCH(TABLE, column_to_search => STRING, query_value => STRING, lexical_search_columns => ARRAY<STRING>, lexical_search_query_value => STRING, [options => JSON], [top_k => INT64], [distance_type => STRING], [max_distance => DOUBLE]) [at 1:15]
+SELECT * FROM hybrid_vector_search(
+              ^
+==
+
+# lexical_search_columns not passed with named argument
+SELECT * FROM hybrid_vector_search(
+  TABLE base_table,
+  'embedding',
+  query_value => ARRAY<DOUBLE>[1.0, 2.0, 3.0],
+  ['string_col'],
+  lexical_search_query_value => 'query_string'
+)
+--
+ERROR: No matching signature for table valued function : HYBRID_VECTOR_SEARCH. Supported Signatures: HYBRID_VECTOR_SEARCH(TABLE, column_to_search => STRING, TABLE, lexical_search_columns => ARRAY<STRING>, [query_column_to_search => STRING], [lexical_search_query_column => STRING], [options => googlesql_test.TestApproxDistanceFunctionOptionsProto], [top_k => INT64], [distance_type => STRING], [max_distance => DOUBLE]); HYBRID_VECTOR_SEARCH(TABLE, column_to_search => STRING, TABLE, lexical_search_columns => ARRAY<STRING>, [query_column_to_search => STRING], [lexical_search_query_column => STRING], [options => JSON], [top_k => INT64], [distance_type => STRING], [max_distance => DOUBLE]); HYBRID_VECTOR_SEARCH(TABLE, column_to_search => STRING, query_value => ARRAY<FLOAT>, lexical_search_columns => ARRAY<STRING>, lexical_search_query_value => STRING, [options => googlesql_test.TestApproxDistanceFunctionOptionsProto], [top_k => INT64], [distance_type => STRING], [max_distance => DOUBLE]); HYBRID_VECTOR_SEARCH(TABLE, column_to_search => STRING, query_value => ARRAY<FLOAT>, lexical_search_columns => ARRAY<STRING>, lexical_search_query_value => STRING, [options => JSON], [top_k => INT64], [distance_type => STRING], [max_distance => DOUBLE]); HYBRID_VECTOR_SEARCH(TABLE, column_to_search => STRING, query_value => ARRAY<DOUBLE>, lexical_search_columns => ARRAY<STRING>, lexical_search_query_value => STRING, [options => googlesql_test.TestApproxDistanceFunctionOptionsProto], [top_k => INT64], [distance_type => STRING], [max_distance => DOUBLE]); HYBRID_VECTOR_SEARCH(TABLE, column_to_search => STRING, query_value => ARRAY<DOUBLE>, lexical_search_columns => ARRAY<STRING>, lexical_search_query_value => STRING, [options => JSON], [top_k => INT64], [distance_type => STRING], [max_distance => DOUBLE]); HYBRID_VECTOR_SEARCH(TABLE, column_to_search => STRING, query_value => STRING, lexical_search_columns => ARRAY<STRING>, lexical_search_query_value => STRING, [options => googlesql_test.TestApproxDistanceFunctionOptionsProto], [top_k => INT64], [distance_type => STRING], [max_distance => DOUBLE]); HYBRID_VECTOR_SEARCH(TABLE, column_to_search => STRING, query_value => STRING, lexical_search_columns => ARRAY<STRING>, lexical_search_query_value => STRING, [options => JSON], [top_k => INT64], [distance_type => STRING], [max_distance => DOUBLE]) [at 1:15]
+SELECT * FROM hybrid_vector_search(
+              ^
+==
+
+# lexical_search_query_value not passed with named argument
+SELECT * FROM hybrid_vector_search(
+  TABLE base_table,
+  'embedding',
+  query_value => ARRAY<DOUBLE>[1.0, 2.0, 3.0],
+  lexical_search_columns => ['string_col'],
+  'query_string'
+)
+--
+ERROR: No matching signature for table valued function : HYBRID_VECTOR_SEARCH. Supported Signatures: HYBRID_VECTOR_SEARCH(TABLE, column_to_search => STRING, TABLE, lexical_search_columns => ARRAY<STRING>, [query_column_to_search => STRING], [lexical_search_query_column => STRING], [options => googlesql_test.TestApproxDistanceFunctionOptionsProto], [top_k => INT64], [distance_type => STRING], [max_distance => DOUBLE]); HYBRID_VECTOR_SEARCH(TABLE, column_to_search => STRING, TABLE, lexical_search_columns => ARRAY<STRING>, [query_column_to_search => STRING], [lexical_search_query_column => STRING], [options => JSON], [top_k => INT64], [distance_type => STRING], [max_distance => DOUBLE]); HYBRID_VECTOR_SEARCH(TABLE, column_to_search => STRING, query_value => ARRAY<FLOAT>, lexical_search_columns => ARRAY<STRING>, lexical_search_query_value => STRING, [options => googlesql_test.TestApproxDistanceFunctionOptionsProto], [top_k => INT64], [distance_type => STRING], [max_distance => DOUBLE]); HYBRID_VECTOR_SEARCH(TABLE, column_to_search => STRING, query_value => ARRAY<FLOAT>, lexical_search_columns => ARRAY<STRING>, lexical_search_query_value => STRING, [options => JSON], [top_k => INT64], [distance_type => STRING], [max_distance => DOUBLE]); HYBRID_VECTOR_SEARCH(TABLE, column_to_search => STRING, query_value => ARRAY<DOUBLE>, lexical_search_columns => ARRAY<STRING>, lexical_search_query_value => STRING, [options => googlesql_test.TestApproxDistanceFunctionOptionsProto], [top_k => INT64], [distance_type => STRING], [max_distance => DOUBLE]); HYBRID_VECTOR_SEARCH(TABLE, column_to_search => STRING, query_value => ARRAY<DOUBLE>, lexical_search_columns => ARRAY<STRING>, lexical_search_query_value => STRING, [options => JSON], [top_k => INT64], [distance_type => STRING], [max_distance => DOUBLE]); HYBRID_VECTOR_SEARCH(TABLE, column_to_search => STRING, query_value => STRING, lexical_search_columns => ARRAY<STRING>, lexical_search_query_value => STRING, [options => googlesql_test.TestApproxDistanceFunctionOptionsProto], [top_k => INT64], [distance_type => STRING], [max_distance => DOUBLE]); HYBRID_VECTOR_SEARCH(TABLE, column_to_search => STRING, query_value => STRING, lexical_search_columns => ARRAY<STRING>, lexical_search_query_value => STRING, [options => JSON], [top_k => INT64], [distance_type => STRING], [max_distance => DOUBLE]) [at 1:15]
+SELECT * FROM hybrid_vector_search(
+              ^
+==
+
+# top_k argument is 0
+SELECT * FROM hybrid_vector_search(
+  TABLE base_table,
+  'embedding',
+  query_value => ARRAY<DOUBLE>[1.0, 2.0, 3.0],
+  lexical_search_columns => ['string_col'],
+  lexical_search_query_value => 'query_string',
+  top_k => 0
+)
+--
+ERROR: Argument 'top_k' to table-valued function HYBRID_VECTOR_SEARCH must be at least 1 [at 7:3]
+  top_k => 0
+  ^
+==
+
+# top_k argument is negative
+SELECT * FROM hybrid_vector_search(
+  TABLE base_table,
+  'embedding',
+  query_value => ARRAY<DOUBLE>[1.0, 2.0, 3.0],
+  lexical_search_columns => ['string_col'],
+  lexical_search_query_value => 'query_string',
+  top_k => -1
+)
+--
+ERROR: Argument 'top_k' to table-valued function HYBRID_VECTOR_SEARCH must be at least 1 [at 7:3]
+  top_k => -1
+  ^
+==
+
+# distance_type argument is NULL
+SELECT * FROM hybrid_vector_search(
+  TABLE base_table,
+  'embedding',
+  query_value => ARRAY<DOUBLE>[1.0, 2.0, 3.0],
+  lexical_search_columns => ['string_col'],
+  lexical_search_query_value => 'query_string',
+  distance_type => NULL
+)
+--
+QueryStmt
++-output_column_list=
+| +-hybrid_vector_search.base#16 AS base [STRUCT<id INT64, embedding ARRAY<DOUBLE>, string_col STRING>]
+| +-hybrid_vector_search.distance#17 AS distance [DOUBLE]
++-query=
+  +-ProjectScan
+    +-column_list=hybrid_vector_search.[base#16, distance#17]
+    +-input_scan=
+      +-TVFScan
+        +-column_list=hybrid_vector_search.[base#16, distance#17]
+        +-tvf=GoogleSQL:hybrid_vector_search
+        +-signature=(TABLE<id INT64, embedding ARRAY<DOUBLE>, string_col STRING>, literal STRING, ARRAY<DOUBLE>, ARRAY<STRING>, literal STRING, null PROTO<googlesql_test.TestApproxDistanceFunctionOptionsProto>, literal INT64, null STRING, null DOUBLE) -> TABLE<base STRUCT<id INT64, embedding ARRAY<DOUBLE>, string_col STRING>, distance DOUBLE>
+        +-argument_list=
+        | +-FunctionArgument
+        | | +-scan=
+        | | | +-TableScan(column_list=base_table.[id#13, embedding#14, string_col#15], node_source="table_clause", table=base_table, column_index_list=[0, 1, 2])
+        | | +-argument_column_list=base_table.[id#13, embedding#14, string_col#15]
+        | +-FunctionArgument
+        | | +-expr=
+        | |   +-Literal(type=STRING, value="embedding")
+        | +-FunctionArgument
+        | | +-expr=
+        | |   +-Literal(type=ARRAY<DOUBLE>, value=[1, 2, 3], has_explicit_type=TRUE)
+        | +-FunctionArgument
+        | | +-expr=
+        | |   +-Literal(type=ARRAY<STRING>, value=["string_col"])
+        | +-FunctionArgument
+        | | +-expr=
+        | |   +-Literal(type=STRING, value="query_string")
+        | +-FunctionArgument
+        | | +-expr=
+        | |   +-Literal(type=PROTO<googlesql_test.TestApproxDistanceFunctionOptionsProto>, value=NULL, preserve_in_literal_remover=TRUE)
+        | +-FunctionArgument
+        | | +-expr=
+        | |   +-Literal(type=INT64, value=10)
+        | +-FunctionArgument
+        | | +-expr=
+        | |   +-Literal(type=STRING, value=NULL)
+        | +-FunctionArgument
+        |   +-expr=
+        |     +-Literal(type=DOUBLE, value=NULL)
+        +-column_index_list=[0, 1]
+        +-function_call_signature=(ANY TABLE, STRING column_to_search, ARRAY<DOUBLE> query_value, ARRAY<STRING> lexical_search_columns, STRING lexical_search_query_value, optional(1) PROTO<googlesql_test.TestApproxDistanceFunctionOptionsProto> options, optional(1) INT64 top_k, optional(1) STRING distance_type, optional(1) DOUBLE max_distance) -> ANY TABLE
+==
+
+# HYBRID_VECTOR_SEARCH TVF used in a function definition
+CREATE TEMP FUNCTION OneSidedChamferDistanceHybridSingle(
+  colA STRING,
+  distance_type STRING)
+RETURNS DOUBLE
+AS (
+  (
+    SELECT AVG(distance) AS distance
+    FROM
+      HYBRID_VECTOR_SEARCH(
+        TABLE base_table, colA,
+        query_value => ARRAY<DOUBLE>[1.0, 2.0, 3.0],
+        lexical_search_columns => ['string_col'],
+        lexical_search_query_value => 'query_string',
+        top_k => 1,
+        distance_type => distance_type)
+  )
+);
+--
+CreateFunctionStmt
++-name_path=OneSidedChamferDistanceHybridSingle
++-create_scope=CREATE_TEMP
++-has_explicit_return_type=TRUE
++-return_type=DOUBLE
++-argument_name_list=[colA, distance_type]
++-signature=(STRING colA, STRING distance_type) -> DOUBLE
++-language="SQL"
++-code="(\n    SELECT AVG(distance) AS distance\n    FROM\n      HYBRID_VECTOR_SEARCH(\n        TABLE base_table, colA,\n        query_value => ARRAY<DOUBLE>[1.0, 2.0, 3.0],\n        lexical_search_columns => ['string_col'],\n        lexical_search_query_value => 'query_string',\n        top_k => 1,\n        distance_type => distance_type)\n  )"
++-function_expression=
+  +-SubqueryExpr
+    +-type=DOUBLE
+    +-subquery_type=SCALAR
+    +-subquery=
+      +-ProjectScan
+        +-column_list=[$aggregate.distance#18]
+        +-input_scan=
+          +-AggregateScan
+            +-column_list=[$aggregate.distance#18]
+            +-input_scan=
+            | +-TVFScan
+            |   +-column_list=[HYBRID_VECTOR_SEARCH.distance#17]
+            |   +-tvf=GoogleSQL:hybrid_vector_search
+            |   +-signature=(TABLE<id INT64, embedding ARRAY<DOUBLE>, string_col STRING>, STRING, ARRAY<DOUBLE>, ARRAY<STRING>, literal STRING, null PROTO<googlesql_test.TestApproxDistanceFunctionOptionsProto>, literal INT64, STRING, null DOUBLE) -> TABLE<base STRUCT<id INT64, embedding ARRAY<DOUBLE>, string_col STRING>, distance DOUBLE>
+            |   +-argument_list=
+            |   | +-FunctionArgument
+            |   | | +-scan=
+            |   | | | +-TableScan(column_list=base_table.[id#13, embedding#14, string_col#15], node_source="table_clause", table=base_table, column_index_list=[0, 1, 2])
+            |   | | +-argument_column_list=base_table.[id#13, embedding#14, string_col#15]
+            |   | +-FunctionArgument
+            |   | | +-expr=
+            |   | |   +-ArgumentRef(type=STRING, name="colA")
+            |   | +-FunctionArgument
+            |   | | +-expr=
+            |   | |   +-Literal(type=ARRAY<DOUBLE>, value=[1, 2, 3], has_explicit_type=TRUE)
+            |   | +-FunctionArgument
+            |   | | +-expr=
+            |   | |   +-Literal(type=ARRAY<STRING>, value=["string_col"])
+            |   | +-FunctionArgument
+            |   | | +-expr=
+            |   | |   +-Literal(type=STRING, value="query_string")
+            |   | +-FunctionArgument
+            |   | | +-expr=
+            |   | |   +-Literal(type=PROTO<googlesql_test.TestApproxDistanceFunctionOptionsProto>, value=NULL, preserve_in_literal_remover=TRUE)
+            |   | +-FunctionArgument
+            |   | | +-expr=
+            |   | |   +-Literal(type=INT64, value=1)
+            |   | +-FunctionArgument
+            |   | | +-expr=
+            |   | |   +-ArgumentRef(type=STRING, name="distance_type")
+            |   | +-FunctionArgument
+            |   |   +-expr=
+            |   |     +-Literal(type=DOUBLE, value=NULL)
+            |   +-column_index_list=[1]
+            |   +-function_call_signature=(ANY TABLE, STRING column_to_search, ARRAY<DOUBLE> query_value, ARRAY<STRING> lexical_search_columns, STRING lexical_search_query_value, optional(1) PROTO<googlesql_test.TestApproxDistanceFunctionOptionsProto> options, optional(1) INT64 top_k, optional(1) STRING distance_type, optional(1) DOUBLE max_distance) -> ANY TABLE
+            +-aggregate_list=
+              +-distance#18 :=
+                +-AggregateFunctionCall(GoogleSQL:avg(DOUBLE) -> DOUBLE)
+                  +-ColumnRef(type=DOUBLE, column=HYBRID_VECTOR_SEARCH.distance#17)
+==
+
+[language_features=DEV,-SINGLE_HYBRID_VECTOR_SEARCH_TVF]
+# SINGLE_HYBRID_VECTOR_SEARCH_TVF language feature disabled (Single)
+SELECT * FROM hybrid_vector_search(
+  TABLE base_table,
+  'embedding',
+  query_value => ARRAY<DOUBLE>[1.0, 2.0, 3.0],
+  lexical_search_columns => ['string_col'],
+  lexical_search_query_value => 'query_string'
+)
+--
+ERROR: Table-valued function not found: hybrid_vector_search [at 2:15]
+SELECT * FROM hybrid_vector_search(
+              ^
+==
+
+[language_features=DEV,-SINGLE_HYBRID_VECTOR_SEARCH_TVF]
+# SINGLE_HYBRID_VECTOR_SEARCH_TVF language feature disabled (Batch)
 SELECT * FROM hybrid_vector_search(
   TABLE base_table,
   'embedding',
@@ -1093,3 +2259,4 @@ SELECT * FROM hybrid_vector_search(
 ERROR: Table-valued function not found: hybrid_vector_search [at 2:15]
 SELECT * FROM hybrid_vector_search(
               ^
+

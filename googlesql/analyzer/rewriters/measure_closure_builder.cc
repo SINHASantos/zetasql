@@ -23,8 +23,10 @@
 #include <utility>
 #include <vector>
 
+#include "googlesql/analyzer/annotation_propagator.h"
 #include "googlesql/analyzer/rewriters/measure_dependency_graph.h"
 #include "googlesql/public/catalog.h"
+#include "googlesql/public/types/annotation.h"
 #include "googlesql/public/types/struct_type.h"
 #include "googlesql/public/types/type_factory.h"
 #include "googlesql/resolved_ast/column_factory.h"
@@ -50,6 +52,29 @@ namespace {
 
 /* Helper functions for building closure types */
 
+absl::StatusOr<AnnotatedType> MakeAnnotatedStructType(
+    absl::Span<const StructType::StructField> fields,
+    absl::Span<const AnnotationMap* const> field_annotations,
+    TypeFactory& type_factory) {
+  GOOGLESQL_RET_CHECK_EQ(fields.size(), field_annotations.size());
+  const StructType* struct_type = nullptr;
+  GOOGLESQL_RETURN_IF_ERROR(type_factory.MakeStructType(fields, &struct_type));
+
+  std::unique_ptr<AnnotationMap> map = AnnotationMap::Create(struct_type);
+  StructAnnotationMap* struct_map = map->AsStructMap();
+  for (int i = 0; i < fields.size(); ++i) {
+    if (field_annotations[i] != nullptr) {
+      GOOGLESQL_RETURN_IF_ERROR(struct_map->CloneIntoField(i, field_annotations[i]));
+    }
+  }
+  map->Normalize();
+  const AnnotationMap* owned_map = nullptr;
+  if (!map->Empty()) {
+    GOOGLESQL_ASSIGN_OR_RETURN(owned_map, type_factory.TakeOwnership(std::move(map)));
+  }
+  return AnnotatedType(struct_type, owned_map);
+}
+
 // Builds a shared closure struct type for all the given `base_measures`.
 //
 // The shared type contains all columns referenced by any of the base measures,
@@ -62,7 +87,7 @@ namespace {
 //
 // Returns:
 // - The shared closure struct type.
-absl::StatusOr<const StructType*> BuildSharedBaseMeasureClosureType(
+absl::StatusOr<AnnotatedType> BuildSharedBaseMeasureClosureType(
     absl::Span<const MeasureGraph::Node* const> base_measures,
     const Table& table, TypeFactory& type_factory) {
   absl::btree_set<std::string, googlesql_base::CaseLess>
@@ -81,6 +106,7 @@ absl::StatusOr<const StructType*> BuildSharedBaseMeasureClosureType(
 
   // Build referenced_columns struct type
   std::vector<StructType::StructField> ref_fields;
+  std::vector<const AnnotationMap*> ref_annotations;
   for (int table_col_idx = 0; table_col_idx < table.NumColumns();
        ++table_col_idx) {
     const Column* column = table.GetColumn(table_col_idx);
@@ -90,32 +116,39 @@ absl::StatusOr<const StructType*> BuildSharedBaseMeasureClosureType(
       GOOGLESQL_RET_CHECK(!column->GetType()->IsMeasureType());
       ref_fields.push_back(
           StructType::StructField(column->Name(), column->GetType()));
+      ref_annotations.push_back(column->GetTypeAnnotationMap());
     }
   }
-  const StructType* referenced_columns_type = nullptr;
-  GOOGLESQL_RETURN_IF_ERROR(
-      type_factory.MakeStructType(ref_fields, &referenced_columns_type));
+  GOOGLESQL_ASSIGN_OR_RETURN(
+      AnnotatedType referenced_columns_annotated_type,
+      MakeAnnotatedStructType(ref_fields, ref_annotations, type_factory));
 
   // Build key_columns struct type
   std::vector<StructType::StructField> key_fields;
+  std::vector<const AnnotationMap*> key_annotations;
   key_fields.reserve(all_row_identity_column_indices.size());
+  key_annotations.reserve(all_row_identity_column_indices.size());
   for (int row_id_col_idx : all_row_identity_column_indices) {
     const Column* column = table.GetColumn(row_id_col_idx);
     GOOGLESQL_RET_CHECK(column != nullptr);
     key_fields.push_back(
         StructType::StructField(column->Name(), column->GetType()));
+    key_annotations.push_back(column->GetTypeAnnotationMap());
   }
-  const StructType* key_columns_type = nullptr;
-  GOOGLESQL_RETURN_IF_ERROR(type_factory.MakeStructType(key_fields, &key_columns_type));
+  GOOGLESQL_ASSIGN_OR_RETURN(
+      AnnotatedType key_columns_annotated_type,
+      MakeAnnotatedStructType(key_fields, key_annotations, type_factory));
 
   // Build closure struct type
   std::vector<StructType::StructField> closure_fields = {
-      {kReferencedColumnsFieldName, referenced_columns_type},
-      {kKeyColumnsFieldName, key_columns_type}};
-  const StructType* closure_type = nullptr;
-  GOOGLESQL_RETURN_IF_ERROR(type_factory.MakeStructType(closure_fields, &closure_type));
+      {kReferencedColumnsFieldName, referenced_columns_annotated_type.type},
+      {kKeyColumnsFieldName, key_columns_annotated_type.type}};
+  std::vector<const AnnotationMap*> closure_annotations = {
+      referenced_columns_annotated_type.annotation_map,
+      key_columns_annotated_type.annotation_map};
 
-  return closure_type;
+  return MakeAnnotatedStructType(closure_fields, closure_annotations,
+                                 type_factory);
 }
 
 // Computes the closure struct type for a specific measure `node`.
@@ -133,20 +166,22 @@ absl::StatusOr<const StructType*> BuildSharedBaseMeasureClosureType(
 //
 // Returns:
 // - The computed closure struct type.
-absl::StatusOr<const StructType*> BuildMeasureClosureType(
+absl::StatusOr<AnnotatedType> BuildMeasureClosureType(
     const MeasureGraph::Node& node,
-    const CaseInsensitiveMap<const StructType* const*>& computed_dependencies,
+    const CaseInsensitiveMap<const AnnotatedType*>& computed_dependencies,
     const Table& table, TypeFactory& type_factory) {
   GOOGLESQL_ASSIGN_OR_RETURN(CaseInsensitiveStringSet referenced_column_names,
                    GetExpressionColumnNames(*node.def_expr));
 
   // Build referenced_columns struct type.
   std::vector<StructType::StructField> ref_fields;
+  std::vector<const AnnotationMap*> ref_annotations;
   std::vector<std::string> sorted_names(referenced_column_names.begin(),
                                         referenced_column_names.end());
   std::sort(sorted_names.begin(), sorted_names.end(),
             googlesql_base::CaseLess());
   ref_fields.reserve(sorted_names.size());
+  ref_annotations.reserve(sorted_names.size());
 
   for (const std::string& name : sorted_names) {
     const Column* column = table.FindColumnByName(name);
@@ -156,45 +191,52 @@ absl::StatusOr<const StructType*> BuildMeasureClosureType(
       GOOGLESQL_RET_CHECK(it != computed_dependencies.end())
           << "Cannot find dependency type for: " << name;
       GOOGLESQL_RET_CHECK(it->second != nullptr);
-      const StructType* dep_closure_type = *it->second;
-      GOOGLESQL_RET_CHECK(dep_closure_type != nullptr);
+      const AnnotatedType& dep_closure_type = *it->second;
       ref_fields.push_back(
-          StructType::StructField(column->Name(), dep_closure_type));
+          StructType::StructField(column->Name(), dep_closure_type.type));
+      ref_annotations.push_back(dep_closure_type.annotation_map);
     } else {
       ref_fields.push_back(
           StructType::StructField(column->Name(), column->GetType()));
+      ref_annotations.push_back(column->GetTypeAnnotationMap());
     }
   }
-  const StructType* referenced_columns_type = nullptr;
-  GOOGLESQL_RETURN_IF_ERROR(
-      type_factory.MakeStructType(ref_fields, &referenced_columns_type));
+  GOOGLESQL_ASSIGN_OR_RETURN(
+      AnnotatedType referenced_columns_annotated_type,
+      MakeAnnotatedStructType(ref_fields, ref_annotations, type_factory));
 
   // Build key_columns struct type.
   std::vector<StructType::StructField> key_fields;
+  std::vector<const AnnotationMap*> key_annotations;
   key_fields.reserve(node.row_identity_column_indices.size());
+  key_annotations.reserve(node.row_identity_column_indices.size());
   for (int idx : node.row_identity_column_indices) {
     const Column* column = table.GetColumn(idx);
     GOOGLESQL_RET_CHECK(column != nullptr);
     key_fields.push_back(
         StructType::StructField(column->Name(), column->GetType()));
+    key_annotations.push_back(column->GetTypeAnnotationMap());
   }
-  const StructType* key_columns_type = nullptr;
-  GOOGLESQL_RETURN_IF_ERROR(type_factory.MakeStructType(key_fields, &key_columns_type));
+  GOOGLESQL_ASSIGN_OR_RETURN(
+      AnnotatedType key_columns_annotated_type,
+      MakeAnnotatedStructType(key_fields, key_annotations, type_factory));
 
   // Build closure struct type.
   std::vector<StructType::StructField> closure_fields = {
-      {kReferencedColumnsFieldName, referenced_columns_type},
-      {kKeyColumnsFieldName, key_columns_type}};
-  const StructType* closure_type = nullptr;
-  GOOGLESQL_RETURN_IF_ERROR(type_factory.MakeStructType(closure_fields, &closure_type));
+      {kReferencedColumnsFieldName, referenced_columns_annotated_type.type},
+      {kKeyColumnsFieldName, key_columns_annotated_type.type}};
+  std::vector<const AnnotationMap*> closure_annotations = {
+      referenced_columns_annotated_type.annotation_map,
+      key_columns_annotated_type.annotation_map};
 
-  return closure_type;
+  return MakeAnnotatedStructType(closure_fields, closure_annotations,
+                                 type_factory);
 }
 
 // Visitor that computes the closure struct types for measures from a scan.
 //
 // All the base measures will share a single closure struct type.
-class ScanClosureTypeVisitor : public MeasureGraphVisitor<const StructType*> {
+class ScanClosureTypeVisitor : public MeasureGraphVisitor<AnnotatedType> {
  public:
   static absl::StatusOr<std::unique_ptr<ScanClosureTypeVisitor>> Create(
       const MeasureGraph& graph, const Table& table, TypeFactory& type_factory);
@@ -204,15 +246,15 @@ class ScanClosureTypeVisitor : public MeasureGraphVisitor<const StructType*> {
   ScanClosureTypeVisitor(ScanClosureTypeVisitor&&) = default;
   ScanClosureTypeVisitor& operator=(ScanClosureTypeVisitor&&) = default;
 
-  absl::StatusOr<const StructType*> ComputeBase(
+  absl::StatusOr<AnnotatedType> ComputeBase(
       const MeasureGraph::Node& base_node) override {
-    GOOGLESQL_RET_CHECK(shared_base_type_ != nullptr);
+    GOOGLESQL_RET_CHECK(shared_base_type_.type != nullptr);
     return shared_base_type_;
   }
 
-  absl::StatusOr<const StructType*> ComputeDerived(
+  absl::StatusOr<AnnotatedType> ComputeDerived(
       const MeasureGraph::Node& node,
-      const CaseInsensitiveMap<const StructType* const*>& computed_dependencies)
+      const CaseInsensitiveMap<const AnnotatedType*>& computed_dependencies)
       override {
     return BuildMeasureClosureType(node, computed_dependencies, table_,
                                    type_factory_);
@@ -220,7 +262,9 @@ class ScanClosureTypeVisitor : public MeasureGraphVisitor<const StructType*> {
 
  private:
   ScanClosureTypeVisitor(const Table& table, TypeFactory& type_factory)
-      : table_(table), type_factory_(type_factory) {}
+      : table_(table),
+        type_factory_(type_factory),
+        shared_base_type_(/*type=*/nullptr) {}
 
   // Initializes the visitor by pre-computing the shared base closure type.
   absl::Status Init(const MeasureGraph& graph);
@@ -232,8 +276,7 @@ class ScanClosureTypeVisitor : public MeasureGraphVisitor<const StructType*> {
   TypeFactory& type_factory_;
 
   // The pre-computed shared closure struct type for all base measures.
-  // Can be null if there are no base measures in the graph.
-  const StructType* shared_base_type_ = nullptr;
+  AnnotatedType shared_base_type_;
 };
 
 absl::StatusOr<std::unique_ptr<ScanClosureTypeVisitor>>
@@ -283,10 +326,12 @@ class ScanClosureExprVisitor : public MeasureGraphVisitor<ClosureExprResult> {
   static absl::StatusOr<std::unique_ptr<ScanClosureExprVisitor>> Create(
       const MeasureGraph& graph, const Table& table,
       ColumnFactory& column_factory,
-      const CaseInsensitiveMap<const StructType*>& closure_types,
-      ColumnProvider& column_provider) {
-    auto visitor = absl::WrapUnique(new ScanClosureExprVisitor(
-        table, column_factory, closure_types, column_provider));
+      const CaseInsensitiveMap<AnnotatedType>& closure_types,
+      ColumnProvider& column_provider,
+      AnnotationPropagator& annotation_propagator) {
+    auto visitor = absl::WrapUnique(
+        new ScanClosureExprVisitor(table, column_factory, closure_types,
+                                   column_provider, annotation_propagator));
     GOOGLESQL_RETURN_IF_ERROR(visitor->Init(graph));
     return visitor;
   }
@@ -318,14 +363,15 @@ class ScanClosureExprVisitor : public MeasureGraphVisitor<ClosureExprResult> {
   }
 
  private:
-  ScanClosureExprVisitor(
-      const Table& table, ColumnFactory& column_factory,
-      const CaseInsensitiveMap<const StructType*>& closure_types,
-      ColumnProvider& column_provider)
+  ScanClosureExprVisitor(const Table& table, ColumnFactory& column_factory,
+                         const CaseInsensitiveMap<AnnotatedType>& closure_types,
+                         ColumnProvider& column_provider,
+                         AnnotationPropagator& annotation_propagator)
       : table_(table),
         column_factory_(column_factory),
         closure_types_(closure_types),
-        column_provider_(column_provider) {}
+        column_provider_(column_provider),
+        annotation_propagator_(annotation_propagator) {}
 
   // Initializes the visitor by verifying all the base measures share the same
   // closure struct type.
@@ -334,7 +380,7 @@ class ScanClosureExprVisitor : public MeasureGraphVisitor<ClosureExprResult> {
   // Builds the closure expression result for a measure node, and stores the
   // generated computed column in `computed_columns_`.
   absl::StatusOr<ClosureExprResult> BuildClosureExpr(
-      const StructType* closure_type, const std::string& measure_name,
+      AnnotatedType closure_annotated_type, const std::string& measure_name,
       const CaseInsensitiveMap<const ClosureExprResult*>&
           computed_dependencies);
 
@@ -345,10 +391,13 @@ class ScanClosureExprVisitor : public MeasureGraphVisitor<ClosureExprResult> {
   ColumnFactory& column_factory_;
 
   // Pre-computed closure struct types for all measures.
-  const CaseInsensitiveMap<const StructType*>& closure_types_;
+  const CaseInsensitiveMap<AnnotatedType>& closure_types_;
 
   // Provider to project or get columns from the source scan.
   ColumnProvider& column_provider_;
+
+  // Annotation propagator for attaching annotations bottom-up.
+  AnnotationPropagator& annotation_propagator_;
 
   // The pre-computed closure expression result for all base measures.
   // Initialized in Init().
@@ -374,17 +423,21 @@ absl::Status ScanClosureExprVisitor::Init(const MeasureGraph& graph) {
   auto shared_type_it = closure_types_.find(base_measures[0]->name);
   GOOGLESQL_RET_CHECK(shared_type_it != closure_types_.end())
       << "Missing closure type for base measure: " << base_measures[0]->name;
-  const StructType* shared_type = shared_type_it->second;
+  AnnotatedType shared_type = shared_type_it->second;
 
   for (size_t i = 1; i < base_measures.size(); ++i) {
     auto type_it = closure_types_.find(base_measures[i]->name);
     GOOGLESQL_RET_CHECK(type_it != closure_types_.end())
         << "Missing closure type for base measure: " << base_measures[i]->name;
-    GOOGLESQL_RET_CHECK(type_it->second->Equals(shared_type))
+    GOOGLESQL_RET_CHECK(type_it->second.type->Equals(shared_type.type))
         << "Base measures do not have the same closure type. "
-        << base_measures[0]->name << " has type " << shared_type->DebugString()
-        << ", but " << base_measures[i]->name << " has type "
-        << type_it->second->DebugString();
+        << base_measures[0]->name << " has type "
+        << shared_type.type->DebugString() << ", but " << base_measures[i]->name
+        << " has type " << type_it->second.type->DebugString();
+    GOOGLESQL_RET_CHECK(AnnotationMap::Equals(type_it->second.annotation_map,
+                                    shared_type.annotation_map))
+        << "Base measures do not have the same closure type annotations. "
+        << base_measures[0]->name << " vs " << base_measures[i]->name;
   }
 
   GOOGLESQL_ASSIGN_OR_RETURN(shared_base_result_,
@@ -395,8 +448,9 @@ absl::Status ScanClosureExprVisitor::Init(const MeasureGraph& graph) {
 }
 
 absl::StatusOr<ClosureExprResult> ScanClosureExprVisitor::BuildClosureExpr(
-    const StructType* closure_type, const std::string& measure_name,
+    AnnotatedType closure_annotated_type, const std::string& measure_name,
     const CaseInsensitiveMap<const ClosureExprResult*>& computed_dependencies) {
+  const StructType* closure_type = closure_annotated_type.type->AsStruct();
   GOOGLESQL_RET_CHECK(closure_type != nullptr);
   GOOGLESQL_RET_CHECK(closure_type->fields().size() == 2);
   GOOGLESQL_RET_CHECK(closure_type->field(0).type->IsStruct());
@@ -427,7 +481,7 @@ absl::StatusOr<ClosureExprResult> ScanClosureExprVisitor::BuildClosureExpr(
       const ResolvedColumn& dep_closure_col = dep_result->closure_column;
 
       ref_exprs.push_back(MakeResolvedColumnRef(
-          field.type, dep_closure_col,
+          dep_closure_col,
           // These columns will be added to the expr_list of the ProjectScans,
           // so they are not correlated.
           /*is_correlated=*/false));
@@ -438,15 +492,17 @@ absl::StatusOr<ClosureExprResult> ScanClosureExprVisitor::BuildClosureExpr(
       GOOGLESQL_ASSIGN_OR_RETURN(ResolvedColumn non_measure_col,
                        column_provider_.GetOrProjectColumn(column));
       ref_exprs.push_back(MakeResolvedColumnRef(
-          field.type, non_measure_col,
+          non_measure_col,
           // These columns are from or will be projected by the measure source
           // scan, so they are not correlated.
           /*is_correlated=*/false));
       required_dependencies.insert(non_measure_col);
     }
   }
-  auto ref_struct_expr =
+  std::unique_ptr<ResolvedMakeStruct> ref_struct_expr =
       MakeResolvedMakeStruct(ref_struct_type, std::move(ref_exprs));
+  GOOGLESQL_RETURN_IF_ERROR(annotation_propagator_.CheckAndPropagateAnnotations(
+      nullptr, ref_struct_expr.get()));
 
   // Build the key columns struct expression.
   std::vector<std::unique_ptr<const ResolvedExpr>> key_exprs;
@@ -455,24 +511,28 @@ absl::StatusOr<ClosureExprResult> ScanClosureExprVisitor::BuildClosureExpr(
     GOOGLESQL_RET_CHECK(column != nullptr);
     GOOGLESQL_ASSIGN_OR_RETURN(ResolvedColumn key_col,
                      column_provider_.GetOrProjectColumn(column));
-    key_exprs.push_back(MakeResolvedColumnRef(field.type, key_col,
+    key_exprs.push_back(MakeResolvedColumnRef(key_col,
                                               /*is_correlated=*/false));
     required_dependencies.insert(key_col);
   }
-  auto key_struct_expr =
+  std::unique_ptr<ResolvedMakeStruct> key_struct_expr =
       MakeResolvedMakeStruct(key_struct_type, std::move(key_exprs));
+  GOOGLESQL_RETURN_IF_ERROR(annotation_propagator_.CheckAndPropagateAnnotations(
+      nullptr, key_struct_expr.get()));
 
   // Build the closure struct expression.
   std::vector<std::unique_ptr<const ResolvedExpr>> wrapping_exprs;
   wrapping_exprs.push_back(std::move(ref_struct_expr));
   wrapping_exprs.push_back(std::move(key_struct_expr));
-  auto closure_expr =
+  std::unique_ptr<ResolvedMakeStruct> closure_expr =
       MakeResolvedMakeStruct(closure_type, std::move(wrapping_exprs));
+  GOOGLESQL_RETURN_IF_ERROR(annotation_propagator_.CheckAndPropagateAnnotations(
+      nullptr, closure_expr.get()));
 
   const std::string closure_column_name =
       absl::StrCat("struct_for_measures_from_table_", table_.Name());
   ResolvedColumn closure_column = column_factory_.MakeCol(
-      table_.Name(), closure_column_name, closure_expr->type());
+      table_.Name(), closure_column_name, closure_expr->annotated_type());
 
   computed_columns_[measure_name] =
       MakeResolvedComputedColumn(closure_column, std::move(closure_expr));
@@ -485,8 +545,7 @@ absl::StatusOr<ClosureExprResult> ScanClosureExprVisitor::BuildClosureExpr(
 // Visitor that computes the closure struct types for measures from a row type.
 //
 // Each measure type has its own closure struct type.
-class RowTypeClosureTypeVisitor
-    : public MeasureGraphVisitor<const StructType*> {
+class RowTypeClosureTypeVisitor : public MeasureGraphVisitor<AnnotatedType> {
  public:
   RowTypeClosureTypeVisitor(const Table& table, TypeFactory& type_factory)
       : table_(table), type_factory_(type_factory) {}
@@ -497,12 +556,12 @@ class RowTypeClosureTypeVisitor
   RowTypeClosureTypeVisitor(RowTypeClosureTypeVisitor&&) = default;
   RowTypeClosureTypeVisitor& operator=(RowTypeClosureTypeVisitor&&) = default;
 
-  absl::StatusOr<const StructType*> ComputeBase(
+  absl::StatusOr<AnnotatedType> ComputeBase(
       const MeasureGraph::Node& base_node) override;
 
-  absl::StatusOr<const StructType*> ComputeDerived(
+  absl::StatusOr<AnnotatedType> ComputeDerived(
       const MeasureGraph::Node& node,
-      const CaseInsensitiveMap<const StructType* const*>& computed_dependencies)
+      const CaseInsensitiveMap<const AnnotatedType*>& computed_dependencies)
       override;
 
  private:
@@ -510,22 +569,22 @@ class RowTypeClosureTypeVisitor
   TypeFactory& type_factory_;
 };
 
-absl::StatusOr<const StructType*> RowTypeClosureTypeVisitor::ComputeBase(
+absl::StatusOr<AnnotatedType> RowTypeClosureTypeVisitor::ComputeBase(
     const MeasureGraph::Node& base_node) {
   return BuildMeasureClosureType(base_node, /*computed_dependencies=*/{},
                                  table_, type_factory_);
 }
 
-absl::StatusOr<const StructType*> RowTypeClosureTypeVisitor::ComputeDerived(
+absl::StatusOr<AnnotatedType> RowTypeClosureTypeVisitor::ComputeDerived(
     const MeasureGraph::Node& node,
-    const CaseInsensitiveMap<const StructType* const*>& computed_dependencies) {
+    const CaseInsensitiveMap<const AnnotatedType*>& computed_dependencies) {
   return BuildMeasureClosureType(node, computed_dependencies, table_,
                                  type_factory_);
 }
 
 }  // namespace
 
-absl::StatusOr<CaseInsensitiveMap<const StructType*>>
+absl::StatusOr<CaseInsensitiveMap<AnnotatedType>>
 ComputeClosureTypesForMeasuresFromScan(const MeasureGraph& graph,
                                        const Table& table,
                                        TypeFactory& type_factory) {
@@ -534,7 +593,7 @@ ComputeClosureTypesForMeasuresFromScan(const MeasureGraph& graph,
   GOOGLESQL_ASSIGN_OR_RETURN(auto traversal_results,
                    graph.TopologicalTraversal(*type_visitor));
 
-  CaseInsensitiveMap<const StructType*> closure_types;
+  CaseInsensitiveMap<AnnotatedType> closure_types;
   for (const auto& level_results : traversal_results) {
     for (const auto& [node, type] : level_results) {
       GOOGLESQL_RET_CHECK(closure_types.insert({node->name, type}).second)
@@ -544,13 +603,12 @@ ComputeClosureTypesForMeasuresFromScan(const MeasureGraph& graph,
   return closure_types;
 }
 
-absl::StatusOr<CaseInsensitiveMap<const StructType*>>
-BuildClosureTypesForTableRow(const MeasureGraph& graph, const Table& table,
-                             TypeFactory& type_factory) {
+absl::StatusOr<CaseInsensitiveMap<AnnotatedType>> BuildClosureTypesForTableRow(
+    const MeasureGraph& graph, const Table& table, TypeFactory& type_factory) {
   RowTypeClosureTypeVisitor visitor(table, type_factory);
   GOOGLESQL_ASSIGN_OR_RETURN(auto traversal_results, graph.TopologicalTraversal(visitor));
 
-  CaseInsensitiveMap<const StructType*> closure_types;
+  CaseInsensitiveMap<AnnotatedType> closure_types;
   for (const auto& level_results : traversal_results) {
     for (const auto& [node, type] : level_results) {
       GOOGLESQL_RET_CHECK(closure_types.insert({node->name, type}).second)
@@ -563,14 +621,15 @@ BuildClosureTypesForTableRow(const MeasureGraph& graph, const Table& table,
 absl::StatusOr<ComputeClosureColumnsResult>
 ComputeClosureColumnsForMeasuresFromScan(
     const MeasureGraph& graph, const Table& table,
-    const CaseInsensitiveMap<const StructType*>& closure_types,
-    TypeFactory& type_factory, ColumnFactory& column_factory,
-    ColumnProvider& column_provider) {
+    const CaseInsensitiveMap<AnnotatedType>& closure_types,
+    ColumnFactory& column_factory, ColumnProvider& column_provider,
+    AnnotationPropagator& annotation_propagator) {
   ComputeClosureColumnsResult result;
 
-  GOOGLESQL_ASSIGN_OR_RETURN(auto expr_visitor, ScanClosureExprVisitor::Create(
-                                          graph, table, column_factory,
-                                          closure_types, column_provider));
+  GOOGLESQL_ASSIGN_OR_RETURN(auto expr_visitor,
+                   ScanClosureExprVisitor::Create(
+                       graph, table, column_factory, closure_types,
+                       column_provider, annotation_propagator));
   GOOGLESQL_ASSIGN_OR_RETURN(auto traversal_exprs,
                    graph.TopologicalTraversal(*expr_visitor));
 

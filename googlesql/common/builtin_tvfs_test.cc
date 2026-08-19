@@ -194,10 +194,47 @@ TEST_F(GetVectorSearchTableValuedFunctionsTest,
       "TABLE, ARRAY<STRING> lexical_search_columns, optional STRING "
       "query_column_to_search, optional STRING lexical_search_query_column, "
       "optional JSON options, optional INT64 top_k, optional STRING "
-      "distance_type, optional DOUBLE max_distance) -> ANY TABLE");
+      "distance_type, optional DOUBLE max_distance) -> ANY TABLE\n  (ANY "
+      "TABLE, STRING column_to_search, ARRAY<FLOAT> query_value, ARRAY<STRING> "
+      "lexical_search_columns, STRING lexical_search_query_value, optional "
+      "INT64 top_k, optional STRING distance_type, optional DOUBLE "
+      "max_distance) -> ANY TABLE\n  (ANY TABLE, STRING column_to_search, "
+      "ARRAY<FLOAT> query_value, ARRAY<STRING> lexical_search_columns, STRING "
+      "lexical_search_query_value, optional JSON options, optional INT64 "
+      "top_k, optional STRING distance_type, optional DOUBLE max_distance) -> "
+      "ANY TABLE\n  (ANY TABLE, STRING column_to_search, ARRAY<DOUBLE> "
+      "query_value, ARRAY<STRING> lexical_search_columns, STRING "
+      "lexical_search_query_value, optional INT64 top_k, optional STRING "
+      "distance_type, optional DOUBLE max_distance) -> ANY TABLE\n  (ANY "
+      "TABLE, STRING column_to_search, ARRAY<DOUBLE> query_value, "
+      "ARRAY<STRING> "
+      "lexical_search_columns, STRING lexical_search_query_value, optional "
+      "JSON options, optional INT64 top_k, optional STRING distance_type, "
+      "optional DOUBLE max_distance) -> ANY TABLE\n  (ANY TABLE, STRING "
+      "column_to_search, STRING query_value, ARRAY<STRING> "
+      "lexical_search_columns, STRING lexical_search_query_value, optional "
+      "INT64 top_k, optional STRING distance_type, optional DOUBLE "
+      "max_distance) -> ANY TABLE\n  (ANY TABLE, STRING column_to_search, "
+      "STRING query_value, ARRAY<STRING> lexical_search_columns, STRING "
+      "lexical_search_query_value, optional JSON options, optional INT64 "
+      "top_k, optional STRING distance_type, optional DOUBLE max_distance) -> "
+      "ANY TABLE");
   EXPECT_EQ(output_properties_.SupportsSuppliedArgumentType(
                 FN_BATCH_HYBRID_VECTOR_SEARCH_TVF_WITH_PROTO_OPTIONS, 6),
             true);
+  EXPECT_EQ(
+      output_properties_.SupportsSuppliedArgumentType(
+          FN_HYBRID_SINGLE_VECTOR_SEARCH_TVF_FLOAT_ARRAY_WITH_PROTO_OPTIONS, 5),
+      true);
+  EXPECT_EQ(
+      output_properties_.SupportsSuppliedArgumentType(
+          FN_HYBRID_SINGLE_VECTOR_SEARCH_TVF_DOUBLE_ARRAY_WITH_PROTO_OPTIONS,
+          5),
+      true);
+  EXPECT_EQ(
+      output_properties_.SupportsSuppliedArgumentType(
+          FN_HYBRID_SINGLE_VECTOR_SEARCH_TVF_STRING_WITH_PROTO_OPTIONS, 5),
+      true);
 }
 
 }  // namespace

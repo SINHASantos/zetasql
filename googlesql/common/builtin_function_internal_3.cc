@@ -135,6 +135,7 @@ void GetStringFunctions(TypeFactory* type_factory,
   const Type* time_type = type_factory->get_time();
   const Type* datetime_type = type_factory->get_datetime();
   const Type* normalize_mode_type = types::NormalizeModeEnumType();
+  const Type* double_type = type_factory->get_double();
 
   const Function::Mode SCALAR = Function::SCALAR;
 
@@ -482,6 +483,42 @@ void GetStringFunctions(TypeFactory* type_factory,
   }
   InsertFunction(functions, options, "edit_distance", SCALAR,
                  edit_distance_signature, FunctionOptions());
+
+  if (options.language_options.LanguageFeatureEnabled(
+          FEATURE_ENABLE_JAROWINKLER_SIMILARITY)) {
+    std::vector<FunctionSignatureOnHeap> jarowinkler_similarity_signature = {
+        {double_type,
+         {string_type,
+          string_type,
+          {double_type,
+           FunctionArgumentTypeOptions()
+               .set_cardinality(FunctionEnums::OPTIONAL)
+               .set_argument_name("prefix_scaling_factor", kNamedOnly)
+               .set_default(values::Double(0.1))},
+          {double_type,
+           FunctionArgumentTypeOptions()
+               .set_cardinality(FunctionEnums::OPTIONAL)
+               .set_argument_name("prefix_boost_threshold", kNamedOnly)
+               .set_default(values::Double(0.7))}},
+         FN_JAROWINKLER_SIMILARITY},
+        {double_type,
+         {bytes_type,
+          bytes_type,
+          {double_type,
+           FunctionArgumentTypeOptions()
+               .set_cardinality(FunctionEnums::OPTIONAL)
+               .set_argument_name("prefix_scaling_factor", kNamedOnly)
+               .set_default(values::Double(0.1))},
+          {double_type,
+           FunctionArgumentTypeOptions()
+               .set_cardinality(FunctionEnums::OPTIONAL)
+               .set_argument_name("prefix_boost_threshold", kNamedOnly)
+               .set_default(values::Double(0.7))}},
+         FN_JAROWINKLER_SIMILARITY_BYTES},
+    };
+    InsertFunction(functions, options, "jarowinkler_similarity", SCALAR,
+                   jarowinkler_similarity_signature, FunctionOptions());
+  }
 }
 
 namespace {

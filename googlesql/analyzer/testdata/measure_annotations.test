@@ -1,0 +1,1500 @@
+[default language_features=MAXIMUM,+ENABLE_MEASURES,+DERIVED_MEASURE,+MEASURES_IN_STRUCT,+ANNOTATION_FRAMEWORK,+COLLATION_SUPPORT,+TIMESTAMP_PRECISION_ANNOTATION]
+[default enabled_ast_rewrites=DEFAULTS,+MEASURE_TYPE]
+[default no_run_sqlbuilder]
+# Verification of Closure Struct Type and Collation propagation
+# Don't run sqlbuilder because the sqlbuilder outputs would drop collations
+# and fail the test. See b/546263673.
+SELECT AGG(measure_ci) FROM MeasureTable_SingleKey_WithAnnotations GROUP BY key;
+--
+QueryStmt
++-output_column_list=
+| +-$aggregate.$agg1#16{Collation:"und:ci"} AS `$col1` [STRING]
++-query=
+  +-ProjectScan
+    +-column_list=[$aggregate.$agg1#16{Collation:"und:ci"}]
+    +-input_scan=
+      +-AggregateScan
+        +-column_list=[$aggregate.$agg1#16{Collation:"und:ci"}]
+        +-input_scan=
+        | +-TableScan(column_list=MeasureTable_SingleKey_WithAnnotations.[key#1, measure_ci#4], table=MeasureTable_SingleKey_WithAnnotations, column_index_list=[0, 3])
+        +-group_by_list=
+        | +-key#17 := ColumnRef(type=INT64, column=MeasureTable_SingleKey_WithAnnotations.key#1)
+        +-aggregate_list=
+          +-$agg1#16 :=
+            +-AggregateFunctionCall(GoogleSQL:AGG(MEASURE<STRING>) -> STRING)
+              +-type_annotation_map={Collation:"und:ci"}
+              +-ColumnRef(type=MEASURE<STRING>, type_annotation_map=<{Collation:"und:ci"}>, column=MeasureTable_SingleKey_WithAnnotations.measure_ci#4<{Collation:"und:ci"}>)
+
+[REWRITTEN AST]
+QueryStmt
++-output_column_list=
+| +-$aggregate.$agg1#16{Collation:"und:ci"} AS `$col1` [STRING]
++-query=
+  +-ProjectScan
+    +-column_list=[$aggregate.$agg1#16{Collation:"und:ci"}]
+    +-input_scan=
+      +-ProjectScan
+        +-column_list=[$aggregate.$agg1#16{Collation:"und:ci"}]
+        +-expr_list=
+        | +-$agg1#16 := ColumnRef(type=STRING, column=$aggregate.constituent_aggregate_1#20)
+        +-input_scan=
+          +-AggregateScan
+            +-column_list=[$aggregate.constituent_aggregate_1#20]
+            +-input_scan=
+            | +-ProjectScan
+            |   +-column_list=MeasureTable_SingleKey_WithAnnotations.[key#1, struct_for_measures_from_table_MeasureTable_SingleKey_WithAnnotations#19]
+            |   +-expr_list=
+            |   | +-struct_for_measures_from_table_MeasureTable_SingleKey_WithAnnotations#19 :=
+            |   |   +-MakeStruct
+            |   |     +-type=STRUCT<referenced_columns STRUCT<col_ci STRING>, key_columns STRUCT<key INT64>>
+            |   |     +-type_annotation_map=<<{Collation:"und:ci"}>,_>
+            |   |     +-field_list=
+            |   |       +-MakeStruct
+            |   |       | +-type=STRUCT<col_ci STRING>
+            |   |       | +-type_annotation_map=<{Collation:"und:ci"}>
+            |   |       | +-field_list=
+            |   |       |   +-ColumnRef(type=STRING, type_annotation_map={Collation:"und:ci"}, column=MeasureTable_SingleKey_WithAnnotations.col_ci#18{Collation:"und:ci"})
+            |   |       +-MakeStruct
+            |   |         +-type=STRUCT<key INT64>
+            |   |         +-field_list=
+            |   |           +-ColumnRef(type=INT64, column=MeasureTable_SingleKey_WithAnnotations.key#1)
+            |   +-input_scan=
+            |     +-TableScan(column_list=MeasureTable_SingleKey_WithAnnotations.[key#1, col_ci#18], table=MeasureTable_SingleKey_WithAnnotations, column_index_list=[0, 1])
+            +-group_by_list=
+            | +-key#17 := ColumnRef(type=INT64, column=MeasureTable_SingleKey_WithAnnotations.key#1)
+            +-aggregate_list=
+              +-constituent_aggregate_1#20 :=
+                +-AggregateFunctionCall(GoogleSQL:max(STRING) -> STRING)
+                  +-type_annotation_map={Collation:"und:ci"}
+                  +-ColumnRef(type=STRING, column=$aggregate.$any_value_grain_lock_0#21)
+                  +-collation_list=[und:ci]
+                  +-where_expr=
+                  | +-FunctionCall(GoogleSQL:$not(BOOL) -> BOOL)
+                  |   +-FunctionCall(GoogleSQL:$is_null(STRUCT<referenced_columns STRUCT<col_ci STRING>, key_columns STRUCT<key INT64>>) -> BOOL)
+                  |     +-ColumnRef(type=STRUCT<referenced_columns STRUCT<col_ci STRING>, key_columns STRUCT<key INT64>>, type_annotation_map=<<{Collation:"und:ci"}>,_>, column=MeasureTable_SingleKey_WithAnnotations.struct_for_measures_from_table_MeasureTable_SingleKey_WithAnnotations#19<<{Collation:"und:ci"}>,_>)
+                  +-group_by_list=
+                  | +-grain_lock_key#22 :=
+                  |   +-GetStructField
+                  |     +-type=STRUCT<key INT64>
+                  |     +-expr=
+                  |     | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<col_ci STRING>, key_columns STRUCT<key INT64>>, type_annotation_map=<<{Collation:"und:ci"}>,_>, column=MeasureTable_SingleKey_WithAnnotations.struct_for_measures_from_table_MeasureTable_SingleKey_WithAnnotations#19<<{Collation:"und:ci"}>,_>)
+                  |     +-field_idx=1
+                  +-group_by_aggregate_list=
+                    +-$any_value_grain_lock_0#21 :=
+                      +-AggregateFunctionCall(GoogleSQL:any_value(STRING) -> STRING)
+                        +-GetStructField
+                          +-type=STRING
+                          +-type_annotation_map={Collation:"und:ci"}
+                          +-expr=
+                          | +-GetStructField
+                          |   +-type=STRUCT<col_ci STRING>
+                          |   +-type_annotation_map=<{Collation:"und:ci"}>
+                          |   +-expr=
+                          |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<col_ci STRING>, key_columns STRUCT<key INT64>>, type_annotation_map=<<{Collation:"und:ci"}>,_>, column=MeasureTable_SingleKey_WithAnnotations.struct_for_measures_from_table_MeasureTable_SingleKey_WithAnnotations#19<<{Collation:"und:ci"}>,_>)
+                          |   +-field_idx=0
+                          +-field_idx=0
+==
+
+# Distinct Aggregate Constituent with Collation (measure_distinct_count_ci)
+SELECT AGG(measure_distinct_count_ci)
+FROM MeasureTable_SingleKey_WithAnnotations
+GROUP BY key;
+--
+QueryStmt
++-output_column_list=
+| +-$aggregate.$agg1#16 AS `$col1` [INT64]
++-query=
+  +-ProjectScan
+    +-column_list=[$aggregate.$agg1#16]
+    +-input_scan=
+      +-AggregateScan
+        +-column_list=[$aggregate.$agg1#16]
+        +-input_scan=
+        | +-TableScan(column_list=MeasureTable_SingleKey_WithAnnotations.[key#1, measure_distinct_count_ci#6], table=MeasureTable_SingleKey_WithAnnotations, column_index_list=[0, 5])
+        +-group_by_list=
+        | +-key#17 := ColumnRef(type=INT64, column=MeasureTable_SingleKey_WithAnnotations.key#1)
+        +-aggregate_list=
+          +-$agg1#16 :=
+            +-AggregateFunctionCall(GoogleSQL:AGG(MEASURE<INT64>) -> INT64)
+              +-ColumnRef(type=MEASURE<INT64>, column=MeasureTable_SingleKey_WithAnnotations.measure_distinct_count_ci#6)
+
+[REWRITTEN AST]
+QueryStmt
++-output_column_list=
+| +-$aggregate.$agg1#16 AS `$col1` [INT64]
++-query=
+  +-ProjectScan
+    +-column_list=[$aggregate.$agg1#16]
+    +-input_scan=
+      +-ProjectScan
+        +-column_list=[$aggregate.$agg1#16]
+        +-expr_list=
+        | +-$agg1#16 := ColumnRef(type=INT64, column=$aggregate.constituent_aggregate_1#20)
+        +-input_scan=
+          +-AggregateScan
+            +-column_list=[$aggregate.constituent_aggregate_1#20]
+            +-input_scan=
+            | +-ProjectScan
+            |   +-column_list=MeasureTable_SingleKey_WithAnnotations.[key#1, struct_for_measures_from_table_MeasureTable_SingleKey_WithAnnotations#19]
+            |   +-expr_list=
+            |   | +-struct_for_measures_from_table_MeasureTable_SingleKey_WithAnnotations#19 :=
+            |   |   +-MakeStruct
+            |   |     +-type=STRUCT<referenced_columns STRUCT<col_ci STRING>, key_columns STRUCT<key INT64>>
+            |   |     +-type_annotation_map=<<{Collation:"und:ci"}>,_>
+            |   |     +-field_list=
+            |   |       +-MakeStruct
+            |   |       | +-type=STRUCT<col_ci STRING>
+            |   |       | +-type_annotation_map=<{Collation:"und:ci"}>
+            |   |       | +-field_list=
+            |   |       |   +-ColumnRef(type=STRING, type_annotation_map={Collation:"und:ci"}, column=MeasureTable_SingleKey_WithAnnotations.col_ci#18{Collation:"und:ci"})
+            |   |       +-MakeStruct
+            |   |         +-type=STRUCT<key INT64>
+            |   |         +-field_list=
+            |   |           +-ColumnRef(type=INT64, column=MeasureTable_SingleKey_WithAnnotations.key#1)
+            |   +-input_scan=
+            |     +-TableScan(column_list=MeasureTable_SingleKey_WithAnnotations.[key#1, col_ci#18], table=MeasureTable_SingleKey_WithAnnotations, column_index_list=[0, 1])
+            +-group_by_list=
+            | +-key#17 := ColumnRef(type=INT64, column=MeasureTable_SingleKey_WithAnnotations.key#1)
+            +-aggregate_list=
+              +-constituent_aggregate_1#20 :=
+                +-AggregateFunctionCall(GoogleSQL:count(STRING) -> INT64)
+                  +-ColumnRef(type=STRING, column=$aggregate.$any_value_grain_lock_0#21)
+                  +-collation_list=[und:ci]
+                  +-distinct=TRUE
+                  +-where_expr=
+                  | +-FunctionCall(GoogleSQL:$not(BOOL) -> BOOL)
+                  |   +-FunctionCall(GoogleSQL:$is_null(STRUCT<referenced_columns STRUCT<col_ci STRING>, key_columns STRUCT<key INT64>>) -> BOOL)
+                  |     +-ColumnRef(type=STRUCT<referenced_columns STRUCT<col_ci STRING>, key_columns STRUCT<key INT64>>, type_annotation_map=<<{Collation:"und:ci"}>,_>, column=MeasureTable_SingleKey_WithAnnotations.struct_for_measures_from_table_MeasureTable_SingleKey_WithAnnotations#19<<{Collation:"und:ci"}>,_>)
+                  +-group_by_list=
+                  | +-grain_lock_key#22 :=
+                  |   +-GetStructField
+                  |     +-type=STRUCT<key INT64>
+                  |     +-expr=
+                  |     | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<col_ci STRING>, key_columns STRUCT<key INT64>>, type_annotation_map=<<{Collation:"und:ci"}>,_>, column=MeasureTable_SingleKey_WithAnnotations.struct_for_measures_from_table_MeasureTable_SingleKey_WithAnnotations#19<<{Collation:"und:ci"}>,_>)
+                  |     +-field_idx=1
+                  +-group_by_aggregate_list=
+                    +-$any_value_grain_lock_0#21 :=
+                      +-AggregateFunctionCall(GoogleSQL:any_value(STRING) -> STRING)
+                        +-GetStructField
+                          +-type=STRING
+                          +-type_annotation_map={Collation:"und:ci"}
+                          +-expr=
+                          | +-GetStructField
+                          |   +-type=STRUCT<col_ci STRING>
+                          |   +-type_annotation_map=<{Collation:"und:ci"}>
+                          |   +-expr=
+                          |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<col_ci STRING>, key_columns STRUCT<key INT64>>, type_annotation_map=<<{Collation:"und:ci"}>,_>, column=MeasureTable_SingleKey_WithAnnotations.struct_for_measures_from_table_MeasureTable_SingleKey_WithAnnotations#19<<{Collation:"und:ci"}>,_>)
+                          |   +-field_idx=0
+                          +-field_idx=0
+==
+
+# Annotation propagation through scalar subquery
+SELECT (SELECT AGG(measure_ci) FROM MeasureTable_SingleKey_WithAnnotations);
+--
+QueryStmt
++-output_column_list=
+| +-$query.$col1#17{Collation:"und:ci"} AS `$col1` [STRING]
++-query=
+  +-ProjectScan
+    +-column_list=[$query.$col1#17{Collation:"und:ci"}]
+    +-expr_list=
+    | +-$col1#17 :=
+    |   +-SubqueryExpr
+    |     +-type=STRING
+    |     +-type_annotation_map={Collation:"und:ci"}
+    |     +-subquery_type=SCALAR
+    |     +-subquery=
+    |       +-ProjectScan
+    |         +-column_list=[$aggregate.$agg1#16{Collation:"und:ci"}]
+    |         +-input_scan=
+    |           +-AggregateScan
+    |             +-column_list=[$aggregate.$agg1#16{Collation:"und:ci"}]
+    |             +-input_scan=
+    |             | +-TableScan(column_list=[MeasureTable_SingleKey_WithAnnotations.measure_ci#4<{Collation:"und:ci"}>], table=MeasureTable_SingleKey_WithAnnotations, column_index_list=[3])
+    |             +-aggregate_list=
+    |               +-$agg1#16 :=
+    |                 +-AggregateFunctionCall(GoogleSQL:AGG(MEASURE<STRING>) -> STRING)
+    |                   +-type_annotation_map={Collation:"und:ci"}
+    |                   +-ColumnRef(type=MEASURE<STRING>, type_annotation_map=<{Collation:"und:ci"}>, column=MeasureTable_SingleKey_WithAnnotations.measure_ci#4<{Collation:"und:ci"}>)
+    +-input_scan=
+      +-SingleRowScan
+
+[REWRITTEN AST]
+QueryStmt
++-output_column_list=
+| +-$query.$col1#17{Collation:"und:ci"} AS `$col1` [STRING]
++-query=
+  +-ProjectScan
+    +-column_list=[$query.$col1#17{Collation:"und:ci"}]
+    +-expr_list=
+    | +-$col1#17 :=
+    |   +-SubqueryExpr
+    |     +-type=STRING
+    |     +-type_annotation_map={Collation:"und:ci"}
+    |     +-subquery_type=SCALAR
+    |     +-subquery=
+    |       +-ProjectScan
+    |         +-column_list=[$aggregate.$agg1#16{Collation:"und:ci"}]
+    |         +-input_scan=
+    |           +-ProjectScan
+    |             +-column_list=[$aggregate.$agg1#16{Collation:"und:ci"}]
+    |             +-expr_list=
+    |             | +-$agg1#16 := ColumnRef(type=STRING, column=$aggregate.constituent_aggregate_1#21)
+    |             +-input_scan=
+    |               +-AggregateScan
+    |                 +-column_list=[$aggregate.constituent_aggregate_1#21]
+    |                 +-input_scan=
+    |                 | +-ProjectScan
+    |                 |   +-column_list=[MeasureTable_SingleKey_WithAnnotations.struct_for_measures_from_table_MeasureTable_SingleKey_WithAnnotations#20<<{Collation:"und:ci"}>,_>]
+    |                 |   +-expr_list=
+    |                 |   | +-struct_for_measures_from_table_MeasureTable_SingleKey_WithAnnotations#20 :=
+    |                 |   |   +-MakeStruct
+    |                 |   |     +-type=STRUCT<referenced_columns STRUCT<col_ci STRING>, key_columns STRUCT<key INT64>>
+    |                 |   |     +-type_annotation_map=<<{Collation:"und:ci"}>,_>
+    |                 |   |     +-field_list=
+    |                 |   |       +-MakeStruct
+    |                 |   |       | +-type=STRUCT<col_ci STRING>
+    |                 |   |       | +-type_annotation_map=<{Collation:"und:ci"}>
+    |                 |   |       | +-field_list=
+    |                 |   |       |   +-ColumnRef(type=STRING, type_annotation_map={Collation:"und:ci"}, column=MeasureTable_SingleKey_WithAnnotations.col_ci#18{Collation:"und:ci"})
+    |                 |   |       +-MakeStruct
+    |                 |   |         +-type=STRUCT<key INT64>
+    |                 |   |         +-field_list=
+    |                 |   |           +-ColumnRef(type=INT64, column=MeasureTable_SingleKey_WithAnnotations.key#19)
+    |                 |   +-input_scan=
+    |                 |     +-TableScan(column_list=MeasureTable_SingleKey_WithAnnotations.[key#19, col_ci#18], table=MeasureTable_SingleKey_WithAnnotations, column_index_list=[0, 1])
+    |                 +-aggregate_list=
+    |                   +-constituent_aggregate_1#21 :=
+    |                     +-AggregateFunctionCall(GoogleSQL:max(STRING) -> STRING)
+    |                       +-type_annotation_map={Collation:"und:ci"}
+    |                       +-ColumnRef(type=STRING, column=$aggregate.$any_value_grain_lock_0#22)
+    |                       +-collation_list=[und:ci]
+    |                       +-where_expr=
+    |                       | +-FunctionCall(GoogleSQL:$not(BOOL) -> BOOL)
+    |                       |   +-FunctionCall(GoogleSQL:$is_null(STRUCT<referenced_columns STRUCT<col_ci STRING>, key_columns STRUCT<key INT64>>) -> BOOL)
+    |                       |     +-ColumnRef(type=STRUCT<referenced_columns STRUCT<col_ci STRING>, key_columns STRUCT<key INT64>>, type_annotation_map=<<{Collation:"und:ci"}>,_>, column=MeasureTable_SingleKey_WithAnnotations.struct_for_measures_from_table_MeasureTable_SingleKey_WithAnnotations#20<<{Collation:"und:ci"}>,_>)
+    |                       +-group_by_list=
+    |                       | +-grain_lock_key#23 :=
+    |                       |   +-GetStructField
+    |                       |     +-type=STRUCT<key INT64>
+    |                       |     +-expr=
+    |                       |     | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<col_ci STRING>, key_columns STRUCT<key INT64>>, type_annotation_map=<<{Collation:"und:ci"}>,_>, column=MeasureTable_SingleKey_WithAnnotations.struct_for_measures_from_table_MeasureTable_SingleKey_WithAnnotations#20<<{Collation:"und:ci"}>,_>)
+    |                       |     +-field_idx=1
+    |                       +-group_by_aggregate_list=
+    |                         +-$any_value_grain_lock_0#22 :=
+    |                           +-AggregateFunctionCall(GoogleSQL:any_value(STRING) -> STRING)
+    |                             +-GetStructField
+    |                               +-type=STRING
+    |                               +-type_annotation_map={Collation:"und:ci"}
+    |                               +-expr=
+    |                               | +-GetStructField
+    |                               |   +-type=STRUCT<col_ci STRING>
+    |                               |   +-type_annotation_map=<{Collation:"und:ci"}>
+    |                               |   +-expr=
+    |                               |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<col_ci STRING>, key_columns STRUCT<key INT64>>, type_annotation_map=<<{Collation:"und:ci"}>,_>, column=MeasureTable_SingleKey_WithAnnotations.struct_for_measures_from_table_MeasureTable_SingleKey_WithAnnotations#20<<{Collation:"und:ci"}>,_>)
+    |                               |   +-field_idx=0
+    |                               +-field_idx=0
+    +-input_scan=
+      +-SingleRowScan
+==
+
+# Multiple references and expressions on annotated measure
+SELECT key, CONCAT(AGG(measure_ci), AGG(measure_ci)) AS double_ci
+FROM MeasureTable_SingleKey_WithAnnotations
+GROUP BY key;
+--
+
+QueryStmt
++-output_column_list=
+| +-$groupby.key#18 AS key [INT64]
+| +-$query.double_ci#19{Collation:"und:ci"} AS double_ci [STRING]
++-query=
+  +-ProjectScan
+    +-column_list=[$groupby.key#18, $query.double_ci#19{Collation:"und:ci"}]
+    +-expr_list=
+    | +-double_ci#19 :=
+    |   +-FunctionCall(GoogleSQL:concat(STRING, repeated(1) STRING) -> STRING)
+    |     +-type_annotation_map={Collation:"und:ci"}
+    |     +-ColumnRef(type=STRING, type_annotation_map={Collation:"und:ci"}, column=$aggregate.$agg1#16{Collation:"und:ci"})
+    |     +-ColumnRef(type=STRING, type_annotation_map={Collation:"und:ci"}, column=$aggregate.$agg2#17{Collation:"und:ci"})
+    +-input_scan=
+      +-AggregateScan
+        +-column_list=[$groupby.key#18, $aggregate.$agg1#16{Collation:"und:ci"}, $aggregate.$agg2#17{Collation:"und:ci"}]
+        +-input_scan=
+        | +-TableScan(column_list=MeasureTable_SingleKey_WithAnnotations.[key#1, measure_ci#4], table=MeasureTable_SingleKey_WithAnnotations, column_index_list=[0, 3])
+        +-group_by_list=
+        | +-key#18 := ColumnRef(type=INT64, column=MeasureTable_SingleKey_WithAnnotations.key#1)
+        +-aggregate_list=
+          +-$agg1#16 :=
+          | +-AggregateFunctionCall(GoogleSQL:AGG(MEASURE<STRING>) -> STRING)
+          |   +-type_annotation_map={Collation:"und:ci"}
+          |   +-ColumnRef(type=MEASURE<STRING>, type_annotation_map=<{Collation:"und:ci"}>, column=MeasureTable_SingleKey_WithAnnotations.measure_ci#4<{Collation:"und:ci"}>)
+          +-$agg2#17 :=
+            +-AggregateFunctionCall(GoogleSQL:AGG(MEASURE<STRING>) -> STRING)
+              +-type_annotation_map={Collation:"und:ci"}
+              +-ColumnRef(type=MEASURE<STRING>, type_annotation_map=<{Collation:"und:ci"}>, column=MeasureTable_SingleKey_WithAnnotations.measure_ci#4<{Collation:"und:ci"}>)
+
+[REWRITTEN AST]
+QueryStmt
++-output_column_list=
+| +-$groupby.key#18 AS key [INT64]
+| +-$query.double_ci#19{Collation:"und:ci"} AS double_ci [STRING]
++-query=
+  +-ProjectScan
+    +-column_list=[$groupby.key#18, $query.double_ci#19{Collation:"und:ci"}]
+    +-expr_list=
+    | +-double_ci#19 :=
+    |   +-FunctionCall(GoogleSQL:concat(STRING, repeated(1) STRING) -> STRING)
+    |     +-type_annotation_map={Collation:"und:ci"}
+    |     +-ColumnRef(type=STRING, type_annotation_map={Collation:"und:ci"}, column=$aggregate.$agg1#16{Collation:"und:ci"})
+    |     +-ColumnRef(type=STRING, type_annotation_map={Collation:"und:ci"}, column=$aggregate.$agg2#17{Collation:"und:ci"})
+    +-input_scan=
+      +-ProjectScan
+        +-column_list=[$groupby.key#18, $aggregate.$agg1#16{Collation:"und:ci"}, $aggregate.$agg2#17{Collation:"und:ci"}]
+        +-expr_list=
+        | +-$agg1#16 := ColumnRef(type=STRING, column=$aggregate.constituent_aggregate_1#22)
+        | +-$agg2#17 := ColumnRef(type=STRING, column=$aggregate.constituent_aggregate_1#25)
+        +-input_scan=
+          +-AggregateScan
+            +-column_list=[$groupby.key#18, $aggregate.constituent_aggregate_1#22, $aggregate.constituent_aggregate_1#25]
+            +-input_scan=
+            | +-ProjectScan
+            |   +-column_list=MeasureTable_SingleKey_WithAnnotations.[key#1, struct_for_measures_from_table_MeasureTable_SingleKey_WithAnnotations#21]
+            |   +-expr_list=
+            |   | +-struct_for_measures_from_table_MeasureTable_SingleKey_WithAnnotations#21 :=
+            |   |   +-MakeStruct
+            |   |     +-type=STRUCT<referenced_columns STRUCT<col_ci STRING>, key_columns STRUCT<key INT64>>
+            |   |     +-type_annotation_map=<<{Collation:"und:ci"}>,_>
+            |   |     +-field_list=
+            |   |       +-MakeStruct
+            |   |       | +-type=STRUCT<col_ci STRING>
+            |   |       | +-type_annotation_map=<{Collation:"und:ci"}>
+            |   |       | +-field_list=
+            |   |       |   +-ColumnRef(type=STRING, type_annotation_map={Collation:"und:ci"}, column=MeasureTable_SingleKey_WithAnnotations.col_ci#20{Collation:"und:ci"})
+            |   |       +-MakeStruct
+            |   |         +-type=STRUCT<key INT64>
+            |   |         +-field_list=
+            |   |           +-ColumnRef(type=INT64, column=MeasureTable_SingleKey_WithAnnotations.key#1)
+            |   +-input_scan=
+            |     +-TableScan(column_list=MeasureTable_SingleKey_WithAnnotations.[key#1, col_ci#20], table=MeasureTable_SingleKey_WithAnnotations, column_index_list=[0, 1])
+            +-group_by_list=
+            | +-key#18 := ColumnRef(type=INT64, column=MeasureTable_SingleKey_WithAnnotations.key#1)
+            +-aggregate_list=
+              +-constituent_aggregate_1#22 :=
+              | +-AggregateFunctionCall(GoogleSQL:max(STRING) -> STRING)
+              |   +-type_annotation_map={Collation:"und:ci"}
+              |   +-ColumnRef(type=STRING, column=$aggregate.$any_value_grain_lock_0#23)
+              |   +-collation_list=[und:ci]
+              |   +-where_expr=
+              |   | +-FunctionCall(GoogleSQL:$not(BOOL) -> BOOL)
+              |   |   +-FunctionCall(GoogleSQL:$is_null(STRUCT<referenced_columns STRUCT<col_ci STRING>, key_columns STRUCT<key INT64>>) -> BOOL)
+              |   |     +-ColumnRef(type=STRUCT<referenced_columns STRUCT<col_ci STRING>, key_columns STRUCT<key INT64>>, type_annotation_map=<<{Collation:"und:ci"}>,_>, column=MeasureTable_SingleKey_WithAnnotations.struct_for_measures_from_table_MeasureTable_SingleKey_WithAnnotations#21<<{Collation:"und:ci"}>,_>)
+              |   +-group_by_list=
+              |   | +-grain_lock_key#24 :=
+              |   |   +-GetStructField
+              |   |     +-type=STRUCT<key INT64>
+              |   |     +-expr=
+              |   |     | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<col_ci STRING>, key_columns STRUCT<key INT64>>, type_annotation_map=<<{Collation:"und:ci"}>,_>, column=MeasureTable_SingleKey_WithAnnotations.struct_for_measures_from_table_MeasureTable_SingleKey_WithAnnotations#21<<{Collation:"und:ci"}>,_>)
+              |   |     +-field_idx=1
+              |   +-group_by_aggregate_list=
+              |     +-$any_value_grain_lock_0#23 :=
+              |       +-AggregateFunctionCall(GoogleSQL:any_value(STRING) -> STRING)
+              |         +-GetStructField
+              |           +-type=STRING
+              |           +-type_annotation_map={Collation:"und:ci"}
+              |           +-expr=
+              |           | +-GetStructField
+              |           |   +-type=STRUCT<col_ci STRING>
+              |           |   +-type_annotation_map=<{Collation:"und:ci"}>
+              |           |   +-expr=
+              |           |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<col_ci STRING>, key_columns STRUCT<key INT64>>, type_annotation_map=<<{Collation:"und:ci"}>,_>, column=MeasureTable_SingleKey_WithAnnotations.struct_for_measures_from_table_MeasureTable_SingleKey_WithAnnotations#21<<{Collation:"und:ci"}>,_>)
+              |           |   +-field_idx=0
+              |           +-field_idx=0
+              +-constituent_aggregate_1#25 :=
+                +-AggregateFunctionCall(GoogleSQL:max(STRING) -> STRING)
+                  +-type_annotation_map={Collation:"und:ci"}
+                  +-ColumnRef(type=STRING, column=$aggregate.$any_value_grain_lock_0#26)
+                  +-collation_list=[und:ci]
+                  +-where_expr=
+                  | +-FunctionCall(GoogleSQL:$not(BOOL) -> BOOL)
+                  |   +-FunctionCall(GoogleSQL:$is_null(STRUCT<referenced_columns STRUCT<col_ci STRING>, key_columns STRUCT<key INT64>>) -> BOOL)
+                  |     +-ColumnRef(type=STRUCT<referenced_columns STRUCT<col_ci STRING>, key_columns STRUCT<key INT64>>, type_annotation_map=<<{Collation:"und:ci"}>,_>, column=MeasureTable_SingleKey_WithAnnotations.struct_for_measures_from_table_MeasureTable_SingleKey_WithAnnotations#21<<{Collation:"und:ci"}>,_>)
+                  +-group_by_list=
+                  | +-grain_lock_key#27 :=
+                  |   +-GetStructField
+                  |     +-type=STRUCT<key INT64>
+                  |     +-expr=
+                  |     | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<col_ci STRING>, key_columns STRUCT<key INT64>>, type_annotation_map=<<{Collation:"und:ci"}>,_>, column=MeasureTable_SingleKey_WithAnnotations.struct_for_measures_from_table_MeasureTable_SingleKey_WithAnnotations#21<<{Collation:"und:ci"}>,_>)
+                  |     +-field_idx=1
+                  +-group_by_aggregate_list=
+                    +-$any_value_grain_lock_0#26 :=
+                      +-AggregateFunctionCall(GoogleSQL:any_value(STRING) -> STRING)
+                        +-GetStructField
+                          +-type=STRING
+                          +-type_annotation_map={Collation:"und:ci"}
+                          +-expr=
+                          | +-GetStructField
+                          |   +-type=STRUCT<col_ci STRING>
+                          |   +-type_annotation_map=<{Collation:"und:ci"}>
+                          |   +-expr=
+                          |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<col_ci STRING>, key_columns STRUCT<key INT64>>, type_annotation_map=<<{Collation:"und:ci"}>,_>, column=MeasureTable_SingleKey_WithAnnotations.struct_for_measures_from_table_MeasureTable_SingleKey_WithAnnotations#21<<{Collation:"und:ci"}>,_>)
+                          |   +-field_idx=0
+                          +-field_idx=0
+==
+
+# Derived Measure: Single Base Dependency with Collation
+SELECT key, AGG(measure_derived_concat_ci)
+FROM MeasureTable_SingleKey_WithAnnotations
+GROUP BY key;
+--
+QueryStmt
++-output_column_list=
+| +-$groupby.key#17 AS key [INT64]
+| +-$aggregate.$agg1#16{Collation:"und:ci"} AS `$col2` [STRING]
++-query=
+  +-ProjectScan
+    +-column_list=[$groupby.key#17, $aggregate.$agg1#16{Collation:"und:ci"}]
+    +-input_scan=
+      +-AggregateScan
+        +-column_list=[$groupby.key#17, $aggregate.$agg1#16{Collation:"und:ci"}]
+        +-input_scan=
+        | +-TableScan(column_list=MeasureTable_SingleKey_WithAnnotations.[key#1, measure_derived_concat_ci#7], table=MeasureTable_SingleKey_WithAnnotations, column_index_list=[0, 6])
+        +-group_by_list=
+        | +-key#17 := ColumnRef(type=INT64, column=MeasureTable_SingleKey_WithAnnotations.key#1)
+        +-aggregate_list=
+          +-$agg1#16 :=
+            +-AggregateFunctionCall(GoogleSQL:AGG(MEASURE<STRING>) -> STRING)
+              +-type_annotation_map={Collation:"und:ci"}
+              +-ColumnRef(type=MEASURE<STRING>, type_annotation_map=<{Collation:"und:ci"}>, column=MeasureTable_SingleKey_WithAnnotations.measure_derived_concat_ci#7<{Collation:"und:ci"}>)
+
+[REWRITTEN AST]
+QueryStmt
++-output_column_list=
+| +-$groupby.key#17 AS key [INT64]
+| +-$aggregate.$agg1#16{Collation:"und:ci"} AS `$col2` [STRING]
++-query=
+  +-ProjectScan
+    +-column_list=[$groupby.key#17, $aggregate.$agg1#16{Collation:"und:ci"}]
+    +-input_scan=
+      +-ProjectScan
+        +-column_list=[$groupby.key#17, $aggregate.$agg1#16{Collation:"und:ci"}]
+        +-expr_list=
+        | +-$agg1#16 :=
+        |   +-FunctionCall(GoogleSQL:concat(STRING, repeated(1) STRING) -> STRING)
+        |     +-type_annotation_map={Collation:"und:ci"}
+        |     +-ColumnRef(type=STRING, column=$aggregate.constituent_aggregate_1#23)
+        |     +-Literal(type=STRING, value="-suffix")
+        +-input_scan=
+          +-AggregateScan
+            +-column_list=[$groupby.key#17, $aggregate.constituent_aggregate_1#23]
+            +-input_scan=
+            | +-ProjectScan
+            |   +-column_list=[MeasureTable_SingleKey_WithAnnotations.key#1, MeasureTable_SingleKey_WithAnnotations.struct_for_measures_from_table_MeasureTable_SingleKey_WithAnnotations#20<<<<{Collation:"und:ci"}>,_>>,_>, $aggregate.dep_closure#22<<{Collation:"und:ci"}>,_>]
+            |   +-expr_list=
+            |   | +-dep_closure#22 :=
+            |   |   +-GetStructField
+            |   |     +-type=STRUCT<referenced_columns STRUCT<col_ci STRING>, key_columns STRUCT<key INT64>>
+            |   |     +-type_annotation_map=<<{Collation:"und:ci"}>,_>
+            |   |     +-expr=
+            |   |     | +-GetStructField
+            |   |     |   +-type=STRUCT<measure_ci STRUCT<referenced_columns STRUCT<col_ci STRING>, key_columns STRUCT<key INT64>>>
+            |   |     |   +-type_annotation_map=<<<{Collation:"und:ci"}>,_>>
+            |   |     |   +-expr=
+            |   |     |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<measure_ci STRUCT<referenced_columns STRUCT<col_ci STRING>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>, type_annotation_map=<<<<{Collation:"und:ci"}>,_>>,_>, column=MeasureTable_SingleKey_WithAnnotations.struct_for_measures_from_table_MeasureTable_SingleKey_WithAnnotations#20<<<<{Collation:"und:ci"}>,_>>,_>)
+            |   |     |   +-field_idx=0
+            |   |     +-field_idx=0
+            |   +-input_scan=
+            |     +-ProjectScan
+            |       +-column_list=MeasureTable_SingleKey_WithAnnotations.[key#1, struct_for_measures_from_table_MeasureTable_SingleKey_WithAnnotations#20]
+            |       +-expr_list=
+            |       | +-struct_for_measures_from_table_MeasureTable_SingleKey_WithAnnotations#20 :=
+            |       |   +-MakeStruct
+            |       |     +-type=STRUCT<referenced_columns STRUCT<measure_ci STRUCT<referenced_columns STRUCT<col_ci STRING>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>
+            |       |     +-type_annotation_map=<<<<{Collation:"und:ci"}>,_>>,_>
+            |       |     +-field_list=
+            |       |       +-MakeStruct
+            |       |       | +-type=STRUCT<measure_ci STRUCT<referenced_columns STRUCT<col_ci STRING>, key_columns STRUCT<key INT64>>>
+            |       |       | +-type_annotation_map=<<<{Collation:"und:ci"}>,_>>
+            |       |       | +-field_list=
+            |       |       |   +-ColumnRef(type=STRUCT<referenced_columns STRUCT<col_ci STRING>, key_columns STRUCT<key INT64>>, type_annotation_map=<<{Collation:"und:ci"}>,_>, column=MeasureTable_SingleKey_WithAnnotations.struct_for_measures_from_table_MeasureTable_SingleKey_WithAnnotations#19<<{Collation:"und:ci"}>,_>)
+            |       |       +-MakeStruct
+            |       |         +-type=STRUCT<key INT64>
+            |       |         +-field_list=
+            |       |           +-ColumnRef(type=INT64, column=MeasureTable_SingleKey_WithAnnotations.key#1)
+            |       +-input_scan=
+            |         +-ProjectScan
+            |           +-column_list=MeasureTable_SingleKey_WithAnnotations.[key#1, struct_for_measures_from_table_MeasureTable_SingleKey_WithAnnotations#19]
+            |           +-expr_list=
+            |           | +-struct_for_measures_from_table_MeasureTable_SingleKey_WithAnnotations#19 :=
+            |           |   +-MakeStruct
+            |           |     +-type=STRUCT<referenced_columns STRUCT<col_ci STRING>, key_columns STRUCT<key INT64>>
+            |           |     +-type_annotation_map=<<{Collation:"und:ci"}>,_>
+            |           |     +-field_list=
+            |           |       +-MakeStruct
+            |           |       | +-type=STRUCT<col_ci STRING>
+            |           |       | +-type_annotation_map=<{Collation:"und:ci"}>
+            |           |       | +-field_list=
+            |           |       |   +-ColumnRef(type=STRING, type_annotation_map={Collation:"und:ci"}, column=MeasureTable_SingleKey_WithAnnotations.col_ci#18{Collation:"und:ci"})
+            |           |       +-MakeStruct
+            |           |         +-type=STRUCT<key INT64>
+            |           |         +-field_list=
+            |           |           +-ColumnRef(type=INT64, column=MeasureTable_SingleKey_WithAnnotations.key#1)
+            |           +-input_scan=
+            |             +-TableScan(column_list=MeasureTable_SingleKey_WithAnnotations.[key#1, col_ci#18], table=MeasureTable_SingleKey_WithAnnotations, column_index_list=[0, 1])
+            +-group_by_list=
+            | +-key#17 := ColumnRef(type=INT64, column=MeasureTable_SingleKey_WithAnnotations.key#1)
+            +-aggregate_list=
+              +-constituent_aggregate_1#23 :=
+                +-AggregateFunctionCall(GoogleSQL:max(STRING) -> STRING)
+                  +-type_annotation_map={Collation:"und:ci"}
+                  +-ColumnRef(type=STRING, column=$aggregate.$any_value_grain_lock_0#24)
+                  +-collation_list=[und:ci]
+                  +-where_expr=
+                  | +-FunctionCall(GoogleSQL:$not(BOOL) -> BOOL)
+                  |   +-FunctionCall(GoogleSQL:$is_null(STRUCT<referenced_columns STRUCT<col_ci STRING>, key_columns STRUCT<key INT64>>) -> BOOL)
+                  |     +-ColumnRef(type=STRUCT<referenced_columns STRUCT<col_ci STRING>, key_columns STRUCT<key INT64>>, type_annotation_map=<<{Collation:"und:ci"}>,_>, column=$aggregate.dep_closure#22<<{Collation:"und:ci"}>,_>)
+                  +-group_by_list=
+                  | +-grain_lock_key#25 :=
+                  |   +-GetStructField
+                  |     +-type=STRUCT<key INT64>
+                  |     +-expr=
+                  |     | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<col_ci STRING>, key_columns STRUCT<key INT64>>, type_annotation_map=<<{Collation:"und:ci"}>,_>, column=$aggregate.dep_closure#22<<{Collation:"und:ci"}>,_>)
+                  |     +-field_idx=1
+                  +-group_by_aggregate_list=
+                    +-$any_value_grain_lock_0#24 :=
+                      +-AggregateFunctionCall(GoogleSQL:any_value(STRING) -> STRING)
+                        +-GetStructField
+                          +-type=STRING
+                          +-type_annotation_map={Collation:"und:ci"}
+                          +-expr=
+                          | +-GetStructField
+                          |   +-type=STRUCT<col_ci STRING>
+                          |   +-type_annotation_map=<{Collation:"und:ci"}>
+                          |   +-expr=
+                          |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<col_ci STRING>, key_columns STRUCT<key INT64>>, type_annotation_map=<<{Collation:"und:ci"}>,_>, column=$aggregate.dep_closure#22<<{Collation:"und:ci"}>,_>)
+                          |   +-field_idx=0
+                          +-field_idx=0
+==
+
+# Derived Measure: Multiple Base Dependencies with Collation
+SELECT key, AGG(measure_derived_two_ci)
+FROM MeasureTable_SingleKey_WithAnnotations
+GROUP BY key;
+--
+QueryStmt
++-output_column_list=
+| +-$groupby.key#17 AS key [INT64]
+| +-$aggregate.$agg1#16{Collation:"und:ci"} AS `$col2` [STRING]
++-query=
+  +-ProjectScan
+    +-column_list=[$groupby.key#17, $aggregate.$agg1#16{Collation:"und:ci"}]
+    +-input_scan=
+      +-AggregateScan
+        +-column_list=[$groupby.key#17, $aggregate.$agg1#16{Collation:"und:ci"}]
+        +-input_scan=
+        | +-TableScan(column_list=MeasureTable_SingleKey_WithAnnotations.[key#1, measure_derived_two_ci#8], table=MeasureTable_SingleKey_WithAnnotations, column_index_list=[0, 7])
+        +-group_by_list=
+        | +-key#17 := ColumnRef(type=INT64, column=MeasureTable_SingleKey_WithAnnotations.key#1)
+        +-aggregate_list=
+          +-$agg1#16 :=
+            +-AggregateFunctionCall(GoogleSQL:AGG(MEASURE<STRING>) -> STRING)
+              +-type_annotation_map={Collation:"und:ci"}
+              +-ColumnRef(type=MEASURE<STRING>, type_annotation_map=<{Collation:"und:ci"}>, column=MeasureTable_SingleKey_WithAnnotations.measure_derived_two_ci#8<{Collation:"und:ci"}>)
+
+[REWRITTEN AST]
+QueryStmt
++-output_column_list=
+| +-$groupby.key#17 AS key [INT64]
+| +-$aggregate.$agg1#16{Collation:"und:ci"} AS `$col2` [STRING]
++-query=
+  +-ProjectScan
+    +-column_list=[$groupby.key#17, $aggregate.$agg1#16{Collation:"und:ci"}]
+    +-input_scan=
+      +-ProjectScan
+        +-column_list=[$groupby.key#17, $aggregate.$agg1#16{Collation:"und:ci"}]
+        +-expr_list=
+        | +-$agg1#16 :=
+        |   +-FunctionCall(GoogleSQL:concat(STRING, repeated(1) STRING) -> STRING)
+        |     +-type_annotation_map={Collation:"und:ci"}
+        |     +-ColumnRef(type=STRING, column=$aggregate.constituent_aggregate_1#24)
+        |     +-ColumnRef(type=STRING, column=$aggregate.constituent_aggregate_1#28)
+        +-input_scan=
+          +-AggregateScan
+            +-column_list=[$groupby.key#17, $aggregate.constituent_aggregate_1#24, $aggregate.constituent_aggregate_1#28]
+            +-input_scan=
+            | +-ProjectScan
+            |   +-column_list=[MeasureTable_SingleKey_WithAnnotations.key#1, MeasureTable_SingleKey_WithAnnotations.struct_for_measures_from_table_MeasureTable_SingleKey_WithAnnotations#20<<<<{Collation:"und:ci"}>,_>>,_>, $aggregate.dep_closure#23<<{Collation:"und:ci"}>,_>, $aggregate.dep_closure#27<<{Collation:"und:ci"}>,_>]
+            |   +-expr_list=
+            |   | +-dep_closure#27 :=
+            |   |   +-GetStructField
+            |   |     +-type=STRUCT<referenced_columns STRUCT<col_ci STRING>, key_columns STRUCT<key INT64>>
+            |   |     +-type_annotation_map=<<{Collation:"und:ci"}>,_>
+            |   |     +-expr=
+            |   |     | +-GetStructField
+            |   |     |   +-type=STRUCT<measure_ci STRUCT<referenced_columns STRUCT<col_ci STRING>, key_columns STRUCT<key INT64>>>
+            |   |     |   +-type_annotation_map=<<<{Collation:"und:ci"}>,_>>
+            |   |     |   +-expr=
+            |   |     |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<measure_ci STRUCT<referenced_columns STRUCT<col_ci STRING>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>, type_annotation_map=<<<<{Collation:"und:ci"}>,_>>,_>, column=MeasureTable_SingleKey_WithAnnotations.struct_for_measures_from_table_MeasureTable_SingleKey_WithAnnotations#20<<<<{Collation:"und:ci"}>,_>>,_>)
+            |   |     |   +-field_idx=0
+            |   |     +-field_idx=0
+            |   +-input_scan=
+            |     +-ProjectScan
+            |       +-column_list=[MeasureTable_SingleKey_WithAnnotations.key#1, MeasureTable_SingleKey_WithAnnotations.struct_for_measures_from_table_MeasureTable_SingleKey_WithAnnotations#20<<<<{Collation:"und:ci"}>,_>>,_>, $aggregate.dep_closure#23<<{Collation:"und:ci"}>,_>]
+            |       +-expr_list=
+            |       | +-dep_closure#23 :=
+            |       |   +-GetStructField
+            |       |     +-type=STRUCT<referenced_columns STRUCT<col_ci STRING>, key_columns STRUCT<key INT64>>
+            |       |     +-type_annotation_map=<<{Collation:"und:ci"}>,_>
+            |       |     +-expr=
+            |       |     | +-GetStructField
+            |       |     |   +-type=STRUCT<measure_ci STRUCT<referenced_columns STRUCT<col_ci STRING>, key_columns STRUCT<key INT64>>>
+            |       |     |   +-type_annotation_map=<<<{Collation:"und:ci"}>,_>>
+            |       |     |   +-expr=
+            |       |     |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<measure_ci STRUCT<referenced_columns STRUCT<col_ci STRING>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>, type_annotation_map=<<<<{Collation:"und:ci"}>,_>>,_>, column=MeasureTable_SingleKey_WithAnnotations.struct_for_measures_from_table_MeasureTable_SingleKey_WithAnnotations#20<<<<{Collation:"und:ci"}>,_>>,_>)
+            |       |     |   +-field_idx=0
+            |       |     +-field_idx=0
+            |       +-input_scan=
+            |         +-ProjectScan
+            |           +-column_list=MeasureTable_SingleKey_WithAnnotations.[key#1, struct_for_measures_from_table_MeasureTable_SingleKey_WithAnnotations#20]
+            |           +-expr_list=
+            |           | +-struct_for_measures_from_table_MeasureTable_SingleKey_WithAnnotations#20 :=
+            |           |   +-MakeStruct
+            |           |     +-type=STRUCT<referenced_columns STRUCT<measure_ci STRUCT<referenced_columns STRUCT<col_ci STRING>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>
+            |           |     +-type_annotation_map=<<<<{Collation:"und:ci"}>,_>>,_>
+            |           |     +-field_list=
+            |           |       +-MakeStruct
+            |           |       | +-type=STRUCT<measure_ci STRUCT<referenced_columns STRUCT<col_ci STRING>, key_columns STRUCT<key INT64>>>
+            |           |       | +-type_annotation_map=<<<{Collation:"und:ci"}>,_>>
+            |           |       | +-field_list=
+            |           |       |   +-ColumnRef(type=STRUCT<referenced_columns STRUCT<col_ci STRING>, key_columns STRUCT<key INT64>>, type_annotation_map=<<{Collation:"und:ci"}>,_>, column=MeasureTable_SingleKey_WithAnnotations.struct_for_measures_from_table_MeasureTable_SingleKey_WithAnnotations#19<<{Collation:"und:ci"}>,_>)
+            |           |       +-MakeStruct
+            |           |         +-type=STRUCT<key INT64>
+            |           |         +-field_list=
+            |           |           +-ColumnRef(type=INT64, column=MeasureTable_SingleKey_WithAnnotations.key#1)
+            |           +-input_scan=
+            |             +-ProjectScan
+            |               +-column_list=MeasureTable_SingleKey_WithAnnotations.[key#1, struct_for_measures_from_table_MeasureTable_SingleKey_WithAnnotations#19]
+            |               +-expr_list=
+            |               | +-struct_for_measures_from_table_MeasureTable_SingleKey_WithAnnotations#19 :=
+            |               |   +-MakeStruct
+            |               |     +-type=STRUCT<referenced_columns STRUCT<col_ci STRING>, key_columns STRUCT<key INT64>>
+            |               |     +-type_annotation_map=<<{Collation:"und:ci"}>,_>
+            |               |     +-field_list=
+            |               |       +-MakeStruct
+            |               |       | +-type=STRUCT<col_ci STRING>
+            |               |       | +-type_annotation_map=<{Collation:"und:ci"}>
+            |               |       | +-field_list=
+            |               |       |   +-ColumnRef(type=STRING, type_annotation_map={Collation:"und:ci"}, column=MeasureTable_SingleKey_WithAnnotations.col_ci#18{Collation:"und:ci"})
+            |               |       +-MakeStruct
+            |               |         +-type=STRUCT<key INT64>
+            |               |         +-field_list=
+            |               |           +-ColumnRef(type=INT64, column=MeasureTable_SingleKey_WithAnnotations.key#1)
+            |               +-input_scan=
+            |                 +-TableScan(column_list=MeasureTable_SingleKey_WithAnnotations.[key#1, col_ci#18], table=MeasureTable_SingleKey_WithAnnotations, column_index_list=[0, 1])
+            +-group_by_list=
+            | +-key#17 := ColumnRef(type=INT64, column=MeasureTable_SingleKey_WithAnnotations.key#1)
+            +-aggregate_list=
+              +-constituent_aggregate_1#24 :=
+              | +-AggregateFunctionCall(GoogleSQL:max(STRING) -> STRING)
+              |   +-type_annotation_map={Collation:"und:ci"}
+              |   +-ColumnRef(type=STRING, column=$aggregate.$any_value_grain_lock_0#25)
+              |   +-collation_list=[und:ci]
+              |   +-where_expr=
+              |   | +-FunctionCall(GoogleSQL:$not(BOOL) -> BOOL)
+              |   |   +-FunctionCall(GoogleSQL:$is_null(STRUCT<referenced_columns STRUCT<col_ci STRING>, key_columns STRUCT<key INT64>>) -> BOOL)
+              |   |     +-ColumnRef(type=STRUCT<referenced_columns STRUCT<col_ci STRING>, key_columns STRUCT<key INT64>>, type_annotation_map=<<{Collation:"und:ci"}>,_>, column=$aggregate.dep_closure#23<<{Collation:"und:ci"}>,_>)
+              |   +-group_by_list=
+              |   | +-grain_lock_key#26 :=
+              |   |   +-GetStructField
+              |   |     +-type=STRUCT<key INT64>
+              |   |     +-expr=
+              |   |     | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<col_ci STRING>, key_columns STRUCT<key INT64>>, type_annotation_map=<<{Collation:"und:ci"}>,_>, column=$aggregate.dep_closure#23<<{Collation:"und:ci"}>,_>)
+              |   |     +-field_idx=1
+              |   +-group_by_aggregate_list=
+              |     +-$any_value_grain_lock_0#25 :=
+              |       +-AggregateFunctionCall(GoogleSQL:any_value(STRING) -> STRING)
+              |         +-GetStructField
+              |           +-type=STRING
+              |           +-type_annotation_map={Collation:"und:ci"}
+              |           +-expr=
+              |           | +-GetStructField
+              |           |   +-type=STRUCT<col_ci STRING>
+              |           |   +-type_annotation_map=<{Collation:"und:ci"}>
+              |           |   +-expr=
+              |           |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<col_ci STRING>, key_columns STRUCT<key INT64>>, type_annotation_map=<<{Collation:"und:ci"}>,_>, column=$aggregate.dep_closure#23<<{Collation:"und:ci"}>,_>)
+              |           |   +-field_idx=0
+              |           +-field_idx=0
+              +-constituent_aggregate_1#28 :=
+                +-AggregateFunctionCall(GoogleSQL:max(STRING) -> STRING)
+                  +-type_annotation_map={Collation:"und:ci"}
+                  +-ColumnRef(type=STRING, column=$aggregate.$any_value_grain_lock_0#29)
+                  +-collation_list=[und:ci]
+                  +-where_expr=
+                  | +-FunctionCall(GoogleSQL:$not(BOOL) -> BOOL)
+                  |   +-FunctionCall(GoogleSQL:$is_null(STRUCT<referenced_columns STRUCT<col_ci STRING>, key_columns STRUCT<key INT64>>) -> BOOL)
+                  |     +-ColumnRef(type=STRUCT<referenced_columns STRUCT<col_ci STRING>, key_columns STRUCT<key INT64>>, type_annotation_map=<<{Collation:"und:ci"}>,_>, column=$aggregate.dep_closure#27<<{Collation:"und:ci"}>,_>)
+                  +-group_by_list=
+                  | +-grain_lock_key#30 :=
+                  |   +-GetStructField
+                  |     +-type=STRUCT<key INT64>
+                  |     +-expr=
+                  |     | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<col_ci STRING>, key_columns STRUCT<key INT64>>, type_annotation_map=<<{Collation:"und:ci"}>,_>, column=$aggregate.dep_closure#27<<{Collation:"und:ci"}>,_>)
+                  |     +-field_idx=1
+                  +-group_by_aggregate_list=
+                    +-$any_value_grain_lock_0#29 :=
+                      +-AggregateFunctionCall(GoogleSQL:any_value(STRING) -> STRING)
+                        +-GetStructField
+                          +-type=STRING
+                          +-type_annotation_map={Collation:"und:ci"}
+                          +-expr=
+                          | +-GetStructField
+                          |   +-type=STRUCT<col_ci STRING>
+                          |   +-type_annotation_map=<{Collation:"und:ci"}>
+                          |   +-expr=
+                          |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<col_ci STRING>, key_columns STRUCT<key INT64>>, type_annotation_map=<<{Collation:"und:ci"}>,_>, column=$aggregate.dep_closure#27<<{Collation:"und:ci"}>,_>)
+                          |   +-field_idx=0
+                          +-field_idx=0
+==
+
+# Derived Measure: Mixed Dependencies (Base Measure Closure + Direct Column)
+SELECT key, AGG(measure_derived_mixed_ci)
+FROM MeasureTable_SingleKey_WithAnnotations
+GROUP BY key;
+--
+QueryStmt
++-output_column_list=
+| +-$groupby.key#17 AS key [INT64]
+| +-$aggregate.$agg1#16{Collation:"und:ci"} AS `$col2` [STRING]
++-query=
+  +-ProjectScan
+    +-column_list=[$groupby.key#17, $aggregate.$agg1#16{Collation:"und:ci"}]
+    +-input_scan=
+      +-AggregateScan
+        +-column_list=[$groupby.key#17, $aggregate.$agg1#16{Collation:"und:ci"}]
+        +-input_scan=
+        | +-TableScan(column_list=MeasureTable_SingleKey_WithAnnotations.[key#1, measure_derived_mixed_ci#9], table=MeasureTable_SingleKey_WithAnnotations, column_index_list=[0, 8])
+        +-group_by_list=
+        | +-key#17 := ColumnRef(type=INT64, column=MeasureTable_SingleKey_WithAnnotations.key#1)
+        +-aggregate_list=
+          +-$agg1#16 :=
+            +-AggregateFunctionCall(GoogleSQL:AGG(MEASURE<STRING>) -> STRING)
+              +-type_annotation_map={Collation:"und:ci"}
+              +-ColumnRef(type=MEASURE<STRING>, type_annotation_map=<{Collation:"und:ci"}>, column=MeasureTable_SingleKey_WithAnnotations.measure_derived_mixed_ci#9<{Collation:"und:ci"}>)
+
+[REWRITTEN AST]
+QueryStmt
++-output_column_list=
+| +-$groupby.key#17 AS key [INT64]
+| +-$aggregate.$agg1#16{Collation:"und:ci"} AS `$col2` [STRING]
++-query=
+  +-ProjectScan
+    +-column_list=[$groupby.key#17, $aggregate.$agg1#16{Collation:"und:ci"}]
+    +-input_scan=
+      +-ProjectScan
+        +-column_list=[$groupby.key#17, $aggregate.$agg1#16{Collation:"und:ci"}]
+        +-expr_list=
+        | +-$agg1#16 :=
+        |   +-FunctionCall(GoogleSQL:concat(STRING, repeated(1) STRING) -> STRING)
+        |     +-type_annotation_map={Collation:"und:ci"}
+        |     +-ColumnRef(type=STRING, column=$aggregate.constituent_aggregate_1#24)
+        |     +-ColumnRef(type=STRING, column=$aggregate.constituent_aggregate_2#22)
+        +-input_scan=
+          +-AggregateScan
+            +-column_list=[$groupby.key#17, $aggregate.constituent_aggregate_1#24, $aggregate.constituent_aggregate_2#22]
+            +-input_scan=
+            | +-ProjectScan
+            |   +-column_list=[MeasureTable_SingleKey_WithAnnotations.key#1, MeasureTable_SingleKey_WithAnnotations.struct_for_measures_from_table_MeasureTable_SingleKey_WithAnnotations#20<<{Collation:"und:ci"},<<{Collation:"und:ci"}>,_>>,_>, $aggregate.dep_closure#23<<{Collation:"und:ci"}>,_>]
+            |   +-expr_list=
+            |   | +-dep_closure#23 :=
+            |   |   +-GetStructField
+            |   |     +-type=STRUCT<referenced_columns STRUCT<col_ci STRING>, key_columns STRUCT<key INT64>>
+            |   |     +-type_annotation_map=<<{Collation:"und:ci"}>,_>
+            |   |     +-expr=
+            |   |     | +-GetStructField
+            |   |     |   +-type=STRUCT<col_ci STRING, measure_ci STRUCT<referenced_columns STRUCT<col_ci STRING>, key_columns STRUCT<key INT64>>>
+            |   |     |   +-type_annotation_map=<{Collation:"und:ci"},<<{Collation:"und:ci"}>,_>>
+            |   |     |   +-expr=
+            |   |     |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<col_ci STRING, measure_ci STRUCT<referenced_columns STRUCT<col_ci STRING>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>, type_annotation_map=<<{Collation:"und:ci"},<<{Collation:"und:ci"}>,_>>,_>, column=MeasureTable_SingleKey_WithAnnotations.struct_for_measures_from_table_MeasureTable_SingleKey_WithAnnotations#20<<{Collation:"und:ci"},<<{Collation:"und:ci"}>,_>>,_>)
+            |   |     |   +-field_idx=0
+            |   |     +-field_idx=1
+            |   +-input_scan=
+            |     +-ProjectScan
+            |       +-column_list=MeasureTable_SingleKey_WithAnnotations.[key#1, struct_for_measures_from_table_MeasureTable_SingleKey_WithAnnotations#20]
+            |       +-expr_list=
+            |       | +-struct_for_measures_from_table_MeasureTable_SingleKey_WithAnnotations#20 :=
+            |       |   +-MakeStruct
+            |       |     +-type=STRUCT<referenced_columns STRUCT<col_ci STRING, measure_ci STRUCT<referenced_columns STRUCT<col_ci STRING>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>
+            |       |     +-type_annotation_map=<<{Collation:"und:ci"},<<{Collation:"und:ci"}>,_>>,_>
+            |       |     +-field_list=
+            |       |       +-MakeStruct
+            |       |       | +-type=STRUCT<col_ci STRING, measure_ci STRUCT<referenced_columns STRUCT<col_ci STRING>, key_columns STRUCT<key INT64>>>
+            |       |       | +-type_annotation_map=<{Collation:"und:ci"},<<{Collation:"und:ci"}>,_>>
+            |       |       | +-field_list=
+            |       |       |   +-ColumnRef(type=STRING, type_annotation_map={Collation:"und:ci"}, column=MeasureTable_SingleKey_WithAnnotations.col_ci#18{Collation:"und:ci"})
+            |       |       |   +-ColumnRef(type=STRUCT<referenced_columns STRUCT<col_ci STRING>, key_columns STRUCT<key INT64>>, type_annotation_map=<<{Collation:"und:ci"}>,_>, column=MeasureTable_SingleKey_WithAnnotations.struct_for_measures_from_table_MeasureTable_SingleKey_WithAnnotations#19<<{Collation:"und:ci"}>,_>)
+            |       |       +-MakeStruct
+            |       |         +-type=STRUCT<key INT64>
+            |       |         +-field_list=
+            |       |           +-ColumnRef(type=INT64, column=MeasureTable_SingleKey_WithAnnotations.key#1)
+            |       +-input_scan=
+            |         +-ProjectScan
+            |           +-column_list=MeasureTable_SingleKey_WithAnnotations.[key#1, col_ci#18, struct_for_measures_from_table_MeasureTable_SingleKey_WithAnnotations#19]
+            |           +-expr_list=
+            |           | +-struct_for_measures_from_table_MeasureTable_SingleKey_WithAnnotations#19 :=
+            |           |   +-MakeStruct
+            |           |     +-type=STRUCT<referenced_columns STRUCT<col_ci STRING>, key_columns STRUCT<key INT64>>
+            |           |     +-type_annotation_map=<<{Collation:"und:ci"}>,_>
+            |           |     +-field_list=
+            |           |       +-MakeStruct
+            |           |       | +-type=STRUCT<col_ci STRING>
+            |           |       | +-type_annotation_map=<{Collation:"und:ci"}>
+            |           |       | +-field_list=
+            |           |       |   +-ColumnRef(type=STRING, type_annotation_map={Collation:"und:ci"}, column=MeasureTable_SingleKey_WithAnnotations.col_ci#18{Collation:"und:ci"})
+            |           |       +-MakeStruct
+            |           |         +-type=STRUCT<key INT64>
+            |           |         +-field_list=
+            |           |           +-ColumnRef(type=INT64, column=MeasureTable_SingleKey_WithAnnotations.key#1)
+            |           +-input_scan=
+            |             +-TableScan(column_list=MeasureTable_SingleKey_WithAnnotations.[key#1, col_ci#18], table=MeasureTable_SingleKey_WithAnnotations, column_index_list=[0, 1])
+            +-group_by_list=
+            | +-key#17 := ColumnRef(type=INT64, column=MeasureTable_SingleKey_WithAnnotations.key#1)
+            +-aggregate_list=
+              +-constituent_aggregate_1#24 :=
+              | +-AggregateFunctionCall(GoogleSQL:max(STRING) -> STRING)
+              |   +-type_annotation_map={Collation:"und:ci"}
+              |   +-ColumnRef(type=STRING, column=$aggregate.$any_value_grain_lock_0#25)
+              |   +-collation_list=[und:ci]
+              |   +-where_expr=
+              |   | +-FunctionCall(GoogleSQL:$not(BOOL) -> BOOL)
+              |   |   +-FunctionCall(GoogleSQL:$is_null(STRUCT<referenced_columns STRUCT<col_ci STRING>, key_columns STRUCT<key INT64>>) -> BOOL)
+              |   |     +-ColumnRef(type=STRUCT<referenced_columns STRUCT<col_ci STRING>, key_columns STRUCT<key INT64>>, type_annotation_map=<<{Collation:"und:ci"}>,_>, column=$aggregate.dep_closure#23<<{Collation:"und:ci"}>,_>)
+              |   +-group_by_list=
+              |   | +-grain_lock_key#26 :=
+              |   |   +-GetStructField
+              |   |     +-type=STRUCT<key INT64>
+              |   |     +-expr=
+              |   |     | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<col_ci STRING>, key_columns STRUCT<key INT64>>, type_annotation_map=<<{Collation:"und:ci"}>,_>, column=$aggregate.dep_closure#23<<{Collation:"und:ci"}>,_>)
+              |   |     +-field_idx=1
+              |   +-group_by_aggregate_list=
+              |     +-$any_value_grain_lock_0#25 :=
+              |       +-AggregateFunctionCall(GoogleSQL:any_value(STRING) -> STRING)
+              |         +-GetStructField
+              |           +-type=STRING
+              |           +-type_annotation_map={Collation:"und:ci"}
+              |           +-expr=
+              |           | +-GetStructField
+              |           |   +-type=STRUCT<col_ci STRING>
+              |           |   +-type_annotation_map=<{Collation:"und:ci"}>
+              |           |   +-expr=
+              |           |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<col_ci STRING>, key_columns STRUCT<key INT64>>, type_annotation_map=<<{Collation:"und:ci"}>,_>, column=$aggregate.dep_closure#23<<{Collation:"und:ci"}>,_>)
+              |           |   +-field_idx=0
+              |           +-field_idx=0
+              +-constituent_aggregate_2#22 :=
+                +-AggregateFunctionCall(GoogleSQL:max(STRING) -> STRING)
+                  +-type_annotation_map={Collation:"und:ci"}
+                  +-ColumnRef(type=STRING, column=$aggregate.$any_value_grain_lock_0#27)
+                  +-collation_list=[und:ci]
+                  +-where_expr=
+                  | +-FunctionCall(GoogleSQL:$not(BOOL) -> BOOL)
+                  |   +-FunctionCall(GoogleSQL:$is_null(STRUCT<referenced_columns STRUCT<col_ci STRING, measure_ci STRUCT<referenced_columns STRUCT<col_ci STRING>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>) -> BOOL)
+                  |     +-ColumnRef(type=STRUCT<referenced_columns STRUCT<col_ci STRING, measure_ci STRUCT<referenced_columns STRUCT<col_ci STRING>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>, type_annotation_map=<<{Collation:"und:ci"},<<{Collation:"und:ci"}>,_>>,_>, column=MeasureTable_SingleKey_WithAnnotations.struct_for_measures_from_table_MeasureTable_SingleKey_WithAnnotations#20<<{Collation:"und:ci"},<<{Collation:"und:ci"}>,_>>,_>)
+                  +-group_by_list=
+                  | +-grain_lock_key#28 :=
+                  |   +-GetStructField
+                  |     +-type=STRUCT<key INT64>
+                  |     +-expr=
+                  |     | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<col_ci STRING, measure_ci STRUCT<referenced_columns STRUCT<col_ci STRING>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>, type_annotation_map=<<{Collation:"und:ci"},<<{Collation:"und:ci"}>,_>>,_>, column=MeasureTable_SingleKey_WithAnnotations.struct_for_measures_from_table_MeasureTable_SingleKey_WithAnnotations#20<<{Collation:"und:ci"},<<{Collation:"und:ci"}>,_>>,_>)
+                  |     +-field_idx=1
+                  +-group_by_aggregate_list=
+                    +-$any_value_grain_lock_0#27 :=
+                      +-AggregateFunctionCall(GoogleSQL:any_value(STRING) -> STRING)
+                        +-GetStructField
+                          +-type=STRING
+                          +-type_annotation_map={Collation:"und:ci"}
+                          +-expr=
+                          | +-GetStructField
+                          |   +-type=STRUCT<col_ci STRING, measure_ci STRUCT<referenced_columns STRUCT<col_ci STRING>, key_columns STRUCT<key INT64>>>
+                          |   +-type_annotation_map=<{Collation:"und:ci"},<<{Collation:"und:ci"}>,_>>
+                          |   +-expr=
+                          |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<col_ci STRING, measure_ci STRUCT<referenced_columns STRUCT<col_ci STRING>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>, type_annotation_map=<<{Collation:"und:ci"},<<{Collation:"und:ci"}>,_>>,_>, column=MeasureTable_SingleKey_WithAnnotations.struct_for_measures_from_table_MeasureTable_SingleKey_WithAnnotations#20<<{Collation:"und:ci"},<<{Collation:"und:ci"}>,_>>,_>)
+                          |   +-field_idx=0
+                          +-field_idx=0
+==
+
+# Derived Measure: Composite Types (ARRAY)
+SELECT key, AGG(measure_derived_array)
+FROM MeasureTable_SingleKey_WithAnnotations
+GROUP BY key;
+--
+QueryStmt
++-output_column_list=
+| +-$groupby.key#17 AS key [INT64]
+| +-$aggregate.$agg1#16<{Collation:"und:ci"}> AS `$col2` [ARRAY<STRING>]
++-query=
+  +-ProjectScan
+    +-column_list=[$groupby.key#17, $aggregate.$agg1#16<{Collation:"und:ci"}>]
+    +-input_scan=
+      +-AggregateScan
+        +-column_list=[$groupby.key#17, $aggregate.$agg1#16<{Collation:"und:ci"}>]
+        +-input_scan=
+        | +-TableScan(column_list=MeasureTable_SingleKey_WithAnnotations.[key#1, measure_derived_array#15], table=MeasureTable_SingleKey_WithAnnotations, column_index_list=[0, 14])
+        +-group_by_list=
+        | +-key#17 := ColumnRef(type=INT64, column=MeasureTable_SingleKey_WithAnnotations.key#1)
+        +-aggregate_list=
+          +-$agg1#16 :=
+            +-AggregateFunctionCall(GoogleSQL:AGG(MEASURE<ARRAY<STRING>>) -> ARRAY<STRING>)
+              +-type_annotation_map=<{Collation:"und:ci"}>
+              +-ColumnRef(type=MEASURE<ARRAY<STRING>>, type_annotation_map=<<{Collation:"und:ci"}>>, column=MeasureTable_SingleKey_WithAnnotations.measure_derived_array#15<<{Collation:"und:ci"}>>)
+
+[REWRITTEN AST]
+QueryStmt
++-output_column_list=
+| +-$groupby.key#17 AS key [INT64]
+| +-$aggregate.$agg1#16<{Collation:"und:ci"}> AS `$col2` [ARRAY<STRING>]
++-query=
+  +-ProjectScan
+    +-column_list=[$groupby.key#17, $aggregate.$agg1#16<{Collation:"und:ci"}>]
+    +-input_scan=
+      +-ProjectScan
+        +-column_list=[$groupby.key#17, $aggregate.$agg1#16<{Collation:"und:ci"}>]
+        +-expr_list=
+        | +-$agg1#16 :=
+        |   +-FunctionCall(GoogleSQL:$make_array(repeated(1) STRING) -> ARRAY<STRING>)
+        |     +-type_annotation_map=<{Collation:"und:ci"}>
+        |     +-ColumnRef(type=STRING, column=$aggregate.constituent_aggregate_1#23)
+        +-input_scan=
+          +-AggregateScan
+            +-column_list=[$groupby.key#17, $aggregate.constituent_aggregate_1#23]
+            +-input_scan=
+            | +-ProjectScan
+            |   +-column_list=[MeasureTable_SingleKey_WithAnnotations.key#1, MeasureTable_SingleKey_WithAnnotations.struct_for_measures_from_table_MeasureTable_SingleKey_WithAnnotations#20<<<<{Collation:"und:ci"}>,_>>,_>, $aggregate.dep_closure#22<<{Collation:"und:ci"}>,_>]
+            |   +-expr_list=
+            |   | +-dep_closure#22 :=
+            |   |   +-GetStructField
+            |   |     +-type=STRUCT<referenced_columns STRUCT<col_ci STRING>, key_columns STRUCT<key INT64>>
+            |   |     +-type_annotation_map=<<{Collation:"und:ci"}>,_>
+            |   |     +-expr=
+            |   |     | +-GetStructField
+            |   |     |   +-type=STRUCT<measure_ci STRUCT<referenced_columns STRUCT<col_ci STRING>, key_columns STRUCT<key INT64>>>
+            |   |     |   +-type_annotation_map=<<<{Collation:"und:ci"}>,_>>
+            |   |     |   +-expr=
+            |   |     |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<measure_ci STRUCT<referenced_columns STRUCT<col_ci STRING>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>, type_annotation_map=<<<<{Collation:"und:ci"}>,_>>,_>, column=MeasureTable_SingleKey_WithAnnotations.struct_for_measures_from_table_MeasureTable_SingleKey_WithAnnotations#20<<<<{Collation:"und:ci"}>,_>>,_>)
+            |   |     |   +-field_idx=0
+            |   |     +-field_idx=0
+            |   +-input_scan=
+            |     +-ProjectScan
+            |       +-column_list=MeasureTable_SingleKey_WithAnnotations.[key#1, struct_for_measures_from_table_MeasureTable_SingleKey_WithAnnotations#20]
+            |       +-expr_list=
+            |       | +-struct_for_measures_from_table_MeasureTable_SingleKey_WithAnnotations#20 :=
+            |       |   +-MakeStruct
+            |       |     +-type=STRUCT<referenced_columns STRUCT<measure_ci STRUCT<referenced_columns STRUCT<col_ci STRING>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>
+            |       |     +-type_annotation_map=<<<<{Collation:"und:ci"}>,_>>,_>
+            |       |     +-field_list=
+            |       |       +-MakeStruct
+            |       |       | +-type=STRUCT<measure_ci STRUCT<referenced_columns STRUCT<col_ci STRING>, key_columns STRUCT<key INT64>>>
+            |       |       | +-type_annotation_map=<<<{Collation:"und:ci"}>,_>>
+            |       |       | +-field_list=
+            |       |       |   +-ColumnRef(type=STRUCT<referenced_columns STRUCT<col_ci STRING>, key_columns STRUCT<key INT64>>, type_annotation_map=<<{Collation:"und:ci"}>,_>, column=MeasureTable_SingleKey_WithAnnotations.struct_for_measures_from_table_MeasureTable_SingleKey_WithAnnotations#19<<{Collation:"und:ci"}>,_>)
+            |       |       +-MakeStruct
+            |       |         +-type=STRUCT<key INT64>
+            |       |         +-field_list=
+            |       |           +-ColumnRef(type=INT64, column=MeasureTable_SingleKey_WithAnnotations.key#1)
+            |       +-input_scan=
+            |         +-ProjectScan
+            |           +-column_list=MeasureTable_SingleKey_WithAnnotations.[key#1, struct_for_measures_from_table_MeasureTable_SingleKey_WithAnnotations#19]
+            |           +-expr_list=
+            |           | +-struct_for_measures_from_table_MeasureTable_SingleKey_WithAnnotations#19 :=
+            |           |   +-MakeStruct
+            |           |     +-type=STRUCT<referenced_columns STRUCT<col_ci STRING>, key_columns STRUCT<key INT64>>
+            |           |     +-type_annotation_map=<<{Collation:"und:ci"}>,_>
+            |           |     +-field_list=
+            |           |       +-MakeStruct
+            |           |       | +-type=STRUCT<col_ci STRING>
+            |           |       | +-type_annotation_map=<{Collation:"und:ci"}>
+            |           |       | +-field_list=
+            |           |       |   +-ColumnRef(type=STRING, type_annotation_map={Collation:"und:ci"}, column=MeasureTable_SingleKey_WithAnnotations.col_ci#18{Collation:"und:ci"})
+            |           |       +-MakeStruct
+            |           |         +-type=STRUCT<key INT64>
+            |           |         +-field_list=
+            |           |           +-ColumnRef(type=INT64, column=MeasureTable_SingleKey_WithAnnotations.key#1)
+            |           +-input_scan=
+            |             +-TableScan(column_list=MeasureTable_SingleKey_WithAnnotations.[key#1, col_ci#18], table=MeasureTable_SingleKey_WithAnnotations, column_index_list=[0, 1])
+            +-group_by_list=
+            | +-key#17 := ColumnRef(type=INT64, column=MeasureTable_SingleKey_WithAnnotations.key#1)
+            +-aggregate_list=
+              +-constituent_aggregate_1#23 :=
+                +-AggregateFunctionCall(GoogleSQL:max(STRING) -> STRING)
+                  +-type_annotation_map={Collation:"und:ci"}
+                  +-ColumnRef(type=STRING, column=$aggregate.$any_value_grain_lock_0#24)
+                  +-collation_list=[und:ci]
+                  +-where_expr=
+                  | +-FunctionCall(GoogleSQL:$not(BOOL) -> BOOL)
+                  |   +-FunctionCall(GoogleSQL:$is_null(STRUCT<referenced_columns STRUCT<col_ci STRING>, key_columns STRUCT<key INT64>>) -> BOOL)
+                  |     +-ColumnRef(type=STRUCT<referenced_columns STRUCT<col_ci STRING>, key_columns STRUCT<key INT64>>, type_annotation_map=<<{Collation:"und:ci"}>,_>, column=$aggregate.dep_closure#22<<{Collation:"und:ci"}>,_>)
+                  +-group_by_list=
+                  | +-grain_lock_key#25 :=
+                  |   +-GetStructField
+                  |     +-type=STRUCT<key INT64>
+                  |     +-expr=
+                  |     | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<col_ci STRING>, key_columns STRUCT<key INT64>>, type_annotation_map=<<{Collation:"und:ci"}>,_>, column=$aggregate.dep_closure#22<<{Collation:"und:ci"}>,_>)
+                  |     +-field_idx=1
+                  +-group_by_aggregate_list=
+                    +-$any_value_grain_lock_0#24 :=
+                      +-AggregateFunctionCall(GoogleSQL:any_value(STRING) -> STRING)
+                        +-GetStructField
+                          +-type=STRING
+                          +-type_annotation_map={Collation:"und:ci"}
+                          +-expr=
+                          | +-GetStructField
+                          |   +-type=STRUCT<col_ci STRING>
+                          |   +-type_annotation_map=<{Collation:"und:ci"}>
+                          |   +-expr=
+                          |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<col_ci STRING>, key_columns STRUCT<key INT64>>, type_annotation_map=<<{Collation:"und:ci"}>,_>, column=$aggregate.dep_closure#22<<{Collation:"und:ci"}>,_>)
+                          |   +-field_idx=0
+                          +-field_idx=0
+==
+
+# Derived Measure: Multi-level Chained Nesting (Level 2)
+SELECT key, AGG(measure_derived_nest_l2)
+FROM MeasureTable_SingleKey_WithAnnotations
+GROUP BY key;
+--
+QueryStmt
++-output_column_list=
+| +-$groupby.key#17 AS key [INT64]
+| +-$aggregate.$agg1#16{Collation:"und:ci"} AS `$col2` [STRING]
++-query=
+  +-ProjectScan
+    +-column_list=[$groupby.key#17, $aggregate.$agg1#16{Collation:"und:ci"}]
+    +-input_scan=
+      +-AggregateScan
+        +-column_list=[$groupby.key#17, $aggregate.$agg1#16{Collation:"und:ci"}]
+        +-input_scan=
+        | +-TableScan(column_list=MeasureTable_SingleKey_WithAnnotations.[key#1, measure_derived_nest_l2#11], table=MeasureTable_SingleKey_WithAnnotations, column_index_list=[0, 10])
+        +-group_by_list=
+        | +-key#17 := ColumnRef(type=INT64, column=MeasureTable_SingleKey_WithAnnotations.key#1)
+        +-aggregate_list=
+          +-$agg1#16 :=
+            +-AggregateFunctionCall(GoogleSQL:AGG(MEASURE<STRING>) -> STRING)
+              +-type_annotation_map={Collation:"und:ci"}
+              +-ColumnRef(type=MEASURE<STRING>, type_annotation_map=<{Collation:"und:ci"}>, column=MeasureTable_SingleKey_WithAnnotations.measure_derived_nest_l2#11<{Collation:"und:ci"}>)
+
+[REWRITTEN AST]
+QueryStmt
++-output_column_list=
+| +-$groupby.key#17 AS key [INT64]
+| +-$aggregate.$agg1#16{Collation:"und:ci"} AS `$col2` [STRING]
++-query=
+  +-ProjectScan
+    +-column_list=[$groupby.key#17, $aggregate.$agg1#16{Collation:"und:ci"}]
+    +-input_scan=
+      +-ProjectScan
+        +-column_list=[$groupby.key#17, $aggregate.$agg1#16{Collation:"und:ci"}]
+        +-expr_list=
+        | +-$agg1#16 :=
+        |   +-FunctionCall(GoogleSQL:concat(STRING, repeated(1) STRING) -> STRING)
+        |     +-type_annotation_map={Collation:"und:ci"}
+        |     +-FunctionCall(GoogleSQL:concat(STRING, repeated(1) STRING) -> STRING)
+        |     | +-type_annotation_map={Collation:"und:ci"}
+        |     | +-ColumnRef(type=STRING, column=$aggregate.constituent_aggregate_1#26)
+        |     | +-Literal(type=STRING, value="-l1")
+        |     +-Literal(type=STRING, value="-l2")
+        +-input_scan=
+          +-AggregateScan
+            +-column_list=[$groupby.key#17, $aggregate.constituent_aggregate_1#26]
+            +-input_scan=
+            | +-ProjectScan
+            |   +-column_list=[MeasureTable_SingleKey_WithAnnotations.key#1, MeasureTable_SingleKey_WithAnnotations.struct_for_measures_from_table_MeasureTable_SingleKey_WithAnnotations#21<<<<<<{Collation:"und:ci"}>,_>>,_>>,_>, $aggregate.dep_closure#23<<<<{Collation:"und:ci"}>,_>>,_>, $aggregate.dep_closure#25<<{Collation:"und:ci"}>,_>]
+            |   +-expr_list=
+            |   | +-dep_closure#25 :=
+            |   |   +-GetStructField
+            |   |     +-type=STRUCT<referenced_columns STRUCT<col_ci STRING>, key_columns STRUCT<key INT64>>
+            |   |     +-type_annotation_map=<<{Collation:"und:ci"}>,_>
+            |   |     +-expr=
+            |   |     | +-GetStructField
+            |   |     |   +-type=STRUCT<measure_ci STRUCT<referenced_columns STRUCT<col_ci STRING>, key_columns STRUCT<key INT64>>>
+            |   |     |   +-type_annotation_map=<<<{Collation:"und:ci"}>,_>>
+            |   |     |   +-expr=
+            |   |     |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<measure_ci STRUCT<referenced_columns STRUCT<col_ci STRING>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>, type_annotation_map=<<<<{Collation:"und:ci"}>,_>>,_>, column=$aggregate.dep_closure#23<<<<{Collation:"und:ci"}>,_>>,_>)
+            |   |     |   +-field_idx=0
+            |   |     +-field_idx=0
+            |   +-input_scan=
+            |     +-ProjectScan
+            |       +-column_list=[MeasureTable_SingleKey_WithAnnotations.key#1, MeasureTable_SingleKey_WithAnnotations.struct_for_measures_from_table_MeasureTable_SingleKey_WithAnnotations#21<<<<<<{Collation:"und:ci"}>,_>>,_>>,_>, $aggregate.dep_closure#23<<<<{Collation:"und:ci"}>,_>>,_>]
+            |       +-expr_list=
+            |       | +-dep_closure#23 :=
+            |       |   +-GetStructField
+            |       |     +-type=STRUCT<referenced_columns STRUCT<measure_ci STRUCT<referenced_columns STRUCT<col_ci STRING>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>
+            |       |     +-type_annotation_map=<<<<{Collation:"und:ci"}>,_>>,_>
+            |       |     +-expr=
+            |       |     | +-GetStructField
+            |       |     |   +-type=STRUCT<measure_derived_nest_l1 STRUCT<referenced_columns STRUCT<measure_ci STRUCT<referenced_columns STRUCT<col_ci STRING>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>>
+            |       |     |   +-type_annotation_map=<<<<<{Collation:"und:ci"}>,_>>,_>>
+            |       |     |   +-expr=
+            |       |     |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<measure_derived_nest_l1 STRUCT<referenced_columns STRUCT<measure_ci STRUCT<referenced_columns STRUCT<col_ci STRING>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>, type_annotation_map=<<<<<<{Collation:"und:ci"}>,_>>,_>>,_>, column=MeasureTable_SingleKey_WithAnnotations.struct_for_measures_from_table_MeasureTable_SingleKey_WithAnnotations#21<<<<<<{Collation:"und:ci"}>,_>>,_>>,_>)
+            |       |     |   +-field_idx=0
+            |       |     +-field_idx=0
+            |       +-input_scan=
+            |         +-ProjectScan
+            |           +-column_list=MeasureTable_SingleKey_WithAnnotations.[key#1, struct_for_measures_from_table_MeasureTable_SingleKey_WithAnnotations#21]
+            |           +-expr_list=
+            |           | +-struct_for_measures_from_table_MeasureTable_SingleKey_WithAnnotations#21 :=
+            |           |   +-MakeStruct
+            |           |     +-type=STRUCT<referenced_columns STRUCT<measure_derived_nest_l1 STRUCT<referenced_columns STRUCT<measure_ci STRUCT<referenced_columns STRUCT<col_ci STRING>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>
+            |           |     +-type_annotation_map=<<<<<<{Collation:"und:ci"}>,_>>,_>>,_>
+            |           |     +-field_list=
+            |           |       +-MakeStruct
+            |           |       | +-type=STRUCT<measure_derived_nest_l1 STRUCT<referenced_columns STRUCT<measure_ci STRUCT<referenced_columns STRUCT<col_ci STRING>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>>
+            |           |       | +-type_annotation_map=<<<<<{Collation:"und:ci"}>,_>>,_>>
+            |           |       | +-field_list=
+            |           |       |   +-ColumnRef(type=STRUCT<referenced_columns STRUCT<measure_ci STRUCT<referenced_columns STRUCT<col_ci STRING>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>, type_annotation_map=<<<<{Collation:"und:ci"}>,_>>,_>, column=MeasureTable_SingleKey_WithAnnotations.struct_for_measures_from_table_MeasureTable_SingleKey_WithAnnotations#20<<<<{Collation:"und:ci"}>,_>>,_>)
+            |           |       +-MakeStruct
+            |           |         +-type=STRUCT<key INT64>
+            |           |         +-field_list=
+            |           |           +-ColumnRef(type=INT64, column=MeasureTable_SingleKey_WithAnnotations.key#1)
+            |           +-input_scan=
+            |             +-ProjectScan
+            |               +-column_list=MeasureTable_SingleKey_WithAnnotations.[key#1, struct_for_measures_from_table_MeasureTable_SingleKey_WithAnnotations#20]
+            |               +-expr_list=
+            |               | +-struct_for_measures_from_table_MeasureTable_SingleKey_WithAnnotations#20 :=
+            |               |   +-MakeStruct
+            |               |     +-type=STRUCT<referenced_columns STRUCT<measure_ci STRUCT<referenced_columns STRUCT<col_ci STRING>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>
+            |               |     +-type_annotation_map=<<<<{Collation:"und:ci"}>,_>>,_>
+            |               |     +-field_list=
+            |               |       +-MakeStruct
+            |               |       | +-type=STRUCT<measure_ci STRUCT<referenced_columns STRUCT<col_ci STRING>, key_columns STRUCT<key INT64>>>
+            |               |       | +-type_annotation_map=<<<{Collation:"und:ci"}>,_>>
+            |               |       | +-field_list=
+            |               |       |   +-ColumnRef(type=STRUCT<referenced_columns STRUCT<col_ci STRING>, key_columns STRUCT<key INT64>>, type_annotation_map=<<{Collation:"und:ci"}>,_>, column=MeasureTable_SingleKey_WithAnnotations.struct_for_measures_from_table_MeasureTable_SingleKey_WithAnnotations#19<<{Collation:"und:ci"}>,_>)
+            |               |       +-MakeStruct
+            |               |         +-type=STRUCT<key INT64>
+            |               |         +-field_list=
+            |               |           +-ColumnRef(type=INT64, column=MeasureTable_SingleKey_WithAnnotations.key#1)
+            |               +-input_scan=
+            |                 +-ProjectScan
+            |                   +-column_list=MeasureTable_SingleKey_WithAnnotations.[key#1, struct_for_measures_from_table_MeasureTable_SingleKey_WithAnnotations#19]
+            |                   +-expr_list=
+            |                   | +-struct_for_measures_from_table_MeasureTable_SingleKey_WithAnnotations#19 :=
+            |                   |   +-MakeStruct
+            |                   |     +-type=STRUCT<referenced_columns STRUCT<col_ci STRING>, key_columns STRUCT<key INT64>>
+            |                   |     +-type_annotation_map=<<{Collation:"und:ci"}>,_>
+            |                   |     +-field_list=
+            |                   |       +-MakeStruct
+            |                   |       | +-type=STRUCT<col_ci STRING>
+            |                   |       | +-type_annotation_map=<{Collation:"und:ci"}>
+            |                   |       | +-field_list=
+            |                   |       |   +-ColumnRef(type=STRING, type_annotation_map={Collation:"und:ci"}, column=MeasureTable_SingleKey_WithAnnotations.col_ci#18{Collation:"und:ci"})
+            |                   |       +-MakeStruct
+            |                   |         +-type=STRUCT<key INT64>
+            |                   |         +-field_list=
+            |                   |           +-ColumnRef(type=INT64, column=MeasureTable_SingleKey_WithAnnotations.key#1)
+            |                   +-input_scan=
+            |                     +-TableScan(column_list=MeasureTable_SingleKey_WithAnnotations.[key#1, col_ci#18], table=MeasureTable_SingleKey_WithAnnotations, column_index_list=[0, 1])
+            +-group_by_list=
+            | +-key#17 := ColumnRef(type=INT64, column=MeasureTable_SingleKey_WithAnnotations.key#1)
+            +-aggregate_list=
+              +-constituent_aggregate_1#26 :=
+                +-AggregateFunctionCall(GoogleSQL:max(STRING) -> STRING)
+                  +-type_annotation_map={Collation:"und:ci"}
+                  +-ColumnRef(type=STRING, column=$aggregate.$any_value_grain_lock_0#27)
+                  +-collation_list=[und:ci]
+                  +-where_expr=
+                  | +-FunctionCall(GoogleSQL:$not(BOOL) -> BOOL)
+                  |   +-FunctionCall(GoogleSQL:$is_null(STRUCT<referenced_columns STRUCT<col_ci STRING>, key_columns STRUCT<key INT64>>) -> BOOL)
+                  |     +-ColumnRef(type=STRUCT<referenced_columns STRUCT<col_ci STRING>, key_columns STRUCT<key INT64>>, type_annotation_map=<<{Collation:"und:ci"}>,_>, column=$aggregate.dep_closure#25<<{Collation:"und:ci"}>,_>)
+                  +-group_by_list=
+                  | +-grain_lock_key#28 :=
+                  |   +-GetStructField
+                  |     +-type=STRUCT<key INT64>
+                  |     +-expr=
+                  |     | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<col_ci STRING>, key_columns STRUCT<key INT64>>, type_annotation_map=<<{Collation:"und:ci"}>,_>, column=$aggregate.dep_closure#25<<{Collation:"und:ci"}>,_>)
+                  |     +-field_idx=1
+                  +-group_by_aggregate_list=
+                    +-$any_value_grain_lock_0#27 :=
+                      +-AggregateFunctionCall(GoogleSQL:any_value(STRING) -> STRING)
+                        +-GetStructField
+                          +-type=STRING
+                          +-type_annotation_map={Collation:"und:ci"}
+                          +-expr=
+                          | +-GetStructField
+                          |   +-type=STRUCT<col_ci STRING>
+                          |   +-type_annotation_map=<{Collation:"und:ci"}>
+                          |   +-expr=
+                          |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<col_ci STRING>, key_columns STRUCT<key INT64>>, type_annotation_map=<<{Collation:"und:ci"}>,_>, column=$aggregate.dep_closure#25<<{Collation:"und:ci"}>,_>)
+                          |   +-field_idx=0
+                          +-field_idx=0
+==
+
+# Derived Measure: Distinct Aggregate Constituent with Collation
+SELECT key, AGG(measure_derived_distinct_plus_one)
+FROM MeasureTable_SingleKey_WithAnnotations
+GROUP BY key;
+--
+QueryStmt
++-output_column_list=
+| +-$groupby.key#17 AS key [INT64]
+| +-$aggregate.$agg1#16 AS `$col2` [INT64]
++-query=
+  +-ProjectScan
+    +-column_list=[$groupby.key#17, $aggregate.$agg1#16]
+    +-input_scan=
+      +-AggregateScan
+        +-column_list=[$groupby.key#17, $aggregate.$agg1#16]
+        +-input_scan=
+        | +-TableScan(column_list=MeasureTable_SingleKey_WithAnnotations.[key#1, measure_derived_distinct_plus_one#12], table=MeasureTable_SingleKey_WithAnnotations, column_index_list=[0, 11])
+        +-group_by_list=
+        | +-key#17 := ColumnRef(type=INT64, column=MeasureTable_SingleKey_WithAnnotations.key#1)
+        +-aggregate_list=
+          +-$agg1#16 :=
+            +-AggregateFunctionCall(GoogleSQL:AGG(MEASURE<INT64>) -> INT64)
+              +-ColumnRef(type=MEASURE<INT64>, column=MeasureTable_SingleKey_WithAnnotations.measure_derived_distinct_plus_one#12)
+
+[REWRITTEN AST]
+QueryStmt
++-output_column_list=
+| +-$groupby.key#17 AS key [INT64]
+| +-$aggregate.$agg1#16 AS `$col2` [INT64]
++-query=
+  +-ProjectScan
+    +-column_list=[$groupby.key#17, $aggregate.$agg1#16]
+    +-input_scan=
+      +-ProjectScan
+        +-column_list=[$groupby.key#17, $aggregate.$agg1#16]
+        +-expr_list=
+        | +-$agg1#16 :=
+        |   +-FunctionCall(GoogleSQL:$add(INT64, INT64) -> INT64)
+        |     +-ColumnRef(type=INT64, column=$aggregate.constituent_aggregate_1#23)
+        |     +-Literal(type=INT64, value=1)
+        +-input_scan=
+          +-AggregateScan
+            +-column_list=[$groupby.key#17, $aggregate.constituent_aggregate_1#23]
+            +-input_scan=
+            | +-ProjectScan
+            |   +-column_list=[MeasureTable_SingleKey_WithAnnotations.key#1, MeasureTable_SingleKey_WithAnnotations.struct_for_measures_from_table_MeasureTable_SingleKey_WithAnnotations#20<<<<{Collation:"und:ci"}>,_>>,_>, $aggregate.dep_closure#22<<{Collation:"und:ci"}>,_>]
+            |   +-expr_list=
+            |   | +-dep_closure#22 :=
+            |   |   +-GetStructField
+            |   |     +-type=STRUCT<referenced_columns STRUCT<col_ci STRING>, key_columns STRUCT<key INT64>>
+            |   |     +-type_annotation_map=<<{Collation:"und:ci"}>,_>
+            |   |     +-expr=
+            |   |     | +-GetStructField
+            |   |     |   +-type=STRUCT<measure_distinct_count_ci STRUCT<referenced_columns STRUCT<col_ci STRING>, key_columns STRUCT<key INT64>>>
+            |   |     |   +-type_annotation_map=<<<{Collation:"und:ci"}>,_>>
+            |   |     |   +-expr=
+            |   |     |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<measure_distinct_count_ci STRUCT<referenced_columns STRUCT<col_ci STRING>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>, type_annotation_map=<<<<{Collation:"und:ci"}>,_>>,_>, column=MeasureTable_SingleKey_WithAnnotations.struct_for_measures_from_table_MeasureTable_SingleKey_WithAnnotations#20<<<<{Collation:"und:ci"}>,_>>,_>)
+            |   |     |   +-field_idx=0
+            |   |     +-field_idx=0
+            |   +-input_scan=
+            |     +-ProjectScan
+            |       +-column_list=MeasureTable_SingleKey_WithAnnotations.[key#1, struct_for_measures_from_table_MeasureTable_SingleKey_WithAnnotations#20]
+            |       +-expr_list=
+            |       | +-struct_for_measures_from_table_MeasureTable_SingleKey_WithAnnotations#20 :=
+            |       |   +-MakeStruct
+            |       |     +-type=STRUCT<referenced_columns STRUCT<measure_distinct_count_ci STRUCT<referenced_columns STRUCT<col_ci STRING>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>
+            |       |     +-type_annotation_map=<<<<{Collation:"und:ci"}>,_>>,_>
+            |       |     +-field_list=
+            |       |       +-MakeStruct
+            |       |       | +-type=STRUCT<measure_distinct_count_ci STRUCT<referenced_columns STRUCT<col_ci STRING>, key_columns STRUCT<key INT64>>>
+            |       |       | +-type_annotation_map=<<<{Collation:"und:ci"}>,_>>
+            |       |       | +-field_list=
+            |       |       |   +-ColumnRef(type=STRUCT<referenced_columns STRUCT<col_ci STRING>, key_columns STRUCT<key INT64>>, type_annotation_map=<<{Collation:"und:ci"}>,_>, column=MeasureTable_SingleKey_WithAnnotations.struct_for_measures_from_table_MeasureTable_SingleKey_WithAnnotations#19<<{Collation:"und:ci"}>,_>)
+            |       |       +-MakeStruct
+            |       |         +-type=STRUCT<key INT64>
+            |       |         +-field_list=
+            |       |           +-ColumnRef(type=INT64, column=MeasureTable_SingleKey_WithAnnotations.key#1)
+            |       +-input_scan=
+            |         +-ProjectScan
+            |           +-column_list=MeasureTable_SingleKey_WithAnnotations.[key#1, struct_for_measures_from_table_MeasureTable_SingleKey_WithAnnotations#19]
+            |           +-expr_list=
+            |           | +-struct_for_measures_from_table_MeasureTable_SingleKey_WithAnnotations#19 :=
+            |           |   +-MakeStruct
+            |           |     +-type=STRUCT<referenced_columns STRUCT<col_ci STRING>, key_columns STRUCT<key INT64>>
+            |           |     +-type_annotation_map=<<{Collation:"und:ci"}>,_>
+            |           |     +-field_list=
+            |           |       +-MakeStruct
+            |           |       | +-type=STRUCT<col_ci STRING>
+            |           |       | +-type_annotation_map=<{Collation:"und:ci"}>
+            |           |       | +-field_list=
+            |           |       |   +-ColumnRef(type=STRING, type_annotation_map={Collation:"und:ci"}, column=MeasureTable_SingleKey_WithAnnotations.col_ci#18{Collation:"und:ci"})
+            |           |       +-MakeStruct
+            |           |         +-type=STRUCT<key INT64>
+            |           |         +-field_list=
+            |           |           +-ColumnRef(type=INT64, column=MeasureTable_SingleKey_WithAnnotations.key#1)
+            |           +-input_scan=
+            |             +-TableScan(column_list=MeasureTable_SingleKey_WithAnnotations.[key#1, col_ci#18], table=MeasureTable_SingleKey_WithAnnotations, column_index_list=[0, 1])
+            +-group_by_list=
+            | +-key#17 := ColumnRef(type=INT64, column=MeasureTable_SingleKey_WithAnnotations.key#1)
+            +-aggregate_list=
+              +-constituent_aggregate_1#23 :=
+                +-AggregateFunctionCall(GoogleSQL:count(STRING) -> INT64)
+                  +-ColumnRef(type=STRING, column=$aggregate.$any_value_grain_lock_0#24)
+                  +-collation_list=[und:ci]
+                  +-distinct=TRUE
+                  +-where_expr=
+                  | +-FunctionCall(GoogleSQL:$not(BOOL) -> BOOL)
+                  |   +-FunctionCall(GoogleSQL:$is_null(STRUCT<referenced_columns STRUCT<col_ci STRING>, key_columns STRUCT<key INT64>>) -> BOOL)
+                  |     +-ColumnRef(type=STRUCT<referenced_columns STRUCT<col_ci STRING>, key_columns STRUCT<key INT64>>, type_annotation_map=<<{Collation:"und:ci"}>,_>, column=$aggregate.dep_closure#22<<{Collation:"und:ci"}>,_>)
+                  +-group_by_list=
+                  | +-grain_lock_key#25 :=
+                  |   +-GetStructField
+                  |     +-type=STRUCT<key INT64>
+                  |     +-expr=
+                  |     | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<col_ci STRING>, key_columns STRUCT<key INT64>>, type_annotation_map=<<{Collation:"und:ci"}>,_>, column=$aggregate.dep_closure#22<<{Collation:"und:ci"}>,_>)
+                  |     +-field_idx=1
+                  +-group_by_aggregate_list=
+                    +-$any_value_grain_lock_0#24 :=
+                      +-AggregateFunctionCall(GoogleSQL:any_value(STRING) -> STRING)
+                        +-GetStructField
+                          +-type=STRING
+                          +-type_annotation_map={Collation:"und:ci"}
+                          +-expr=
+                          | +-GetStructField
+                          |   +-type=STRUCT<col_ci STRING>
+                          |   +-type_annotation_map=<{Collation:"und:ci"}>
+                          |   +-expr=
+                          |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<col_ci STRING>, key_columns STRUCT<key INT64>>, type_annotation_map=<<{Collation:"und:ci"}>,_>, column=$aggregate.dep_closure#22<<{Collation:"und:ci"}>,_>)
+                          |   +-field_idx=0
+                          +-field_idx=0
+==
+
+# Derived Measure: Subquery Propagation
+SELECT key, AGG(m_ci)
+FROM (
+  SELECT key, measure_derived_concat_ci AS m_ci
+  FROM MeasureTable_SingleKey_WithAnnotations
+)
+GROUP BY key;
+--
+QueryStmt
++-output_column_list=
+| +-$groupby.key#17 AS key [INT64]
+| +-$aggregate.$agg1#16{Collation:"und:ci"} AS `$col2` [STRING]
++-query=
+  +-ProjectScan
+    +-column_list=[$groupby.key#17, $aggregate.$agg1#16{Collation:"und:ci"}]
+    +-input_scan=
+      +-AggregateScan
+        +-column_list=[$groupby.key#17, $aggregate.$agg1#16{Collation:"und:ci"}]
+        +-input_scan=
+        | +-ProjectScan
+        |   +-column_list=MeasureTable_SingleKey_WithAnnotations.[key#1, measure_derived_concat_ci#7]
+        |   +-input_scan=
+        |     +-TableScan(column_list=MeasureTable_SingleKey_WithAnnotations.[key#1, measure_derived_concat_ci#7], table=MeasureTable_SingleKey_WithAnnotations, column_index_list=[0, 6])
+        +-group_by_list=
+        | +-key#17 := ColumnRef(type=INT64, column=MeasureTable_SingleKey_WithAnnotations.key#1)
+        +-aggregate_list=
+          +-$agg1#16 :=
+            +-AggregateFunctionCall(GoogleSQL:AGG(MEASURE<STRING>) -> STRING)
+              +-type_annotation_map={Collation:"und:ci"}
+              +-ColumnRef(type=MEASURE<STRING>, type_annotation_map=<{Collation:"und:ci"}>, column=MeasureTable_SingleKey_WithAnnotations.measure_derived_concat_ci#7<{Collation:"und:ci"}>)
+
+[REWRITTEN AST]
+QueryStmt
++-output_column_list=
+| +-$groupby.key#17 AS key [INT64]
+| +-$aggregate.$agg1#16{Collation:"und:ci"} AS `$col2` [STRING]
++-query=
+  +-ProjectScan
+    +-column_list=[$groupby.key#17, $aggregate.$agg1#16{Collation:"und:ci"}]
+    +-input_scan=
+      +-ProjectScan
+        +-column_list=[$groupby.key#17, $aggregate.$agg1#16{Collation:"und:ci"}]
+        +-expr_list=
+        | +-$agg1#16 :=
+        |   +-FunctionCall(GoogleSQL:concat(STRING, repeated(1) STRING) -> STRING)
+        |     +-type_annotation_map={Collation:"und:ci"}
+        |     +-ColumnRef(type=STRING, column=$aggregate.constituent_aggregate_1#23)
+        |     +-Literal(type=STRING, value="-suffix")
+        +-input_scan=
+          +-AggregateScan
+            +-column_list=[$groupby.key#17, $aggregate.constituent_aggregate_1#23]
+            +-input_scan=
+            | +-ProjectScan
+            |   +-column_list=[MeasureTable_SingleKey_WithAnnotations.key#1, MeasureTable_SingleKey_WithAnnotations.struct_for_measures_from_table_MeasureTable_SingleKey_WithAnnotations#20<<<<{Collation:"und:ci"}>,_>>,_>, $aggregate.dep_closure#22<<{Collation:"und:ci"}>,_>]
+            |   +-expr_list=
+            |   | +-dep_closure#22 :=
+            |   |   +-GetStructField
+            |   |     +-type=STRUCT<referenced_columns STRUCT<col_ci STRING>, key_columns STRUCT<key INT64>>
+            |   |     +-type_annotation_map=<<{Collation:"und:ci"}>,_>
+            |   |     +-expr=
+            |   |     | +-GetStructField
+            |   |     |   +-type=STRUCT<measure_ci STRUCT<referenced_columns STRUCT<col_ci STRING>, key_columns STRUCT<key INT64>>>
+            |   |     |   +-type_annotation_map=<<<{Collation:"und:ci"}>,_>>
+            |   |     |   +-expr=
+            |   |     |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<measure_ci STRUCT<referenced_columns STRUCT<col_ci STRING>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>, type_annotation_map=<<<<{Collation:"und:ci"}>,_>>,_>, column=MeasureTable_SingleKey_WithAnnotations.struct_for_measures_from_table_MeasureTable_SingleKey_WithAnnotations#20<<<<{Collation:"und:ci"}>,_>>,_>)
+            |   |     |   +-field_idx=0
+            |   |     +-field_idx=0
+            |   +-input_scan=
+            |     +-ProjectScan
+            |       +-column_list=MeasureTable_SingleKey_WithAnnotations.[key#1, struct_for_measures_from_table_MeasureTable_SingleKey_WithAnnotations#20]
+            |       +-input_scan=
+            |         +-ProjectScan
+            |           +-column_list=MeasureTable_SingleKey_WithAnnotations.[key#1, struct_for_measures_from_table_MeasureTable_SingleKey_WithAnnotations#20]
+            |           +-expr_list=
+            |           | +-struct_for_measures_from_table_MeasureTable_SingleKey_WithAnnotations#20 :=
+            |           |   +-MakeStruct
+            |           |     +-type=STRUCT<referenced_columns STRUCT<measure_ci STRUCT<referenced_columns STRUCT<col_ci STRING>, key_columns STRUCT<key INT64>>>, key_columns STRUCT<key INT64>>
+            |           |     +-type_annotation_map=<<<<{Collation:"und:ci"}>,_>>,_>
+            |           |     +-field_list=
+            |           |       +-MakeStruct
+            |           |       | +-type=STRUCT<measure_ci STRUCT<referenced_columns STRUCT<col_ci STRING>, key_columns STRUCT<key INT64>>>
+            |           |       | +-type_annotation_map=<<<{Collation:"und:ci"}>,_>>
+            |           |       | +-field_list=
+            |           |       |   +-ColumnRef(type=STRUCT<referenced_columns STRUCT<col_ci STRING>, key_columns STRUCT<key INT64>>, type_annotation_map=<<{Collation:"und:ci"}>,_>, column=MeasureTable_SingleKey_WithAnnotations.struct_for_measures_from_table_MeasureTable_SingleKey_WithAnnotations#19<<{Collation:"und:ci"}>,_>)
+            |           |       +-MakeStruct
+            |           |         +-type=STRUCT<key INT64>
+            |           |         +-field_list=
+            |           |           +-ColumnRef(type=INT64, column=MeasureTable_SingleKey_WithAnnotations.key#1)
+            |           +-input_scan=
+            |             +-ProjectScan
+            |               +-column_list=MeasureTable_SingleKey_WithAnnotations.[key#1, struct_for_measures_from_table_MeasureTable_SingleKey_WithAnnotations#19]
+            |               +-expr_list=
+            |               | +-struct_for_measures_from_table_MeasureTable_SingleKey_WithAnnotations#19 :=
+            |               |   +-MakeStruct
+            |               |     +-type=STRUCT<referenced_columns STRUCT<col_ci STRING>, key_columns STRUCT<key INT64>>
+            |               |     +-type_annotation_map=<<{Collation:"und:ci"}>,_>
+            |               |     +-field_list=
+            |               |       +-MakeStruct
+            |               |       | +-type=STRUCT<col_ci STRING>
+            |               |       | +-type_annotation_map=<{Collation:"und:ci"}>
+            |               |       | +-field_list=
+            |               |       |   +-ColumnRef(type=STRING, type_annotation_map={Collation:"und:ci"}, column=MeasureTable_SingleKey_WithAnnotations.col_ci#18{Collation:"und:ci"})
+            |               |       +-MakeStruct
+            |               |         +-type=STRUCT<key INT64>
+            |               |         +-field_list=
+            |               |           +-ColumnRef(type=INT64, column=MeasureTable_SingleKey_WithAnnotations.key#1)
+            |               +-input_scan=
+            |                 +-TableScan(column_list=MeasureTable_SingleKey_WithAnnotations.[key#1, col_ci#18], table=MeasureTable_SingleKey_WithAnnotations, column_index_list=[0, 1])
+            +-group_by_list=
+            | +-key#17 := ColumnRef(type=INT64, column=MeasureTable_SingleKey_WithAnnotations.key#1)
+            +-aggregate_list=
+              +-constituent_aggregate_1#23 :=
+                +-AggregateFunctionCall(GoogleSQL:max(STRING) -> STRING)
+                  +-type_annotation_map={Collation:"und:ci"}
+                  +-ColumnRef(type=STRING, column=$aggregate.$any_value_grain_lock_0#24)
+                  +-collation_list=[und:ci]
+                  +-where_expr=
+                  | +-FunctionCall(GoogleSQL:$not(BOOL) -> BOOL)
+                  |   +-FunctionCall(GoogleSQL:$is_null(STRUCT<referenced_columns STRUCT<col_ci STRING>, key_columns STRUCT<key INT64>>) -> BOOL)
+                  |     +-ColumnRef(type=STRUCT<referenced_columns STRUCT<col_ci STRING>, key_columns STRUCT<key INT64>>, type_annotation_map=<<{Collation:"und:ci"}>,_>, column=$aggregate.dep_closure#22<<{Collation:"und:ci"}>,_>)
+                  +-group_by_list=
+                  | +-grain_lock_key#25 :=
+                  |   +-GetStructField
+                  |     +-type=STRUCT<key INT64>
+                  |     +-expr=
+                  |     | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<col_ci STRING>, key_columns STRUCT<key INT64>>, type_annotation_map=<<{Collation:"und:ci"}>,_>, column=$aggregate.dep_closure#22<<{Collation:"und:ci"}>,_>)
+                  |     +-field_idx=1
+                  +-group_by_aggregate_list=
+                    +-$any_value_grain_lock_0#24 :=
+                      +-AggregateFunctionCall(GoogleSQL:any_value(STRING) -> STRING)
+                        +-GetStructField
+                          +-type=STRING
+                          +-type_annotation_map={Collation:"und:ci"}
+                          +-expr=
+                          | +-GetStructField
+                          |   +-type=STRUCT<col_ci STRING>
+                          |   +-type_annotation_map=<{Collation:"und:ci"}>
+                          |   +-expr=
+                          |   | +-ColumnRef(type=STRUCT<referenced_columns STRUCT<col_ci STRING>, key_columns STRUCT<key INT64>>, type_annotation_map=<<{Collation:"und:ci"}>,_>, column=$aggregate.dep_closure#22<<{Collation:"und:ci"}>,_>)
+                          |   +-field_idx=0
+                          +-field_idx=0
