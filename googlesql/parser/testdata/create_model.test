@@ -127,6 +127,44 @@ CreateModelStatement [0-45] [create model...nnection conn_1]
 CREATE MODEL t1 REMOTE WITH CONNECTION conn_1
 ==
 
+create model t1 with connection (k1 = 'v1', k2 = 'v2')
+--
+CreateModelStatement [0-54] [create model...k2 = 'v2')]
+  PathExpression [13-15] [t1]
+    Identifier(t1) [13-15] [t1]
+  WithConnectionClause [16-54] [with connection...k2 = 'v2')]
+    ConnectionClause [21-54] [connection...k2 = 'v2')]
+      ConnectionKeyValuePair [33-42] [k1 = 'v1']
+        Identifier(k1) [33-35] [k1]
+        StringLiteral [38-42] ['v1']
+          StringLiteralComponent('v1') [38-42] ['v1']
+      ConnectionKeyValuePair [44-53] [k2 = 'v2']
+        Identifier(k2) [44-46] [k2]
+        StringLiteral [49-53] ['v2']
+          StringLiteralComponent('v2') [49-53] ['v2']
+--
+CREATE MODEL t1 WITH CONNECTION (k1 = 'v1', k2 = 'v2')
+==
+
+create model t1 remote with connection (k1 = 'v1', k2 = 'v2')
+--
+CreateModelStatement [0-61] [create model...k2 = 'v2')]
+  PathExpression [13-15] [t1]
+    Identifier(t1) [13-15] [t1]
+  WithConnectionClause [23-61] [with connection...k2 = 'v2')]
+    ConnectionClause [28-61] [connection...k2 = 'v2')]
+      ConnectionKeyValuePair [40-49] [k1 = 'v1']
+        Identifier(k1) [40-42] [k1]
+        StringLiteral [45-49] ['v1']
+          StringLiteralComponent('v1') [45-49] ['v1']
+      ConnectionKeyValuePair [51-60] [k2 = 'v2']
+        Identifier(k2) [51-53] [k2]
+        StringLiteral [56-60] ['v2']
+          StringLiteralComponent('v2') [56-60] ['v2']
+--
+CREATE MODEL t1 REMOTE WITH CONNECTION (k1 = 'v1', k2 = 'v2')
+==
+
 create model t1 options (abc = def)
 --
 CreateModelStatement [0-35] [create model...abc = def)]

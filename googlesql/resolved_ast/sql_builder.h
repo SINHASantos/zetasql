@@ -175,6 +175,22 @@ struct CopyableState {
     ResolvedColumn classifier_column;
   };
   std::optional<MatchRecognizeState> match_recognize_state;
+
+  struct GroupRowsScope {
+    // The input scan of the active aggregation. Used to associate group rows
+    // with correct columns.
+    const ResolvedScan* aggregate_input_scan = nullptr;
+
+    // The name of the group rows context (e.g. "group_rows_1") associated
+    // with this aggregation level. Globally unique generated id.
+    std::string group_rows_name;
+
+    // The subquery expression that defines this scope.
+    const ResolvedSubqueryExpr* subquery_expr = nullptr;
+  };
+
+  // Stack of active GROUP ROWS aggregation and subquery context boundaries.
+  std::vector<GroupRowsScope> group_rows_scopes = {};
 };
 
 // SQLBuilder takes the GoogleSQL Resolved ASTs and generates its equivalent SQL
@@ -648,6 +664,8 @@ class SQLBuilder : public ResolvedASTVisitor {
   absl::Status VisitResolvedAnalyticScan(
       const ResolvedAnalyticScan* node) override;
   absl::Status VisitResolvedTableScan(const ResolvedTableScan* node) override;
+  absl::Status VisitResolvedGroupRowsScan(
+      const ResolvedGroupRowsScan* node) override;
   absl::Status VisitResolvedProjectScan(
       const ResolvedProjectScan* node) override;
   absl::Status VisitResolvedExecuteAsRoleScan(
@@ -712,6 +730,7 @@ class SQLBuilder : public ResolvedASTVisitor {
   absl::Status VisitResolvedPipeCreateTableScan(
       const ResolvedPipeCreateTableScan* node) override;
   absl::Status VisitResolvedInsertScan(const ResolvedInsertScan* node) override;
+  absl::Status VisitResolvedUpdateScan(const ResolvedUpdateScan* node) override;
   absl::Status VisitResolvedBarrierScan(
       const ResolvedBarrierScan* node) override;
   absl::Status VisitResolvedSubpipeline(

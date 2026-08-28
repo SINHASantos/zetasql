@@ -39,6 +39,15 @@ public class SimpleTypeTest {
   }
 
   @Test
+  public void testAsSimpleType() {
+    SimpleType int32Type = TypeFactory.createSimpleType(TypeKind.TYPE_INT32);
+    assertThat(int32Type.asSimpleType()).isSameInstanceAs(int32Type);
+
+    ArrayType arrayType = TypeFactory.createArrayType(int32Type);
+    assertThat(arrayType.asSimpleType()).isNull();
+  }
+
+  @Test
   public void testSerializationAndDeserialization() {
     for (TypeKind kind : TypeKind.values()) {
       if (TypeFactory.isSimpleType(kind)) {

@@ -102,6 +102,7 @@ message ValueProto {
 
   // A list of unqualified column names.
   message ColumnListSpec {
+    repeated string column_names = 1;
   }
 
   // Each non-null value will have exactly one of these fields specified.
@@ -126,6 +127,7 @@ message ValueProto {
     google.protobuf.Timestamp timestamp_value = 16;
     bytes timestamp_pico_value = 29 [deprecated = true];
     TimestampPicos timestamp_picos_value = 30;
+    ColumnListSpec column_list_spec_value = 32;
     Datetime datetime_value = 17;
     // Bit field encoding of hour/minute/second/nanos. See TimeValue class for
     // details.
@@ -162,4 +164,6 @@ message ValueProto {
   reserved 11;
   // Obsolete bytes type for json value.
   reserved 22;
+  // Dropped tag number for column list spec.
+  reserved 31;
 }

@@ -1149,7 +1149,7 @@ catch_all: /./ -100 {
 //   1: Graph SET
 //   2: FUNCTION and MAP templated types
 //   1: type_name followed by "."
-%expect 39;
+%expect 40;
 
 // Precedence for operator tokens. The operator precedence is defined by the
 // order of the declarations here, with tokens specified in the same declaration
@@ -6986,13 +6986,13 @@ table_subquery {ASTTableSubquery*}:
 ;
 
 table_clause_no_keyword {ASTNode*}:
-    path_expression[table_name] opt_where_clause[where]
+    path_expression[table_name]
     {
-      $$ = MakeNode<ASTTableClause>(@$, $table_name, $where);
+      $$ = MakeNode<ASTTableClause>(@$, $table_name);
     }
-  | tvf as_alias[alias]? pivot_or_unpivot_clause[pivot]? opt_where_clause[where]
+  | tvf as_alias[alias]? pivot_or_unpivot_clause[pivot]?
     {
-      $$ = MakeNode<ASTTableClause>(@$, ExtendNodeRight($tvf, $alias, $pivot), $where);
+      $$ = MakeNode<ASTTableClause>(@$, ExtendNodeRight($tvf, $alias, $pivot));
     }
 ;
 
@@ -7026,6 +7026,17 @@ connection_clause {ASTNode*}:
     "CONNECTION" path_expression_or_default
     {
       $$ = MakeNode<ASTConnectionClause>(@$, $2);
+    }
+  | "CONNECTION" "(" (connection_kv_entry separator ",")+[kv_pairs] ")"
+    {
+      $$ = MakeNode<ASTConnectionClause>(@$, $kv_pairs);
+    }
+;
+
+connection_kv_entry {ASTConnectionKeyValuePair*}:
+    identifier[key] "=" expression[value]
+    {
+      $$ = MakeNode<ASTConnectionKeyValuePair>(@$, $key, $value);
     }
 ;
 
@@ -9173,9 +9184,6 @@ with_clause_entry {ASTWithClauseEntry*}:
   }
 | with_function_name_identifier[name] "(" ")" "AS" "GROUP" "ROWS"
   {
-    if (!language_options.LanguageFeatureEnabled(FEATURE_WITH_GROUP_ROWS)) {
-      return MakeSyntaxError(@5, "GROUP ROWS is not supported.");
-    }
     auto aliased_group_rows = MakeNode<ASTAliasedGroupRows>(@$, $name);
     $$ = MakeNode<ASTWithClauseEntry>(@$, aliased_group_rows);
     $$ = WithEndLocation($$, @$);
@@ -9411,9 +9419,15 @@ expression_with_opt_alias {ASTNode*}:
 
 expression_with_alias {ASTExpressionWithAlias*}:
     expression[expr] as_alias[alias]
-   {
+    {
       $$ = MakeNode<ASTExpressionWithAlias>(@$, $expr, $alias);
-   }
+    }
+  | expression
+    {
+      return MakeSyntaxError(
+          ParseLocationRange(@1.end(), @1.end()),
+          "Syntax error: Expected alias");
+    }
 ;
 
 unnest_expression {ASTNode*}:

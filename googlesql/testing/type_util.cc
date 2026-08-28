@@ -30,6 +30,7 @@
 #include "googlesql/public/type.h"
 #include "googlesql/public/type.pb.h"
 #include "googlesql/public/types/type_factory.h"
+#include "googlesql/testdata/test_hop_tumble.pb.h"
 #include "googlesql/testdata/test_proto3.pb.h"
 #include "googlesql/testdata/test_schema.pb.h"
 #include "googlesql/base/check.h"
@@ -129,6 +130,7 @@ std::vector<std::string> GoogleSqlTestProtoFilepaths() {
           "googlesql/proto/kmeans_options.proto",
           "googlesql/testdata/test_schema.proto",
           "googlesql/testdata/test_proto3.proto",
+          "googlesql/testdata/test_hop_tumble.proto",
           "google/protobuf/duration.proto",
           "google/protobuf/timestamp.proto",
           "google/protobuf/wrappers.proto",
@@ -149,6 +151,7 @@ std::vector<std::string> GoogleSqlTestProtoNames() {
           "googlesql_test.Proto3MessageWithNulls",
           "googlesql_test.EmptyMessage",
           "googlesql_test.Proto3TestExtraPB",
+          "googlesql_test.TestHopAndTumblePB",
           "google.protobuf.Timestamp",
           "google.protobuf.Duration",
           "google.type.Date",

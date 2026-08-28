@@ -80,3 +80,22 @@ cc_library(
         "//googlesql/public/types",
     ],
 )
+
+cc_library(
+    name = "vector_length",
+    srcs = ["vector_length.cc"],
+    hdrs = ["vector_length.h"],
+    deps = [
+        ":default_annotation",
+        "//googlesql/base:ret_check",
+        "//googlesql/base:status",
+        "//googlesql/common:errors",
+        "//googlesql/public:builtin_function_cc_proto",
+        "//googlesql/public:constant",
+        "//googlesql/public:parse_location",
+        "//googlesql/public/types:type",
+        "//googlesql/resolved_ast",
+        "@com_google_absl//absl/status",
+        "@com_google_absl//absl/status:statusor",
+    ],
+)

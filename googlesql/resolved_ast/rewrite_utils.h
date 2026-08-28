@@ -206,9 +206,40 @@ absl::StatusOr<std::unique_ptr<ResolvedScan>> ReplaceScanColumns(
 
 // Creates a new set of replacement columns to the given list.
 // Useful when replacing columns for a ResolvedExecuteAsRole node.
+//
+// `column_list` is the original column list.
+// `replaced_column_map` is an output parameter that contains the map of columns
+// from the new column to the original column.
+//
+// Returns a new column list with the replacement columns.
 std::vector<ResolvedColumn> CreateReplacementColumns(
-    ColumnFactory& column_factory,
-    absl::Span<const ResolvedColumn> column_list);
+    ColumnFactory& column_factory, absl::Span<const ResolvedColumn> column_list,
+    ColumnReplacementMap& replaced_column_map);
+
+// Creates a new ResolvedExecuteAsRoleScan with the given body scan and
+// replacement columns.
+//
+// The replacement columns are created from the body scan's column list and
+// the `column_map`. With the first unique column from the left of the column
+// list being replaced with the corresponding column in the `column_map`. And
+// the rest of the columns being allocated from the `column_factory`, with the
+// same name, table name, and type as the original column.
+//
+// `column_factory` is the column factory to allocate new columns from.
+// `column_map` is the map of columns to replace.
+// `body_scan` is the scan to be wrapped by the ResolvedExecuteAsRoleScan.
+// `original_inlined_view` is the original inlined view of the scan.
+// `original_inlined_tvf` is the original inlined TVF of the scan.
+//
+// Only one of `original_inlined_view` or `original_inlined_tvf` should be set.
+//
+// Returns a new ResolvedExecuteAsRoleScan.
+absl::StatusOr</*absl_nonnull*/ std::unique_ptr<ResolvedExecuteAsRoleScan>>
+CreateResolvedExecuteAsRoleScan(
+    ColumnFactory& column_factory, const ColumnReplacementMap& column_map,
+    /*absl_nonnull*/ std::unique_ptr<const ResolvedScan> body_scan,
+    const Table* /*absl_nullable*/ original_inlined_view,
+    const TableValuedFunction* /*absl_nullable*/ original_inlined_tvf);
 
 // Helper for rewriters to check whether a needed built-in function is part
 // of the catalog. This is useful to generate good error messages when a
@@ -301,6 +332,16 @@ class FunctionCallBuilder {
   // Like `IsNull`, a built-in function "$is_null" must be available.
   absl::StatusOr<std::unique_ptr<const ResolvedFunctionCall>> AnyIsNull(
       std::vector<std::unique_ptr<const ResolvedExpr>> args);
+
+  // Construct a ResolvedFunctionCall for IFNULL(arg, null_case)
+  //
+  // Requires: arg and null_case must return equal types.
+  //
+  // The signature for the built-in function "IFNULL" must be available in
+  // <catalog> or an error status is returned.
+  absl::StatusOr<std::unique_ptr<const ResolvedFunctionCall>> IfNull(
+      std::unique_ptr<const ResolvedExpr> arg,
+      std::unique_ptr<const ResolvedExpr> null_case);
 
   // Construct a ResolvedFunctionCall for IFERROR(try_expr, handle_expr)
   //

@@ -1558,7 +1558,7 @@ def main(unused_argv):
       the `name` field is non-empty.
       """,
       fields=[
-          Field('column', SCALAR_COLUMN, tag_id=2),
+          Field('column', SCALAR_COLUMN, tag_id=2, ignorable=IGNORABLE_DEFAULT),
           Field(
               'name',
               SCALAR_STRING,
@@ -3486,6 +3486,7 @@ value.
       name='ResolvedColumnHolder',
       tag_id=23,
       parent='ResolvedArgument',
+      use_custom_columns_created=True,
       comment="""
       This wrapper is used for an optional ResolvedColumn inside another node.
 

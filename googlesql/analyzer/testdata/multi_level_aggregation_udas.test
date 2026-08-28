@@ -1430,16 +1430,16 @@ FROM
          |> AGGREGATE
               SUM((
                   SELECT
-                    MAX(KeyValue.Key) AS a_7
+                    MAX(KeyValue.Key) AS a_8
                   FROM
                     KeyValue
                   WHERE
                     (KeyValue.Key) < a_3
                   GROUP BY KeyValue.Value
-                  |> AS aggregatescan_8
+                  |> AS aggregatescan_9
                   |> SELECT
-                       aggregatescan_8.a_7 AS a_7
-                )) AS a_9)) AS a_2;
+                       aggregatescan_9.a_8 AS a_8
+                )) AS a_10)) AS a_2;
 
 [REWRITTEN AST]
 QueryStmt
@@ -1613,20 +1613,20 @@ FROM
                        |> AGGREGATE
                             SUM((
                                 SELECT
-                                  MAX(KeyValue.Key) AS a_12
+                                  MAX(KeyValue.Key) AS a_13
                                 FROM
                                   KeyValue
                                 WHERE
                                   (KeyValue.Key) < a_6
                                 GROUP BY KeyValue.Value
-                                |> AS aggregatescan_13
+                                |> AS aggregatescan_14
                                 |> SELECT
-                                     aggregatescan_13.a_12 AS a_12
-                              )) AS a_14) AS a_8
-                |> AS projectscan_15
-                |> ORDER BY projectscan_15.a_7
+                                     aggregatescan_14.a_13 AS a_13
+                              )) AS a_15) AS a_8
+                |> AS projectscan_16
+                |> ORDER BY projectscan_16.a_7
                 |> SELECT
-                     projectscan_15.a_8 AS a_8
+                     projectscan_16.a_8 AS a_8
               )) AS a_5
      ) AS a_2;
 ==

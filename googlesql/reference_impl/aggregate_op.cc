@@ -599,7 +599,8 @@ absl::StatusOr<std::unique_ptr<AggregateArg>> AggregateArg::Create(
     ResolvedFunctionCallBase::ErrorMode error_mode,
     std::unique_ptr<ValueExpr> filter, std::unique_ptr<ValueExpr> having_filter,
     std::vector<CollatorInfo> collation_list,
-    const VariableId& side_effects_variable) {
+    const VariableId& side_effects_variable,
+    const VariableId& grain_locking_measure_variable) {
   GOOGLESQL_ASSIGN_OR_RETURN(std::unique_ptr<AggregateFunctionCallExpr> aggregate_expr,
                    AggregateFunctionCallExpr::Create(std::move(function),
                                                      std::move(arguments)));
@@ -609,13 +610,14 @@ absl::StatusOr<std::unique_ptr<AggregateArg>> AggregateArg::Create(
       std::move(group_rows_subquery), std::move(inner_grouping_keys),
       std::move(inner_aggregators), error_mode, std::move(filter),
       std::move(having_filter), std::move(collation_list),
-      side_effects_variable));
+      side_effects_variable, grain_locking_measure_variable));
 }
 
 absl::Status AggregateArg::SetSchemasForEvaluation(
     const TupleSchema& group_schema,
     absl::Span<const TupleSchema* const> params_schemas,
     const TupleSchema* grouping_keys_schema) {
+  input_schema_ = std::make_unique<const TupleSchema>(group_schema.variables());
   std::vector<const TupleSchema*> params_and_group_schemas =
       ConcatSpans(params_schemas, {&group_schema});
   // Owned pointer of group rows schema that needs to stay alive for when
@@ -1800,6 +1802,116 @@ std::vector<const T*> RawPtrVector(
   return raw_ptr_vector;
 }
 
+// An accumulator wrapper that implements "grain locking" for measure
+// aggregation.
+//
+// It ensures that duplicate rows, i.e., the rows with the same grain locking
+// keys, are not accumulated more than once to avoid overcounting.
+class GrainLockingAccumulator : public IntermediateAggregateAccumulator {
+ public:
+  GrainLockingAccumulator(
+      std::unique_ptr<IntermediateAggregateAccumulator> accumulator,
+      int measure_slot_idx)
+      : accumulator_(std::move(accumulator)),
+        measure_slot_idx_(measure_slot_idx) {}
+
+  GrainLockingAccumulator(const GrainLockingAccumulator&) = delete;
+  GrainLockingAccumulator& operator=(const GrainLockingAccumulator&) = delete;
+
+  absl::Status Reset() override {
+    seen_keys_.clear();
+    seen_keys_memory_.clear();
+    return accumulator_->Reset();
+  }
+
+  bool Accumulate(const TupleData& input_row, const Value& input_value,
+                  bool* stop_accumulation, absl::Status* status) override {
+    if (measure_slot_idx_ >= input_row.num_slots()) {
+      *status = absl::InternalError("measure_slot_idx_ out of range");
+      return false;
+    }
+    const Value& measure_value = input_row.slot(measure_slot_idx_).value();
+
+    // Measure value is NULL. This can only happen in 2 cases:
+    //
+    // 1. If the measure propagated past an OUTER JOIN. For this case, we
+    //    simply skip the NULL measure value because these rows do not come
+    //    from the source table and should not contribute to the measure
+    //    aggregation.
+    //
+    // 2. If the measure value is produced by scanning an empty relation (e.g.
+    //    via LIMIT 0 or a WHERE condition that discards all rows).
+    //
+    // Either way, we simply skip the NULL measure value. Note that skipping
+    // NULL measure values does not affect correctness of the underlying
+    // aggregate functions invoked by the measure (i.e. It is still correct to
+    // skip NULL measure values for measures like "ARRAY_AGG(X RESPECT NULLS)".
+    if (measure_value.is_null()) {
+      return true;
+    }
+
+    absl::StatusOr<std::vector<int>> status_or_grain_locking_indices =
+        InternalValue::GetMeasureGrainLockingIndices(measure_value);
+    if (!status_or_grain_locking_indices.ok()) {
+      *status = status_or_grain_locking_indices.status();
+      return false;
+    }
+    const std::vector<int>& grain_locking_indices =
+        *status_or_grain_locking_indices;
+
+    if (grain_locking_indices.empty()) {
+      *status =
+          absl::InternalError("Measure does not have any grain locking keys");
+      return false;
+    }
+
+    absl::StatusOr<Value> status_or_measure_value_as_struct =
+        InternalValue::GetMeasureAsStructValue(measure_value);
+    if (!status_or_measure_value_as_struct.ok()) {
+      *status = status_or_measure_value_as_struct.status();
+      return false;
+    }
+    const Value& measure_value_as_struct = *status_or_measure_value_as_struct;
+
+    auto grain_locking_keys_data =
+        std::make_unique<TupleData>(grain_locking_indices.size());
+    for (int i = 0; i < grain_locking_indices.size(); ++i) {
+      grain_locking_keys_data->mutable_slot(i)->SetValue(
+          measure_value_as_struct.field(grain_locking_indices[i]));
+    }
+
+    auto [_, inserted] =
+        seen_keys_.emplace(TupleDataPtr(grain_locking_keys_data.get()));
+
+    if (inserted) {
+      seen_keys_memory_.push_back(std::move(grain_locking_keys_data));
+      return accumulator_->Accumulate(input_row, input_value, stop_accumulation,
+                                      status);
+    }
+
+    return true;
+  }
+
+  absl::StatusOr<Value> GetFinalResult(bool inputs_in_defined_order) override {
+    return accumulator_->GetFinalResult(inputs_in_defined_order);
+  }
+
+ private:
+  // The wrapped accumulator performing the actual accumulation for the
+  // aggregation.
+  std::unique_ptr<IntermediateAggregateAccumulator> accumulator_;
+
+  // The slot index in the input row containing the measure value.
+  const int measure_slot_idx_;
+
+  // Set of grain-locking keys that have been seen during accumulation for the
+  // current group.
+  absl::flat_hash_set<TupleDataPtr> seen_keys_;
+
+  // Memory owner for the keys stored in `seen_keys_`.
+  std::vector<std::unique_ptr<TupleData>> seen_keys_memory_;
+};
+
 }  // namespace
 
 absl::StatusOr<std::unique_ptr<AggregateArgAccumulator>>
@@ -1969,13 +2081,32 @@ AggregateArg::CreateAccumulator(absl::Span<const TupleData* const> params,
     input_fields.clear();
   }
 
+  if (grain_locking_measure_variable_.is_valid()) {
+    // We need to apply grain locking using `grain_locking_measure_variable_`
+    // as the grain-locking key to avoid overcounting.
+    GOOGLESQL_RET_CHECK(input_schema_ != nullptr);
+    std::optional<int> slot_idx =
+        input_schema_->FindIndexForVariable(grain_locking_measure_variable_);
+    GOOGLESQL_RET_CHECK(slot_idx.has_value())
+        << "Grain-locking measure variable "
+        << grain_locking_measure_variable_.ToString()
+        << " not found in input schema: " << input_schema_->DebugString();
+    accumulator = std::make_unique<GrainLockingAccumulator>(
+        std::move(accumulator), *slot_idx);
+  }
+
   // WHERE filter support.
+  //
+  // The filtered accumulator needs to be the outmost accumulator so that the
+  // filter is applied first.
   if (filter() != nullptr) {
     accumulator = std::make_unique<FilteredArgAccumulator>(
         params, std::move(accumulator), filter(), context);
   }
 
   // Adapt 'accumulator' to the AggregateArgAccumulator interface.
+  // TODO: Fix execution order so filtering and deduplication
+  // occur before argument evaluation.
   return std::make_unique<IntermediateAggregateAccumulatorAdaptor>(
       params, input_fields, type, std::move(accumulator), context);
 }
@@ -2099,7 +2230,8 @@ AggregateArg::AggregateArg(
     ResolvedFunctionCallBase::ErrorMode error_mode,
     std::unique_ptr<ValueExpr> filter, std::unique_ptr<ValueExpr> having_filter,
     std::vector<CollatorInfo> collation_list,
-    const VariableId& side_effects_variable)
+    const VariableId& side_effects_variable,
+    const VariableId& grain_locking_measure_variable)
     : ExprArg(variable, std::move(function)),
       distinct_(distinct),
       having_expr_(std::move(having_expr)),
@@ -2113,7 +2245,8 @@ AggregateArg::AggregateArg(
       filter_(std::move(filter)),
       having_filter_(std::move(having_filter)),
       collation_list_(std::move(collation_list)),
-      side_effects_variable_(side_effects_variable) {}
+      side_effects_variable_(side_effects_variable),
+      grain_locking_measure_variable_(grain_locking_measure_variable) {}
 
 const AggregateFunctionCallExpr* AggregateArg::aggregate_function() const {
   return static_cast<const AggregateFunctionCallExpr*>(value_expr());
@@ -2599,118 +2732,5 @@ absl::StatusOr<std::unique_ptr<TupleIterator>> RowsForUdaOp::CreateIterator(
   return MaybeReorder(std::move(iter), context);
 }
 
-// -------------------------------------------------------
-// GrainLockingOp
-// -------------------------------------------------------
-
-std::unique_ptr<GrainLockingOp> GrainLockingOp::Create(
-    VariableId measure_variable) {
-  return absl::WrapUnique(new GrainLockingOp(std::move(measure_variable)));
-}
-
-absl::Status GrainLockingOp::SetSchemasForEvaluation(
-    absl::Span<const TupleSchema* const> params_schemas) {
-  return absl::OkStatus();
-}
-
-absl::StatusOr<std::unique_ptr<TupleIterator>> GrainLockingOp::CreateIterator(
-    absl::Span<const TupleData* const> params, int num_extra_slots,
-    EvaluationContext* context) const {
-  if (context->active_group_rows() == nullptr) {
-    return googlesql_base::OutOfRangeErrorBuilder()
-           << "GrainLockingOp: Cannot read rows from the current context";
-  }
-  GOOGLESQL_RET_CHECK_EQ(num_extra_slots, 0);
-
-  auto input_iter = std::make_unique<TupleDataDequeIterator>(
-      *context->active_group_rows(), num_extra_slots, CreateOutputSchema(),
-      context);
-  // `grain_locking_keys_set` is used to deduplicate input tuples with the same
-  // grain locking key values.
-  absl::flat_hash_set<TupleDataPtr> grain_locking_keys_set;
-  // `grain_locking_keys_memory` owns the memory referenced by
-  // `grain_locking_keys_set`.
-  std::vector<std::unique_ptr<TupleData>> grain_locking_keys_memory;
-  // `grain_locked_tuples` are the tuples output by this operator.
-  auto grain_locked_tuples =
-      std::make_unique<TupleDataDeque>(context->memory_accountant());
-  for (const TupleData* next_input = input_iter->Next(); next_input != nullptr;
-       next_input = input_iter->Next()) {
-    // Should be only one slot for the measure variable.
-    GOOGLESQL_RET_CHECK_EQ(next_input->num_slots(), 1);
-    const Value& measure_value = next_input->slot(0).value();
-    // Measure value is NULL. This can only happen in 2 cases:
-    //
-    // 1. If the measure propagated past an OUTER JOIN. This case is currently
-    //    blocked on implementation support for aggregate filtering. For this
-    //    case, we simply skip the NULL measure value.
-    //
-    // 2. If the measure value is produced by scanning an empty relation (e.g.
-    //    via LIMIT 0 or a WHERE condition that discards all rows).
-    //
-    // Either way, we simply skip the NULL measure value. Note that skipping
-    // NULL measure values does not affect correctness of the underlying
-    // aggregate functions invoked by the measure (i.e. It is still correct to
-    // skip NULL measure values for measures like "ARRAY_AGG(X RESPECT NULLS)".
-    if (measure_value.is_null()) {
-      continue;
-    }
-
-    // Create a TupleData for the grain locking keys.
-    GOOGLESQL_ASSIGN_OR_RETURN(
-        std::vector<int> grain_locking_indices,
-        InternalValue::GetMeasureGrainLockingIndices(measure_value));
-    auto grain_locking_keys_data =
-        std::make_unique<TupleData>(grain_locking_indices.size());
-    GOOGLESQL_ASSIGN_OR_RETURN(Value measure_value_as_struct,
-                     InternalValue::GetMeasureAsStructValue(measure_value));
-    for (int i = 0; i < grain_locking_indices.size(); ++i) {
-      grain_locking_keys_data->mutable_slot(i)->SetValue(
-          measure_value_as_struct.field(grain_locking_indices[i]));
-    }
-
-    // Insert the `grain_locking_keys_data` and `measure_value` into the map.
-    auto [_, inserted] = grain_locking_keys_set.emplace(
-        TupleDataPtr(grain_locking_keys_data.get()));
-    grain_locking_keys_memory.push_back(std::move(grain_locking_keys_data));
-
-    // If the grain locking keys are new, add the input tuple to
-    // `grain_locked_tuples`.
-    if (inserted) {
-      absl::Status status;
-      if (!grain_locked_tuples->PushBack(
-              std::make_unique<TupleData>(*next_input), &status)) {
-        return status;
-      }
-    }
-  }
-  GOOGLESQL_RETURN_IF_ERROR(input_iter->Status());
-
-  // Return an iterator over the grain locked tuples.
-  std::unique_ptr<TupleIterator> grain_locked_tuples_iter =
-      std::make_unique<AggregateTupleIterator>(
-          params, std::move(grain_locked_tuples), std::move(input_iter),
-          CreateOutputSchema(), context);
-  return MaybeReorder(std::move(grain_locked_tuples_iter), context);
-}
-
-// Returns the schema consisting of variables corresponding to the
-// list of argument names passed to the constructor.
-std::unique_ptr<TupleSchema> GrainLockingOp::CreateOutputSchema() const {
-  return std::make_unique<TupleSchema>(
-      std::vector<VariableId>{measure_variable_});
-}
-
-std::string GrainLockingOp::IteratorDebugString() const {
-  return "GrainLocking=TupleIterator(<outer_from_clause>)";
-}
-
-std::string GrainLockingOp::DebugInternal(const std::string& indent,
-                                          bool verbose) const {
-  return absl::StrCat(indent, "GrainLockingOp");
-}
-
-GrainLockingOp::GrainLockingOp(VariableId measure_variable)
-    : measure_variable_(measure_variable) {}
 
 }  // namespace googlesql

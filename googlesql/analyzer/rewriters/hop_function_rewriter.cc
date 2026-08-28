@@ -22,6 +22,7 @@
 #include <utility>
 #include <vector>
 
+#include "googlesql/analyzer/builtin_only_catalog.h"
 #include "googlesql/analyzer/substitute.h"
 #include "googlesql/common/errors.h"
 #include "googlesql/public/analyzer_options.h"
@@ -445,49 +446,65 @@ class HopRewriteVisitor : public ResolvedASTRewriteVisitor {
   //   ) AS window_end
   // FROM
   //   <InputTable> AS t
+  //   CROSS JOIN _hop_params AS p
   //   LEFT JOIN UNNEST(
   //       -- Calculate window_from using GENERATE_TIMESTAMP_ARRAY
   //       GENERATE_TIMESTAMP_ARRAY(
   //         -- starting point
   //         TIMESTAMP_ADD(
   //           TIMESTAMP_BUCKET(
-  //             TIMESTAMP_SUB(t.ts, (SELECT window_size FROM _hop_params)),
-  //             (SELECT step_size FROM _hop_params),
-  //             (SELECT origin FROM _hop_params)
+  //             TIMESTAMP_SUB(t.ts, p.window_size),
+  //             p.step_size,
+  //             p.origin
   //           ),
-  //           (SELECT step_size FROM _hop_params)
+  //           p.step_size
   //         ),
   //         -- end point
   //         TIMESTAMP_BUCKET(
   //           t.ts,
-  //           (SELECT step_size FROM _hop_params),
-  //           (SELECT origin FROM _hop_params)
+  //           p.step_size,
+  //           p.origin
   //         ),
   //         -- step expression (pre-calculated integer)
-  //         INTERVAL (SELECT step_nanos FROM _hop_params) NANOSECOND
+  //         INTERVAL p.step_nanos NANOSECOND
   //       )
   //     )
   //   ) AS generated_windows
   //
-  // Note: Scalar subqueries are used for convenience to reference the
-  // single-row _hop_params CTE values as scalar expressions without
-  // having to join the CTE.
-  // See (broken link) for more details.
   absl::StatusOr<std::unique_ptr<const ResolvedScan>> BuildHopFinalProjection(
       const HopFunctionArguments& args, const ResolvedColumnList& cte_cols,
       absl::string_view cte_name,
       std::unique_ptr<const ResolvedScan> input_relation) {
-    auto get_window_interval_expr = [&]() {
-      return CreateCteColumnSubquery(column_factory_, cte_name, cte_cols, 0);
+    // Create new CTE reference columns for _hop_params CTE.
+    // We cross join input_relation with this CTE scan to make parameters
+    // directly available as column references.
+    std::vector<ResolvedColumn> cte_ref_cols;
+    cte_ref_cols.reserve(cte_cols.size());
+    for (const auto& col : cte_cols) {
+      cte_ref_cols.push_back(
+          column_factory_.MakeCol(cte_name, col.name(), col.type()));
+    }
+    auto cte_scan = MakeResolvedWithRefScan(cte_ref_cols, cte_name);
+
+    auto get_window_interval_expr =
+        [&]() -> absl::StatusOr<std::unique_ptr<const ResolvedExpr>> {
+      return MakeResolvedColumnRef(cte_ref_cols[0].type(), cte_ref_cols[0],
+                                   /*is_correlated=*/false);
     };
-    auto get_step_interval_expr = [&]() {
-      return CreateCteColumnSubquery(column_factory_, cte_name, cte_cols, 1);
+    auto get_step_interval_expr =
+        [&]() -> absl::StatusOr<std::unique_ptr<const ResolvedExpr>> {
+      return MakeResolvedColumnRef(cte_ref_cols[1].type(), cte_ref_cols[1],
+                                   /*is_correlated=*/false);
     };
-    auto get_step_nanos_expr = [&]() {
-      return CreateCteColumnSubquery(column_factory_, cte_name, cte_cols, 2);
+    auto get_step_nanos_expr =
+        [&]() -> absl::StatusOr<std::unique_ptr<const ResolvedExpr>> {
+      return MakeResolvedColumnRef(cte_ref_cols[2].type(), cte_ref_cols[2],
+                                   /*is_correlated=*/false);
     };
-    auto get_origin_expr = [&]() {
-      return CreateCteColumnSubquery(column_factory_, cte_name, cte_cols, 3);
+    auto get_origin_expr =
+        [&]() -> absl::StatusOr<std::unique_ptr<const ResolvedExpr>> {
+      return MakeResolvedColumnRef(cte_ref_cols[3].type(), cte_ref_cols[3],
+                                   /*is_correlated=*/false);
     };
 
     // Creates the starting point expression for GENERATE_TIMESTAMP_ARRAY:
@@ -572,14 +589,24 @@ class HopRewriteVisitor : public ResolvedASTRewriteVisitor {
     // Save input columns before moving input_relation.
     const ResolvedColumnList input_columns = input_relation->column_list();
 
-    ResolvedColumnList array_scan_output_cols = input_columns;
+    ResolvedColumnList cross_join_output_cols = input_columns;
+    for (const auto& col : cte_ref_cols) {
+      cross_join_output_cols.push_back(col);
+    }
+
+    auto cross_join_scan =
+        MakeResolvedJoinScan(cross_join_output_cols, ResolvedJoinScan::INNER,
+                             std::move(input_relation), std::move(cte_scan),
+                             /*join_expr=*/nullptr);
+
+    ResolvedColumnList array_scan_output_cols = cross_join_output_cols;
     array_scan_output_cols.push_back(window_start_col);
     // LEFT OUTER JOIN UNNEST(...) AS generated_windows
     // This preserves the input row even if array generation yields a NULL
     // array (if the timestamp is NULL), in which case window columns will
     // be NULL.
     auto array_scan = MakeResolvedArrayScan(
-        array_scan_output_cols, std::move(input_relation),
+        array_scan_output_cols, std::move(cross_join_scan),
         std::move(generate_array_expr), window_start_col,
         /*array_offset_column=*/nullptr, /*join_expr=*/nullptr,
         /*is_outer=*/true);
@@ -670,12 +697,18 @@ class HopFunctionRewriter : public Rewriter {
       GOOGLESQL_RETURN_IF_ERROR(input->Accept(&cte_name_generator));
     }
 
-    HopRewriteVisitor rewriter(options, catalog, type_factory, column_factory,
-                               cte_name_generator);
+    BuiltinOnlyCatalog builtin_catalog("builtin_catalog", catalog);
+    HopRewriteVisitor rewriter(options, builtin_catalog, type_factory,
+                               column_factory, cte_name_generator);
+
     return rewriter.VisitAll(std::move(input));
   }
 
   std::string Name() const override { return "HopFunctionRewriter"; }
+
+  bool ProvideUnfilteredCatalogToBuiltinRewriter() const override {
+    return true;
+  }
 };
 
 const Rewriter* GetHopFunctionRewriter() {

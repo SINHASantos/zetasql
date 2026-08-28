@@ -140,7 +140,8 @@ Each item in the `SELECT` list is one of:
 +  `expression`
 +  `expression.*`
 
-### `SELECT *`
+### `SELECT *` 
+<a id="select_star"></a>
 
 `SELECT *`, often referred to as *select star*, produces one output column for
 each column that's visible after executing the full query.

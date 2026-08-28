@@ -349,9 +349,6 @@ void Unparser::visitASTTableClause(const ASTTableClause* node, void* data) {
   if (node->tvf() != nullptr) {
     node->tvf()->Accept(this, data);
   }
-  if (node->where_clause() != nullptr) {
-    node->where_clause()->Accept(this, data);
-  }
 }
 
 void Unparser::visitASTModelClause(const ASTModelClause* node, void* data) {
@@ -362,7 +359,27 @@ void Unparser::visitASTModelClause(const ASTModelClause* node, void* data) {
 void Unparser::visitASTConnectionClause(const ASTConnectionClause* node,
                                         void* data) {
   print("CONNECTION ");
-  node->connection_path()->Accept(this, data);
+  if (node->connection_path() != nullptr) {
+    node->connection_path()->Accept(this, data);
+  } else {
+    print("(");
+    bool first = true;
+    for (const auto* kv_pair : node->connection_kv_pairs()) {
+      if (!first) {
+        print(", ");
+      }
+      first = false;
+      kv_pair->Accept(this, data);
+    }
+    print(")");
+  }
+}
+
+void Unparser::visitASTConnectionKeyValuePair(
+    const ASTConnectionKeyValuePair* node, void* data) {
+  node->key()->Accept(this, data);
+  print("=");
+  node->value()->Accept(this, data);
 }
 
 void Unparser::visitASTGraphClause(const ASTGraphClause* node, void* data) {

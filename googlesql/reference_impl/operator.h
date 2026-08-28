@@ -733,7 +733,8 @@ class AggregateArg final : public ExprArg {
       std::unique_ptr<ValueExpr> filter = nullptr,
       std::unique_ptr<ValueExpr> having_filter = nullptr,
       std::vector<CollatorInfo> collation_list = {},
-      const VariableId& side_effects_variable = VariableId());
+      const VariableId& side_effects_variable = VariableId(),
+      const VariableId& grain_locking_measure_variable = VariableId());
 
   // Sets the schemas used in CreateAccumulator/EvalAgg.
   absl::Status SetSchemasForEvaluation(
@@ -775,7 +776,8 @@ class AggregateArg final : public ExprArg {
                std::unique_ptr<ValueExpr> filter,
                std::unique_ptr<ValueExpr> having_filter,
                std::vector<CollatorInfo> collation_list,
-               const VariableId& side_effects_variable);
+               const VariableId& side_effects_variable,
+               const VariableId& grain_locking_measure_variable);
 
   AggregateArg(const AggregateArg&) = delete;
   AggregateArg& operator=(const AggregateArg&) = delete;
@@ -832,11 +834,27 @@ class AggregateArg final : public ExprArg {
   std::vector<std::unique_ptr<AggregateArg>> inner_aggregators_;
   const ResolvedFunctionCallBase::ErrorMode error_mode_;
   // Set by SetSchemasForEvaluation().
+  //
+  // `input_schema_` is the schema of the input rows to the aggregate operator
+  // as a whole.
+  //
+  // `group_schema_` is the schema of the rows that are actually accumulated by
+  // this `AggregateArg`'s accumulator. If there is an inner aggregation, this
+  // is the schema of the intermediate results from the inner aggregation.
+  // Otherwise, it is the same as `input_schema_`.
+  std::unique_ptr<const TupleSchema> input_schema_;
   std::unique_ptr<const TupleSchema> group_schema_;
   std::unique_ptr<ValueExpr> filter_;
   std::unique_ptr<ValueExpr> having_filter_;
   const std::vector<CollatorInfo> collation_list_;
   const VariableId side_effects_variable_;
+
+  // If the `AggregateArg` is a top-level standard aggregate function call under
+  // a measure definition expression, this variable is the variable for the
+  // measure. Otherwise, it is null.
+  //
+  // This is used to perform grain locking for the aggregate function call.
+  const VariableId grain_locking_measure_variable_;
 };
 
 // Abstract expression argument class that specifies an analytic function and
@@ -2089,39 +2107,6 @@ class RowsForUdaOp : public RelationalOp {
   explicit RowsForUdaOp(std::vector<VariableId> argument);
 
   std::vector<VariableId> arguments_;
-};
-
-// `GrainLockingOp` returns an iterator to the deduplicated set of input rows
-// fed to a measure expression. `active_group_rows_` is used to feed the input
-// rows for deduplication to `GrainLockingOp`.
-// `GrainLockingOp` can be thought of as a specialized form of an `AggregateOp`.
-class GrainLockingOp : public RelationalOp {
- public:
-  GrainLockingOp(const GrainLockingOp&) = delete;
-  GrainLockingOp& operator=(const GrainLockingOp&) = delete;
-
-  static std::unique_ptr<GrainLockingOp> Create(VariableId measure_variable);
-
-  absl::Status SetSchemasForEvaluation(
-      absl::Span<const TupleSchema* const> params_schemas) override;
-
-  absl::StatusOr<std::unique_ptr<TupleIterator>> CreateIterator(
-      absl::Span<const TupleData* const> params, int num_extra_slots,
-      EvaluationContext* context) const override;
-
-  // Returns the schema consisting of variables corresponding to the
-  // list of argument names passed to the constructor.
-  std::unique_ptr<TupleSchema> CreateOutputSchema() const override;
-
-  std::string IteratorDebugString() const override;
-
-  std::string DebugInternal(const std::string& indent,
-                            bool verbose) const override;
-
- private:
-  explicit GrainLockingOp(VariableId measure_variable);
-
-  VariableId measure_variable_;
 };
 
 // Partitions the input by <partition_keys>, and evaluates a number of analytic

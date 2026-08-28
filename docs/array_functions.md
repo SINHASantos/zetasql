@@ -1731,10 +1731,13 @@ The `GENERATE_ARRAY` function accepts the following data types as inputs:
 The `step_expression` parameter determines the increment used to
 generate array values. The default value for this parameter is `1`.
 
-This function returns an error if `step_expression` is set to 0, or if any
-input is `NaN`.
+The `GENERATE_ARRAY` function returns an error if any of the following are true:
 
-If any argument is `NULL`, the function will return a `NULL` array.
++   `step_expression` evaluates to 0.
++   Any input is `NaN`.
++   The resulting array is too large.
+
+If any argument is `NULL`, the function returns a `NULL` array.
 
 **Return Data Type**
 
@@ -1852,7 +1855,11 @@ The `GENERATE_DATE_ARRAY` function accepts the following data types as inputs:
 The `INT64_expr` parameter determines the increment used to generate dates. The
 default value for this parameter is 1 day.
 
-This function returns an error if `INT64_expr` is set to 0.
+The `GENERATE_DATE_ARRAY` function returns an error if any of the following are
+true:
+
++   `INT64_expr` is set to 0.
++   The resulting array is too large.
 
 **Return Data Type**
 
@@ -2000,6 +2007,12 @@ inputs:
 
 The `step_expression` parameter determines the increment used to generate
 timestamps.
+
+The `GENERATE_TIMESTAMP_ARRAY` function returns an error if any of the following
+are true:
+
++   `step_expression` evaluates to 0.
++   The resulting array is too large.
 
 **Return Data Type**
 

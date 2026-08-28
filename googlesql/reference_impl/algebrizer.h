@@ -223,7 +223,9 @@ class Algebrizer {
              const AlgebrizerOptions& algebrizer_options,
              TypeFactory* type_factory, Parameters* parameters,
              ParameterMap* column_map,
-             SystemVariablesAlgebrizerMap* system_variables_map);
+             SystemVariablesAlgebrizerMap* system_variables_map,
+             std::shared_ptr<MeasureColumnToExprMapping>
+                 measure_column_to_expr = nullptr);
 
   absl::StatusOr<std::unique_ptr<ValueExpr>> AlgebrizeCast(
       const ResolvedCast* cast);
@@ -391,7 +393,9 @@ class Algebrizer {
       std::function<absl::StatusOr<std::unique_ptr<RelationalOp>>(Algebrizer&)>
           create_input_op,
       const LanguageOptions& language_options,
-      const AlgebrizerOptions& algebrizer_options, TypeFactory* type_factory);
+      const AlgebrizerOptions& algebrizer_options, TypeFactory* type_factory,
+      std::shared_ptr<MeasureColumnToExprMapping> measure_column_to_expr =
+          nullptr);
 
   absl::StatusOr<std::unique_ptr<RelationalOp>> CreateInputOpForUdaCall(
       absl::Span<const UdaArgumentInfo> argument_infos);
@@ -1447,7 +1451,10 @@ class Algebrizer {
   // measure. The expression used to compute the measure is stored in the
   // catalog (not the ResolvedColumn or the type), hence why we need to track it
   // here.
-  MeasureColumnToExprMapping measure_column_to_expr_;
+  //
+  // We use shared_ptr because this mapping can be used by multiple algebrizer
+  // instances to resolve derived measures.
+  std::shared_ptr<MeasureColumnToExprMapping> measure_column_to_expr_;
   // Maps parameters to variables for named parameters or else contains a list
   // of positional parameters. Not owned.
   Parameters* parameters_;
@@ -1464,6 +1471,9 @@ class Algebrizer {
   // single-use algebrizer.
   VariableId measure_variable_;
   const MeasureType* measure_type_ = nullptr;
+
+  // Tracks the nesting depth of subqueries currently being algebrized.
+  int subquery_depth_ = 0;
 
   // Maps system variables to variable ids.  Not owned.
   SystemVariablesAlgebrizerMap* system_variables_map_;

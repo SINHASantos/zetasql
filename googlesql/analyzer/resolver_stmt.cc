@@ -2929,12 +2929,8 @@ absl::Status Resolver::ResolveCreateExternalSchemaStatement(
       ast_statement, "CREATE EXTERNAL SCHEMA", &create_scope, &create_mode));
 
   std::unique_ptr<const ResolvedConnection> resolved_connection;
-  if (ast_statement->with_connection_clause() != nullptr) {
-    GOOGLESQL_RETURN_IF_ERROR(ResolveConnection(ast_statement->with_connection_clause()
-                                          ->connection_clause()
-                                          ->connection_path(),
-                                      &resolved_connection));
-  }
+  GOOGLESQL_RETURN_IF_ERROR(ResolveConnectionClause(
+      ast_statement->with_connection_clause(), &resolved_connection));
 
   // Engine-specific options are required for external schema (as they are how
   // the source of the external schema is provided)
@@ -3271,11 +3267,9 @@ absl::Status Resolver::ResolveCreateIndexStatement(
              << "WITH CONNECTION is not supported for "
              << GetCreateIndexStatementName(ast_statement) << " statement";
     }
-    GOOGLESQL_RETURN_IF_ERROR(ResolveConnection(ast_statement->with_connection_clause()
-                                          ->connection_clause()
-                                          ->connection_path(),
-                                      &resolved_connection,
-                                      /*is_default_connection_allowed=*/true));
+    GOOGLESQL_RETURN_IF_ERROR(ResolveConnectionClause(
+        ast_statement->with_connection_clause(), &resolved_connection,
+        /*is_default_connection_allowed=*/true));
   }
 
   std::vector<std::unique_ptr<const ResolvedOption>> resolved_options;
@@ -3567,13 +3561,9 @@ absl::Status Resolver::ResolveCreateModelStatement(
 
   // Resolve connection.
   std::unique_ptr<const ResolvedConnection> resolved_connection;
-  if (with_connection_clause != nullptr) {
-    GOOGLESQL_RETURN_IF_ERROR(ResolveConnection(ast_statement->with_connection_clause()
-                                          ->connection_clause()
-                                          ->connection_path(),
-                                      &resolved_connection,
-                                      /*is_default_connection_allowed=*/true));
-  }
+  GOOGLESQL_RETURN_IF_ERROR(ResolveConnectionClause(
+      ast_statement->with_connection_clause(), &resolved_connection,
+      /*is_default_connection_allowed=*/true));
 
   // Resolve the query.
   std::unique_ptr<const ResolvedScan> query_scan;
@@ -3988,19 +3978,18 @@ absl::Status Resolver::ResolveCreateTableStmtBaseProperties(
                << "WITH CONNECTION clause is unsupported for CREATE TABLE";
       }
     }
+    bool is_default_connection_allowed = false;
     switch (ast_statement->node_kind()) {
       case AST_CREATE_EXTERNAL_TABLE_STATEMENT:
       case AST_CREATE_TABLE_STATEMENT:
-        GOOGLESQL_RETURN_IF_ERROR(ResolveConnection(
-            with_connection_clause->connection_clause()->connection_path(),
-            &statement_base_properties->connection,
-            /*is_default_connection_allowed=*/true));
+        is_default_connection_allowed = true;
         break;
       default:
-        GOOGLESQL_RETURN_IF_ERROR(ResolveConnection(
-            with_connection_clause->connection_clause()->connection_path(),
-            &statement_base_properties->connection));
+        break;
     }
+    GOOGLESQL_RETURN_IF_ERROR(ResolveConnectionClause(
+        with_connection_clause, &statement_base_properties->connection,
+        is_default_connection_allowed));
   }
 
   if (partitions_clause != nullptr) {
@@ -5520,9 +5509,8 @@ absl::Status Resolver::ResolveCreateFunctionStatement(
     }
 
     if (with_connection != nullptr) {
-      GOOGLESQL_RETURN_IF_ERROR(ResolveConnection(
-          with_connection->connection_clause()->connection_path(),
-          &resolved_connection));
+      GOOGLESQL_RETURN_IF_ERROR(
+          ResolveConnectionClause(with_connection, &resolved_connection));
     }
   } else if (with_connection != nullptr) {
     if (!language().LanguageFeatureEnabled(FEATURE_REMOTE_FUNCTION) &&
@@ -5551,9 +5539,8 @@ absl::Status Resolver::ResolveCreateFunctionStatement(
              << "WITH CONNECTION clause should be preceded by keyword REMOTE "
                 "or must be used with LANGUAGE clause";
     }
-    GOOGLESQL_RETURN_IF_ERROR(ResolveConnection(
-        with_connection->connection_clause()->connection_path(),
-        &resolved_connection));
+    GOOGLESQL_RETURN_IF_ERROR(
+        ResolveConnectionClause(with_connection, &resolved_connection));
   }
 
   // If REMOTE keyword is used or LANGUAGE is set to "REMOTE" and the feature is
@@ -5861,9 +5848,8 @@ absl::Status Resolver::ResolveCreateTableFunctionStatement(
              << "WITH CONNECTION clause must be used with LANGUAGE clause";
     }
 
-    GOOGLESQL_RETURN_IF_ERROR(ResolveConnection(
-        with_connection->connection_clause()->connection_path(),
-        &resolved_connection));
+    GOOGLESQL_RETURN_IF_ERROR(
+        ResolveConnectionClause(with_connection, &resolved_connection));
   }
 
   // Option resolution is done with an empty namescope. That includes any
@@ -6351,10 +6337,8 @@ absl::Status Resolver::ResolveCreateProcedureStatement(
       return MakeSqlErrorAt(ast_statement)
              << "WITH CONNECTION clause is not supported inside modules";
     }
-    GOOGLESQL_RETURN_IF_ERROR(ResolveConnection(ast_statement->with_connection_clause()
-                                          ->connection_clause()
-                                          ->connection_path(),
-                                      &resolved_connection));
+    GOOGLESQL_RETURN_IF_ERROR(ResolveConnectionClause(
+        ast_statement->with_connection_clause(), &resolved_connection));
   }
 
   std::string procedure_body;
@@ -7494,12 +7478,8 @@ absl::Status Resolver::ResolveExportDataStatement(
   }
 
   std::unique_ptr<const ResolvedConnection> resolved_connection;
-  if (ast_statement->with_connection_clause() != nullptr) {
-    GOOGLESQL_RETURN_IF_ERROR(ResolveConnection(ast_statement->with_connection_clause()
-                                          ->connection_clause()
-                                          ->connection_path(),
-                                      &resolved_connection));
-  }
+  GOOGLESQL_RETURN_IF_ERROR(ResolveConnectionClause(
+      ast_statement->with_connection_clause(), &resolved_connection));
 
   std::vector<std::unique_ptr<const ResolvedOption>> resolved_options;
   GOOGLESQL_RETURN_IF_ERROR(ResolveOptionsList(ast_statement->options_list(),
@@ -7520,12 +7500,8 @@ absl::Status Resolver::ResolveExportMetadataStatement(
       ast_statement->name_path()->ToIdentifierVector();
 
   std::unique_ptr<const ResolvedConnection> resolved_connection;
-  if (ast_statement->with_connection_clause() != nullptr) {
-    GOOGLESQL_RETURN_IF_ERROR(ResolveConnection(ast_statement->with_connection_clause()
-                                          ->connection_clause()
-                                          ->connection_path(),
-                                      &resolved_connection));
-  }
+  GOOGLESQL_RETURN_IF_ERROR(ResolveConnectionClause(
+      ast_statement->with_connection_clause(), &resolved_connection));
 
   std::vector<std::unique_ptr<const ResolvedOption>> resolved_options;
   GOOGLESQL_RETURN_IF_ERROR(ResolveOptionsList(ast_statement->options_list(),
@@ -7545,12 +7521,8 @@ absl::Status Resolver::ResolveExportModelStatement(
       ast_statement->model_name_path()->ToIdentifierVector();
 
   std::unique_ptr<const ResolvedConnection> resolved_connection;
-  if (ast_statement->with_connection_clause() != nullptr) {
-    GOOGLESQL_RETURN_IF_ERROR(ResolveConnection(ast_statement->with_connection_clause()
-                                          ->connection_clause()
-                                          ->connection_path(),
-                                      &resolved_connection));
-  }
+  GOOGLESQL_RETURN_IF_ERROR(ResolveConnectionClause(
+      ast_statement->with_connection_clause(), &resolved_connection));
 
   std::vector<std::unique_ptr<const ResolvedOption>> resolved_options;
   GOOGLESQL_RETURN_IF_ERROR(ResolveOptionsList(ast_statement->options_list(),

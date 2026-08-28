@@ -783,7 +783,7 @@ Input values:
 +   `key_name`: When `key_name` is provided without a wrapping keyword,
     it's the same as `SAFE_KEY(key_name)`. Note that `NULL` is a
     valid key and can pair with non-`NULL` values. For example,
-    `MAP_FROM_ARRAY([NULL, 1])[NULL]` returns `1`.
+    `MAP_FROM_ARRAY([(NULL, 1)])[NULL]` returns `1`.
 +   `mode_keyword(key_name)`: Specifies whether to produce `NULL` or
     an error if the key isn't present in the map.
 
@@ -802,10 +802,11 @@ In the following query, the map subscript operator returns the value when the
 key is present:
 
 ```googlesql
+WITH t AS
+  (SELECT MAP_FROM_ARRAY([('A', 1), ('B', 2), ('C', 3)]) AS input_map)
 SELECT
   input_map[KEY('B')] AS map_value
-FROM
-  MAP_FROM_ARRAY([('A', 1), ('B', 2), ('C', 3)]) AS input_map;
+FROM t
 
 /*-----------+
  | map_value |
@@ -817,22 +818,24 @@ FROM
 In the following query, because the key doesn't exist in the map and `KEY`
 is used, an error is produced:
 
-```googlesql
--- ERROR: Key not found in map: D
+```googlesql {.bad}
+-- ERROR: Key not found in map: "D"
+WITH t AS
+  (SELECT MAP_FROM_ARRAY([('A', 1), ('B', 2), ('C', 3)]) AS input_map)
 SELECT
   input_map[KEY('D')] AS map_value
-FROM
-  MAP_FROM_ARRAY([('A', 1), ('B', 2), ('C', 3)]) AS input_map;
+FROM t
 ```
 
 In the following query, because the key doesn't exist in the map and
 `SAFE_KEY` is used, the map subscript operator returns `NULL`:
 
 ```googlesql
+WITH t AS
+  (SELECT MAP_FROM_ARRAY([('A', 1), ('B', 2), ('C', 3)]) AS input_map)
 SELECT
   input_map[SAFE_KEY('D')] AS safe_key_missing
-FROM
-  MAP_FROM_ARRAY([('A', 1), ('B', 2), ('C', 3)]) AS input_map;
+FROM t
 
 /*------------------+
  | safe_key_missing |
@@ -845,26 +848,28 @@ In the following query, the subscript operator returns `NULL` when the map is
 `NULL`:
 
 ```googlesql
+WITH t AS
+  (SELECT MAP_FROM_ARRAY(CAST(NULL AS ARRAY<STRUCT<STRING, INT64>>)) AS input_map)
 SELECT
   input_map[KEY('A')] AS null_map
-FROM
-  MAP_FROM_ARRAY(CAST(NULL AS ARRAY<STRUCT<INT64, INT64>>)) AS input_map;
+FROM t
 
-/*-----------+
- | null_map  |
- +-----------+
- | NULL      |
- +-----------*/
+/*----------+
+ | null_map |
+ +----------+
+ | NULL     |
+ +----------*/
 ```
 
 In the following query, the subscript operator returns a non-`NULL` value for
 a `NULL` key because `NULL` is present in the map as a key:
 
 ```googlesql
+WITH t AS
+  (SELECT MAP_FROM_ARRAY([('A', 1), ('B', 2), (NULL, -100)]) AS input_map)
 SELECT
   input_map[KEY(NULL)] AS map_value
-FROM
-  MAP_FROM_ARRAY([(NULL, -100), ('A', 1), ('B', 2)]) AS input_map;
+FROM t
 
 /*-----------+
  | map_value |
@@ -879,18 +884,19 @@ are present in the map returns the associated value, and keys not present
 return `NULL`.
 
 ```googlesql
+WITH t AS
+  (SELECT MAP_FROM_ARRAY([('A', 1), ('B', 2), ('C', 3)]) AS input_map)
 SELECT
   input_map['B'] AS present_key_value,
   input_map['D'] AS missing_key_value,
   input_map[NULL] AS missing_null_key_value
-FROM
-  MAP_FROM_ARRAY([('A', 1), ('B', 2), ('C', 3)]) AS input_map;
+FROM t
 
-/*----------------------------------------------------------------+
+/*-------------------+-------------------+------------------------+
  | present_key_value | missing_key_value | missing_null_key_value |
- +-------------------|-------------------|------------------------+
+ +-------------------+-------------------+------------------------+
  | 2                 | NULL              | NULL                   |
- +----------------------------------------------------------------*/
+ +-------------------+-------------------+------------------------*/
 ```
 
 [map-type]: https://github.com/google/googlesql/blob/master/docs/data-types.md#map_type
@@ -2980,7 +2986,7 @@ Example with `IN` and a struct:
 
 ```googlesql
 SELECT
-  (SELECT AS STRUCT Items.info) as item
+  Items.info as item
 FROM
   Items
 WHERE (info.shape, info.color) IN (('round', 'blue'));
@@ -5820,7 +5826,8 @@ rows. Returns `NULL` when `expression`
 or `having_expression` is
 `NULL` for all rows in the group.
 
-If `expression` contains any non-NULL values, then `ANY_VALUE` behaves as if
+If `expression` contains any non-NULL values,
+then `ANY_VALUE` behaves as if
 `IGNORE NULLS` is specified;
 rows for which `expression` is `NULL` aren't considered and won't be
 selected.
@@ -9694,10 +9701,13 @@ The `GENERATE_ARRAY` function accepts the following data types as inputs:
 The `step_expression` parameter determines the increment used to
 generate array values. The default value for this parameter is `1`.
 
-This function returns an error if `step_expression` is set to 0, or if any
-input is `NaN`.
+The `GENERATE_ARRAY` function returns an error if any of the following are true:
 
-If any argument is `NULL`, the function will return a `NULL` array.
++   `step_expression` evaluates to 0.
++   Any input is `NaN`.
++   The resulting array is too large.
+
+If any argument is `NULL`, the function returns a `NULL` array.
 
 **Return Data Type**
 
@@ -9815,7 +9825,11 @@ The `GENERATE_DATE_ARRAY` function accepts the following data types as inputs:
 The `INT64_expr` parameter determines the increment used to generate dates. The
 default value for this parameter is 1 day.
 
-This function returns an error if `INT64_expr` is set to 0.
+The `GENERATE_DATE_ARRAY` function returns an error if any of the following are
+true:
+
++   `INT64_expr` is set to 0.
++   The resulting array is too large.
 
 **Return Data Type**
 
@@ -9963,6 +9977,12 @@ inputs:
 
 The `step_expression` parameter determines the increment used to generate
 timestamps.
+
+The `GENERATE_TIMESTAMP_ARRAY` function returns an error if any of the following
+are true:
+
++   `step_expression` evaluates to 0.
++   The resulting array is too large.
 
 **Return Data Type**
 

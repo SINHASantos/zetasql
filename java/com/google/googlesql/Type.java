@@ -448,6 +448,11 @@ public abstract class Type implements Serializable {
     return debugString(false);
   }
 
+  /** Returns {@code this} cast to SimpleType or null for other types. */
+  public SimpleType asSimpleType() {
+    return null;
+  }
+
   /** Returns {@code this} cast to ArrayType or null for other types. */
   public ArrayType asArray() {
     return null;

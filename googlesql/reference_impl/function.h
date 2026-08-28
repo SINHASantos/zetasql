@@ -65,8 +65,8 @@
 #include "googlesql/base/source_location.h"
 #include "absl/types/span.h"
 #include "google/protobuf/descriptor.h"
-#include "googlesql/base/optional_ref.h"
 #include "re2/re2.h"
+#include "googlesql/base/optional_ref.h"
 
 namespace googlesql {
 
@@ -2749,37 +2749,6 @@ class HopTVF : public BuiltinTableValuedFunction {
     absl::Status status_;
     std::unique_ptr<googlesql::TypeFactory> type_factory_;
   };
-};
-
-// Table-valued function (TVF) evaluator for `VECTOR_SEARCH`. Supports both
-// the batch vector search variant (finding nearest neighbors for a table of
-// query vectors) and the single vector search variant (finding nearest
-// neighbors for a single query vector).
-class VectorSearchTVF : public BuiltinTableValuedFunction {
- public:
-  explicit VectorSearchTVF(FunctionKind kind)
-      : BuiltinTableValuedFunction(kind) {}
-
-  absl::StatusOr<std::unique_ptr<EvaluatorTableIterator>> CreateEvaluator(
-      std::vector<TableValuedFunction::TvfEvaluatorArg> args,
-      std::shared_ptr<FunctionSignature> function_call_signature,
-      std::shared_ptr<const TVFSignature> tvf_signature,
-      EvaluationContext* context) override;
-
-  std::string debug_name() const override { return "vector_search"; }
-};
-
-class KMeansTVF : public BuiltinTableValuedFunction {
- public:
-  explicit KMeansTVF(FunctionKind kind) : BuiltinTableValuedFunction(kind) {}
-
-  absl::StatusOr<std::unique_ptr<EvaluatorTableIterator>> CreateEvaluator(
-      std::vector<TableValuedFunction::TvfEvaluatorArg> args,
-      std::shared_ptr<FunctionSignature> function_call_signature,
-      std::shared_ptr<const TVFSignature> tvf_signature,
-      EvaluationContext* context) override;
-
-  std::string debug_name() const override { return "kmeans"; }
 };
 
 class AiIfFunction : public SimpleBuiltinScalarFunction {

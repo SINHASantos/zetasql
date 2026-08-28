@@ -7799,15 +7799,6 @@ QueryStmt
       +-SingleRowScan
 ==
 
-select *
-from tvf_one_relation_arg_with_fixed_output(TABLE KeyValue WHERE true)
---
-
-ERROR: TABLE clause with WHERE is not supported [at 2:45]
-from tvf_one_relation_arg_with_fixed_output(TABLE KeyValue WHERE true)
-                                            ^
-==
-
 # Test with optional relation and named scalar arguments.
 select *
 from tvf_optional_relation_named_scalar(TABLE KeyValue)

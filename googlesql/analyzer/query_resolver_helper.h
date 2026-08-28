@@ -1511,7 +1511,9 @@ GetDeferredResolutionSelectColumnInfo(const ASTSelectColumn* select_column);
 // Returns true if the given query expression contains a FROM GROUP ROWS
 // expression. This only searches the current query level and does not look into
 // subqueries.
-absl::StatusOr<bool> HasGroupRowsInQuery(const ASTQueryExpression* query_expr);
+absl::StatusOr<bool> HasGroupRowsInQuery(
+    const ASTQueryExpression* query_expr,
+    const LanguageOptions& language_options);
 
 // Extracts collation annotations from the `group_by_list` of `aggregate_scan`
 // and populates the scan's collation list.

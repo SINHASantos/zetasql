@@ -88,6 +88,25 @@ CallStatement [0-42]
 CALL myprocedure(CONNECTION my.connection)
 ==
 
+# Connection-typed parameters (key-value).
+call myprocedure(CONNECTION (k1 = 'v1', k2 = 123))
+--
+CallStatement [0-50]
+  PathExpression [5-16]
+    Identifier(myprocedure) [5-16]
+  TVFArgument [17-49]
+    ConnectionClause [17-49]
+      ConnectionKeyValuePair [29-38]
+        Identifier(k1) [29-31]
+        StringLiteral [34-38]
+          StringLiteralComponent('v1') [34-38]
+      ConnectionKeyValuePair [40-48]
+        Identifier(k2) [40-42]
+        IntLiteral(123) [45-48]
+--
+CALL myprocedure(CONNECTION (k1 = 'v1', k2 = 123))
+==
+
 # Table-typed parameters.
 call myprocedure(TABLE my.table, (SELECT * FROM my.another_table), mytvf(1, 2))
 --

@@ -916,13 +916,17 @@ Resolver::ResolveWithClauseIfPresent(const ASTWithClause* with_clause,
     // resolution later.
     if (!with_clause->entries().empty() &&
         with_clause->entries().at(0)->aliased_group_rows() != nullptr) {
+      const auto* aliased_group_rows =
+          with_clause->entries().at(0)->aliased_group_rows();
+      if (!language().LanguageFeatureEnabled(FEATURE_WITH_GROUP_ROWS)) {
+        return MakeSqlErrorAt(aliased_group_rows)
+               << "GROUP ROWS is not supported";
+      }
       if (parent_from_clause_name_list_ == nullptr) {
         return MakeSqlErrorAt(with_clause)
                << "GROUP ROWS is not supported in this (sub)query.";
       }
       has_group_rows_out = true;
-      const auto* aliased_group_rows =
-          with_clause->entries().at(0)->aliased_group_rows();
       GOOGLESQL_RETURN_IF_ERROR(
           AddAliasedGroupRows(aliased_group_rows->alias()->GetAsIdString(),
                               parent_from_clause_name_list_));
@@ -1053,7 +1057,7 @@ absl::Status Resolver::ResolveQuery(
                                  with_clause_has_group_rows));
 
   GOOGLESQL_ASSIGN_OR_RETURN(bool from_clause_has_group_rows,
-                   HasGroupRowsInQuery(query->query_expr()));
+                   HasGroupRowsInQuery(query->query_expr(), language()));
 
   if (with_clause_has_group_rows && from_clause_has_group_rows) {
     return MakeSqlErrorAt(query)
@@ -1063,6 +1067,13 @@ absl::Status Resolver::ResolveQuery(
   std::unique_ptr<const NameScope> group_rows_scope;
   if ((with_clause_has_group_rows || from_clause_has_group_rows) &&
       parent_expr_resolution_info != nullptr) {
+    // Only allow group rows in clauses that allow aggregation.
+    if (!parent_expr_resolution_info->allows_aggregation) {
+      return MakeSqlErrorAt(query) << "GROUP ROWS is not allowed in "
+                                   << parent_expr_resolution_info->clause_name;
+    }
+    GOOGLESQL_RET_CHECK(parent_expr_resolution_info->query_resolution_info != nullptr);
+
     parent_expr_resolution_info->findings.has_group_rows = true;
     parent_expr_resolution_info->findings.has_aggregation = true;
     parent_expr_resolution_info->query_resolution_info->SetHasAggregation(true);
@@ -16065,10 +16076,6 @@ absl::Status Resolver::ResolveGroupRows(
     std::shared_ptr<const NameList>* output_name_list) {
   RETURN_ERROR_IF_OUT_OF_STACK_SPACE();
 
-  if (!language().LanguageFeatureEnabled(FEATURE_WITH_GROUP_ROWS)) {
-    return MakeSqlErrorAt(ast_location) << "GROUP ROWS is not supported";
-  }
-
   // Create new column and input lists for group rows scan.
   absl::flat_hash_map<int, ResolvedColumn> column_map;
   ResolvedColumnList group_rows_column_list;
@@ -16386,10 +16393,11 @@ absl::Status Resolver::ResolveTVF(
       GOOGLESQL_ASSIGN_OR_RETURN(std::unique_ptr<const ResolvedConnection> connection,
                        arg.MoveConnection());
       final_resolved_tvf_args.push_back(
-          MakeResolvedTVFArgument(/*expr=*/nullptr, /*scan=*/nullptr,
-                                  /*model=*/nullptr, std::move(connection),
-                                  /*descriptor_arg=*/nullptr,
-                                  /*argument_column_list=*/{})
+          MakeResolvedFunctionArgument(
+              /*expr=*/nullptr, /*scan=*/nullptr, /*model=*/nullptr,
+              std::move(connection), /*descriptor_arg=*/nullptr,
+              /*argument_column_list=*/{}, /*inline_lambda=*/nullptr,
+              /*sequence=*/nullptr, /*graph=*/nullptr)
               .release());
     } else if (arg.IsDescriptor()) {
       GOOGLESQL_ASSIGN_OR_RETURN(std::unique_ptr<const ResolvedDescriptor> descriptor,
@@ -17507,8 +17515,8 @@ absl::StatusOr<ResolvedTVFArg> Resolver::ResolveTVFArg(
     }
   } else if (ast_connection_clause != nullptr) {
     std::unique_ptr<const ResolvedConnection> resolved_connection;
-    GOOGLESQL_RETURN_IF_ERROR(ResolveConnection(ast_connection_clause->connection_path(),
-                                      &resolved_connection));
+    GOOGLESQL_RETURN_IF_ERROR(
+        ResolveConnectionClause(ast_connection_clause, &resolved_connection));
     resolved_tvf_arg.SetConnection(std::move(resolved_connection));
   } else if (ast_model_clause != nullptr) {
     std::unique_ptr<const ResolvedModel> resolved_model;
@@ -18148,11 +18156,6 @@ absl::Status Resolver::ResolveTableClause(
     bool resolve_argument_first, const std::string& read_as_row_type_error_kind,
     std::unique_ptr<const ResolvedScan>* output_scan,
     std::shared_ptr<const NameList>* output_name_list) {
-  if (ast_table_clause->where_clause() != nullptr) {
-    return MakeSqlErrorAt(ast_table_clause)
-           << "TABLE clause with WHERE is not supported";
-  }
-
   const Table* table = nullptr;
   if (ast_table_clause->tvf() != nullptr) {
     // The TABLE clause represents a TVF call with arguments. Resolve the
@@ -18903,6 +18906,34 @@ absl::Status Resolver::ResolveDefaultConnection(
 
   *resolved_connection = MakeResolvedConnection(connection);
   return absl::OkStatus();
+}
+
+absl::Status Resolver::ResolveConnectionClause(
+    const ASTConnectionClause* connection_clause,
+    std::unique_ptr<const ResolvedConnection>* resolved_connection,
+    bool is_default_connection_allowed) {
+  if (connection_clause == nullptr) {
+    return absl::OkStatus();
+  }
+  if (connection_clause->connection_path() != nullptr) {
+    GOOGLESQL_RET_CHECK(connection_clause->connection_kv_pairs().empty());
+    return ResolveConnection(connection_clause->connection_path(),
+                             resolved_connection,
+                             is_default_connection_allowed);
+  }
+  GOOGLESQL_RET_CHECK(!connection_clause->connection_kv_pairs().empty());
+  return MakeSqlErrorAt(connection_clause)
+         << "Multiple connections in CONNECTION clause is not supported";
+}
+
+absl::Status Resolver::ResolveConnectionClause(
+    const ASTWithConnectionClause* with_connection,
+    std::unique_ptr<const ResolvedConnection>* resolved_connection,
+    bool is_default_connection_allowed) {
+  return ResolveConnectionClause(
+      with_connection == nullptr ? nullptr
+                                 : with_connection->connection_clause(),
+      resolved_connection, is_default_connection_allowed);
 }
 
 bool Resolver::IsPathExpressionStartingFromNamedSubquery(

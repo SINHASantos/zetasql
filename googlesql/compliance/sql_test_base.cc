@@ -3187,20 +3187,22 @@ void SQLTestBase::MaybeAddMeasureTables(
     const FilebasedSQLTestCaseOptions& test_case_options,
     TestDatabase& test_db) {
   const bool add_tables_with_measures =
-      test_case_options.required_features().find(
-          LanguageFeature::FEATURE_ENABLE_MEASURES) !=
-      test_case_options.required_features().end();
+      test_case_options.required_features().contains(
+          LanguageFeature::FEATURE_ENABLE_MEASURES);
   if (!add_tables_with_measures) {
     return;
   }
 
   const bool add_measures_with_udas =
-      test_case_options.required_features().find(
-          LanguageFeature::FEATURE_MULTILEVEL_AGGREGATION_ON_UDAS) !=
-      test_case_options.required_features().end();
+      test_case_options.required_features().contains(
+          LanguageFeature::FEATURE_MULTILEVEL_AGGREGATION_ON_UDAS);
 
-  TestDatabase measure_db =
-      GetMeasureTablesTestDatabase(add_measures_with_udas);
+  const bool add_derived_measures =
+      test_case_options.required_features().contains(
+          LanguageFeature::FEATURE_DERIVED_MEASURE);
+
+  TestDatabase measure_db = GetMeasureTablesTestDatabase(add_measures_with_udas,
+                                                         add_derived_measures);
 
   // Adds the measure tables and measure function definitions to the output test
   // database.

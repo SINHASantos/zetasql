@@ -21,6 +21,7 @@
 #include <utility>
 #include <vector>
 
+#include "googlesql/common/internal_value.h"
 #include "googlesql/base/testing/status_matchers.h"
 #include "googlesql/public/analyzer_options.h"
 #include "googlesql/public/annotation/collation.h"
@@ -1032,6 +1033,72 @@ TEST_F(AddMeasureColumnsToTableTest,
 | +-field_idx=0
 +-collation_list=[und:ci]
 )");
+}
+
+// Tests that the captured struct field names are the same as the original
+// column names, with the same case.
+TEST_F(AddMeasureColumnsToTableTest,
+       UpdateTableRowsWithMeasureValuesCapturedColumnNames) {
+  auto upper_table = std::make_unique<SimpleTable>(
+      "UpperTable",
+      std::vector<const Column*>{
+          new SimpleColumn("UpperTable", "IdCol", type_factory_.get_int64()),
+          new SimpleColumn("UpperTable", "ValCol", type_factory_.get_int64())},
+      /*take_ownership=*/true);
+  GOOGLESQL_ASSERT_OK(upper_table->SetRowIdentityColumns({0}));
+
+  std::vector<MeasureColumnDef> measures = {
+      {.name = "m1", .expression = "SUM(ValCol)"},
+  };
+
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(
+      std::vector<std::unique_ptr<const AnalyzerOutput>> analyzer_outputs,
+      AddMeasureColumnsToTable(*upper_table, measures, type_factory_,
+                               *catalog_->catalog(), options_));
+
+  const StructType* input_row_type = nullptr;
+  GOOGLESQL_ASSERT_OK(
+      type_factory_.MakeStructType({{"IdCol", type_factory_.get_int64()},
+                                    {"ValCol", type_factory_.get_int64()}},
+                                   &input_row_type));
+
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(
+      Value row_val,
+      Value::MakeStruct(input_row_type, {Value::Int64(1), Value::Int64(10)}));
+
+  const ArrayType* array_type = nullptr;
+  GOOGLESQL_ASSERT_OK(type_factory_.MakeArrayType(input_row_type, &array_type));
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(Value array_val,
+                       Value::MakeArray(array_type, {row_val}));
+
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(
+      Value updated_array_val,
+      UpdateTableRowsWithMeasureValues(array_val, upper_table.get(), measures,
+                                       /*table_level_row_identity_columns=*/{0},
+                                       &type_factory_, options_.language()));
+  ASSERT_EQ(updated_array_val.num_elements(), 1);
+  Value updated_row = updated_array_val.element(0);
+
+  const StructType* updated_row_type = updated_row.type()->AsStruct();
+  ASSERT_NE(updated_row_type, nullptr);
+  ASSERT_EQ(updated_row_type->num_fields(), 3);
+  EXPECT_EQ(updated_row_type->field(0).name, "IdCol");
+  EXPECT_EQ(updated_row_type->field(1).name, "ValCol");
+  EXPECT_EQ(updated_row_type->field(2).name, "m1");
+
+  Value measure_val = updated_row.field(2);
+  ASSERT_TRUE(measure_val.type()->IsMeasureType());
+
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(Value captured_struct,
+                       InternalValue::GetMeasureAsStructValue(measure_val));
+  const StructType* captured_struct_type = captured_struct.type()->AsStruct();
+  ASSERT_NE(captured_struct_type, nullptr);
+
+  // The captured struct should have fields with the same case as the original
+  // columns.
+  ASSERT_EQ(captured_struct_type->num_fields(), 2);
+  EXPECT_EQ(captured_struct_type->field(0).name, "IdCol");
+  EXPECT_EQ(captured_struct_type->field(1).name, "ValCol");
 }
 
 }  // namespace

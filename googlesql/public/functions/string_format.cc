@@ -37,7 +37,6 @@
 #include "googlesql/public/strings.h"
 #include "googlesql/public/type.pb.h"
 #include "googlesql/public/types/proto_type.h"
-#include "googlesql/public/types/struct_type.h"
 #include "googlesql/public/types/type.h"
 #include "googlesql/public/types/type_factory.h"
 #include "googlesql/public/value.h"

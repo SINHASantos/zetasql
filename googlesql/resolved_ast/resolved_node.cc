@@ -60,7 +60,7 @@
 
 // TODO: Remove the flag once it is rolled out in external tests.
 ABSL_FLAG(bool, googlesql_omit_tvf_signatures_in_resolved_ast_debug_string,
-          false,
+          true,
           "If true, TVF signatures are omittied from the debug string "
           "representation of TableValueFunction fields in ResolvedAST nodes.");
 
@@ -1245,6 +1245,18 @@ std::vector<ResolvedColumn> ResolvedAuxLoadDataStmt::GetColumnsReferenced()
     const {
   std::vector<ResolvedColumn> columns = SUPER::GetColumnsCreated();
   return columns;
+}
+
+std::vector<ResolvedColumn> ResolvedColumnHolder::GetColumnsCreated() const {
+  // Column creation semantics are defined on the parent node field holding this
+  // holder. ResolvedColumnHolder itself does not create columns.
+  return {};
+}
+
+std::vector<ResolvedColumn> ResolvedColumnHolder::GetColumnsReferenced() const {
+  // Column reference semantics are defined on the parent node field holding
+  // this holder. ResolvedColumnHolder itself does not reference columns.
+  return {};
 }
 
 }  // namespace googlesql

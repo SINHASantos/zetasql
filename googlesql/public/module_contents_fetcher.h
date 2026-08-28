@@ -114,6 +114,20 @@ struct ProtoContentsInfo {
 typedef absl::flat_hash_map<std::string, ProtoContentsInfo>
     ProtoContentsInfoMap;
 
+// Fetches all transitive proto dependencies for the given <initial_proto_names>
+// using <module_contents_fetcher>. If a proto is imported multiple times, it
+// appears only once in the returned map. Clears <errors> and
+// <proto_contents_info_map>, and populates <proto_contents_info_map> with
+// fetched descriptors. Populates <errors> with all errors found during
+// processing (normally these would be proto file lookup errors). If an error is
+// found then returns the first error status inserted into <errors>, otherwise
+// returns OK.
+absl::Status FetchTransitiveProtoDependencies(
+    absl::Span<const std::string> initial_proto_names,
+    ModuleContentsFetcher* module_contents_fetcher,
+    ProtoContentsInfoMap* proto_contents_info_map,
+    std::vector<absl::Status>* errors);
+
 // The std::vector<string> is the module name path that was looked up, which
 // is case insensitive.
 typedef std::map<std::vector<std::string>, ModuleContentsInfo,

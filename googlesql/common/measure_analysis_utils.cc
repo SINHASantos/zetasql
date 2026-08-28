@@ -38,10 +38,12 @@
 #include "googlesql/public/types/type.h"
 #include "googlesql/public/types/type_factory.h"
 #include "googlesql/resolved_ast/resolved_ast.h"
+#include "googlesql/resolved_ast/resolved_ast_visitor.h"
 #include "googlesql/resolved_ast/resolved_node.h"
 #include "googlesql/resolved_ast/resolved_node_kind.pb.h"
 #include "googlesql/base/case.h"
 #include "absl/container/flat_hash_set.h"
+#include "absl/container/linked_hash_set.h"
 #include "absl/status/status.h"
 #include "googlesql/base/status_macros.h"
 #include "absl/status/statusor.h"
@@ -327,6 +329,129 @@ absl::Status ResolveColumnForMeasureExpression(
   return absl::OkStatus();
 }
 
+int FindColumnIndexByName(const SimpleTable& table, absl::string_view name) {
+  for (int i = 0; i < table.NumColumns(); ++i) {
+    if (googlesql_base::CaseEqual(table.GetColumn(i)->Name(), name)) {
+      return i;
+    }
+  }
+  return -1;
+}
+
+using LinkedCaseInsensitiveStringSet =
+    absl::linked_hash_set<std::string, googlesql_base::StringViewCaseHash,
+                          googlesql_base::StringViewCaseEqual>;
+
+// Visitor that finds all columns referenced by a resolved expression.
+class ReferencedColumnFinder : public ResolvedASTVisitor {
+ public:
+  ReferencedColumnFinder() = default;
+
+  // Returns the names of the referenced columns.
+  const LinkedCaseInsensitiveStringSet& referenced_columns() const {
+    return referenced_columns_;
+  }
+
+ protected:
+  absl::Status VisitResolvedExpressionColumn(
+      const ResolvedExpressionColumn* node) override {
+    referenced_columns_.insert(node->name());
+    return ResolvedASTVisitor::VisitResolvedExpressionColumn(node);
+  }
+
+ private:
+  // Names of the referenced columns.
+  LinkedCaseInsensitiveStringSet referenced_columns_;
+};
+
+// Represents the column dependencies for a measure column.
+struct MeasureCaptureInfo {
+  // Indices of the columns (measures and non-measures) that are needed by
+  // this measure, i.e., the columns that are referenced by the measure
+  // definition expression and the row identity columns.
+  //
+  // The indices are w.r.t. the `SimpleTable` to which this measure belongs.
+  std::vector<int> captured_indices;
+
+  // The struct type corresponding to the captured values.
+  const StructType* captured_struct_type = nullptr;
+
+  // The field indices of the key columns in the captured struct.
+  std::vector<int> key_indices;
+};
+
+// Returns the dependency information for a single measure column in the table.
+// The `captured_struct_type` will have the key columns as the first N fields,
+// followed by the other referenced columns.
+//
+// Input:
+// - `table`: The table containing the columns.
+// - `column_index`: The index of the measure column to build capture info for.
+// - `row_identity_columns`: The indices of the row identity columns for the
+//   measure, w.r.t. the `table`.
+absl::StatusOr<MeasureCaptureInfo> BuildMeasureCaptureInfo(
+    const SimpleTable& table, int column_index,
+    absl::Span<const int> row_identity_columns, TypeFactory& type_factory) {
+  const Column* column = table.GetColumn(column_index);
+  std::optional<Column::ExpressionAttributes> expr_attr =
+      column->GetExpression();
+  GOOGLESQL_RET_CHECK(expr_attr.has_value());
+  const ResolvedExpr* resolved_expr = expr_attr->GetResolvedExpression();
+  GOOGLESQL_RET_CHECK(resolved_expr != nullptr);
+
+  ReferencedColumnFinder finder;
+  GOOGLESQL_RETURN_IF_ERROR(resolved_expr->Accept(&finder));
+  const auto& referenced_columns = finder.referenced_columns();
+  // Table column indices forming the fields of the captured struct for this
+  // measure. This includes both row identity columns (keys) and referenced
+  // columns.
+  std::vector<int> captured_indices;
+  // 0-based field positions within the captured struct (i.e. indices pointing
+  // into `captured_indices`) that represent primary keys, as required by
+  // `Value::TypedMeasure::Create`.
+  std::vector<int> key_indices;
+
+  // Indices of the columns that have been added to `captured_indices`.
+  absl::flat_hash_set<int> added_indices;
+
+  // 1. Add row identity columns.
+  for (const int id_col_idx : row_identity_columns) {
+    if (!added_indices.insert(id_col_idx).second) {
+      continue;
+    }
+    captured_indices.push_back(id_col_idx);
+    key_indices.push_back(static_cast<int>(captured_indices.size()) - 1);
+  }
+
+  // 2. Add the referenced columns.
+  for (const std::string& ref_col_name : referenced_columns) {
+    int ref_col_idx = FindColumnIndexByName(table, ref_col_name);
+    GOOGLESQL_RET_CHECK(ref_col_idx != -1);
+    GOOGLESQL_RET_CHECK(ref_col_idx < table.NumColumns());
+
+    if (added_indices.insert(ref_col_idx).second) {
+      captured_indices.push_back(ref_col_idx);
+    }
+  }
+
+  // 3. Create StructType for this measure's captured values.
+  std::vector<StructField> struct_fields;
+  struct_fields.reserve(captured_indices.size());
+  for (int idx : captured_indices) {
+    const Column* col = table.GetColumn(idx);
+    GOOGLESQL_RET_CHECK(col != nullptr);
+    struct_fields.push_back({col->Name(), col->GetType()});
+  }
+  const StructType* captured_struct_type = nullptr;
+  GOOGLESQL_RETURN_IF_ERROR(
+      type_factory.MakeStructType(struct_fields, &captured_struct_type));
+
+  return MeasureCaptureInfo{
+      .captured_indices = std::move(captured_indices),
+      .captured_struct_type = captured_struct_type,
+      .key_indices = std::move(key_indices),
+  };
+}
 }  // namespace
 
 absl::StatusOr<const ResolvedExpr*> AnalyzeMeasureExpressionInternal(
@@ -446,6 +571,34 @@ absl::StatusOr<Value> UpdateTableRowsWithMeasureValues(
   GOOGLESQL_RET_CHECK_OK(
       type_factory->MakeStructType(new_row_fields, &new_row_as_struct_type));
 
+  // Get the required dependencies to capture for each measure column.
+  std::vector<MeasureCaptureInfo> measure_capture_infos;
+  measure_capture_infos.reserve(num_new_columns - num_existing_fields);
+  for (int i = num_existing_fields; i < num_new_columns; ++i) {
+    const int measure_idx = i - num_existing_fields;
+    GOOGLESQL_RET_CHECK_LT(measure_idx, measure_column_defs.size());
+    const auto& measure_def = measure_column_defs[measure_idx];
+    const std::vector<int>& row_identity_columns =
+        measure_def.row_identity_column_indices.has_value()
+            ? *measure_def.row_identity_column_indices
+            : table_level_row_identity_columns;
+    GOOGLESQL_RET_CHECK(!row_identity_columns.empty())
+        << "row identity columns cannot be empty";
+
+    for (int id_col_idx : row_identity_columns) {
+      GOOGLESQL_RET_CHECK_LT(id_col_idx, num_existing_fields)
+          << "Row identity column index " << id_col_idx
+          << " must be a non-measure column (index < " << num_existing_fields
+          << ")";
+    }
+
+    GOOGLESQL_ASSIGN_OR_RETURN(
+        MeasureCaptureInfo info,
+        BuildMeasureCaptureInfo(*simple_table, i, row_identity_columns,
+                                *type_factory));
+    measure_capture_infos.push_back(std::move(info));
+  }
+
   std::vector<Value> new_rows_as_struct_values;
   new_rows_as_struct_values.reserve(array_value.elements().size());
 
@@ -460,20 +613,26 @@ absl::StatusOr<Value> UpdateTableRowsWithMeasureValues(
     // Add measure values.
     for (int i = num_existing_fields; i < new_row_fields.size(); ++i) {
       GOOGLESQL_RET_CHECK(new_row_fields[i].type->IsMeasureType());
-      GOOGLESQL_RET_CHECK_LT(i - num_existing_fields, measure_column_defs.size());
-      const auto& measure_def = measure_column_defs[i - num_existing_fields];
-      // If the measure definition does not specify any row identity columns,
-      // then use the table-level row identity columns.
-      const std::vector<int>& row_identity_columns =
-          measure_def.row_identity_column_indices.has_value()
-              ? *measure_def.row_identity_column_indices
-              : table_level_row_identity_columns;
-      GOOGLESQL_RET_CHECK(!row_identity_columns.empty())
-          << "row identity columns cannot be empty";
-      GOOGLESQL_ASSIGN_OR_RETURN(
-          Value measure_value,
-          InternalValue::MakeMeasure(new_row_fields[i].type->AsMeasure(), row,
-                                     row_identity_columns, language_options));
+      const int measure_idx = i - num_existing_fields;
+      const auto& capture_info = measure_capture_infos[measure_idx];
+
+      // Construct captured struct value.
+      std::vector<Value> captured_values;
+      captured_values.reserve(capture_info.captured_indices.size());
+      for (int idx : capture_info.captured_indices) {
+        GOOGLESQL_RET_CHECK_LT(idx, new_row_values.size());
+        captured_values.push_back(new_row_values[idx]);
+      }
+
+      GOOGLESQL_ASSIGN_OR_RETURN(Value captured_struct_val,
+                       Value::MakeStruct(capture_info.captured_struct_type,
+                                         std::move(captured_values)));
+
+      GOOGLESQL_ASSIGN_OR_RETURN(Value measure_value,
+                       InternalValue::MakeMeasure(
+                           new_row_fields[i].type->AsMeasure(),
+                           std::move(captured_struct_val),
+                           capture_info.key_indices, language_options));
       new_row_values.push_back(measure_value);
     }
 

@@ -19,6 +19,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <utility>
 #include <variant>
@@ -60,6 +61,11 @@ size_t DeclarativeTypeDescriptor::GetEstimatedOwnedMemoryBytesSize() const {
              data_->additional_required_language_features);
 }
 
+const std::optional<TypeParameterHandlers>&
+DeclarativeTypeDescriptor::type_parameter_handlers() const {
+  return data_->type_parameter_handlers;
+}
+
 DeclarativeType::DeclarativeType(const TypeFactoryBase& factory,
                                  DeclarativeTypeDescriptor data)
     : Type(factory, TYPE_DECLARATIVE), data_(std::move(data)) {
@@ -79,8 +85,6 @@ std::string DeclarativeType::TypeName(ProductMode mode) const {
   return data_.display_name();
 }
 
-// TODO: When we generalize the declarative type validation,
-// this method should validate the type and type modifiers.
 absl::StatusOr<std::string> DeclarativeType::TypeNameWithModifiers(
     const TypeModifiers& type_modifiers, ProductMode mode) const {
   if (type_modifiers.IsEmpty()) {
@@ -88,8 +92,35 @@ absl::StatusOr<std::string> DeclarativeType::TypeNameWithModifiers(
   }
   GOOGLESQL_RET_CHECK(type_modifiers.collation().Empty())
       << "Collation is not supported for declarative types";
+  GOOGLESQL_RETURN_IF_ERROR(
+      ValidateResolvedTypeParameters(type_modifiers.type_parameters(), mode));
   return absl::StrCat(data_.display_name(),
                       type_modifiers.type_parameters().ToParenthesizedString());
+}
+
+absl::StatusOr<TypeParameters>
+DeclarativeType::ValidateAndResolveTypeParameters(
+    const std::vector<TypeParameterValue>& type_parameter_values,
+    ProductMode mode) const {
+  const auto& handlers = descriptor().type_parameter_handlers();
+  if (handlers.has_value()) {
+    return handlers->resolve_callback()(type_parameter_values, mode);
+  }
+  // Delegate to the base implementation, which returns a "Not Supported" error.
+  return Type::ValidateAndResolveTypeParameters(type_parameter_values, mode);
+}
+
+absl::Status DeclarativeType::ValidateResolvedTypeParameters(
+    const TypeParameters& type_parameters, ProductMode mode) const {
+  if (type_parameters.IsEmpty()) {
+    return absl::OkStatus();
+  }
+  const auto& handlers = descriptor().type_parameter_handlers();
+  if (handlers.has_value()) {
+    return handlers->validate_callback()(type_parameters, mode);
+  }
+  // Delegate to the base implementation, which returns a "Not Supported" error.
+  return Type::ValidateResolvedTypeParameters(type_parameters, mode);
 }
 
 std::vector<const Type*> DeclarativeType::ComponentTypes() const { return {}; }
@@ -363,7 +394,8 @@ bool DeclarativeTypeDescriptor::IsIdenticalTo(
          AreSame(returning_strategy(), other.returning_strategy()) &&
          AreSame(equality_strategy(), other.equality_strategy()) &&
          additional_required_language_features() ==
-             other.additional_required_language_features();
+             other.additional_required_language_features() &&
+         data_->type_parameter_handlers == other.data_->type_parameter_handlers;
 }
 
 bool DeclarativeType::EqualsForSameKind(const Type* that,

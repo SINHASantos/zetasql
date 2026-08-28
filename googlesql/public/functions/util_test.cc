@@ -19,7 +19,6 @@
 #include "googlesql/base/testing/status_matchers.h"
 #include "gtest/gtest.h"
 #include "absl/status/status.h"
-#include "googlesql/base/status.h"
 
 namespace googlesql {
 namespace functions {

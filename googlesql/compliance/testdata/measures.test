@@ -109,7 +109,7 @@ ARRAY<STRUCT<INT64,
   2.2,
   3,
   275,
-  ARRAY<STRING>[unknown order:"Canada", "Mexico", "USA"],
+  ARRAY<STRING>[unknown order:"USA", "Canada", "Mexico"],
   ARRAY<STRING>[unknown order:
     "not_null",
     "not_null",
@@ -881,7 +881,7 @@ ARRAY<STRUCT<INT64, INT64, ARRAY<>, ARRAY<>>>[
   {
     2,
     3,
-    ARRAY<STRING>[unknown order:NULL, "not_null", "not_null", "not_null", NULL],
+    ARRAY<STRING>[unknown order:NULL, "not_null", NULL, "not_null", "not_null"],
     ARRAY<STRING>[unknown order:
       "not_null",
       NULL,
@@ -938,10 +938,10 @@ ARRAY<STRUCT<INT64, INT64, ARRAY<>, ARRAY<>, INT64, INT64, ARRAY<>, ARRAY<>>>[
     3,
     4,
     ARRAY<STRING>[unknown order:
+      "not_null",
+      "not_null",
+      "not_null",
       NULL,
-      "not_null",
-      "not_null",
-      "not_null",
       "not_null",
       NULL
     ],
@@ -984,11 +984,11 @@ ARRAY<STRUCT<
       >>
 [{4200,
   ARRAY<STRING>[unknown order:"Electronics", "Groceries"],
-  ARRAY<STRING>[unknown order:"South", "North"],
+  ARRAY<STRING>[unknown order:"North", "South"],
   ARRAY<STRING>[unknown order:
     "Electronics, North",
-    "Groceries, North",
-    "Electronics, South"
+    "Electronics, South",
+    "Groceries, North"
   ],
   57,
   ARRAY<STRING>[unknown order:"SAVE15", "SAVE10"],
@@ -1032,15 +1032,15 @@ ARRAY<STRUCT<
       >>
 [{4200,
   ARRAY<STRING>[unknown order:"Electronics", "Groceries"],
-  ARRAY<STRING>[unknown order:"South", "North"],
+  ARRAY<STRING>[unknown order:"North", "South"],
   ARRAY<STRING>[unknown order:
     "Electronics, North",
-    "Groceries, North",
-    "Electronics, South"
+    "Electronics, South",
+    "Groceries, North"
   ],
   57,
   ARRAY<STRING>[unknown order:"SAVE15", "SAVE10"],
-  ARRAY<STRING>[unknown order:"SAVE15", NULL, "SAVE10", NULL]}]
+  ARRAY<STRING>[unknown order:"SAVE15", NULL, NULL, "SAVE10"]}]
 ==
 
 [name=column_level_row_identity_columns_with_inner_joins]
@@ -1057,7 +1057,7 @@ INNER JOIN MeasureTable_Sales_Denormalized AS T2 USING (row_id)
 --
 ARRAY<STRUCT<INT64, ARRAY<>, ARRAY<>, ARRAY<>, INT64, ARRAY<>, ARRAY<>>>[
   {4200,
-   ARRAY<STRING>[unknown order:"Groceries", "Electronics"],
+   ARRAY<STRING>[unknown order:"Electronics", "Groceries"],
    ARRAY<STRING>[unknown order:"South", "North"],
    ARRAY<STRING>[unknown order:
      "Electronics, South",
@@ -1083,16 +1083,16 @@ FROM MeasureTable_Sales_Denormalized AS T1, MeasureTable_Sales_Denormalized AS T
 --
 ARRAY<STRUCT<INT64, ARRAY<>, ARRAY<>, ARRAY<>, INT64, ARRAY<>, ARRAY<>>>[
   {4200,
-   ARRAY<STRING>[unknown order:"Groceries", "Electronics"],
-   ARRAY<STRING>[unknown order:"South", "North"],
+   ARRAY<STRING>[unknown order:"Electronics", "Groceries"],
+   ARRAY<STRING>[unknown order:"North", "South"],
    ARRAY<STRING>[unknown order:
-     "Electronics, North",
      "Groceries, North",
+     "Electronics, North",
      "Electronics, South"
    ],
    57,
    ARRAY<STRING>[unknown order:"SAVE15", "SAVE10"],
-   ARRAY<STRING>[unknown order:"SAVE15", NULL, "SAVE10", NULL]}
+   ARRAY<STRING>[unknown order:"SAVE10", "SAVE15", NULL, NULL]}
 ]
 ==
 
@@ -1150,11 +1150,11 @@ ARRAY<STRUCT<
     "Electronics",
     3700,
     ARRAY<STRING>["Electronics"],
-    ARRAY<STRING>[unknown order:"South", "North"],
-    ARRAY<STRING>[unknown order:"Electronics, South", "Electronics, North"],
+    ARRAY<STRING>[unknown order:"North", "South"],
+    ARRAY<STRING>[unknown order:"Electronics, North", "Electronics, South"],
     37,
     ARRAY<STRING>["SAVE15"],
-    ARRAY<STRING>[unknown order:NULL, "SAVE15", NULL]
+    ARRAY<STRING>[unknown order:"SAVE15", NULL, NULL]
   },
   {
     "Groceries",
@@ -1276,8 +1276,8 @@ ARRAY<STRUCT<
     1,
     3700,
     ARRAY<STRING>["Electronics"],
-    ARRAY<STRING>[unknown order:"South", "North"],
-    ARRAY<STRING>[unknown order:"Electronics, South", "Electronics, North"],
+    ARRAY<STRING>[unknown order:"North", "South"],
+    ARRAY<STRING>[unknown order:"Electronics, North", "Electronics, South"],
     37,
     ARRAY<STRING>["SAVE15"],
     ARRAY<STRING>[unknown order:NULL, "SAVE15", NULL]
@@ -1404,7 +1404,7 @@ ARRAY<STRUCT<
 [{
    ARRAY<STRING>["North"],
    ARRAY<STRING>[unknown order:"South", "North"],
-   ARRAY<STRING>[unknown order:NULL, "SAVE10"],
+   ARRAY<STRING>[unknown order:"SAVE10", NULL],
    ARRAY<STRING>[unknown order:NULL, "SAVE15", "SAVE10", NULL],
    ARRAY<STRING>[unknown order:"SAVE10", NULL, NULL, NULL],
    ARRAY<STRING>[unknown order:"SAVE10", NULL, NULL, "SAVE15"]
@@ -1436,8 +1436,8 @@ ARRAY<STRUCT<ARRAY<>, ARRAY<>, ARRAY<>, ARRAY<>, ARRAY<>, ARRAY<>>>[
     ARRAY<STRING>["North"],
     ARRAY<STRING>[unknown order:NULL, "SAVE10"],
     ARRAY<STRING>[unknown order:"SAVE10", NULL, NULL],
-    ARRAY<STRING>[unknown order:"South", "North"],
-    ARRAY<STRING>[unknown order:NULL, "SAVE10"],
+    ARRAY<STRING>[unknown order:"North", "South"],
+    ARRAY<STRING>[unknown order:"SAVE10", NULL],
     ARRAY<STRING>[unknown order:"SAVE10", NULL, NULL]
   }
 ]

@@ -16,6 +16,7 @@
 
 #include "googlesql/analyzer/rewriters/row_type_rewriter.h"
 
+#include <cstddef>
 #include <functional>
 #include <memory>
 #include <optional>
@@ -24,6 +25,7 @@
 #include <utility>
 #include <vector>
 
+#include "googlesql/analyzer/annotation_propagator.h"
 #include "googlesql/public/analyzer_options.h"
 #include "googlesql/public/catalog.h"
 #include "googlesql/public/function_signature.h"
@@ -59,17 +61,18 @@
 #include "googlesql/base/ret_check.h"
 
 // This is the rewriter for RowOrTableTypes, which includes RowType and
-// TableRefType.  See (broken link).
+// TableRefType. See (broken link).
 //
 // RowOrTableTypes are used in initial analysis as non-concrete types which are
-// never stored or returned.  A RowType (ROW<T>) is a reference to a row of
-// table T, and a TableRefType (TABLE<ROW<T>> or TABLE UNIQUE<ROW<T>>) is
-// a virtual table that can produce rows of table T, originating as a join
-// column on a table.
+// never stored or returned. A RowType (ROW<T>) is a reference to a row of table
+// T, and a TableRefType (TABLE<ROW<T>> or TABLE UNIQUE<ROW<T>>) is a virtual
+// table that can produce rows of table T, originating as a join column on a
+// table.
 //
 // The rewriter replaces the RowOrTableTypes with concrete types (usually
 // STRUCTs) encapsulating the information needed to produce the columns needed
-// when accessing the RowOrTableType.
+// when accessing the RowOrTableType. For example, if columns x, y, and z are
+// read from ROW<T>, then it will be replaced with STRUCT<x, y, z>.
 //
 // There are several cases:
 // 1. RowType representing a row produced by a table scan.
@@ -77,13 +80,13 @@
 // 3. TableRefType with UNIQUE (IsSingleRowTable()==true).
 //    These represent an N:1 join column producing at most one row.
 // 4. TableRefType without UNIQUE. (IsMultiRowTable()==true)
-//    These represent a 1:N join column that could produce multiple rows.
+//    These represent a N:N join column that could produce multiple rows.
 //
 // Case 1, 2, and 3 support ResolvedGetRowField expressions that extract a
 // column from the row.
 //
 // Case 3 and 4 support ResolvedArrayScans that return rows produced by the join
-// (at most one row for case 3).  The output is a ROW<T> type, i.e. it looks
+// (at most one row for case 3). The output is a ROW<T> type, i.e. it looks
 // like a ROW<T> produced from a table scan. The ArrayScan here acts like a
 // join, and will be rewritten as an actual join.
 //
@@ -106,21 +109,22 @@
 // For ResolvedTVFScan:
 // The TVFScan column_list and result schema are update to replace ROW types
 // with a corresponding STRUCT, containing all required columns read from the
-// ROW type.
+// ROW type. The result schema is updated via a callback provided by the TVF for
+// this purpose.
 //
 // For ResolvedGetRowField:
-// ResolvedGetRowField expressions on ROW<T> values can then be replaced with
+// ResolvedGetRowField expressions on ROW<T> values can be replaced with
 // ResolvedGetStructField expressions extracting the column bound into the
-// STRUCT.
+// replacement STRUCT.
 //
 // Rewrite strategy for TableRefTypes
 // ----------------------------------
 // TableRefTypes are used for join columns (on table T1), which represent rows
-// that can be fetched from another table T2 using a join.  This basically looks
+// that can be fetched from another table T2 using a join. This basically looks
 // like traversing a foreign key join, which could produce 0, 1, or multiple
-// rows.  (Cases known to produce at most 1 row have UNIQUE.)
+// rows. (Cases known to produce at most 1 row have UNIQUE.)
 //
-// The initial table scan of T1 doesn't read table T2.  The join column
+// The initial table scan of T1 doesn't read table T2. The join column
 // represents a join that could be run later, if needed.
 //
 // This works by having the initial TableScan of T1, when reading the join
@@ -132,7 +136,7 @@
 // and then make the needed STRUCTs with a ProjectScan.
 //
 // ResolvedArrayScans of TableRefTypes iterate over the joined rows, producing
-// ROW<T2> rows as output.  These ResolvedArrays are rewritten as
+// ROW<T2> rows as output. These ResolvedArrays are rewritten as
 // ResolvedJoinScans, joining a ResolvedTableScan of T2 with a
 // ResolvedProjectScan producing STRUCTs binding in all required columns (as
 // described in the RowType rewrite above).
@@ -140,7 +144,7 @@
 // TABLE types with UNIQUE also support ResolvedGetRowField expressions
 // that read a column of the row.  These are rewritten as expression subqueries
 // that fetch the row (found using the keys bound in the STRUCT) and return
-// the requested column.  (If no row is found, the subquery returns NULL.)
+// the requested column. (If no row is found, the subquery returns NULL.)
 //
 // TODO: This could potentially be optimized to fetch multiple
 // columns earlier with a single subquery, rather than using a separate
@@ -149,18 +153,19 @@
 // STRUCT optimization
 // -------------------
 // The rewrites described above always make STRUCTs binding in the list of
-// required columns.  In many cases, those STRUCTs would just have a single
-// column.  In those cases, we omit the STRUCT and just pass around that
+// required columns. In many cases, those STRUCTs would just have a single
+// column. In those cases, we omit the STRUCT and just pass around that
 // single value.  MakeStruct and GetStructField expressions are omitted,
 // and the bound columns can be read directly with a ColumnRef.
 //
-// TODO This optimization is turned off right now, because that
-// makes the test output more consistent and understandable.
+// TODO: This optimization is turned off, because that makes the test output
+// more consistent and understandable. Not all code in this rewriter is tested
+// with this optimization, so care is required to enable it.
 //
 // How it the implementation works
 // -------------------------------
 // The `State` class holds state across rewrite passes. It's mostly a map
-// holding a RewriteTypeState for each type being rewritten.  RewriteTypeState
+// holding a RewriteTypeState for each type being rewritten. RewriteTypeState
 // tracks how the type gets used (e.g. what columns are accessed under it),
 // and holds its replacement Type, once computed.
 //
@@ -192,7 +197,7 @@
 //    - Update FunctionSignatures containing RowTypes to use their replacement
 //      types.
 //
-// The rewrites are all done locally and independently.  Intermediate resolved
+// The rewrites are all done locally and independently. Intermediate resolved
 // ASTs may be invalid, but after all rewrites are done, input and output
 // ResolvedColumns and Types line up for all nodes and the Resolved AST is
 // valid.
@@ -201,8 +206,14 @@
 // create new ResolvedColumns (derived from old columns with RowTypes),
 // including in columns produced by CTEs.
 
-// TODO Remove all the ABSL_LOG statements or make them VLOGs.
-// They are useful while this is in development.
+// TODO: Issues to fix before removing in_devlopment for RowType:
+//   - Remove all ABSL_LOG statements or make them VLOGs. They are useful while this
+//     is in development.
+
+// TODO: TableRefType support is incomplete, even after this
+// rewriter has in_development=true removed. Known issues:
+//   - Support+test or block TableRefType with nested RowType.
+//   - Support+test annotations (e.g. collation) in TableRefType code paths.
 
 namespace googlesql {
 namespace {
@@ -226,16 +237,29 @@ std::string DebugStringColumnNames(const std::vector<const Column*>& columns) {
   return result;
 }
 
+bool HasRewriteType(const FunctionArgumentType& arg_type) {
+  return arg_type.type() != nullptr && arg_type.type()->IsRowOrTable();
+}
+
 // State collected for a RowOrTableType being written.
 // This holds the replacement_type (after State::MakeReplacementTypes).
 // This tracks the Columns referenced through this RowOrTableType.
 class RewriteTypeState {
  public:
+  explicit RewriteTypeState(AnnotationPropagator& annotation_propagator)
+      : annotation_propagator_(annotation_propagator) {};
   // Get the Type this RowOrTableType is rewritten to.
   const Type* replacement_type() const {
     ABSL_DCHECK(replacement_type_ != nullptr)
         << "Called replacement_type() before MakeReplacementTypes";
     return replacement_type_;
+  }
+  // Get the AnnotationMap for the type this RowOrTableType is rewritten to.
+  const AnnotationMap* replacement_type_annotation_map() const {
+    ABSL_DCHECK(replacement_type_ != nullptr)
+        << "Called replacement_type_annotation_map() before "
+           "MakeReplacementTypes";
+    return replacement_type_annotation_map_;
   }
 
   // Return true if this RowOrTableType is rewritten to a STRUCT.
@@ -276,7 +300,11 @@ class RewriteTypeState {
     if (made_struct_) {
       GOOGLESQL_RET_CHECK(replacement_type_->IsStruct());
       GOOGLESQL_RET_CHECK_EQ(replacement_type_->AsStruct()->num_fields(), fields.size());
-      return MakeResolvedMakeStruct(replacement_type_, std::move(fields));
+      std::unique_ptr<ResolvedMakeStruct> make_struct_expr =
+          MakeResolvedMakeStruct(replacement_type_, std::move(fields));
+      GOOGLESQL_RETURN_IF_ERROR(annotation_propagator_.CheckAndPropagateAnnotations(
+          /*error_node=*/nullptr, make_struct_expr.get()));
+      return make_struct_expr;
     } else {
       GOOGLESQL_RET_CHECK_EQ(fields.size(), 1);
       return std::move(fields[0]);
@@ -333,11 +361,15 @@ class RewriteTypeState {
   // If only one field is needed, we can bypass making a STRUCT and just use
   // that field's type directly.  `made_struct_` will be false in this case.
   const Type* replacement_type_ = nullptr;
+  // Annotation map for the replacement type.
+  const AnnotationMap* replacement_type_annotation_map_ = nullptr;
 
   bool made_struct_ = false;
   // When `made_struct_` is false, this records the name that would have been
   // used as the struct field name (from the column that would have been bound).
   std::string struct_field_name_;
+
+  AnnotationPropagator& annotation_propagator_;
 
   friend class State;
 };
@@ -345,8 +377,10 @@ class RewriteTypeState {
 // State carried across phases of the rewriter.
 class State {
  public:
-  explicit State(ColumnFactory& column_factory)
-      : column_factory_(column_factory) {}
+  explicit State(ColumnFactory& column_factory,
+                 AnnotationPropagator& annotation_propagator)
+      : column_factory_(column_factory),
+        annotation_propagator_(annotation_propagator) {}
 
   // Get the RewriteTypeState for a RowOrTableType.  It must exist already.
   // The returned pointers are always non-null.
@@ -484,7 +518,8 @@ class State {
     }
   }
   // Make the replacement_type_ for each rewrite_type found in the first pass.
-  absl::Status MakeReplacementTypes(TypeFactory& type_factory) {
+  absl::Status MakeReplacementTypes(TypeFactory& type_factory,
+                                    bool tableref_enabled) {
     GOOGLESQL_RET_CHECK_EQ(rewrite_types_.size(), rewrite_type_state_map_.size());
 
     // The first pass handles the TableRefTypes.  The second pass for RowTypes
@@ -494,6 +529,7 @@ class State {
       if (!rewrite_type->IsTable()) {
         continue;
       }
+      GOOGLESQL_RET_CHECK(tableref_enabled);
       const TableRefType* table_type = rewrite_type->AsTableRefType();
 
       GOOGLESQL_ASSIGN_OR_RETURN(RewriteTypeState * rewrite_type_state,
@@ -513,7 +549,7 @@ class State {
       }
       GOOGLESQL_RET_CHECK(!struct_fields.empty());
 
-      // TODO Enable skipping STRUCT types when not needed.
+      // TODO: Enable skipping STRUCT types when not needed.
       if (/* DISABLES CODE */ (true) || struct_fields.size() != 1) {
         GOOGLESQL_RETURN_IF_ERROR(type_factory.MakeStructType(
             struct_fields, &rewrite_type_state->replacement_type_));
@@ -568,9 +604,13 @@ class State {
   }
 
   ColumnFactory& column_factory() { return column_factory_; }
+  AnnotationPropagator& annotation_propagator() {
+    return annotation_propagator_;
+  }
 
  private:
   ColumnFactory& column_factory_;
+  AnnotationPropagator& annotation_propagator_;
 
   // List types found that will be rewritten.  This gives a deterministic order,
   // which we don't get from keys of the map.
@@ -598,7 +638,7 @@ class State {
         rewrite_type_state_map_[rewrite_type];
     if (ptr == nullptr) {
       rewrite_types_.push_back(rewrite_type);
-      ptr = std::make_unique<RewriteTypeState>();
+      ptr = std::make_unique<RewriteTypeState>(annotation_propagator_);
       ptr->type_ = rewrite_type;
     }
     return *ptr;
@@ -617,7 +657,7 @@ class State {
     GOOGLESQL_RET_CHECK(replacement_type_ != nullptr);
 
     std::string field_suffix;
-    /* TODO Enable non-STRUCT simplification, and handle naming.
+    /* TODO: Enable non-STRUCT simplification, and handle naming.
     if (!rewrite_type_state->made_struct()) {
       GOOGLESQL_RET_CHECK(!rewrite_type_state->struct_field_name_.empty());
       field_suffix = absl::StrCat("$", rewrite_type_state->struct_field_name_);
@@ -631,13 +671,12 @@ class State {
           rewrite_type->IsMultiRowTable() ? "$join_multirow" : "$join_row";
     }
 
-    // Preserve annotations from the original column.
-    // TODO Figure out how to validate behavior with annotations.
     ResolvedColumn new_column = column_factory_.MakeCol(
         orig_column.table_name(),
         absl::StrCat(orig_column.name().starts_with('$') ? "" : "$",
                      orig_column.name(), field_suffix),
-        AnnotatedType(replacement_type_, orig_column.type_annotation_map()));
+        AnnotatedType(replacement_type_,
+                      rewrite_type_state->replacement_type_annotation_map_));
 
     ABSL_LOG(INFO) << "Made replacement column: " << ColDebugString(orig_column)
               << " -> " << ColDebugString(new_column);
@@ -753,8 +792,14 @@ class State {
       GOOGLESQL_RETURN_IF_ERROR(MakeRowTypeReplacementTypes(*child, type_factory));
     }
 
+    size_t num_fields =
+        node.non_row_field_accesses.size() + node.children.size();
     std::vector<StructType::StructField> struct_fields;
+    struct_fields.reserve(num_fields);
     std::vector<const Column*> ordered_columns;
+    ordered_columns.reserve(num_fields);
+    std::vector<const AnnotationMap*> annotation_maps;
+    annotation_maps.reserve(num_fields);
 
     // Add all non-RowType children to the computed Struct type.
     for (const Column* col : node.non_row_field_accesses) {
@@ -768,6 +813,7 @@ class State {
       }
       struct_fields.push_back(StructType::StructField(col->Name(), type));
       ordered_columns.push_back(col);
+      annotation_maps.push_back(col->GetTypeAnnotationMap());
     }
 
     // Add all RowType children to the computed STRUCT type.
@@ -782,16 +828,40 @@ class State {
       struct_fields.push_back(
           StructType::StructField(column->Name(), child_replacement_type));
       ordered_columns.push_back(column);
+      annotation_maps.push_back(
+          rewrite_type_state->replacement_type_annotation_map_);
     }
 
     // Make the replacement Struct type.
     const StructType* struct_type = nullptr;
     GOOGLESQL_RETURN_IF_ERROR(type_factory.MakeStructType(struct_fields, &struct_type));
+
+    // Build the Struct AnnotationMap from the child fields annotations.
+    std::unique_ptr<AnnotationMap> annotation_map =
+        AnnotationMap::Create(struct_type);
+    StructAnnotationMap* struct_annotation_map = annotation_map->AsStructMap();
+    GOOGLESQL_RET_CHECK(struct_annotation_map != nullptr);
+    bool has_any_annotations = false;
+    for (int i = 0; i < annotation_maps.size(); ++i) {
+      if (!AnnotationMap::IsNullOrEmpty(annotation_maps[i])) {
+        has_any_annotations = true;
+        GOOGLESQL_RETURN_IF_ERROR(
+            struct_annotation_map->CloneIntoField(i, annotation_maps[i]));
+      }
+    }
+    // Only set the annotation map on the Struct if any field had annotations.
+    const AnnotationMap* annotation_map_ptr = nullptr;
+    if (has_any_annotations) {
+      GOOGLESQL_ASSIGN_OR_RETURN(annotation_map_ptr,
+                       type_factory.TakeOwnership(std::move(annotation_map)));
+    }
+
     // Set the replacement Struct info on all merged RowTypes.
     for (const RowType* row_type : node.row_types) {
       GOOGLESQL_ASSIGN_OR_RETURN(RewriteTypeState * rewrite_type_state,
                        GetMutableRewriteTypeState(row_type));
       rewrite_type_state->replacement_type_ = struct_type;
+      rewrite_type_state->replacement_type_annotation_map_ = annotation_map_ptr;
       rewrite_type_state->made_struct_ = true;
       for (const Column* read_col : ordered_columns) {
         // Record the Columns and their index in the rewrite Struct.
@@ -807,7 +877,8 @@ class State {
 // Columns read from each RowOrTableType with ResolvedGetRowField.
 class RowTypeCollectorVisitor : public ResolvedASTVisitor {
  public:
-  explicit RowTypeCollectorVisitor(State& state) : state_(state) {}
+  explicit RowTypeCollectorVisitor(State& state, bool tableref_enabled)
+      : state_(state), tableref_enabled_(tableref_enabled) {}
 
   // Find all RowOrTableTypes created by ResolvedTableScan and register them.
   // They can be created for the table with `read_as_row_type` or for
@@ -816,17 +887,15 @@ class RowTypeCollectorVisitor : public ResolvedASTVisitor {
     ABSL_LOG(INFO) << "VisitResolvedTableScan";
 
     for (const ResolvedColumn& column : node->column_list()) {
-      if (!column.type()->IsRowOrTable()) continue;
-      const RowOrTableType* rewrite_type = column.type()->AsRowOrTable();
-      state_.RegisterRewriteType(rewrite_type, /*is_root=*/true);
-
-      // Check assumptions about RowOrTableTypes in ResolvedTableScans.
-      if (node->read_as_row_type()) {
+      if (column.type()->IsRow()) {
         GOOGLESQL_RET_CHECK_EQ(node->column_list_size(), 1);
-        GOOGLESQL_RET_CHECK(!rewrite_type->IsTable());
-        GOOGLESQL_RET_CHECK(rewrite_type->IsRow());
-      } else {
-        GOOGLESQL_RET_CHECK(rewrite_type->IsTable());
+        GOOGLESQL_RET_CHECK(node->read_as_row_type());
+        const RowType* rewrite_type = column.type()->AsRowType();
+        state_.RegisterRewriteType(rewrite_type, /*is_root=*/true);
+      } else if (column.type()->IsTable()) {
+        GOOGLESQL_RET_CHECK(tableref_enabled_);
+        const TableRefType* rewrite_type = column.type()->AsTableRefType();
+        state_.RegisterRewriteType(rewrite_type, /*is_root=*/true);
       }
     }
     return absl::OkStatus();
@@ -836,9 +905,12 @@ class RowTypeCollectorVisitor : public ResolvedASTVisitor {
     ABSL_LOG(INFO) << "VisitResolvedTvfScan";
 
     for (const ResolvedColumn& column : node->column_list()) {
-      if (!column.type()->IsRowOrTable()) continue;
-      const RowOrTableType* rewrite_type = column.type()->AsRowOrTable();
-      state_.RegisterRewriteType(rewrite_type, /*is_root=*/true);
+      if (column.type()->IsRow()) {
+        const RowType* rewrite_type = column.type()->AsRowType();
+        state_.RegisterRewriteType(rewrite_type, /*is_root=*/true);
+      } else if (column.type()->IsTable()) {
+        GOOGLESQL_RET_CHECK_FAIL() << "TVF returning a TableRef Type is not supported";
+      }
     }
     return absl::OkStatus();
   }
@@ -851,6 +923,7 @@ class RowTypeCollectorVisitor : public ResolvedASTVisitor {
         !node->array_expr_list()[0]->type()->IsTable()) {
       return ResolvedASTVisitor::VisitResolvedArrayScan(node);
     }
+    GOOGLESQL_RET_CHECK(tableref_enabled_);
 
     GOOGLESQL_RET_CHECK(node->element_column_list_size() == 1);
     const ResolvedColumn& column = node->element_column_list()[0];
@@ -873,8 +946,10 @@ class RowTypeCollectorVisitor : public ResolvedASTVisitor {
 
     const RowOrTableType* parent_type = node->expr()->type()->AsRowOrTable();
     GOOGLESQL_RET_CHECK(parent_type != nullptr);
+    GOOGLESQL_RET_CHECK(tableref_enabled_ || !parent_type->IsTable());
     const Type* child_type = node->type();
     GOOGLESQL_RET_CHECK(child_type != nullptr);
+    GOOGLESQL_RET_CHECK(tableref_enabled_ || !child_type->IsTable());
     const Column* column = node->column();
     GOOGLESQL_RET_CHECK(column != nullptr);
 
@@ -886,6 +961,9 @@ class RowTypeCollectorVisitor : public ResolvedASTVisitor {
 
  private:
   State& state_;
+
+  // Whether TableRef Type is enabled.
+  bool tableref_enabled_;
 };
 
 // This helper class stores a set of unique Columns to read from `table`, with a
@@ -955,6 +1033,7 @@ class ReadColumnsSet {
       ABSL_LOG(INFO) << "Added column in ReadStructWithColumns: "
                 << ColDebugString(resolved_column);
 
+      // This MakeResolvedColumnRef builder propagates annotations.
       struct_field_exprs.push_back(
           MakeResolvedColumnRef(resolved_column, /*is_correlated=*/false));
     }
@@ -983,17 +1062,19 @@ class ReadColumnsSet {
 // This includes:
 // * Replace ResolvedTableScans, returning replacement STRUCTs.
 // * Replace ResolvedGetRowField with one of:
-//   - a ResolvedGetStructField, to get a field out of a replacement STRUCT.
-//   - a ResolvedColumnRef, if the replacement was a single non-STRUCT value.
-//   - a subquery, if this requires expanding a TABLE to multiple ROWs.
+//   - A ResolvedGetStructField, to get a field out of a replacement STRUCT.
+//   - A ResolvedColumnRef, if the replacement was a single non-STRUCT value.
+//   - A subquery, if this requires expanding a TABLE to multiple ROWs.
 // * Replace ResolvedArrayScan of a TableRefType with a subquery fetching
 //   rows of the joined table.
 class RowTypeRewriterVisitor : public ResolvedASTRewriteVisitor {
  public:
   explicit RowTypeRewriterVisitor(State& state,
                                   FunctionCallBuilder& function_call_builder,
-                                  TypeFactory& type_factory)
+                                  TypeFactory& type_factory,
+                                  bool tableref_enabled)
       : state_(state),
+        tableref_enabled_(tableref_enabled),
         function_call_builder_(function_call_builder),
         type_factory_(type_factory) {}
 
@@ -1015,7 +1096,9 @@ class RowTypeRewriterVisitor : public ResolvedASTRewriteVisitor {
 
   absl::Status PreVisitResolvedArrayScan(
       const ResolvedArrayScan& node) override {
-    // ArrayScans for TableRefType must have exactly 1 expr.
+    // ArrayScans for TableRefType must have exactly 1 expr. We also track
+    // non-TableRefType exprs here, so that PostVisitResolvedArrayScan can get
+    // the pre-rewrite type and directly check if it's a TableRefType.
     if (node.array_expr_list_size() == 1) {
       arrayscan_original_type_stack_.push(node.array_expr_list()[0]->type());
     }
@@ -1062,6 +1145,9 @@ class RowTypeRewriterVisitor : public ResolvedASTRewriteVisitor {
 
   State& state_;
 
+  // Whether TableRef Type is enabled.
+  bool tableref_enabled_;
+
   FunctionCallBuilder& function_call_builder_;
 
   TypeFactory& type_factory_;
@@ -1093,11 +1179,11 @@ RowTypeRewriterVisitor::PostVisitResolvedTableScan(
   const Table* table = node->table();
   const std::vector<ResolvedColumn>& orig_resolved_columns =
       node->column_list();
-  std::vector<const Column*> orig_table_columns = node->table_column_list();
-  if (orig_table_columns.empty()) {
-    for (int column_idx : node->column_index_list()) {
-      orig_table_columns.push_back(table->GetColumn(column_idx));
-    }
+  GOOGLESQL_RET_CHECK(node->table_column_list_size() == 0);
+  std::vector<const Column*> orig_table_columns;
+  orig_table_columns.reserve(node->column_index_list_size());
+  for (int column_idx : node->column_index_list()) {
+    orig_table_columns.push_back(table->GetColumn(column_idx));
   }
 
   if (node->read_as_row_type()) {
@@ -1120,11 +1206,12 @@ RowTypeRewriterVisitor::PostVisitResolvedTVFScan(
     std::unique_ptr<const ResolvedTVFScan> node) {
   bool need_rewrite = false;
   // Unreferenced columns may be pruned from the column list, so look at the
-  // result schema to see if any ROW types need to be rewritten.
+  // result schema to see if any RowTypes need to be rewritten.
   for (const TVFSchemaColumn& column :
        node->signature()->result_schema().columns()) {
-    GOOGLESQL_RET_CHECK(!column.type->IsTable()) << "Row type rewriter does not support "
-                                          "TABLE type in TVFScan result schema";
+    GOOGLESQL_RET_CHECK(!column.type->IsTable())
+        << "RowType rewriter does not support TableRefType in TVFScan result "
+           "schema";
     if (column.type->IsRow()) {
       need_rewrite = true;
     }
@@ -1215,6 +1302,7 @@ RowTypeRewriterVisitor::PostVisitResolvedGetRowField(
   ABSL_LOG(INFO) << "PostVisitResolvedGetRowField:\n"
             << get_row_field->DebugString();
 
+  // Get the parent type before it was rewritten.
   GOOGLESQL_RET_CHECK(!getrowfield_original_type_stack_.empty());
   const RowOrTableType* rewrite_type = getrowfield_original_type_stack_.top();
   getrowfield_original_type_stack_.pop();
@@ -1245,7 +1333,7 @@ RowTypeRewriterVisitor::PostVisitResolvedGetRowField(
       GOOGLESQL_ASSIGN_OR_RETURN(const ResolvedColumn replacement_column,
                        state_.FindOrAddReplacementColumn(orig_column));
 
-      // TODO: Keep annotations, here and below?
+      // This MakeResolvedColumnRef builder propagates annotations.
       expr = MakeResolvedColumnRef(replacement_column,
                                    orig_column_ref->is_correlated());
     }
@@ -1257,11 +1345,17 @@ RowTypeRewriterVisitor::PostVisitResolvedGetRowField(
       GOOGLESQL_RET_CHECK(rewrite_type_state->replacement_type_->IsStruct());
       const StructType* struct_type =
           rewrite_type_state->replacement_type_->AsStruct();
-      expr = MakeResolvedGetStructField(struct_type->field(field_idx).type,
-                                        std::move(expr), field_idx);
+
+      std::unique_ptr<ResolvedExpr> new_expr = MakeResolvedGetStructField(
+          struct_type->field(field_idx).type, std::move(expr), field_idx);
+      GOOGLESQL_RETURN_IF_ERROR(
+          state_.annotation_propagator().CheckAndPropagateAnnotations(
+              /*error_node=*/nullptr, new_expr.get()));
+      expr = std::move(new_expr);
     }
     return expr;
-  } else {
+  } else if (rewrite_type->IsTable()) {
+    GOOGLESQL_RET_CHECK(tableref_enabled_);
     // This is GetField on a single-row TABLE type.
     GOOGLESQL_RET_CHECK(rewrite_type->IsSingleRowTable());
     const TableRefType* table_type = rewrite_type->AsTableRefType();
@@ -1375,6 +1469,8 @@ RowTypeRewriterVisitor::PostVisitResolvedGetRowField(
               << new_expr->DebugString();
     return std::move(new_expr);
   }
+  GOOGLESQL_RET_CHECK_FAIL() << "Unexpected type in ResolvedGetRowField: "
+                   << rewrite_type->DebugString();
 }
 
 absl::StatusOr<std::unique_ptr<const ResolvedNode>>
@@ -1393,6 +1489,7 @@ RowTypeRewriterVisitor::PostVisitResolvedArrayScan(
   if (!original_type->IsTable()) {
     return std::move(array_scan);
   }
+  GOOGLESQL_RET_CHECK(tableref_enabled_);
 
   ABSL_LOG(INFO) << "Rewriting ArrayScan:\n" << array_scan->DebugString();
 
@@ -1559,25 +1656,29 @@ RowTypeRewriterVisitor::MakeRewrittenTableScan(
   // needed as inputs to `project_exprs`.  (Some could be both.)
   ReadColumnsSet read_columns_set(state_, table);
 
-  // Collect the non-ROW columns we're reading first.
+  // Collect the non-RowOrTableType columns we're reading first.
   // Reuse the ResolvedColumns that already existed in the original TableScan.
   for (int idx = 0; idx < orig_resolved_columns.size(); ++idx) {
     const ResolvedColumn& col = orig_resolved_columns[idx];
-
-    if (!col.type()->IsRowOrTable()) {
-      const Column* column = orig_table_columns[idx];
-      GOOGLESQL_RET_CHECK(column != nullptr);
-
-      GOOGLESQL_RETURN_IF_ERROR(read_columns_set.AddMappedColumn(column, col));
-      final_output_column_list.push_back(col);
+    if (col.type()->IsRowOrTable()) {
+      continue;
     }
+
+    const Column* column = orig_table_columns[idx];
+    GOOGLESQL_RET_CHECK(column != nullptr);
+
+    GOOGLESQL_RETURN_IF_ERROR(read_columns_set.AddMappedColumn(column, col));
+    final_output_column_list.push_back(col);
   }
 
   // Now handle all the RowOrTableType output columns, and figure out the
   // STRUCTs we need to add in a ProjectScan, and any extra columns we need to
   // read in the `read_columns_set`.
   for (const ResolvedColumn& col : orig_resolved_columns) {
-    if (!col.type()->IsRowOrTable()) continue;
+    if (!col.type()->IsRowOrTable()) {
+      continue;
+    }
+    GOOGLESQL_RET_CHECK(tableref_enabled_ || !col.type()->IsTable());
     ABSL_LOG(INFO) << "Rewriting TableScan column " << ColDebugString(col);
 
     const RowOrTableType* rewrite_type = col.type()->AsRowOrTable();
@@ -1593,8 +1694,11 @@ RowTypeRewriterVisitor::MakeRewrittenTableScan(
         MakeRewriteExprForColumn(rewrite_type,
                                  /*is_inner=*/false, read_columns_set));
 
-    project_exprs.push_back(
-        MakeResolvedComputedColumn(replacement_column, std::move(expr)));
+    std::unique_ptr<ResolvedComputedColumn> computed_col =
+        MakeResolvedComputedColumn(replacement_column, std::move(expr));
+    GOOGLESQL_RETURN_IF_ERROR(state_.annotation_propagator().CheckAndPropagateAnnotations(
+        /*error_node=*/nullptr, computed_col.get()));
+    project_exprs.push_back(std::move(computed_col));
   }
 
   GOOGLESQL_RET_CHECK_EQ(read_columns_set.resolved_columns().size(),
@@ -1606,8 +1710,8 @@ RowTypeRewriterVisitor::MakeRewrittenTableScan(
   builder.set_alias(alias);
   builder.set_column_list(read_columns_set.resolved_columns());
   builder.set_table_column_list(read_columns_set.table_columns());
-  GOOGLESQL_ASSIGN_OR_RETURN(std::unique_ptr<const ResolvedScan> new_scan,
-                   std::move(builder).Build());
+  GOOGLESQL_ASSIGN_OR_RETURN(std::unique_ptr<ResolvedScan> new_scan,
+                   std::move(builder).BuildMutable());
 
   // Then we add a ResolvedProjectScan if necessary.
   if (!project_exprs.empty()) {
@@ -1630,7 +1734,7 @@ RowTypeRewriterVisitor::MakeRewriteExprForColumn(
   // Compute the set of Columns we need to collect and bind in for this
   // RowOrTableType.
   std::vector<const Column*> bound_source_columns;
-  if (!rewrite_type->IsTable()) {
+  if (rewrite_type->IsRow()) {
     bound_source_columns = rewrite_type_state->GetReferencedTableColumns();
   } else {
     bound_source_columns =
@@ -1661,7 +1765,7 @@ RowTypeRewriterVisitor::MakeRewriteExprForColumn(
       GOOGLESQL_ASSIGN_OR_RETURN(ResolvedColumn scan_col,
                        read_columns_set.GetResolvedColumn(table_column));
 
-      // TODO: Handle annotations?
+      // This MakeResolvedColumnRef builder propagates annotations.
       make_struct_args.push_back(
           MakeResolvedColumnRef(scan_col, /*is_correlated=*/false));
     }
@@ -1681,7 +1785,7 @@ RowTypeRewriterVisitor::MakeRewriteExprForColumn(
 // * Replace any ResolvedColumn with RowOrTableType with a replacement column.
 //   - Create the replacement column when we see each column for the first time.
 //   - This doesn't distinguish ResolvedColumn creation from ResolvedColumn
-//     references.  It doesn't matter which is seen first.
+//     references. It doesn't matter which is seen first.
 //
 // * Replace any Type field (with type RowOrTableType) with the replacement
 // type.
@@ -1698,38 +1802,44 @@ RowTypeRewriterVisitor::MakeRewriteExprForColumn(
 // for all nodes and the Resolved AST is valid.
 class RowTypeColumnRewriterVisitor : public ResolvedASTRewriteVisitor {
  public:
-  explicit RowTypeColumnRewriterVisitor(State& state) : state_(state) {}
+  explicit RowTypeColumnRewriterVisitor(State& state, bool tableref_enabled)
+      : state_(state), tableref_enabled_(tableref_enabled) {}
 
  private:
+  absl::StatusOr<const Type*> GetRewriteType(const Type* type) {
+    GOOGLESQL_RET_CHECK(type->IsRowOrTable());
+    const RowOrTableType* rewrite_type = type->AsRowOrTable();
+    GOOGLESQL_ASSIGN_OR_RETURN(const RewriteTypeState* rewrite_type_state,
+                     state_.GetRewriteTypeState(rewrite_type));
+    GOOGLESQL_RET_CHECK_NE(rewrite_type_state->replacement_type(), nullptr);
+    return rewrite_type_state->replacement_type();
+  }
+
+  absl::StatusOr<AnnotatedType> GetRewriteAnnotatedType(const Type* type) {
+    GOOGLESQL_RET_CHECK(type->IsRowOrTable());
+    const RowOrTableType* rewrite_type = type->AsRowOrTable();
+    GOOGLESQL_ASSIGN_OR_RETURN(const RewriteTypeState* rewrite_type_state,
+                     state_.GetRewriteTypeState(rewrite_type));
+    GOOGLESQL_RET_CHECK_NE(rewrite_type_state->replacement_type(), nullptr);
+    return AnnotatedType(rewrite_type_state->replacement_type(),
+                         rewrite_type_state->replacement_type_annotation_map());
+  }
+
   absl::StatusOr<ResolvedColumn> PostVisitResolvedColumn(
       const ResolvedColumn& column) override {
-    if (column.type()->IsRowOrTable()) {
-      GOOGLESQL_ASSIGN_OR_RETURN(const ResolvedColumn replacement_column,
-                       state_.FindOrAddReplacementColumn(column));
-      return replacement_column;
-    } else {
+    if (!HasRewriteType(column.type())) {
       return column;
     }
+    return state_.FindOrAddReplacementColumn(column);
   }
 
   absl::StatusOr<AnnotatedType> PostVisitAnnotatedType(
       const Type* type,
       std::optional<const AnnotationMap*> annotation_map) override {
-    if (type->IsRowOrTable()) {
-      const RowOrTableType* rewrite_type = type->AsRowOrTable();
-      GOOGLESQL_ASSIGN_OR_RETURN(const RewriteTypeState* rewrite_type_state,
-                       state_.GetRewriteTypeState(rewrite_type));
-
-      GOOGLESQL_RET_CHECK(rewrite_type_state->replacement_type() != nullptr);
-      return AnnotatedType(rewrite_type_state->replacement_type(),
-                           annotation_map.value_or(nullptr));
-    } else {
+    if (!HasRewriteType(type)) {
       return AnnotatedType(type, annotation_map.value_or(nullptr));
     }
-  }
-
-  static bool HasRewriteType(const FunctionArgumentType& arg_type) {
-    return arg_type.type() != nullptr && arg_type.type()->IsRowOrTable();
+    return GetRewriteAnnotatedType(type);
   }
 
   // If a FunctionArgumentType reference RowOrTableType, return a rewrite
@@ -1739,20 +1849,23 @@ class RowTypeColumnRewriterVisitor : public ResolvedASTRewriteVisitor {
     if (!HasRewriteType(arg_type)) {
       return arg_type;
     }
-
-    // PostVisitAnnotatedType computes the same mapping we need here.
-    GOOGLESQL_ASSIGN_OR_RETURN(AnnotatedType new_annotated_type,
-                     PostVisitAnnotatedType(arg_type.type(), std::nullopt));
-    const Type* new_type = new_annotated_type.type;
-
+    // TODO: Support annotations here.
+    GOOGLESQL_ASSIGN_OR_RETURN(const Type* new_type, GetRewriteType(arg_type.type()));
     return FunctionArgumentType(new_type, arg_type.options(),
                                 arg_type.num_occurrences());
   }
 
   // Common PostVisit handler for all ResolvedFunctionCallBase subclasses.
+  // RowType and TableType cannot normally be passed as function inputs, but
+  // some rewriters may add them as function arguments. For example, we allow:
+  //   - Passing TableRefType to FLATTEN, the FLATTEN rewriter may pass them to
+  //     function calls.
+  //   - Referencing RowType fields from MEASURE expressions/grain locking, the
+  //     MEASURE rewriter may pass them to function calls.
   absl::StatusOr<std::unique_ptr<const ResolvedNode>>
   RewriteAnyResolvedFunctionCallBase(
-      std::unique_ptr<const ResolvedFunctionCallBase> node) {
+      std::unique_ptr<const ResolvedFunctionCallBase> node,
+      bool tableref_enabled) {
     const FunctionSignature& signature = node->signature();
 
     bool has_rewrite_type = HasRewriteType(signature.result_type());
@@ -1773,10 +1886,12 @@ class RowTypeColumnRewriterVisitor : public ResolvedASTRewriteVisitor {
     FunctionArgumentTypeList arguments;
     arguments.reserve(signature.arguments().size());
     for (const FunctionArgumentType& argument : signature.arguments()) {
+      GOOGLESQL_RET_CHECK(tableref_enabled || !argument.type()->IsTable());
       GOOGLESQL_ASSIGN_OR_RETURN(FunctionArgumentType new_argument,
                        MapFunctionArgumentType(argument));
       arguments.push_back(new_argument);
     }
+    GOOGLESQL_RET_CHECK(tableref_enabled || !signature.result_type().type()->IsTable());
     GOOGLESQL_ASSIGN_OR_RETURN(FunctionArgumentType result_type,
                      MapFunctionArgumentType(signature.result_type()));
 
@@ -1797,20 +1912,26 @@ class RowTypeColumnRewriterVisitor : public ResolvedASTRewriteVisitor {
   absl::StatusOr<std::unique_ptr<const ResolvedNode>>
   PostVisitResolvedFunctionCall(
       std::unique_ptr<const ResolvedFunctionCall> node) override {
-    return RewriteAnyResolvedFunctionCallBase(std::move(node));
+    return RewriteAnyResolvedFunctionCallBase(std::move(node),
+                                              tableref_enabled_);
   }
   absl::StatusOr<std::unique_ptr<const ResolvedNode>>
   PostVisitResolvedAggregateFunctionCall(
       std::unique_ptr<const ResolvedAggregateFunctionCall> node) override {
-    return RewriteAnyResolvedFunctionCallBase(std::move(node));
+    return RewriteAnyResolvedFunctionCallBase(std::move(node),
+                                              tableref_enabled_);
   }
   absl::StatusOr<std::unique_ptr<const ResolvedNode>>
   PostVisitResolvedAnalyticFunctionCall(
       std::unique_ptr<const ResolvedAnalyticFunctionCall> node) override {
-    return RewriteAnyResolvedFunctionCallBase(std::move(node));
+    return RewriteAnyResolvedFunctionCallBase(std::move(node),
+                                              tableref_enabled_);
   }
 
   State& state_;
+
+  // Whether TableRef Type is enabled.
+  bool tableref_enabled_;
 };
 
 class RowTypeRewriter : public Rewriter {
@@ -1819,26 +1940,29 @@ class RowTypeRewriter : public Rewriter {
       const AnalyzerOptions& options, std::unique_ptr<const ResolvedNode> scan,
       Catalog& catalog, TypeFactory& type_factory,
       AnalyzerOutputProperties& output_properties) const override {
+    GOOGLESQL_RET_CHECK(options.id_string_pool() != nullptr);
     GOOGLESQL_RET_CHECK(options.column_id_sequence_number() != nullptr);
-    ColumnFactory column_factory(0, options.id_string_pool().get(),
-                                 options.column_id_sequence_number());
+    ColumnFactory column_factory(0, *options.id_string_pool(),
+                                 *options.column_id_sequence_number());
 
     FunctionCallBuilder function_call_builder(options, catalog, type_factory);
+    bool tableref_enabled =
+        options.language().LanguageFeatureEnabled(FEATURE_TABLE_TYPE);
 
     ABSL_LOG(INFO) << "Before rewrite:\n" << scan->DebugString();
 
-    State state(column_factory);
-    RowTypeCollectorVisitor collector(state);
+    State state(column_factory, function_call_builder.annotation_propagator());
+    RowTypeCollectorVisitor collector(state, tableref_enabled);
     GOOGLESQL_RETURN_IF_ERROR(scan->Accept(&collector));
 
-    GOOGLESQL_RETURN_IF_ERROR(state.MakeReplacementTypes(type_factory));
+    GOOGLESQL_RETURN_IF_ERROR(state.MakeReplacementTypes(type_factory, tableref_enabled));
 
-    RowTypeRewriterVisitor rewriter1(state, function_call_builder,
-                                     type_factory);
+    RowTypeRewriterVisitor rewriter1(state, function_call_builder, type_factory,
+                                     tableref_enabled);
     GOOGLESQL_ASSIGN_OR_RETURN(scan, rewriter1.VisitAll(std::move(scan)));
     ABSL_LOG(INFO) << "After first-pass rewrite:\n" << scan->DebugString();
 
-    RowTypeColumnRewriterVisitor rewriter2(state);
+    RowTypeColumnRewriterVisitor rewriter2(state, tableref_enabled);
     GOOGLESQL_ASSIGN_OR_RETURN(scan, rewriter2.VisitAll(std::move(scan)));
     ABSL_LOG(INFO) << "After final rewrite:\n" << scan->DebugString();
 

@@ -38,6 +38,7 @@
 #include "googlesql/public/interval_value.h"
 #include "googlesql/public/numeric_value.h"
 #include "googlesql/public/options.pb.h"
+#include "googlesql/public/table_valued_function.h"
 #include "googlesql/public/time_series_tvf_util.h"
 #include "googlesql/public/type.pb.h"
 #include "googlesql/public/types/annotation.h"
@@ -564,16 +565,29 @@ FunctionCallBuilder::FromProto(std::unique_ptr<const ResolvedExpr> arg,
   GOOGLESQL_RET_CHECK_NE(target_type, nullptr);
 
   const Function* from_proto_fn = nullptr;
-  GOOGLESQL_RETURN_IF_ERROR(GetBuiltinFunctionFromCatalog("from_proto", &from_proto_fn));
+  GOOGLESQL_RETURN_IF_ERROR(catalog_.FindFunction({"from_proto"}, &from_proto_fn,
+                                        analyzer_options_.find_options()));
+  GOOGLESQL_RET_CHECK_NE(from_proto_fn, nullptr)
+      << "Required function \"from_proto\" not available.";
 
-  GOOGLESQL_ASSIGN_OR_RETURN(FunctionSignature concrete_signature,
-                   MakeConcreteSignature(from_proto_fn, signature_id,
-                                         target_type, {{arg->type(), 1}}));
+  const FunctionSignature* matched_sig = nullptr;
+  if (from_proto_fn->IsGoogleSQLBuiltin()) {
+    matched_sig = GetSignature(from_proto_fn, signature_id);
+  }
+
+  GOOGLESQL_RET_CHECK_NE(matched_sig, nullptr)
+      << "Could not find matching from_proto signature for proto "
+      << arg->type()->DebugString() << " and result type "
+      << target_type->DebugString();
+
+  GOOGLESQL_ASSIGN_OR_RETURN(
+      FunctionSignature concrete_signature,
+      MakeConcreteSignature(*matched_sig, target_type, {{arg->type(), 1}}));
 
   std::vector<std::unique_ptr<const ResolvedExpr>> from_proto_args;
   from_proto_args.push_back(std::move(arg));
   auto from_proto_call = MakeResolvedFunctionCall(
-      target_type, from_proto_fn, concrete_signature,
+      target_type, from_proto_fn, std::move(concrete_signature),
       std::move(from_proto_args), ResolvedFunctionCall::DEFAULT_ERROR_MODE);
 
   GOOGLESQL_RETURN_IF_ERROR(
@@ -640,17 +654,62 @@ absl::StatusOr<std::unique_ptr<ResolvedScan>> ReplaceScanColumns(
 }
 
 std::vector<ResolvedColumn> CreateReplacementColumns(
-    ColumnFactory& column_factory,
-    absl::Span<const ResolvedColumn> column_list) {
+    ColumnFactory& column_factory, absl::Span<const ResolvedColumn> column_list,
+    ColumnReplacementMap& replaced_column_map) {
   std::vector<ResolvedColumn> replacement_columns;
   replacement_columns.reserve(column_list.size());
 
   for (const ResolvedColumn& old_column : column_list) {
-    replacement_columns.push_back(column_factory.MakeCol(
-        old_column.table_name(), old_column.name(), old_column.type()));
+    const ResolvedColumn new_column = column_factory.MakeCol(
+        old_column.table_name(), old_column.name(), old_column.type());
+    replacement_columns.push_back(new_column);
+    replaced_column_map.insert({new_column, old_column});
   }
 
   return replacement_columns;
+}
+
+// Creates a new set of columns for a ResolvedExecuteAsRoleScan.
+//
+// For each column in `input_scan_columns`, it is replaced with the
+// corresponding column from `column_map` if it exists, and it has not been seen
+// before; otherwise, a new column with the same name, table name, and type is
+// allocated by `column_factory`.
+static std::vector<ResolvedColumn> CreateColumnsForExecuteAsRoleScan(
+    ColumnFactory& column_factory, const ColumnReplacementMap& column_map,
+    absl::Span<const ResolvedColumn> input_scan_columns) {
+  absl::flat_hash_set<ResolvedColumn> seen_columns;
+  std::vector<ResolvedColumn> new_columns;
+  new_columns.reserve(input_scan_columns.size());
+  for (const ResolvedColumn& input_column : input_scan_columns) {
+    if (auto it = column_map.find(input_column);
+        it != column_map.cend() && seen_columns.insert(input_column).second) {
+      new_columns.push_back(it->second);
+    } else {
+      new_columns.push_back(column_factory.MakeCol(
+          input_column.table_name(), input_column.name(), input_column.type()));
+    }
+  }
+  return new_columns;
+}
+
+absl::StatusOr</*absl_nonnull*/ std::unique_ptr<ResolvedExecuteAsRoleScan>>
+CreateResolvedExecuteAsRoleScan(
+    ColumnFactory& column_factory, const ColumnReplacementMap& column_map,
+    /*absl_nonnull*/ std::unique_ptr<const ResolvedScan> body_scan,
+    const Table* /*absl_nullable*/ original_inlined_view,
+    const TableValuedFunction* /*absl_nullable*/ original_inlined_tvf) {
+  GOOGLESQL_RET_CHECK(
+      (original_inlined_view != nullptr && original_inlined_tvf == nullptr) ||
+      (original_inlined_view == nullptr && original_inlined_tvf != nullptr))
+      << "Only one of original_inlined_view or original_inlined_tvf should be "
+         "set.";
+  std::vector<ResolvedColumn> new_columns = CreateColumnsForExecuteAsRoleScan(
+      column_factory, column_map, body_scan->column_list());
+
+  return MakeResolvedExecuteAsRoleScan(new_columns, std::move(body_scan),
+                                       original_inlined_view,
+                                       original_inlined_tvf);
 }
 
 absl::StatusOr<std::unique_ptr<ResolvedFunctionCall>>
@@ -693,6 +752,48 @@ FunctionCallBuilder::AnyIsNull(
     is_nulls.push_back(std::move(is_null));
   }
   return Or(std::move(is_nulls));
+}
+
+absl::StatusOr<std::unique_ptr<const ResolvedFunctionCall>>
+FunctionCallBuilder::IfNull(std::unique_ptr<const ResolvedExpr> arg,
+                            std::unique_ptr<const ResolvedExpr> null_case) {
+  GOOGLESQL_RET_CHECK_NE(arg.get(), nullptr);
+  GOOGLESQL_RET_CHECK_NE(null_case.get(), nullptr);
+  GOOGLESQL_RET_CHECK(arg->type()->Equals(null_case->type()))
+      << "Expected arg->type()->Equals(null_case->type()) to be true, but it "
+         "was false. arg->type(): "
+      << arg->type()->DebugString()
+      << ", null_case->type(): " << null_case->type()->DebugString();
+  if (arg->type_annotation_map() != nullptr &&
+      null_case->type_annotation_map() != nullptr) {
+    GOOGLESQL_RET_CHECK(
+        arg->type_annotation_map()->Equals(*null_case->type_annotation_map()))
+        << "Expected arg->type_annotation_map()->Equals("
+        << "null_case->type_annotation_map()) to be true, but it was false. "
+        << "arg->type(): " << arg->type()->DebugString()
+        << ", null_case->type(): " << null_case->type()->DebugString();
+  }
+
+  const Function* ifnull_fn = nullptr;
+  GOOGLESQL_RETURN_IF_ERROR(GetBuiltinFunctionFromCatalog("ifnull", &ifnull_fn));
+  GOOGLESQL_ASSIGN_OR_RETURN(
+      FunctionSignature concrete_signature,
+      MakeConcreteSignature(ifnull_fn, FN_IFNULL, arg->type(),
+                            {{arg->type(), 1}, {null_case->type(), 1}}));
+
+  GOOGLESQL_ASSIGN_OR_RETURN(
+      auto ifnull_call,
+      ResolvedFunctionCallBuilder()
+          .set_type(arg->type())
+          .set_function(ifnull_fn)
+          .set_signature(std::move(concrete_signature))
+          .add_argument_list(std::move(arg))
+          .add_argument_list(std::move(null_case))
+          .set_function_call_info(std::make_shared<ResolvedFunctionCallInfo>())
+          .BuildMutable());
+  GOOGLESQL_RETURN_IF_ERROR(
+      PropagateAnnotationsAndProcessCollationList(ifnull_call.get()));
+  return ifnull_call;
 }
 
 // TODO: Propagate annotations correctly for this function, if

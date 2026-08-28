@@ -4594,6 +4594,19 @@ class Resolver {
       const ASTPathExpression* path_expr,
       std::unique_ptr<const ResolvedConnection>* resolved_connection);
 
+  absl::Status ResolveConnectionClause(
+      const ASTConnectionClause* connection_clause,
+      std::unique_ptr<const ResolvedConnection>* resolved_connection,
+      bool is_default_connection_allowed = false);
+
+  absl::Status ResolveConnectionClause(
+      const ASTWithConnectionClause* with_connection,
+      std::unique_ptr<const ResolvedConnection>* resolved_connection,
+      bool is_default_connection_allowed = false);
+
+  static absl::Status ParseConnectionString(absl::string_view connection_str,
+                                            std::vector<std::string>* path);
+
   absl::Status ResolveDefaultConnection(
       const ASTDefaultLiteral* default_literal,
       std::unique_ptr<const ResolvedConnection>* resolved_connection);
@@ -6265,10 +6278,6 @@ class Resolver {
   absl::StatusOr<TypeParameters> ResolveTypeParameters(
       const ASTTypeParameterList* type_parameters, const Type& resolved_type,
       const std::vector<TypeParameters>& child_parameter_list);
-
-  absl::StatusOr<TypeParameters> ResolveVectorTypeParameters(
-      const ASTTypeParameterList* type_parameters,
-      const std::vector<TypeParameterValue>& resolved_type_parameter_list);
 
   // Resolve the simple type literals for each input type parameter. Valid
   // literal types are BOOL, BYTES, FLOAT, INT, STRING, and MAX.

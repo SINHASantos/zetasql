@@ -61,7 +61,7 @@ enum FunctionSignatureId {
   // 3100-3199 Measure functions              (NextId: 3101)
   // 3200-3299 MATCH_RECOGNIZE functions      (NextId: 3207)
   // 3300-3399 Aggregate functions III        (NextId: 3303)
-  // 3400-3499 Misc functions II              (NextId: 3429)
+  // 3400-3499 Misc functions II              (NextId: 3430)
   // 3500-3599 Vector functions               (NextId: 3502)
   // 4000-4099 Table valued functions         (NextId: 4006)
   // 5000-5023 AI functions                   (Fully used)

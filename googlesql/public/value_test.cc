@@ -69,6 +69,7 @@
 #include "absl/container/flat_hash_set.h"
 #include "absl/hash/hash.h"
 #include "absl/hash/hash_testing.h"
+#include "googlesql/base/check.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/numbers.h"
@@ -1026,7 +1027,7 @@ TEST_F(ValueTest, JSON) {
     ASSERT_TRUE(v2.is_unparsed_json());
     EXPECT_EQ(kStringValue, v2.json_value_unparsed());
     EXPECT_EQ(kStringValue, v2.json_string());
-    EXPECT_DEATH(v2.json_value(), "Non a validated json value");
+    EXPECT_DEATH(v2.json_value(), "Not a validated json value");
   }
 
   // Test the assignment operator for validated JSON.
@@ -4360,7 +4361,7 @@ TEST_F(ValueTest, ClassAndProtoSize) {
       << "The size of Value class has changed, please also update the proto "
       << "and serialization code if you added/removed fields in it.";
   // TODO: Add Java serialization test for TIMESTAMP_PICO type.
-  EXPECT_EQ(29, ValueProto::descriptor()->field_count())
+  EXPECT_EQ(30, ValueProto::descriptor()->field_count())
       << "The number of fields in ValueProto has changed, please also update "
       << "the serialization code accordingly.";
   EXPECT_EQ(1, ValueProto::Array::descriptor()->field_count())
@@ -5836,6 +5837,25 @@ TEST_F(ValueTest, PhysicalByteSize) {
                 sizeof(Value::TypedMap) + map_string.physical_byte_size() +
                 map_int64.physical_byte_size(),
             Map({std::make_pair(map_string, map_int64)}).physical_byte_size());
+
+  // ColumnListSpec type
+  const Type* column_list_spec_type = types::ColumnListSpecType();
+  EXPECT_EQ(sizeof(Value),
+            Value::Null(column_list_spec_type).physical_byte_size());
+
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(
+      auto column_list_spec_array,
+      Value::MakeArray(StringArrayType(),
+                       {values::String("col1"), values::String("col2")}));
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(Value column_list_spec_value,
+                       Value::MakeColumnListSpec(column_list_spec_array));
+
+  const size_t expected_column_list_spec_size =
+      sizeof(Value) + sizeof(internal::ValueContentOrderedListRef) +
+      sizeof(Value::TypedList) + values::String("col1").physical_byte_size() +
+      values::String("col2").physical_byte_size();
+  EXPECT_EQ(column_list_spec_value.physical_byte_size(),
+            expected_column_list_spec_size);
 }
 
 // Roundtrips Value through ValueProto and back.
@@ -7291,4 +7311,67 @@ TEST_F(ValueCompareTest, SortOrder) {
   TestSortOrder<std::pair<absl::Time, absl::Time>>();
 }
 
+TEST_F(ValueTest, ColumnListSpec) {
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(
+      auto array, Value::MakeArray(StringArrayType(),
+                                   {values::String("a"), values::String("b")}));
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(auto column_list_spec, Value::MakeColumnListSpec(array));
+  EXPECT_EQ(TYPE_COLUMN_LIST_SPEC, column_list_spec.type_kind());
+  EXPECT_FALSE(column_list_spec.is_null());
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(auto columns,
+                       column_list_spec.column_list_spec_columns());
+  EXPECT_EQ(2, columns.size());
+  EXPECT_EQ("a", columns[0].string_value());
+  EXPECT_EQ("b", columns[1].string_value());
+}
+
+TEST_F(ValueTest, ColumnListSpecEmpty) {
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(auto array, Value::MakeArray(StringArrayType(), {}));
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(auto column_list_spec, Value::MakeColumnListSpec(array));
+  EXPECT_EQ(TYPE_COLUMN_LIST_SPEC, column_list_spec.type_kind());
+  EXPECT_FALSE(column_list_spec.is_null());
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(auto columns,
+                       column_list_spec.column_list_spec_columns());
+  EXPECT_EQ(0, columns.size());
+}
+
+TEST_F(ValueTest, ColumnListSpecEmptyString) {
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(
+      auto array, Value::MakeArray(StringArrayType(),
+                                   {values::String("a"), values::String("")}));
+  EXPECT_THAT(
+      Value::MakeColumnListSpec(array),
+      StatusIs(
+          absl::StatusCode::kInvalidArgument,
+          HasSubstr("Column name in Column list spec cannot be empty string")));
+}
+
+TEST_F(ValueTest, ColumnListSpecOperations) {
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(
+      auto array1, Value::MakeArray(StringArrayType(), {values::String("a"),
+                                                        values::String("b")}));
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(
+      auto array2, Value::MakeArray(StringArrayType(), {values::String("a"),
+                                                        values::String("b")}));
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(
+      auto array3, Value::MakeArray(StringArrayType(), {values::String("a"),
+                                                        values::String("c")}));
+
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(auto v1, Value::MakeColumnListSpec(array1));
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(auto v2, Value::MakeColumnListSpec(array2));
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(auto v3, Value::MakeColumnListSpec(array3));
+
+  // Test copy
+  Value v1_copy = v1;
+  EXPECT_EQ(v1.column_list_spec_columns(), v1_copy.column_list_spec_columns());
+
+  // Test serialization/deserialization
+  ValueProto proto;
+  GOOGLESQL_ASSERT_OK(v1.Serialize(&proto));
+  auto status_or_v1_deserialized = Value::Deserialize(proto, v1.type());
+  GOOGLESQL_ASSERT_OK(status_or_v1_deserialized);
+  Value v1_deserialized = status_or_v1_deserialized.value();
+  EXPECT_EQ(v1.column_list_spec_columns(),
+            v1_deserialized.column_list_spec_columns());
+}
 }  // namespace googlesql

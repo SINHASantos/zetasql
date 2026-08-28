@@ -25,6 +25,7 @@
 #include "googlesql/public/analyzer_options.h"
 #include "googlesql/public/annotation/collation.h"
 #include "googlesql/public/annotation/is_versioned.h"
+#include "googlesql/public/annotation/vector_length.h"
 #include "googlesql/public/function.h"
 #include "googlesql/public/options.pb.h"
 #include "googlesql/public/sql_function.h"
@@ -64,6 +65,11 @@ void AnnotationPropagator::InitializeAnnotationSpecs(
           FEATURE_VERSION_AWARE_DML)) {
     owned_annotation_specs_.push_back(
         std::make_unique<IsVersionedAnnotation>());
+  }
+
+  if (analyzer_options.language().LanguageFeatureEnabled(FEATURE_VECTOR_TYPE)) {
+    owned_annotation_specs_.push_back(
+        std::make_unique<VectorLengthAnnotation>());
   }
 
   // Copy GoogleSQL annotation specs to combined_annotation_specs_

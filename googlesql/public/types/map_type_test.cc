@@ -444,6 +444,27 @@ TEST(MapTest, FormatValueContentSQLExpressionMode) {
         map_value.type()->FormatValueContent(map_value.GetContent(), options),
         R"(MAP_FROM_ARRAY(ARRAY<STRUCT<FLOAT32, ARRAY<FLOAT32>>>[(CAST(1.5 AS FLOAT32), ARRAY<FLOAT32>[CAST(2.5 AS FLOAT32)])]))");
   }
+
+  // When FEATURE_MAP_LITERAL is enabled
+  {
+    LanguageOptions language_options;
+    language_options.EnableLanguageFeature(FEATURE_MAP_LITERAL);
+
+    Type::FormatValueContentOptions expr_options(language_options);
+    expr_options.mode = Type::FormatValueContentOptions::Mode::kSQLExpression;
+
+    Value map_value =
+        test_values::Map({{Value::String("foo"), Value::Int64(100)}});
+    EXPECT_EQ(map_value.type()->FormatValueContent(map_value.GetContent(),
+                                                   expr_options),
+              R"(NEW MAP<STRING, INT64>{"foo":100})");
+
+    Type::FormatValueContentOptions literal_options(language_options);
+    literal_options.mode = Type::FormatValueContentOptions::Mode::kSQLLiteral;
+    EXPECT_EQ(map_value.type()->FormatValueContent(map_value.GetContent(),
+                                                   literal_options),
+              R"(MAP{"foo":100})");
+  }
 }
 
 INSTANTIATE_TEST_SUITE_P(

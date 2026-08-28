@@ -97,6 +97,7 @@ class SqlViewInlineVistor : public ResolvedASTDeepCopyVisitor {
 
     const ResolvedScan* const view_def = view->view_query();
     GOOGLESQL_RET_CHECK_NE(view_def, nullptr);
+    ColumnReplacementMap column_map;
 
     // For definer-rights views, we introduce a ResolvedExecuteAsRole node to
     // mark the boundary between invoker and definer rights. In this case,
@@ -108,11 +109,16 @@ class SqlViewInlineVistor : public ResolvedASTDeepCopyVisitor {
           std::unique_ptr<ResolvedScan> view_query,
           ReplaceScanColumns(
               *column_factory_, *view_def, scan->column_index_list(),
-              CreateReplacementColumns(*column_factory_, scan->column_list())));
+              CreateReplacementColumns(*column_factory_, scan->column_list(),
+                                       column_map)));
 
-      PushNodeToStack(MakeResolvedExecuteAsRoleScan(
-          scan->column_list(), std::move(view_query), scan->table(),
-          /*original_inlined_tvf=*/nullptr));
+      GOOGLESQL_ASSIGN_OR_RETURN(
+          std::unique_ptr<ResolvedExecuteAsRoleScan> execute_as_role_scan,
+          CreateResolvedExecuteAsRoleScan(*column_factory_, column_map,
+                                          std::move(view_query),
+                                          /*original_inlined_view=*/view,
+                                          /*original_inlined_tvf=*/nullptr));
+      PushNodeToStack(std::move(execute_as_role_scan));
     } else {
       GOOGLESQL_ASSIGN_OR_RETURN(
           std::unique_ptr<ResolvedScan> view_query,

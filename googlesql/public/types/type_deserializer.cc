@@ -16,6 +16,7 @@
 
 #include "googlesql/public/types/type_deserializer.h"
 
+#include <optional>
 #include <string>
 #include <type_traits>
 #include <utility>
@@ -26,6 +27,7 @@
 #include "googlesql/public/options.pb.h"
 #include "googlesql/public/type.pb.h"
 #include "googlesql/public/types/array_type.h"
+#include "googlesql/public/types/builtin_declarative_types.h"
 #include "googlesql/public/types/declarative_type.h"
 #include "googlesql/public/types/enum_type.h"
 #include "googlesql/public/types/extended_type.h"
@@ -80,6 +82,18 @@ absl::Status ValidateTypeProto(const TypeProto& type_proto) {
 }
 
 }  // namespace
+
+absl::StatusOr<std::optional<TypeParameterHandlers>>
+DeclarativeTypeCallbacksRegistry::GetTypeParameterHandlers(
+    const DeclarativeTypeId& type_id) const {
+  if (type_id.IsGoogleSQLBuiltin()) {
+    return GetBuiltinTypeParameterHandlers(type_id.local_id);
+  }
+  if (get_engine_handlers_ != nullptr) {
+    return get_engine_handlers_(type_id);
+  }
+  return std::nullopt;
+}
 
 absl::StatusOr<const GraphElementType*>
 TypeDeserializer::DeserializeGraphElementType(
@@ -159,7 +173,7 @@ TypeDeserializer::DeserializeDeclarativeTypeDescriptor(
     required_language_features.insert(static_cast<LanguageFeature>(feature));
   }
 
-  TypeId type_id = {
+  DeclarativeTypeId type_id = {
       .name_space = std::string(type_proto.type_id().name_space()),
       .local_id = std::string(type_proto.type_id().local_id()),
       .version_id = std::string(type_proto.type_id().version_id())};
@@ -390,6 +404,12 @@ absl::StatusOr<const Type*> TypeDeserializer::Deserialize(
     case TYPE_DECLARATIVE: {
       GOOGLESQL_ASSIGN_OR_RETURN(auto descriptor, DeserializeDeclarativeTypeDescriptor(
                                             type_proto.declarative_type()));
+
+      GOOGLESQL_ASSIGN_OR_RETURN(
+          auto param_handlers,
+          decl_type_opaque_callback_registry_.GetTypeParameterHandlers(
+              descriptor.type_id()));
+      descriptor.set_type_parameter_handlers(std::move(param_handlers));
 
       return type_factory_->MakeDeclarativeType(std::move(descriptor));
     }

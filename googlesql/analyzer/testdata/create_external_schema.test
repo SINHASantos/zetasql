@@ -117,3 +117,13 @@ CREATE EXTERNAL SCHEMA foo WITH CONNECTION connection1 OPTIONS(x=1)
 ERROR: CREATE EXTERNAL SCHEMA is not supported [at 1:1]
 CREATE EXTERNAL SCHEMA foo WITH CONNECTION connection1 OPTIONS(x=1)
 ^
+
+==
+
+# TODO: Support multi-connection syntax.
+CREATE EXTERNAL SCHEMA foo WITH CONNECTION (key1="connection1", key2="connection1") OPTIONS()
+--
+ERROR: Multiple connections in CONNECTION clause is not supported [at 1:33]
+CREATE EXTERNAL SCHEMA foo WITH CONNECTION (key1="connection1", key2="connect...
+                                ^
+

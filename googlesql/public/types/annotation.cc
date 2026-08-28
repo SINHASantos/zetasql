@@ -52,6 +52,8 @@ std::string GetAnnotationKindName(AnnotationKind kind) {
       return "TimestampPrecision";
     case AnnotationKind::kIsVersioned:
       return "IsVersioned";
+    case AnnotationKind::kVectorLength:
+      return "VectorLength";
     case AnnotationKind::kSampleAnnotation:
       return "SampleAnnotation";
     case AnnotationKind::kMaxBuiltinAnnotationKind:

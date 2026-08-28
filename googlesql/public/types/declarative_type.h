@@ -20,6 +20,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <string>
 #include <utility>
 #include <variant>
@@ -28,13 +29,19 @@
 #include "googlesql/public/language_options.h"
 #include "googlesql/public/type.pb.h"
 #include "googlesql/public/types/type.h"
+#include "googlesql/public/types/type_parameters.h"
 #include "googlesql/public/types/value_equality_check_options.h"
 #include "absl/hash/hash.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
+#include "absl/types/span.h"
 
 namespace googlesql {
+
+class DeclarativeType;
+class TypeParameters;
+class TypeParameterValue;
 
 // Uniquely identifies a declaratively-defined type.
 // Any two instances with the same TypeId are identical and Type::Equals() must
@@ -43,6 +50,8 @@ namespace googlesql {
 // TypeFactory currently caches DeclarativeTypes based on TypeId, and any
 // repeated calls to MakeDeclarativeType() with the same TypeId return the same
 // Type* and GOOGLESQL_RET_CHECK that the descriptors are identical.
+//
+// TODO: Rename to `DeclarativeTypeId`.
 struct TypeId {
   static constexpr absl::string_view kGoogleSqlNamespace = "GoogleSQL";
 
@@ -72,6 +81,83 @@ struct TypeId {
                       type_id.version_id);
   }
 };
+
+using DeclarativeTypeId = TypeId;
+
+// Holds the callbacks for resolution and validation of type parameters for
+// types defined through the declarative type framework.
+//
+// Those opaque callbacks are not serialized into TypeProto, and therefore
+// should only be used for built-in types known to the engine.
+//
+// Because built-in types have static, fixed behavior defined within GoogleSQL's
+// codebase, their callbacks do not need to be serialized into TypeProto.
+//
+// Recall that TypeId uniquely identifies the type, so TypeParameter handling
+// must also be consistent and identical for all instances with the same TypeId.
+//
+// Why stateless function pointers (`(*)(...)`) instead of `std::function`:
+// 1. Native Equality: Function pointers can be compared directly (`==`). This
+//    allows `DeclarativeTypeDescriptor::IsIdenticalTo` to verify that two
+//    descriptors with the same TypeId use identical parameter callbacks,
+//    ensuring `TypeFactory` safely deduplicates registrations.
+// 2. Zero State/Lifetime Overhead: Captures are prohibited, ensuring static
+//    lifetime. Stateless C++ lambdas (`+[](...) -> ...`) decay automatically to
+//    function pointers at registration call sites.
+class TypeParameterHandlers {
+ public:
+  // Callback to the implementation of
+  // `Type::ValidateAndResolveTypeParameters()`.
+  // `DeclarativeType::ValidateAndResolveTypeParameters()` will delegate to this
+  // callback, and propagate the result (or any errors) to the caller.
+  using ResolveCallback = absl::StatusOr<TypeParameters> (*)(
+      const std::vector<TypeParameterValue>&, ProductMode);
+
+  // Callback to the implementation of `Type::ValidateResolvedTypeParameters()`.
+  // `DeclarativeType::ValidateResolvedTypeParameters()` will delegate to this
+  // callback, and propagate any errors to the caller.
+  using ValidateCallback = absl::Status (*)(const TypeParameters&, ProductMode);
+
+  // Creates a TypeParameterHandlers instance. Fails if either callback is null.
+  static absl::StatusOr<TypeParameterHandlers> Create(
+      ResolveCallback resolve_callback, ValidateCallback validate_callback) {
+    if (resolve_callback == nullptr || validate_callback == nullptr) {
+      return absl::InvalidArgumentError(
+          "TypeParameterHandlers requires both resolve and validate "
+          "callbacks to be non-null");
+    }
+    return TypeParameterHandlers(resolve_callback, validate_callback);
+  }
+
+  TypeParameterHandlers(const TypeParameterHandlers&) = default;
+  TypeParameterHandlers& operator=(const TypeParameterHandlers&) = default;
+
+  bool operator==(const TypeParameterHandlers& other) const {
+    return resolve_callback_ == other.resolve_callback_ &&
+           validate_callback_ == other.validate_callback_;
+  }
+  bool operator!=(const TypeParameterHandlers& other) const {
+    return !(*this == other);
+  }
+
+  ResolveCallback resolve_callback() const { return resolve_callback_; }
+  ValidateCallback validate_callback() const { return validate_callback_; }
+
+ private:
+  TypeParameterHandlers(ResolveCallback resolve_callback,
+                        ValidateCallback validate_callback)
+      : resolve_callback_(resolve_callback),
+        validate_callback_(validate_callback) {}
+
+  ResolveCallback resolve_callback_;
+  ValidateCallback validate_callback_;
+};
+
+#ifndef SWIG
+// Keep this class cheap to copy.
+static_assert(sizeof(TypeParameterHandlers) == sizeof(void*) * 2,
+              "TypeParameterHandlers size mismatch");
+#endif
 
 // This contains all the information to fully specify a DeclarativeType. It
 // describes the type's properties, traits, and full behavior. It also
@@ -200,6 +286,33 @@ class DeclarativeTypeDescriptor final {
   // A descriptor is identical to other if all fields are identical.
   bool IsIdenticalTo(const DeclarativeTypeDescriptor& other) const;
 
+  // Indicates whether this type supports type parameters, and if so, the
+  // callbacks to resolve and validate those type parameters.
+  // Those are the implementation of `Type::ValidateAndResolveTypeParameters()`
+  // and `Type::ValidateResolvedTypeParameters()`.
+  // When present, `DeclarativeType` delegates to these callbacks from its
+  // overrides of those signatures on Type.
+  //
+  // If false, the type does not support type parameters.
+  // `DeclarativeType`'s implementations of
+  // `Type::ValidateAndResolveTypeParameters()` and
+  // `Type::ValidateResolvedTypeParameters()` return an error reporting as such.
+  bool has_type_parameter_handlers() const {
+    return data_->type_parameter_handlers.has_value();
+  }
+
+  // Returns the callbacks to resolve and validate type parameters for this
+  // declarative type.
+  // Those opaque callbacks are not serialized into TypeProto, and therefore
+  // should only be used for built-in types known to the engine.
+  const std::optional<TypeParameterHandlers>& type_parameter_handlers() const;
+
+  DeclarativeTypeDescriptor& set_type_parameter_handlers(
+      std::optional<TypeParameterHandlers> handlers) {
+    data_->type_parameter_handlers = std::move(handlers);
+    return *this;
+  }
+
  private:
   struct Data {
     // Internal ID which uniquely identifies this type.
@@ -230,6 +343,11 @@ class DeclarativeTypeDescriptor final {
     // features which are required for the backing type.
     // IsSupportedType() checks both, plus FEATURE_DECLARATIVE_TYPE_FRAMEWORK.
     LanguageOptions::LanguageFeatureSet additional_required_language_features;
+
+    // Optional type parameter handlers registered for built-in types.
+    // Those opaque callbacks are not serialized into TypeProto, and therefore
+    // should only be used for built-in types known to the engine.
+    std::optional<TypeParameterHandlers> type_parameter_handlers = std::nullopt;
   };
   // Allocate on the heap.
   std::unique_ptr<Data> data_ = std::make_unique<Data>();
@@ -263,6 +381,7 @@ class DeclarativeType final : public Type {
   std::string ShortTypeName(ProductMode mode) const override;
   std::string TypeName(ProductMode mode) const override;
 
+  const DeclarativeTypeDescriptor& descriptor() const { return data_; }
   const TypeId& id() const { return data_.type_id(); }
 
   // Returns true if this is a GoogleSQL built-in type.
@@ -275,6 +394,13 @@ class DeclarativeType final : public Type {
 
   absl::StatusOr<std::string> TypeNameWithModifiers(
       const TypeModifiers& type_modifiers, ProductMode mode) const override;
+
+  absl::StatusOr<TypeParameters> ValidateAndResolveTypeParameters(
+      const std::vector<TypeParameterValue>& type_parameter_values,
+      ProductMode mode) const override;
+
+  absl::Status ValidateResolvedTypeParameters(
+      const TypeParameters& type_parameters, ProductMode mode) const override;
 
   std::vector<const Type*> ComponentTypes() const final;
 

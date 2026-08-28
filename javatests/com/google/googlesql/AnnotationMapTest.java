@@ -1412,9 +1412,31 @@ public final class AnnotationMapTest {
         .isEqualTo("Collation");
     assertThat(AnnotationMap.getAnnotationKindName(AnnotationMap.AnnotationKind.SAMPLE_ANNOTATION))
         .isEqualTo("SampleAnnotation");
+    assertThat(AnnotationMap.getAnnotationKindName(AnnotationMap.AnnotationKind.IS_VERSIONED))
+        .isEqualTo("IsVersioned");
+    assertThat(AnnotationMap.getAnnotationKindName(AnnotationMap.AnnotationKind.VECTOR_LENGTH))
+        .isEqualTo("VectorLength");
     assertThat(
             AnnotationMap.getAnnotationKindName(
                 AnnotationMap.AnnotationKind.MAX_BUILTIN_ANNOTATION_KIND))
         .isEqualTo("MaxBuiltinAnnotationKind");
+  }
+
+  @Test
+  public void annotationKind_fromId() {
+    assertThat(AnnotationMap.AnnotationKind.fromId(1))
+        .isEqualTo(AnnotationMap.AnnotationKind.COLLATION);
+    assertThat(AnnotationMap.AnnotationKind.fromId(2))
+        .isEqualTo(AnnotationMap.AnnotationKind.SAMPLE_ANNOTATION);
+    assertThat(AnnotationMap.AnnotationKind.fromId(3))
+        .isEqualTo(AnnotationMap.AnnotationKind.TIMESTAMP_PRECISION);
+    assertThat(AnnotationMap.AnnotationKind.fromId(4))
+        .isEqualTo(AnnotationMap.AnnotationKind.IS_VERSIONED);
+    assertThat(AnnotationMap.AnnotationKind.fromId(5))
+        .isEqualTo(AnnotationMap.AnnotationKind.VECTOR_LENGTH);
+    assertThat(AnnotationMap.AnnotationKind.fromId(10000))
+        .isEqualTo(AnnotationMap.AnnotationKind.MAX_BUILTIN_ANNOTATION_KIND);
+
+    assertThat(AnnotationMap.AnnotationKind.VECTOR_LENGTH.getValue()).isEqualTo(5);
   }
 }

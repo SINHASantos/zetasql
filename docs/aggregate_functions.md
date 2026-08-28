@@ -519,7 +519,8 @@ rows. Returns `NULL` when `expression`
 or `having_expression` is
 `NULL` for all rows in the group.
 
-If `expression` contains any non-NULL values, then `ANY_VALUE` behaves as if
+If `expression` contains any non-NULL values,
+then `ANY_VALUE` behaves as if
 `IGNORE NULLS` is specified;
 rows for which `expression` is `NULL` aren't considered and won't be
 selected.

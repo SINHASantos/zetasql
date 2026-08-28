@@ -606,6 +606,43 @@ ResolvedColumnList GetRecursiveScanColumnsExcludingDepth(
   }
   return columns_excluding_depth;
 }
+
+static absl::StatusOr<bool> IsMatchingGroupRowsScope(
+    const CopyableState::GroupRowsScope& scope,
+    const ResolvedGroupRowsScan* node) {
+  absl::flat_hash_set<ResolvedColumn> input_columns(
+      scope.aggregate_input_scan->column_list().begin(),
+      scope.aggregate_input_scan->column_list().end());
+
+  for (const auto& computed_column : node->input_column_list()) {
+    GOOGLESQL_RET_CHECK(computed_column->expr()->Is<ResolvedColumnRef>());
+    ResolvedColumn ref_col =
+        computed_column->expr()->GetAs<ResolvedColumnRef>()->column();
+    if (!input_columns.contains(ref_col)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+// Finds the matching GroupRowsScope for a ResolvedGroupRowsScan.
+// Unlike ResolvedWithScan, ResolvedGroupRowsScan does not have a direct node
+// reference to its enclosing aggregate scope, so we match by checking if the
+// scan's input columns belong to the aggregate input scan.
+static absl::StatusOr<const CopyableState::GroupRowsScope*>
+FindMatchingGroupRowsScope(
+    const ResolvedGroupRowsScan* node,
+    const std::vector<CopyableState::GroupRowsScope>& group_rows_scopes) {
+  for (const auto& scope : group_rows_scopes) {
+    GOOGLESQL_RET_CHECK(scope.aggregate_input_scan != nullptr);
+    GOOGLESQL_ASSIGN_OR_RETURN(bool is_match, IsMatchingGroupRowsScope(scope, node));
+    if (is_match) {
+      return &scope;
+    }
+  }
+  return absl::InternalError("No matching GROUP ROWS scope found");
+}
+
 }  // namespace
 
 absl::Status SQLBuilder::Process(const ResolvedNode& ast) {
@@ -894,7 +931,7 @@ absl::StatusOr<std::string> SQLBuilder::GetSQL(
     return value.GetSQL(mode);
   }
   if (type->IsMap()) {
-    return value.GetSQL(mode, use_external_float32);
+    return value.GetSQL(options_.language_options, use_external_float32);
   }
   if (type->IsExtendedType()) {
     return value.GetSQL(mode);
@@ -2063,6 +2100,28 @@ absl::Status SQLBuilder::VisitResolvedSubqueryExpr(
       result->query_expression.release());
   GOOGLESQL_RETURN_IF_ERROR(AddSelectListIfNeeded(node->subquery()->column_list(),
                                         subquery_result.get()));
+
+  // Handle group rows subqueries.
+  if (!state_.group_rows_scopes.empty() &&
+      state_.group_rows_scopes.back().subquery_expr == node) {
+    // If the subquery already has a WITH clause, wrap it to avoid conflicts.
+    if (subquery_result->HasWithClause()) {
+      GOOGLESQL_RETURN_IF_ERROR(
+          WrapQueryExpression(node->subquery(), subquery_result.get()));
+    }
+
+    // Add the GROUP ROWS definition to the WITH list.
+    SQLAliasPairList with_list;
+    with_list.push_back(std::make_pair(
+        absl::StrCat(ToIdentifierLiteral(
+                         state_.group_rows_scopes.back().group_rows_name),
+                     "() AS GROUP ROWS"),
+        ""));
+
+    GOOGLESQL_RET_CHECK(
+        subquery_result->TrySetWithClause(with_list, /*recursive=*/false));
+  }
+
   absl::StrAppend(&text, "(", subquery_result->GetSQLQuery(), ")",
                   node->in_expr() == nullptr ? "" : ")");
 
@@ -2506,16 +2565,67 @@ absl::Status SQLBuilder::VisitResolvedMakeProtoField(
 }
 
 absl::Status SQLBuilder::VisitResolvedMakeMap(const ResolvedMakeMap* node) {
-  // TODO: b/490428363 - Implement SQLBuilder for MAP literal.
-  return absl::UnimplementedError(
-      "ResolvedMakeMap is not supported in SQLBuilder yet.");
+  const MapType* map_type = node->type()->AsMap();
+  GOOGLESQL_RET_CHECK_NE(map_type, nullptr);
+
+  std::string text;
+  if (!options_.language_options.LanguageFeatureEnabled(FEATURE_MAP_LITERAL)) {
+    absl::StrAppend(
+        &text, "MAP_FROM_ARRAY(ARRAY<STRUCT<",
+        map_type->key_type()->TypeName(options_.language_options.product_mode(),
+                                       options_.use_external_float32),
+        ", ",
+        map_type->value_type()->TypeName(
+            options_.language_options.product_mode(),
+            options_.use_external_float32),
+        ">>[");
+    for (int i = 0; i < node->entry_list_size(); ++i) {
+      if (i > 0) absl::StrAppend(&text, ",");
+      GOOGLESQL_ASSIGN_OR_RETURN(std::unique_ptr<QueryFragment> entry_sql,
+                       ProcessNode(node->entry_list(i)));
+      absl::StrAppend(&text, entry_sql->GetSQL());
+    }
+    absl::StrAppend(&text, "])");
+    PushQueryFragment(node, text);
+    return absl::OkStatus();
+  }
+
+  absl::StrAppend(
+      &text, "NEW MAP<",
+      map_type->key_type()->TypeName(options_.language_options.product_mode(),
+                                     options_.use_external_float32),
+      ", ",
+      map_type->value_type()->TypeName(options_.language_options.product_mode(),
+                                       options_.use_external_float32),
+      ">{");
+  for (int i = 0; i < node->entry_list_size(); ++i) {
+    if (i > 0) absl::StrAppend(&text, ",");
+    GOOGLESQL_ASSIGN_OR_RETURN(std::unique_ptr<QueryFragment> entry_result,
+                     ProcessNode(node->entry_list(i)));
+    absl::StrAppend(&text, entry_result->GetSQL());
+  }
+  absl::StrAppend(&text, "}");
+
+  PushQueryFragment(node, text);
+  return absl::OkStatus();
 }
 
 absl::Status SQLBuilder::VisitResolvedMakeMapEntry(
     const ResolvedMakeMapEntry* node) {
-  // TODO: b/490428363 - Implement SQLBuilder for MAP literal.
-  return absl::UnimplementedError(
-      "ResolvedMakeMapEntry is not supported in SQLBuilder yet.");
+  GOOGLESQL_ASSIGN_OR_RETURN(std::unique_ptr<QueryFragment> key_result,
+                   ProcessNode(node->key()));
+  GOOGLESQL_ASSIGN_OR_RETURN(std::unique_ptr<QueryFragment> value_result,
+                   ProcessNode(node->value()));
+
+  if (options_.language_options.LanguageFeatureEnabled(FEATURE_MAP_LITERAL)) {
+    PushQueryFragment(
+        node, absl::StrCat(key_result->GetSQL(), ":", value_result->GetSQL()));
+  } else {
+    PushQueryFragment(node, absl::StrCat("(", key_result->GetSQL(), ",",
+                                         value_result->GetSQL(), ")"));
+  }
+
+  return absl::OkStatus();
 }
 
 absl::Status SQLBuilder::VisitResolvedMakeStruct(
@@ -5706,6 +5816,27 @@ absl::Status SQLBuilder::ProcessAggregateScanBase(
                      ProcessNode(computed_col->expr()));
     googlesql_base::InsertOrDie(&group_by_list, computed_col->column().column_id(),
                      result->GetSQL());
+
+    // Register the path for grouping keys so that correlated references to them
+    // inside group rows subqueries can be properly resolved.
+    //
+    // Standard and Pipe SQL have opposite scoping rules for this.
+    if (!IsPipeSyntaxTargetMode()) {
+      // Standard SQL: Map to the raw expression. Standard SQL subqueries
+      // cannot reference sibling SELECT-list aliases (no lateral references),
+      // so they must use the underlying grouped expression.
+      SetPathForColumn(computed_col->column(), result->GetSQL());
+    } else {
+      // Pipe SQL: Map to the grouping key alias. The grouped expression is
+      // evaluated in a preceding EXTEND step, leaving the source column
+      // (e.g. Table.col) un-grouped in the relation. Referencing it inside
+      // AGGREGATE is therefore forbidden; subqueries must use an alias.
+      //
+      // TODO: Remove this branch once PIPE AGGREGATE uses aliases
+      //                    directly in GROUP BY clause.
+      GetColumnAlias(computed_col->column());
+    }
+
     int group_by_col_id = computed_col->column().column_id();
     for (const auto& [grouping_col_id, grouping_argument_group_by_col_id] :
          grouping_column_id_map) {
@@ -5738,6 +5869,23 @@ absl::Status SQLBuilder::ProcessAggregateScanBase(
       computed_col->GetAs<ResolvedDeferredComputedColumn>()
           ->side_effect_column();
     }
+
+    // Push group rows scope if the current computed column is a
+    // ResolvedSubqueryExpr (indicates this is a group rows subquery).
+    bool is_group_rows = computed_col->expr()->Is<ResolvedSubqueryExpr>();
+    if (is_group_rows) {
+      state_.group_rows_scopes.push_back({
+          .aggregate_input_scan = node->input_scan(),
+          .group_rows_name = absl::StrCat("group_rows_", GetUniqueId()),
+          .subquery_expr = computed_col->expr()->GetAs<ResolvedSubqueryExpr>(),
+      });
+    }
+    absl::Cleanup scope_cleanup = [this, is_group_rows] {
+      if (is_group_rows) {
+        state_.group_rows_scopes.pop_back();
+      }
+    };
+
     GOOGLESQL_ASSIGN_OR_RETURN(std::unique_ptr<QueryFragment> result,
                      ProcessNode(computed_col->expr()));
     googlesql_base::InsertOrDie(&mutable_pending_columns(),
@@ -5873,6 +6021,54 @@ absl::Status SQLBuilder::VisitResolvedAggregationThresholdAggregateScan(
   GOOGLESQL_RETURN_IF_ERROR(AppendOptions(node->option_list(), &options_sql));
   GOOGLESQL_RET_CHECK(query_expression->TrySetWithAnonymizationClause(options_sql));
 
+  PushSQLForQueryExpression(node, query_expression.release());
+  return absl::OkStatus();
+}
+
+absl::Status SQLBuilder::VisitResolvedGroupRowsScan(
+    const ResolvedGroupRowsScan* node) {
+  GOOGLESQL_RET_CHECK(node != nullptr);
+  GOOGLESQL_RET_CHECK(!state_.group_rows_scopes.empty())
+      << "GROUP ROWS scan is not inside any active aggregate subquery.";
+
+  // Find matching Group Rows scope for this scan.
+  GOOGLESQL_ASSIGN_OR_RETURN(const CopyableState::GroupRowsScope* matching_scope,
+                   FindMatchingGroupRowsScope(node, state_.group_rows_scopes));
+
+  // Build FROM clause referencing group rows TVF with an alias.
+  const std::string group_rows_name = matching_scope->group_rows_name;
+  const std::string group_rows_alias = absl::StrCat("gr_", GetUniqueId());
+  std::string from =
+      absl::StrCat(ToIdentifierLiteral(group_rows_name), "() AS ",
+                   ToIdentifierLiteral(group_rows_alias));
+  auto query_expression =
+      std::make_unique<QueryExpression>(this->options_.target_syntax_mode);
+  GOOGLESQL_RET_CHECK(query_expression->TrySetFromClause(from));
+
+  // Create mapping of GroupRowsScan output columns to their referenced
+  // aggregation input columns.
+  absl::flat_hash_map<ResolvedColumn, ResolvedColumn> output_to_input_map;
+  for (const auto& computed_column : node->input_column_list()) {
+    GOOGLESQL_RET_CHECK(computed_column->expr()->Is<ResolvedColumnRef>());
+    GOOGLESQL_RET_CHECK(googlesql_base::InsertIfNotPresent(
+        &output_to_input_map, computed_column->column(),
+        computed_column->expr()->GetAs<ResolvedColumnRef>()->column()));
+  }
+
+  // Register column paths pointing directly to the TVF columns using their
+  // aggregation input aliases (e.g. "gr_X.a_Y"). ProjectScan above will create
+  // the select list using these registered aliases.
+  for (const ResolvedColumn& column : node->column_list()) {
+    auto it = output_to_input_map.find(column);
+    GOOGLESQL_RET_CHECK(it != output_to_input_map.end())
+        << "Column " << column.DebugString()
+        << " not found in input_column_list";
+    const std::string input_column_alias = GetColumnAlias(it->second);
+    SetPathForColumn(column,
+                     absl::StrCat(group_rows_alias, ".", input_column_alias));
+  }
+
+  // Save the generated query expression for this node.
   PushSQLForQueryExpression(node, query_expression.release());
   return absl::OkStatus();
 }
@@ -12571,6 +12767,11 @@ absl::Status SQLBuilder::VisitResolvedInsertScan(
     const ResolvedInsertScan* node) {
   return VisitResolvedInsertStmtImpl(node->insert_stmt(),
                                      /*generate_as_pipe=*/true);
+}
+
+absl::Status SQLBuilder::VisitResolvedUpdateScan(
+    const ResolvedUpdateScan* node) {
+  GOOGLESQL_RET_CHECK_FAIL() << "SQLBuilder for ResolvedUpdateScan not supported yet";
 }
 
 absl::Status SQLBuilder::VisitResolvedSubpipeline(

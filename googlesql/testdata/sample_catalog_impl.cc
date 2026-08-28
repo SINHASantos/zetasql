@@ -14602,6 +14602,9 @@ absl::Status SampleCatalogImpl::LoadRowTypeObjects(
 
   // Table with a single level of ROW type nesting.
   // Schema: ROW<key STRING, val INT64, nested_row ROW<InnerRowTypeTable>>
+  // Note: Table with Nested RowType can't be queried directly, as it's not
+  // valid to read a nested RowType from a TableScan. This table just helps
+  // define a corresponding TVF for testing purposes.
   const Type* inner_row_type = nullptr;
   GOOGLESQL_RETURN_IF_ERROR(types_->MakeRowType(
       inner_row_table, inner_row_table->FullName(), &inner_row_type));
@@ -14615,6 +14618,9 @@ absl::Status SampleCatalogImpl::LoadRowTypeObjects(
   // Table with recursively-nested ROW types (infinite nesting).
   // Schema: ROW<key STRING, col2 STRING, col3 INT64,
   //             middle ROW<RowTypeRecursiveNested>>
+  // Note: Table with Nested RowType can't be queried directly, as it's not
+  // valid to read a nested RowType from a TableScan. This table just helps
+  // define a corresponding TVF for testing purposes.
   LazySimpleTable* recursive_nested_table = new LazySimpleTable(
       "RowTypeRecursiveNested", Table::ColumnListMode::FIND_ONLY,
       {{"key", types_->get_string()},
@@ -14625,9 +14631,75 @@ absl::Status SampleCatalogImpl::LoadRowTypeObjects(
                                       recursive_nested_table->FullName(),
                                       &recursive_row_type));
   GOOGLESQL_RETURN_IF_ERROR(recursive_nested_table->AddColumn(
-      new SimpleColumn("RowTypeRecursiveNested", "middle", recursive_row_type),
+      new SimpleColumn(/*table_name=*/"RowTypeRecursiveNested",
+                       /*name=*/"middle", recursive_row_type),
       /*is_owned=*/true));
   AddOwnedTable(recursive_nested_table);
+
+  // Table with recursively-nested ROW type and collation.
+  // Schema: ROW<key STRING, string_ci STRING{Collation:"und:ci"},
+  //             middle ROW<RowTypeRecursiveCollated>>
+  // Note: Table with Nested RowType can't be queried directly, as it's not
+  // valid to read a nested RowType from a TableScan. This table just helps
+  // define a corresponding TVF for testing purposes.
+  {
+    absl::string_view kTableName = "RowTypeRecursiveCollated";
+    LazySimpleTable* table =
+        new LazySimpleTable(kTableName, Table::ColumnListMode::LAZY,
+                            {{"key", types_->get_string()}});
+
+    std::unique_ptr<AnnotationMap> annotation_map =
+        AnnotationMap::Create(types_->get_string());
+    annotation_map->SetAnnotation<CollationAnnotation>(
+        SimpleValue::String("und:ci"));
+    GOOGLESQL_ASSIGN_OR_RETURN(const AnnotationMap* annotation_map_ptr,
+                     types_->TakeOwnership(std::move(annotation_map)));
+    GOOGLESQL_RETURN_IF_ERROR(table->AddColumn(
+        new SimpleColumn(
+            kTableName, /*name=*/"string_ci",
+            AnnotatedType(types_->get_string(), annotation_map_ptr)),
+        /*is_owned=*/true));
+
+    const Type* row_type = nullptr;
+    GOOGLESQL_RETURN_IF_ERROR(types_->MakeRowType(table, table->FullName(), &row_type));
+    GOOGLESQL_RETURN_IF_ERROR(table->AddColumn(
+        new SimpleColumn(kTableName, /*name=*/"middle", row_type),
+        /*is_owned=*/true));
+
+    AddOwnedTable(table);
+  }
+
+  // A TVF which returns a ROW type containing recursive, collated ROW type.
+  {
+    TVFComputeResultTypeCallback tvf_callback =
+        [](Catalog* catalog, TypeFactory* type_factory,
+           const FunctionSignature& signature,
+           const std::vector<TVFInputArgumentType>& actual_arguments,
+           const AnalyzerOptions& analyzer_options)
+        -> absl::StatusOr<std::shared_ptr<googlesql::TVFSignature>> {
+      const Table* backing_table;
+      GOOGLESQL_RETURN_IF_ERROR(catalog->FindTable(/*path=*/{"RowTypeRecursiveCollated"},
+                                         &backing_table));
+      const RowType* row_type;
+      GOOGLESQL_RETURN_IF_ERROR(type_factory->MakeRowType(
+          backing_table, "RowTypeRecursiveCollated", &row_type));
+      return std::make_unique<TVFSignature>(
+          actual_arguments,
+          TVFRelation({TVFSchemaColumn("normal_col_1", types::StringType()),
+                       TVFSchemaColumn("row_col", row_type),
+                       TVFSchemaColumn("normal_col_2", types::Int64Type())}),
+          TVFSignatureOptions{.row_type_rewrite_callback =
+                                  TVFSignature::BaseRowTypeRewriteCallback});
+    };
+    catalog_->AddOwnedTableValuedFunction(new TableValuedFunction(
+        {"tvf_returning_row_type_recursive_collated"}, /*group=*/"RowTypeTest",
+        {FunctionSignature(FunctionArgumentType::AnyRelation(),
+                           /*arguments=*/{},
+                           /*context_id=*/-1)},
+        TableValuedFunctionOptions()
+            .set_compute_result_type_callback(tvf_callback)
+            .AddRequiredLanguageFeature(FEATURE_ROW_TYPE)));
+  }
 
   // A TVF which returns a ROW type as one column.
   TVFComputeResultTypeCallback result_type_callback_1 =

@@ -2299,11 +2299,17 @@ std::string ScriptExecutorImpl::VariablesDebugString() const {
     auto it = GetCurrentVariableTypeParameters().find(variable.first);
     if (it != GetCurrentVariableTypeParameters().end() &&
         !it->second.IsEmpty()) {
-      type_name = variable.second.type()
-                      ->TypeNameWithModifiers(TypeModifiers::MakeTypeModifiers(
-                                                  it->second, Collation()),
-                                              LanguageOptions().product_mode())
-                      .value();
+      absl::StatusOr<std::string> type_name_with_modifiers =
+          variable.second.type()->TypeNameWithModifiers(
+              TypeModifiers::MakeTypeModifiers(it->second, Collation()),
+              LanguageOptions().product_mode());
+      if (type_name_with_modifiers.ok()) {
+        type_name = *std::move(type_name_with_modifiers);
+      } else {
+        ABSL_LOG(ERROR) << "Failed to get type name with modifiers: "
+                   << type_name_with_modifiers.status();
+        type_name = variable.second.type()->DebugString();
+      }
     } else {
       type_name = variable.second.type()->DebugString();
     }

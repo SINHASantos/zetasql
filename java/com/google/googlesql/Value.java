@@ -17,6 +17,7 @@
 
 package com.google.googlesql;
 
+import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.googlesql.CivilTimeEncoder.decodePacked64TimeNanos;
 import static com.google.googlesql.CivilTimeEncoder.decodePacked64TimeNanosAsJavaTime;
@@ -312,6 +313,36 @@ public class Value implements Serializable {
     this.backingValue = backingValue;
   }
 
+  /**
+   * Creates a column list spec of given type, proto and elements. Assumes the proto contains the
+   * serialized elements.
+   */
+  private Value(SimpleType type, ValueProto proto, Collection<Value> elements) {
+    this.type = checkNotNull(type);
+    checkArgument(this.type.getKind() == TypeKind.TYPE_COLUMN_LIST_SPEC);
+    this.proto = checkNotNull(proto);
+    this.isNull = Value.isNullValue(proto);
+    this.fields = null;
+    this.elements = ImmutableList.copyOf(elements);
+    this.mapEntries = null;
+    this.numericValue = null;
+    this.intervalValue = null;
+    this.start = null;
+    this.end = null;
+    this.uuidValue = null;
+    this.backingValue = null;
+    if (!this.isNull) {
+      checkNotNull(elements);
+      for (Value val : elements) {
+        checkNotNull(val);
+        checkArgument(!val.isNull(), "Column name in Column list spec cannot be NULL");
+        checkArgument(
+            !val.getStringValue().isEmpty(),
+            "Column name in Column list spec cannot be empty string");
+      }
+    }
+  }
+
   private static IllegalArgumentException typeMismatchException(Type type, ValueProto proto) {
     return new IllegalArgumentException(
         String.format(
@@ -498,7 +529,7 @@ public class Value implements Serializable {
     EnumType enumType = type.asEnum();
     int value = getEnumValue();
     String name = enumType.findName(value);
-    Preconditions.checkNotNull(name, "Value %s not in %s", value, enumType);
+    checkNotNull(name, "Value %s not in %s", value, enumType);
     return name;
   }
 
@@ -974,7 +1005,7 @@ public class Value implements Serializable {
         }
       case TYPE_PROTO:
         {
-          Preconditions.checkNotNull(type.asProto().getDescriptor());
+          checkNotNull(type.asProto().getDescriptor());
           String name =
               String.format("Proto<%s>", getType().asProto().getDescriptor().getFullName());
           if (isNull()) {
@@ -1427,9 +1458,9 @@ public class Value implements Serializable {
 
   @CanIgnoreReturnValue // TODO: consider removing this?
   public static Value deserialize(Type type, ValueProto proto) {
-    Preconditions.checkNotNull(type);
-    Preconditions.checkNotNull(proto);
-    Preconditions.checkArgument(isSupportedTypeKind(type), "Type not supported %s", type);
+    checkNotNull(type);
+    checkNotNull(proto);
+    checkArgument(isSupportedTypeKind(type), "Type not supported %s", type);
 
     if (Value.isNullValue(proto)) {
       return new Value(type, proto);
@@ -1646,6 +1677,23 @@ public class Value implements Serializable {
           return createDeclarativeValue(declType, backingValue);
         }
 
+      case TYPE_COLUMN_LIST_SPEC:
+        {
+          if (!proto.hasColumnListSpecValue() || type.asSimpleType() == null) {
+            throw typeMismatchException(type, proto);
+          }
+          List<Value> elements = new ArrayList<>();
+          for (String columnName : proto.getColumnListSpecValue().getColumnNamesList()) {
+            if (columnName.isEmpty()) {
+              throw new IllegalArgumentException(
+                  "Column name in Column list spec cannot be empty string");
+            }
+            elements.add(Value.createStringValue(columnName));
+          }
+
+          return new Value(type.asSimpleType(), proto, elements);
+        }
+
       default:
         throw new IllegalArgumentException("Should not happen: unsupported type " + type);
     }
@@ -1674,6 +1722,7 @@ public class Value implements Serializable {
       case TYPE_INTERVAL:
       case TYPE_JSON:
       case TYPE_UUID:
+      case TYPE_COLUMN_LIST_SPEC:
         return true;
       case TYPE_ARRAY:
         return isSupportedTypeKind(type.asArray().getElementType());
@@ -1717,7 +1766,7 @@ public class Value implements Serializable {
    * @param type
    */
   public static Value createNullValue(Type type) {
-    Preconditions.checkArgument(isSupportedTypeKind(type));
+    checkArgument(isSupportedTypeKind(type));
     return new Value(type, ValueProto.getDefaultInstance());
   }
 
@@ -1814,14 +1863,14 @@ public class Value implements Serializable {
 
   /** Returns an string Value that equals to {@code v}. */
   public static Value createStringValue(String v) {
-    Preconditions.checkNotNull(v);
+    checkNotNull(v);
     ValueProto proto = ValueProto.newBuilder().setStringValue(v).build();
     return new Value(TypeFactory.createSimpleType(TypeKind.TYPE_STRING), proto);
   }
 
   /** Returns an bytes Value that equals to {@code v}. */
   public static Value createBytesValue(ByteString v) {
-    Preconditions.checkNotNull(v);
+    checkNotNull(v);
     ValueProto proto = ValueProto.newBuilder().setBytesValue(v).build();
     return new Value(TypeFactory.createSimpleType(TypeKind.TYPE_BYTES), proto);
   }
@@ -1850,14 +1899,14 @@ public class Value implements Serializable {
   // TODO: Implement other versions that takes Java Date/Time types.
   @SuppressWarnings("GoodTime") // should accept a java.time.LocalDate (?)
   public static Value createDateValue(int v) {
-    Preconditions.checkArgument(Type.isValidDate(v));
+    checkArgument(Type.isValidDate(v));
     ValueProto proto = ValueProto.newBuilder().setDateValue(v).build();
     return new Value(TypeFactory.createSimpleType(TypeKind.TYPE_DATE), proto);
   }
 
   /** Returns a date Value with given parameter. */
   public static Value createDateValue(LocalDate v) {
-    Preconditions.checkArgument(Type.isValidDate(Math.toIntExact(v.toEpochDay())));
+    checkArgument(Type.isValidDate(Math.toIntExact(v.toEpochDay())));
     ValueProto proto = ValueProto.newBuilder().setDateValue((int) v.toEpochDay()).build();
     return new Value(TypeFactory.createSimpleType(TypeKind.TYPE_DATE), proto);
   }
@@ -1914,24 +1963,24 @@ public class Value implements Serializable {
    */
   @SuppressWarnings("GoodTime") // should accept a java.time.Instant
   public static Value createTimestampValueFromUnixMicros(long v) {
-    Preconditions.checkArgument(Type.isValidTimestampUnixMicros(v));
+    checkArgument(Type.isValidTimestampUnixMicros(v));
     ValueProto proto = ValueProto.newBuilder().setTimestampValue(Timestamps.fromMicros(v)).build();
     return new Value(TypeFactory.createSimpleType(TypeKind.TYPE_TIMESTAMP), proto);
   }
 
   /** Returns an enum Value of given {@code type} with number value {@code v}. */
   public static Value createEnumValue(EnumType type, int v) {
-    Preconditions.checkNotNull(type);
-    Preconditions.checkArgument(!type.getDescriptor().isClosed() || type.findName(v) != null);
+    checkNotNull(type);
+    checkArgument(!type.getDescriptor().isClosed() || type.findName(v) != null);
     ValueProto proto = ValueProto.newBuilder().setEnumValue(v).build();
     return new Value(type, proto);
   }
 
   /** Returns a proto Value of given {@code type} with encoded message {@code v}. */
   public static Value createProtoValue(ProtoType type, ByteString v) {
-    Preconditions.checkNotNull(type);
-    Preconditions.checkArgument(isSupportedTypeKind(type));
-    Preconditions.checkNotNull(v);
+    checkNotNull(type);
+    checkArgument(isSupportedTypeKind(type));
+    checkNotNull(v);
 
     ValueProto proto = ValueProto.newBuilder().setProtoValue(v).build();
     return new Value(type, proto);
@@ -1939,15 +1988,15 @@ public class Value implements Serializable {
 
   /** Returns a struct Value of given {@code type} and field {@code values}. */
   public static Value createStructValue(StructType type, Collection<Value> values) {
-    Preconditions.checkNotNull(type);
-    Preconditions.checkArgument(isSupportedTypeKind(type));
-    Preconditions.checkNotNull(values);
-    Preconditions.checkArgument(type.getFieldCount() == values.size());
+    checkNotNull(type);
+    checkArgument(isSupportedTypeKind(type));
+    checkNotNull(values);
+    checkArgument(type.getFieldCount() == values.size());
 
     Struct.Builder builder = Struct.newBuilder();
     int i = 0;
     for (Value value : values) {
-      Preconditions.checkArgument(type.getField(i++).getType().equals(value.type));
+      checkArgument(type.getField(i++).getType().equals(value.type));
       builder.addField(value.proto);
     }
 
@@ -1957,13 +2006,13 @@ public class Value implements Serializable {
 
   /** Returns an array Value of given {@code type} and elements {@code values}. */
   public static Value createArrayValue(ArrayType type, Collection<Value> values) {
-    Preconditions.checkNotNull(type);
-    Preconditions.checkArgument(isSupportedTypeKind(type));
-    Preconditions.checkNotNull(values);
+    checkNotNull(type);
+    checkArgument(isSupportedTypeKind(type));
+    checkNotNull(values);
 
     Array.Builder builder = Array.newBuilder();
     for (Value value : values) {
-      Preconditions.checkArgument(type.getElementType().equals(value.type));
+      checkArgument(type.getElementType().equals(value.type));
       builder.addElement(value.proto);
     }
 
@@ -1982,7 +2031,7 @@ public class Value implements Serializable {
   // This is a helper function only used by createRangeValue. Returns a negative integer, zero, or a
   // positive integer if the first value is less than, equal to, or greater than the second value.
   private static long compareRangeBoundValues(Value first, Value second) {
-    Preconditions.checkArgument(first.getType().equals(second.getType()));
+    checkArgument(first.getType().equals(second.getType()));
     Type type = first.getType();
 
     switch (type.getKind()) {
@@ -2008,14 +2057,13 @@ public class Value implements Serializable {
 
   /** Returns a range Value of given {@code type}, {@code start}, and {@code end}. */
   public static Value createRangeValue(RangeType type, Value start, Value end) {
-    Preconditions.checkNotNull(type);
-    Preconditions.checkArgument(isSupportedTypeKind(type));
-    Preconditions.checkNotNull(start);
-    Preconditions.checkNotNull(end);
-    Preconditions.checkArgument(start.getType().equals(end.getType()));
-    Preconditions.checkArgument(start.getType().equals(type.getElementType()));
-    Preconditions.checkArgument(
-        start.isNull() || end.isNull() || compareRangeBoundValues(start, end) < 0);
+    checkNotNull(type);
+    checkArgument(isSupportedTypeKind(type));
+    checkNotNull(start);
+    checkNotNull(end);
+    checkArgument(start.getType().equals(end.getType()));
+    checkArgument(start.getType().equals(type.getElementType()));
+    checkArgument(start.isNull() || end.isNull() || compareRangeBoundValues(start, end) < 0);
 
     ValueProto proto =
         ValueProto.newBuilder()
@@ -2026,21 +2074,21 @@ public class Value implements Serializable {
 
   /** Returns a map Value of a given {@code type} and {@code mapEntries} */
   public static Value createMapValue(MapType type, Map<Value, Value> mapEntries) {
-    Preconditions.checkNotNull(type);
-    Preconditions.checkArgument(isSupportedTypeKind(type));
-    Preconditions.checkNotNull(mapEntries);
+    checkNotNull(type);
+    checkArgument(isSupportedTypeKind(type));
+    checkNotNull(mapEntries);
 
     ImmutableList<ValueProto.MapEntry> mapEntriesProto =
         mapEntries.entrySet().stream()
             .map(
                 entry -> {
-                  Preconditions.checkArgument(
+                  checkArgument(
                       type.getKeyType().equals(entry.getKey().getType()),
                       "Key type %s does not match expected %s for key %s",
                       entry.getKey().getType(),
                       type.getKeyType(),
                       entry.getKey());
-                  Preconditions.checkArgument(
+                  checkArgument(
                       type.getValueType().equals(entry.getValue().getType()),
                       "Value type %s does not match expected %s for value %s",
                       entry.getValue().getType(),
@@ -2068,8 +2116,8 @@ public class Value implements Serializable {
   /** Returns a JSON Value from the given JSON document {@code document}. */
   public static Value createJsonValue(String document) {
     SimpleType jsonType = TypeFactory.createSimpleType(TypeKind.TYPE_JSON);
-    Preconditions.checkArgument(isSupportedTypeKind(jsonType));
-    Preconditions.checkNotNull(document);
+    checkArgument(isSupportedTypeKind(jsonType));
+    checkNotNull(document);
 
     ValueProto proto = ValueProto.newBuilder().setJsonValue(document).build();
     return new Value(jsonType, proto);
@@ -2077,13 +2125,13 @@ public class Value implements Serializable {
 
   /** Returns a declarative Value of given {@code type} backed by {@code backingValue}. */
   public static Value createDeclarativeValue(DeclarativeType type, Value backingValue) {
-    Preconditions.checkNotNull(type);
-    Preconditions.checkNotNull(backingValue);
-    Preconditions.checkArgument(isSupportedTypeKind(type));
+    checkNotNull(type);
+    checkNotNull(backingValue);
+    checkArgument(isSupportedTypeKind(type));
     if (backingValue.isNull()) {
       return createNullValue(type);
     }
-    Preconditions.checkArgument(
+    checkArgument(
         backingValue.getType().equals(type.getBackingType()),
         "backingValue type mismatch: expected %s, got %s",
         type.getBackingType().debugString(false),
@@ -2121,7 +2169,7 @@ public class Value implements Serializable {
   //   0xFF, 0xF0].
   private static byte[] toByteArray(BigInteger bigInt, int length) {
     byte[] base = bigInt.toByteArray();
-    Preconditions.checkArgument(base.length <= length);
+    checkArgument(base.length <= length);
     byte[] returnArray = new byte[Math.max(base.length, length)];
     // If the big integer is negative, perform sign extension by filling the array with 0xFF.
     if (bigInt.signum() < 0) {
@@ -2137,7 +2185,7 @@ public class Value implements Serializable {
    * googlesql/public/timestamp_picos_value.cc for the encoding.
    */
   public static ByteString serializeTimestampPicos(TimestampPicos picos) {
-    Preconditions.checkArgument(Type.isValidTimestamp(picos));
+    checkArgument(Type.isValidTimestamp(picos));
 
     // TIMESTAMP_PICOS values are serialized as 128-bit integers in two's complement form in little
     // endian order, taking exactly 16 bytes. BigInteger requires the same encoding but in big

@@ -54,6 +54,7 @@
 #include "googlesql/public/value.pb.h"
 #include "googlesql/public/value_content.h"
 #include "absl/base/no_destructor.h"
+#include "absl/cleanup/cleanup.h"
 #include "absl/hash/hash.h"
 #include "googlesql/base/check.h"
 #include "absl/status/status.h"
@@ -90,6 +91,61 @@ constexpr int kNumericMaxPrecision = 29;
 constexpr int kBigNumericMaxPrecision = 38;
 constexpr int kNumericMaxScale = 9;
 constexpr int kBigNumericMaxScale = 38;
+
+// A ValueContentOrderedList implementation for COLUMN_LIST_SPEC that
+// correctly unrefs its string elements.
+// StringValueContentOrderedList is needed to prevent memory leaks when
+// deserializing values of type TYPE_COLUMN_LIST_SPEC to ValueContents. It is
+// similar to Value::TypedList which is also used for same purpose, but is
+// inaccessible from this module due to circular dependency restrictions. A
+// slight difference is, TypedList stores Values while
+// StringValueContentOrderedList stores ValueContent, which is okay because
+// ValueContent is what we need when deserializing.
+class StringValueContentOrderedList : public internal::ValueContentOrderedList {
+ public:
+  explicit StringValueContentOrderedList(
+      std::vector<internal::NullableValueContent> elements)
+      : elements_(std::move(elements)) {}
+
+  StringValueContentOrderedList(const StringValueContentOrderedList&) = delete;
+  StringValueContentOrderedList& operator=(
+      const StringValueContentOrderedList&) = delete;
+
+  ~StringValueContentOrderedList() override {
+    for (const auto& element : elements_) {
+      if (!element.is_null()) {
+        auto* string_ref =
+            element.value_content().GetAs<internal::StringRef*>();
+        if (string_ref != nullptr) {
+          string_ref->Unref();
+        }
+      }
+    }
+  }
+
+  internal::NullableValueContent element(int i) const override {
+    return elements_[i];
+  }
+
+  int64_t num_elements() const override { return elements_.size(); }
+
+  uint64_t physical_byte_size() const override {
+    uint64_t size = sizeof(*this) + elements_.capacity() * sizeof(elements_[0]);
+    for (const auto& element : elements_) {
+      if (!element.is_null()) {
+        auto* string_ref =
+            element.value_content().GetAs<internal::StringRef*>();
+        if (string_ref != nullptr) {
+          size += string_ref->physical_byte_size();
+        }
+      }
+    }
+    return size;
+  }
+
+ private:
+  std::vector<internal::NullableValueContent> elements_;
+};
 
 // Specifies the type kind that a type name maps to, and when the type name is
 // enabled. Even when the type name is enabled, the type kind might still be
@@ -611,6 +667,9 @@ void SimpleType::CopyValueContent(TypeKind kind, const ValueContent& from,
     case TYPE_UUID:
       from.GetAs<internal::UuidRef*>()->Ref();
       break;
+    case TYPE_COLUMN_LIST_SPEC:
+      from.GetAs<internal::ValueContentOrderedListRef*>()->Ref();
+      break;
     default:
       break;
   }
@@ -653,6 +712,9 @@ void SimpleType::ClearValueContent(TypeKind kind, const ValueContent& value) {
     case TYPE_UUID:
       value.GetAs<internal::UuidRef*>()->Unref();
       return;
+    case TYPE_COLUMN_LIST_SPEC:
+      value.GetAs<internal::ValueContentOrderedListRef*>()->Unref();
+      return;
     default:
       return;
   }
@@ -682,6 +744,9 @@ uint64_t SimpleType::GetValueContentExternallyAllocatedByteSize(
       return value.GetAs<internal::TokenListRef*>()->physical_byte_size();
     case TYPE_UUID:
       return sizeof(internal::UuidRef);
+    case TYPE_COLUMN_LIST_SPEC:
+      return value.GetAs<internal::ValueContentOrderedListRef*>()
+          ->physical_byte_size();
     default:
       return 0;
   }
@@ -1221,6 +1286,21 @@ absl::Status SimpleType::SerializeValueContent(const ValueContent& value,
     case TYPE_UUID:
       value_proto->set_uuid_value(GetUuidValue(value).SerializeAsBytes());
       break;
+    case TYPE_COLUMN_LIST_SPEC: {
+      const internal::ValueContentOrderedList* container =
+          value.GetAs<internal::ValueContentOrderedListRef*>()->value();
+      auto* column_list_spec_proto =
+          value_proto->mutable_column_list_spec_value();
+      for (int i = 0; i < container->num_elements(); ++i) {
+        const internal::NullableValueContent& element_value_content =
+            container->element(i);
+        if (!element_value_content.is_null()) {
+          column_list_spec_proto->add_column_names(
+              GetStringValue(element_value_content.value_content()));
+        }
+      }
+      break;
+    }
     default:
       return absl::Status(absl::StatusCode::kInternal,
                           absl::StrCat("Unsupported type ", DebugString()));
@@ -1398,6 +1478,44 @@ absl::Status SimpleType::DeserializeValueContent(const ValueProto& value_proto,
       GOOGLESQL_ASSIGN_OR_RETURN(UuidValue uuid_v, UuidValue::DeserializeFromBytes(
                                              value_proto.uuid_value()));
       value->set(new internal::UuidRef(uuid_v));
+      break;
+    }
+    case TYPE_COLUMN_LIST_SPEC: {
+      if (!value_proto.has_column_list_spec_value()) {
+        return TypeMismatchError(value_proto);
+      }
+
+      std::vector<internal::NullableValueContent> elements;
+      elements.reserve(
+          value_proto.column_list_spec_value().column_names_size());
+      auto cleanup_elements = absl::MakeCleanup([&elements] {
+        for (const auto& element : elements) {
+          if (!element.is_null()) {
+            auto* string_ref =
+                element.value_content().GetAs<internal::StringRef*>();
+            if (string_ref != nullptr) {
+              string_ref->Unref();
+            }
+          }
+        }
+      });
+      for (const std::string& column_name :
+           value_proto.column_list_spec_value().column_names()) {
+        if (column_name.empty()) {
+          return absl::Status(
+              absl::StatusCode::kInvalidArgument,
+              "Column name in Column list spec cannot be empty string");
+        }
+        ValueContent element_content;
+        element_content.set(new internal::StringRef(column_name));
+        elements.push_back(
+            internal::NullableValueContent(std::move(element_content)));
+      }
+      std::move(cleanup_elements).Cancel();
+
+      value->set(new internal::ValueContentOrderedListRef(
+          std::make_unique<StringValueContentOrderedList>(std::move(elements)),
+          /*preserves_order=*/true));
       break;
     }
     default:

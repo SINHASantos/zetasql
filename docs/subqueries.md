@@ -37,12 +37,12 @@ columns will result in an analysis error. A `SELECT` list with a single
 expression is the simplest way to select a single column. The result type
 of the scalar subquery is the type of that expression.
 
-Another possibility is to use `SELECT AS STRUCT` to define a subquery that
-selects a single `STRUCT` type value whose fields are defined by one or more
-expressions. `SELECT AS ProtocolBufferName`
-can also be used to define a subquery that selects a single `PROTO` value
-of the specified type where one or more expressions define its
-fields.
+Another possibility is to use `SELECT AS STRUCT` to define
+a subquery that selects a single `STRUCT` type value whose fields are defined by
+one or more expressions. `SELECT
+AS ProtocolBufferName` can also be used to define a subquery that selects a
+single `PROTO` value of the specified type where one or more expressions define
+its fields.
 
 If the subquery returns exactly one row, that single value is the
 scalar subquery result. If the subquery returns zero rows, the result is `NULL`.
@@ -107,8 +107,8 @@ Never returns a `NULL` ARRAY.
 
 The `SELECT` list in an ARRAY subquery must have exactly one column of
 any type, which defines the element type of the array returned by the
-array subquery. If not, an error is returned. When the subquery is written with
-`SELECT AS STRUCT` or `SELECT AS ProtocolBufferName`,
+array subquery. If not, an error is returned.
+When the subquery is written with`SELECT AS STRUCT` or `SELECT AS ProtocolBufferName`,
 the `SELECT` list can include multiple columns, and the value returned by
 the array subquery is an ARRAY of the constructed
 STRUCTs or PROTOs.

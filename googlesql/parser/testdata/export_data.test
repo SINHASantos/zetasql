@@ -94,6 +94,33 @@ SELECT
   1
 ==
 
+export data with connection (k1 = 'v1', k2 = 123) options(x=5) as select 1;
+--
+ExportDataStatement [0-74] [export data...as select 1]
+  WithConnectionClause [12-49] [with connection...k2 = 123)]
+    ConnectionClause [17-49] [connection...k2 = 123)]
+      ConnectionKeyValuePair [29-38] [k1 = 'v1']
+        Identifier(k1) [29-31] [k1]
+        StringLiteral [34-38] ['v1']
+          StringLiteralComponent('v1') [34-38] ['v1']
+      ConnectionKeyValuePair [40-48] [k2 = 123]
+        Identifier(k2) [40-42] [k2]
+        IntLiteral(123) [45-48] [123]
+  OptionsList [57-62] [(x=5)]
+    OptionsEntry [58-61] [x=5]
+      Identifier(x) [58-59] [x]
+      IntLiteral(5) [60-61] [5]
+  Query [66-74] [select 1]
+    Select [66-74] [select 1]
+      SelectList [73-74] [1]
+        SelectColumn [73-74] [1]
+          IntLiteral(1) [73-74] [1]
+--
+EXPORT DATA WITH CONNECTION (k1 = 'v1', k2 = 123) OPTIONS(x = 5) AS
+SELECT
+  1
+==
+
 export data with connection connection options(x=5) as select 1;
 --
 ExportDataStatement [0-63] [export data...as select 1]

@@ -537,9 +537,9 @@ documentation on the corresponding syntax.
 
 Produces a new table with the listed columns, similar to the outermost
 [`SELECT` clause][select-clause] in a table subquery in standard syntax. The
-`SELECT` operator supports standard output modifiers like `SELECT AS STRUCT` and
-`SELECT DISTINCT`. The `SELECT` operator
-also supports [window functions][window-functions],
+`SELECT` operator supports standard output modifiers like
+`SELECT AS STRUCT` and `SELECT DISTINCT`.
+The `SELECT` operator also supports [window functions][window-functions],
 including [named windows][named-windows]. Named windows are defined using the
 `WINDOW` keyword and are only visible to the current pipe `SELECT` operator.
 The `SELECT` operator doesn't support aggregations or anonymization.
@@ -1367,39 +1367,89 @@ TVFs in standard syntax can be called in the `FROM` clause or in a `JOIN`
 operation. These are both allowed in pipe syntax as well.
 
 In pipe syntax, TVFs that take a table argument can also be called with the
-`CALL` operator. The first table argument comes from the input table and
-must be omitted in the arguments. An optional table alias can be added for the
-output table.
+`CALL` operator. **By default, the pipe input table is passed as the first table
+argument** and omitted from the argument list. To pass the pipe input table as a
+different argument instead, use `INPUT TABLE`. For more details, see
+[TVFs with multiple table arguments][tvfs-multi-table-args].
 
-Multiple TVFs can be called sequentially without using nested subqueries.
+If `[AS] alias` is present, this adds a table alias for the TVF output table.
+
+Multiple TVFs can be called by writing consecutive `|> CALL` operators.
 
 **Examples**
 
-Suppose you have TVFs with the following parameters:
+Suppose you have TVFs defined as follows:
 
-+  `tvf1(inputTable1 ANY TABLE, arg1 ANY TYPE)` and
-+  `tvf2(arg2 ANY TYPE, arg3 ANY TYPE, inputTable2 ANY TABLE)`.
+*   `tvf1(inputTable1 ANY TABLE, arg1 STRING)`
+*   `tvf2(arg2 STRING, arg3 STRING, inputTable2 ANY TABLE)`
 
-The following examples compare calling both TVFs on an input table
-by using standard syntax and by using the `CALL` pipe operator:
+The following examples compare calling TVFs on an input table by using standard
+syntax and by using the `CALL` pipe operator:
 
 ```googlesql
--- Call the TVFs without using the CALL operator.
+-- Standard syntax: Chained TVF calls are nested in the FROM clause.
 SELECT *
 FROM
   tvf2(arg2, arg3, TABLE tvf1(TABLE input_table, arg1));
 ```
 
 ```googlesql
--- Call the same TVFs with the CALL operator.
+-- Pipe syntax: Chained TVF calls are written sequentially with `|> CALL`.
+-- The pipe input table is implicitly passed as the first table argument.
 FROM input_table
 |> CALL tvf1(arg1)
 |> CALL tvf2(arg2, arg3);
 ```
 
+#### TVFs with multiple table arguments 
+<a id="tvfs_multi_table_args"></a>
+
+When a TVF accepts multiple tables, the pipe input table is passed as the
+first table argument by default. You can also use `INPUT TABLE` to explicitly
+pass the pipe input table as a specific argument.
+
+Suppose you have a TVF defined as follows:
+
+*   `tvf3(table1 ANY TABLE, table2 ANY TABLE)`
+
+By default, the pipe input table is passed as the first table argument
+(`table1`):
+
+```googlesql
+-- Rely on default behavior for the first table argument.
+FROM input_table
+|> CALL tvf3(TABLE other_table);
+```
+
+This is equivalent to explicitly passing `INPUT TABLE` as the first argument:
+
+```googlesql
+-- Explicitly pass the pipe input table as the first argument.
+FROM input_table
+|> CALL tvf3(INPUT TABLE, TABLE other_table);
+```
+
+To pass the pipe input table as the second argument, use `INPUT TABLE`:
+
+```googlesql
+-- Use positional arguments with INPUT TABLE for the second argument.
+FROM input_table
+|> CALL tvf3(TABLE other_table, INPUT TABLE);
+```
+
+`INPUT TABLE` also works in named table arguments:
+
+```googlesql
+-- Use named arguments with INPUT TABLE for the second argument.
+FROM input_table
+|> CALL tvf3(table2 => INPUT TABLE, table1 => TABLE other_table);
+```
+
 [tvf]: https://github.com/google/googlesql/blob/master/docs/table-functions.md#tvfs
 
 [table-function-calls]: https://github.com/google/googlesql/blob/master/docs/query-syntax.md#table_function_calls
+
+[tvfs-multi-table-args]: #tvfs_multi_table_args
 
 ### `ORDER BY` pipe operator 
 <a id="order_by_pipe_operator"></a>
@@ -2537,8 +2587,8 @@ applicable:
 
 +   Columns in the current table, with their names, types, and table aliases.
     This result lists the columns that would be returned if the query were
-    executed up to this point. Value table columns display `<value>` in each
-    table field.
+    executed up to this point. Value table columns display
+    `<value>` in each table field.
 +   Table aliases, with a list of column names available under each.
 +   [Pseudocolumns][pseudocolumns],
      meaning columns that are available to
@@ -3313,7 +3363,7 @@ FROM Produce
 
 [using-aliases]: https://github.com/google/googlesql/blob/master/docs/query-syntax.md#using_aliases
 
-[select-star]: https://github.com/google/googlesql/blob/master/docs/query-syntax.md#select_
+[select-star]: https://github.com/google/googlesql/blob/master/docs/query-syntax.md#select_star
 
 [query-comparison]: #query_comparison
 

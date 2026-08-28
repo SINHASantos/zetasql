@@ -38,6 +38,9 @@ import com.google.googlesql.GoogleSQLType.TypeProto;
 import com.google.googlesql.GoogleSQLValue.ValueProto;
 import com.google.googlesql.GoogleSQLValue.ValueProto.TimestampPicos;
 import com.google.googlesqltest.TestProto3Proto.TestProto3Enum;
+import com.google.testing.junit.testparameterinjector.TestParameter;
+import com.google.testing.junit.testparameterinjector.TestParameterInjector;
+import com.google.testing.junit.testparameterinjector.TestParameters;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -54,9 +57,8 @@ import java.util.Map;
 import java.util.UUID;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.junit.runners.JUnit4;
 
-@RunWith(JUnit4.class)
+@RunWith(TestParameterInjector.class)
 
 public class ValueTest {
 
@@ -2952,6 +2954,64 @@ public class ValueTest {
     assertThat(valueProtoFromText("")).isEqualTo(rangeTimestampNull.getProto());
   }
 
+  @Test
+  @TestParameters(
+      "{protoText: 'column_list_spec_value: { column_names: [ \"col1\", \"col2\" ] }', expectNull:"
+          + " false}")
+  @TestParameters("{protoText: 'column_list_spec_value: {}', expectNull: false}")
+  @TestParameters("{protoText: '', expectNull: true}")
+  public void testColumnListSpecValueValidation_valid(String protoText, boolean expectNull) {
+    Type colListSpecType = TypeFactory.createSimpleType(TypeKind.TYPE_COLUMN_LIST_SPEC);
+    ValueProto proto = valueProtoFromText(protoText);
+    Value val = Value.deserialize(colListSpecType, proto);
+    assertThat(val.isNull()).isEqualTo(expectNull);
+    if (!expectNull) {
+      assertThat(val.getType()).isEqualTo(colListSpecType);
+    }
+  }
+
+  @Test
+  public void testColumnListSpecValueValidation_invalidProto(
+      @TestParameter({"column_list_spec_value: { column_names: [ \"\" ] }", "int32_value: 42"})
+          String protoText) {
+    Type colListSpecType = TypeFactory.createSimpleType(TypeKind.TYPE_COLUMN_LIST_SPEC);
+    ValueProto proto = valueProtoFromText(protoText);
+    assertThrows(IllegalArgumentException.class, () -> Value.deserialize(colListSpecType, proto));
+  }
+
+  @Test
+  public void testColumnListSpecValueValidation_nonSimpleType() {
+    Type colListSpecType = TypeFactory.createSimpleType(TypeKind.TYPE_COLUMN_LIST_SPEC);
+    ValueProto validProto =
+        valueProtoFromText("column_list_spec_value: { column_names: [ \"col1\", \"col2\" ] }");
+    Type nonSimpleColListType =
+        new Type(TypeKind.TYPE_COLUMN_LIST_SPEC) {
+          @Override
+          public void serialize(
+              TypeProto.Builder typeProtoBuilder,
+              FileDescriptorSetsBuilder fileDescriptorSetsBuilder) {
+            typeProtoBuilder.setTypeKind(getKind());
+          }
+
+          @Override
+          public int hashCode() {
+            return getKind().getNumber();
+          }
+
+          @Override
+          public String typeName(GoogleSQLOptions.ProductMode productMode) {
+            return "COLUMN_LIST_SPEC";
+          }
+
+          @Override
+          public String debugString(boolean details) {
+            return "COLUMN_LIST_SPEC";
+          }
+        };
+    assertThrows(
+        IllegalArgumentException.class, () -> Value.deserialize(nonSimpleColListType, validProto));
+  }
+
   public static void checkSerializeAndDeserialize(Value v1, Value v2) {
     assertThat(v1).isEqualTo(v2);
     assertThat(v2.hashCode()).isEqualTo(v1.hashCode());
@@ -3236,7 +3296,7 @@ public class ValueTest {
             "The number of fields of ValueProto has changed, "
                 + "please also update the serialization code accordingly.")
         .that(ValueProto.getDescriptor().getFields())
-        .hasSize(29);
+        .hasSize(30);
     assertWithMessage(
             "The number of fields of ValueProto::Array has changed, "
                 + "please also update the serialization code accordingly.")

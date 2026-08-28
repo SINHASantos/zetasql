@@ -1210,6 +1210,32 @@ CREATE FUNCTION myfunc()
 RETURNS string REMOTE WITH CONNECTION `myconn-abc`
 ==
 
+# Remote function with key-value connection.
+create function myfunc ( ) returns string remote with connection (k1 = 'v1', k2 = 'v2');
+--
+CreateFunctionStatement [0-87] [create function...k2 = 'v2')]
+  FunctionDeclaration [16-26] [myfunc ( )]
+    PathExpression [16-22] [myfunc]
+      Identifier(myfunc) [16-22] [myfunc]
+    FunctionParameters [23-26] [( )]
+  SimpleType [35-41] [string]
+    PathExpression [35-41] [string]
+      Identifier(string) [35-41] [string]
+  WithConnectionClause [49-87] [with connection...k2 = 'v2')]
+    ConnectionClause [54-87] [connection...k2 = 'v2')]
+      ConnectionKeyValuePair [66-75] [k1 = 'v1']
+        Identifier(k1) [66-68] [k1]
+        StringLiteral [71-75] ['v1']
+          StringLiteralComponent('v1') [71-75] ['v1']
+      ConnectionKeyValuePair [77-86] [k2 = 'v2']
+        Identifier(k2) [77-79] [k2]
+        StringLiteral [82-86] ['v2']
+          StringLiteralComponent('v2') [82-86] ['v2']
+--
+CREATE FUNCTION myfunc()
+RETURNS string REMOTE WITH CONNECTION (k1 = 'v1', k2 = 'v2')
+==
+
 # Remote function with missing connection.
 create function myfunc ( ) returns string remote with connection;
 --

@@ -1713,11 +1713,6 @@ void {{node.name}}::CollectDebugStringFields(
      # else
     if (!IsDefaultValue({{field.member_name}})) {
      # endif
-
-     # if node.name == 'ResolvedCatalogColumnRef' and field.name == 'column'
-     if ({{field.member_name}} != nullptr)
-     # endif
-
       fields->emplace_back("{{field.name}}", {{field.to_string_method}}({{field.member_name}}), {{field.member_name}}accessed(), column_created);
     }
     # endif
@@ -1858,8 +1853,7 @@ void {{node.name}}::MarkFieldsAccessed() const {
 std::vector<ResolvedColumn> {{node.name}}::GetColumnsCreated() const {
   std::vector<ResolvedColumn> columns = SUPER::GetColumnsCreated();
   # for field in node.fields
-   # if node.name == 'ResolvedColumnHolder'
-   # elif node.name == 'ResolvedScan' and field.name == 'column_list'
+   # if node.name == 'ResolvedScan' and field.name == 'column_list'
   if (ColumnListIsCreatedColumns()) {
     columns.insert(columns.end(),
                    {{field.member_name}}.begin(), {{field.member_name}}.end());
@@ -1881,10 +1875,9 @@ std::vector<ResolvedColumn> {{node.name}}::GetColumnsCreated() const {
 }
 
 std::vector<ResolvedColumn> {{node.name}}::GetColumnsReferenced() const {
-  std::vector<ResolvedColumn> columns = SUPER::GetColumnsCreated();
+  std::vector<ResolvedColumn> columns = SUPER::GetColumnsReferenced();
   # for field in node.fields
-   # if node.name == 'ResolvedColumnHolder'
-   # elif node.name == 'ResolvedScan' and field.name == 'column_list'
+   # if node.name == 'ResolvedScan' and field.name == 'column_list'
   if (!ColumnListIsCreatedColumns()) {
     columns.insert(columns.end(),
                    {{field.member_name}}.begin(), {{field.member_name}}.end());

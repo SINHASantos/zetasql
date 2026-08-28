@@ -225,3 +225,34 @@ CREATE EXTERNAL SCHEMA foo WITH CONNECTION bar
 ERROR: Syntax error: Expected keyword OPTIONS but got end of statement [at 1:47]
 CREATE EXTERNAL SCHEMA foo WITH CONNECTION bar
                                               ^
+==
+
+CREATE EXTERNAL SCHEMA foo WITH CONNECTION (k1 = 'v1', k2 = 'v2') OPTIONS ()
+--
+CreateExternalSchemaStatement [0-76] [CREATE EXTERNAL...OPTIONS ()]
+  PathExpression [23-26] [foo]
+    Identifier(foo) [23-26] [foo]
+  WithConnectionClause [27-65] [WITH CONNECTION...k2 = 'v2')]
+    ConnectionClause [32-65] [CONNECTION...k2 = 'v2')]
+      ConnectionKeyValuePair [44-53] [k1 = 'v1']
+        Identifier(k1) [44-46] [k1]
+        StringLiteral [49-53] ['v1']
+          StringLiteralComponent('v1') [49-53] ['v1']
+      ConnectionKeyValuePair [55-64] [k2 = 'v2']
+        Identifier(k2) [55-57] [k2]
+        StringLiteral [60-64] ['v2']
+          StringLiteralComponent('v2') [60-64] ['v2']
+  OptionsList [74-76] [()]
+--
+CREATE EXTERNAL SCHEMA foo WITH CONNECTION (k1 = 'v1', k2 = 'v2')
+OPTIONS()
+==
+
+CREATE EXTERNAL SCHEMA foo WITH CONNECTION () OPTIONS ()
+--
+ERROR: Syntax error: Unexpected ")" [at 1:45]
+CREATE EXTERNAL SCHEMA foo WITH CONNECTION () OPTIONS ()
+                                            ^
+==
+
+

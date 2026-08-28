@@ -177,6 +177,7 @@ cc_library(
         "tuple_comparator.cc",
         "unpivot_op.cc",
         "value_expr.cc",
+        "vector_tvfs.cc",
     ],
     hdrs = [
         "evaluation.h",
@@ -185,6 +186,7 @@ cc_library(
         "operator.h",
         "tuple.h",
         "tuple_comparator.h",
+        "vector_tvfs.h",
     ],
     deps = [
         ":common",
@@ -268,6 +270,7 @@ cc_library(
         "//googlesql/base:strings",
         "@com_google_googletest//:gtest",
         "@com_google_absl//absl/algorithm:container",
+        "@com_google_absl//absl/base",
         "@com_google_absl//absl/base:core_headers",
         "@com_google_absl//absl/base:log_severity",
         "@com_google_absl//absl/base:no_destructor",

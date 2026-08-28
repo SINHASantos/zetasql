@@ -2313,6 +2313,12 @@ absl::Status Resolver::PruneColumnLists(const ResolvedNode* node) const {
                     ->column_access_list_size() == 0)
       << "SetColumnAccessList was called before PruneColumnList";
 
+  GOOGLESQL_RET_CHECK(node->node_kind() != googlesql::RESOLVED_UPDATE_SCAN ||
+            node->GetAs<ResolvedUpdateScan>()
+                    ->update_stmt()
+                    ->column_access_list_size() == 0)
+      << "SetColumnAccessList was called before PruneColumnList";
+
   GOOGLESQL_RET_CHECK(node->node_kind() != googlesql::RESOLVED_DELETE_STMT ||
             node->GetAs<ResolvedDeleteStmt>()->column_access_list_size() == 0)
       << "SetColumnAccessList was called before PruneColumnList";

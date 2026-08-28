@@ -42,7 +42,7 @@ from googlesql.parser.generator_utils import UpperCamelCase
 
 # You can use `tag_id=GetTempTagId()` until doing the final submit.
 # That will avoid merge conflicts when syncing in other changes.
-NEXT_NODE_TAG_ID = 599
+NEXT_NODE_TAG_ID = 600
 
 
 def GetTempTagId():
@@ -6521,7 +6521,6 @@ def main(argv):
               """,
           ),
           Field('tvf', 'ASTTVF', tag_id=3),
-          Field('where_clause', 'ASTWhereClause', tag_id=4),
       ],
   )
 
@@ -6542,21 +6541,54 @@ def main(argv):
       ])
 
   gen.AddNode(
+      name='ASTConnectionKeyValuePair',
+      tag_id=599,
+      parent='ASTNode',
+      comment="""
+     This represents a key-value pair in a multi-connection clause:
+     `key = value`
+      """,
+      fields=[
+          Field(
+              'key',
+              'ASTIdentifier',
+              tag_id=2,
+              field_loader=FieldLoaderMethod.REQUIRED,
+          ),
+          Field(
+              'value',
+              'ASTExpression',
+              tag_id=3,
+              field_loader=FieldLoaderMethod.REQUIRED,
+          ),
+      ],
+  )
+
+  gen.AddNode(
       name='ASTConnectionClause',
       tag_id=159,
       parent='ASTNode',
       comment="""
-     This represents a clause of `CONNECTION DEFAULT` or `CONNECTION <path>`.
-     In the former form, the connection_path will be a default literal. In the
-     latter form, the connection_path will be a path expression.
+     This represents a clause of `CONNECTION DEFAULT` or `CONNECTION <path>`
+     or `CONNECTION (key = value, ...)`.
+     In the first two forms, the connection_path will be set. In the third form,
+     the connection_kv_pairs will be populated.
       """,
       fields=[
           Field(
               'connection_path',
               'ASTExpression',
               tag_id=2,
-              field_loader=FieldLoaderMethod.REQUIRED),
-      ])
+              field_loader=FieldLoaderMethod.OPTIONAL_EXPRESSION,
+          ),
+          Field(
+              'connection_kv_pairs',
+              'ASTConnectionKeyValuePair',
+              tag_id=3,
+              field_loader=FieldLoaderMethod.REST_AS_REPEATED,
+          ),
+      ],
+  )
 
   gen.AddNode(
       name='ASTGraphClause',

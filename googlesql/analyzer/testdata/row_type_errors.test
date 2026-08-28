@@ -1,6 +1,6 @@
 # This has tests for error cases where ROW types are not allowed.
-# All tests run on both KeyValue{{Lazy|FindOnly}}, and mostly get
-# the same errors for both.
+# All tests run on both KeyValue{{Lazy|FindOnly}}, and mostly get the same
+# errors for both.
 
 # TODO: Enable testing modes disabled with no_* options.
 [default language_features=MAXIMUM,+ROW_TYPE]
@@ -304,7 +304,6 @@ INSERT INTO KeyValueFindOnly (key)
             ^
 ==
 
-# TODO: Making unqualified names work is in a later change.
 UPDATE KeyValue{{Lazy|FindOnly}} kv
 SET {{|kv.}}key=5
 WHERE true
@@ -343,7 +342,6 @@ UPDATE KeyValueFindOnly kv
        ^
 ==
 
-# TODO: Making unqualified names work is in a later change.
 DELETE FROM KeyValue{{Lazy|FindOnly}} kv
 WHERE {{|kv.}}key=5
 --

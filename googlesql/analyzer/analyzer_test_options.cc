@@ -25,9 +25,11 @@
 #include "googlesql/public/testing/test_case_options_util.h"
 #include "googlesql/public/type.h"
 #include "googlesql/public/types/struct_type.h"
+#include "googlesql/public/types/type_factory.h"
 #include "googlesql/testdata/test_schema.pb.h"
 #include "absl/container/flat_hash_set.h"
 #include "googlesql/base/check.h"
+#include "absl/log/log.h"
 #include "googlesql/base/status_macros.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/str_split.h"
@@ -227,6 +229,8 @@ std::vector<std::pair<std::string, const googlesql::Type*>> GetQueryParameters(
   GOOGLESQL_CHECK_OK(type_factory->MakeArrayType(type_factory->get_int64(),
                                        &array_int64_type));
 
+  const googlesql::Type* array_float_type = googlesql::types::FloatArrayType();
+
   const googlesql::Type* array_double_type;
   GOOGLESQL_CHECK_OK(type_factory->MakeArrayType(type_factory->get_double(),
                                        &array_double_type));
@@ -296,6 +300,7 @@ std::vector<std::pair<std::string, const googlesql::Type*>> GetQueryParameters(
       {"test_param_enum", enum_type},
       {"test_param_array", array_type},
       {"test_param_array_int64", array_int64_type},
+      {"test_param_array_float", array_float_type},
       {"test_param_array_double", array_double_type},
       {"test_param_array_string", array_string_type},
       {"test_param_array_enum", array_enum_type},

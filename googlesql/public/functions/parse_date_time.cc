@@ -26,7 +26,6 @@
 #include <string>
 #include <vector>
 
-#include "googlesql/base/logging.h"
 #include "googlesql/common/errors.h"
 #include "googlesql/public/civil_time.h"
 #include "googlesql/public/functions/date_time_util.h"

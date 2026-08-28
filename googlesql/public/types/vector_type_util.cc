@@ -16,13 +16,17 @@
 
 #include "googlesql/public/types/vector_type_util.h"
 
+#include <optional>
 #include <string>
+#include <utility>
 
 #include "googlesql/public/options.pb.h"
+#include "googlesql/public/types/builtin_declarative_types.h"
 #include "googlesql/public/types/declarative_type.h"
 #include "googlesql/public/types/type.h"
 #include "googlesql/public/types/type_factory.h"
 #include "absl/status/statusor.h"
+#include "googlesql/base/ret_check.h"
 
 namespace googlesql {
 
@@ -32,6 +36,9 @@ bool IsVectorType(const Type* type) {
 }
 
 absl::StatusOr<const Type*> MakeVectorType(TypeFactory* type_factory) {
+  std::optional<TypeParameterHandlers> type_parameter_handlers =
+      GetBuiltinTypeParameterHandlers(kVectorTypeName);
+  GOOGLESQL_RET_CHECK(type_parameter_handlers.has_value());
   return type_factory->MakeDeclarativeType(
       DeclarativeTypeDescriptor()
           .set_type_id({std::string(TypeId::kGoogleSqlNamespace),
@@ -40,6 +47,7 @@ absl::StatusOr<const Type*> MakeVectorType(TypeFactory* type_factory) {
           .set_backing_type(type_factory->get_bytes())
           .set_returning_strategy(
               DeclarativeTypeDescriptor::ReturningDelegated{})
+          .set_type_parameter_handlers(std::move(type_parameter_handlers))
           .set_additional_required_language_features({FEATURE_VECTOR_TYPE}));
 }
 

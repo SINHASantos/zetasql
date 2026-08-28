@@ -6,21 +6,20 @@ FROM TestTable
                    FROM group_rows()
                    |> SELECT key)
 --
-ERROR: GROUP ROWS is not supported. [at 3:41]
+ERROR: GROUP ROWS is not supported [at 3:25]
 |> AGGREGATE ARRAY(WITH group_rows() AS GROUP ROWS
-                                        ^
+                        ^
 ==
 
 [default language_features=MAXIMUM,+WITH_GROUP_ROWS]
-[default no_run_sqlbuilder]
-# TODO: b/430036320 - Enable SQL builder once it supports GROUP ROWS.
+[default no_show_sqlbuilder_output]
 
 # Group rows in PIPE WITH operator fails.
 FROM TestTable
 |> WITH group_rows() AS GROUP ROWS
 |> SELECT key
 --
-ERROR: GROUP ROWS not supported in Pipe WITH operator [at 5:9]
+ERROR: GROUP ROWS not supported in Pipe WITH operator [at 3:9]
 |> WITH group_rows() AS GROUP ROWS
         ^
 ==
@@ -514,6 +513,7 @@ QueryStmt
 
 # Correlated reference to grouping key inside a GROUP ROWS subquery in pipe
 # AGGREGATE is supported. (non group by key is rejected)
+[show_sqlbuilder_output]
 FROM EnumTable
 |> AGGREGATE
      ARRAY(
@@ -562,6 +562,57 @@ QueryStmt
                     +-AnotherTestEnum#15 := ColumnRef(type=ENUM<googlesql_test.AnotherTestEnum>, column=EnumTable.AnotherTestEnum#3)
                     +-Filename#16 := ColumnRef(type=STRING, column=EnumTable.Filename#4)
                     +-RowId#17 := ColumnRef(type=BYTES, column=EnumTable.RowId#5)
+
+[SQLBUILDER_TARGET_SYNTAX_MODE standard]
+[SQLBUILDER_OUTPUT]
+SELECT
+  enumtable_6.a_1 AS key,
+  ARRAY(WITH
+      group_rows_7() AS GROUP ROWS
+    SELECT
+      STRUCT< INT32, INT32 > (gr_8.a_1, enumtable_6.a_1) AS a_9
+    FROM
+      group_rows_7() AS gr_8
+  ) AS a_11
+FROM
+  (
+    SELECT
+      EnumTable.key AS a_1,
+      EnumTable.TestEnum AS a_2,
+      EnumTable.AnotherTestEnum AS a_3,
+      EnumTable.Filename AS a_4,
+      EnumTable.RowId AS a_5
+    FROM
+      EnumTable
+  ) AS enumtable_6
+GROUP BY 1;
+
+[SQLBUILDER_TARGET_SYNTAX_MODE pipe]
+[SQLBUILDER_OUTPUT]
+FROM
+  EnumTable
+|> SELECT
+     EnumTable.key AS a_1,
+     EnumTable.TestEnum AS a_2,
+     EnumTable.AnotherTestEnum AS a_3,
+     EnumTable.Filename AS a_4,
+     EnumTable.RowId AS a_5
+|> AS enumtable_6
+|> EXTEND
+     enumtable_6.a_1 AS a_7
+|> AGGREGATE
+     ARRAY(WITH
+         group_rows_8() AS GROUP ROWS
+       FROM
+         group_rows_8() AS gr_9
+       |> SELECT
+            STRUCT< INT32, INT32 > (gr_9.a_1, a_7) AS a_10
+     ) AS a_11
+   GROUP BY a_7
+|> AS aggregatescan_12
+|> SELECT
+     aggregatescan_12.a_7 AS key,
+     aggregatescan_12.a_11 AS a_11;
 --
 ALTERNATION GROUP: EnumTable.TestEnum
 --
@@ -649,9 +700,9 @@ FROM TestTable
                 FROM group_rows()
                 |> SELECT key)
 --
-ERROR: Pipe SELECT cannot include aggregate expressions [at 2:11]
+ERROR: GROUP ROWS is not allowed in pipe SELECT [at 2:17]
 |> SELECT ARRAY(WITH group_rows() AS GROUP ROWS
-          ^
+                ^
 ==
 
 # Group rows has same schema as <from> value table in pipes.
@@ -952,9 +1003,9 @@ FROM TestTable
                                    FROM group_rows()
                                    |> SELECT int_a))
 --
-ERROR: Pipe SELECT cannot include aggregate expressions [at 4:30]
+ERROR: GROUP ROWS is not allowed in pipe SELECT [at 4:36]
                    |> SELECT ARRAY(WITH group_rows() AS GROUP ROWS
-                             ^
+                                   ^
 ==
 
 # Group rows has same schema as <from> value table in pipes.
@@ -1502,3 +1553,12 @@ QueryStmt
                             |         +-int_d#42 := ColumnRef(type=INT64, column=MultipleColumns.int_d#29)
                             +-limit=
                               +-Literal(type=INT64, value=1)
+==
+
+# Aggregate subquery using GROUP ROWS in WHERE clause is not allowed.
+FROM TestTable
+|> WHERE EXISTS(SELECT 1 FROM GROUP ROWS)
+--
+ERROR: GROUP ROWS is not allowed in pipe WHERE clause [at 2:17]
+|> WHERE EXISTS(SELECT 1 FROM GROUP ROWS)
+                ^

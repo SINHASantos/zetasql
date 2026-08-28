@@ -3683,6 +3683,7 @@ QueryStmt
 Rewrite ERROR: generic::unimplemented: TVF arguments that reference columns are not supported. Arg #1 ('arg0') references column 'b'.
 ==
 
+# ExecuteAsRoleScan is not supported by SQLBuilder
 [no_run_sqlbuilder]
 SELECT * FROM DefinerRightsTvf((select count(*) from KeyValue))
 --
@@ -3773,6 +3774,99 @@ QueryStmt
             |                 +-column_list=[$inlined_DefinerRightsTvf.a#9]
             |                 +-input_scan=
             |                   +-WithRefScan(column_list=[$inlined_DefinerRightsTvf.a#9], with_query_name="$inlined_DefinerRightsTvf_scalar_args")
+            +-original_inlined_view=<null>
+            +-original_inlined_tvf=DefinerRightsTvf
+==
+
+# ExecuteAsRoleScan is not supported by SQLBuilder
+[no_run_sqlbuilder]
+SELECT key FROM DefinerRightsTvf((select count(*) from KeyValue))
+--
+QueryStmt
++-output_column_list=
+| +-DefinerRightsTvf.Key#4 AS key [INT64]
++-query=
+  +-ProjectScan
+    +-column_list=[DefinerRightsTvf.Key#4]
+    +-input_scan=
+      +-TVFScan
+        +-column_list=[DefinerRightsTvf.Key#4]
+        +-tvf=DefinerRightsTvf
+        +-signature=(INT64) -> TABLE<Key INT64, Value STRING>
+        +-argument_list=
+        | +-FunctionArgument
+        |   +-expr=
+        |     +-SubqueryExpr
+        |       +-type=INT64
+        |       +-subquery_type=SCALAR
+        |       +-subquery=
+        |         +-ProjectScan
+        |           +-column_list=[$aggregate.$agg1#3]
+        |           +-input_scan=
+        |             +-AggregateScan
+        |               +-column_list=[$aggregate.$agg1#3]
+        |               +-input_scan=
+        |               | +-TableScan(table=KeyValue)
+        |               +-aggregate_list=
+        |                 +-$agg1#3 := AggregateFunctionCall(GoogleSQL:$count_star() -> INT64)
+        +-column_index_list=[0]
+        +-function_call_signature=(INT64 a) -> TABLE<Key INT64, Value STRING>
+
+[REWRITTEN AST]
+QueryStmt
++-output_column_list=
+| +-DefinerRightsTvf.Key#4 AS key [INT64]
++-query=
+  +-ProjectScan
+    +-column_list=[DefinerRightsTvf.Key#4]
+    +-input_scan=
+      +-WithScan
+        +-column_list=[DefinerRightsTvf.Key#4, KeyValue.Value#8]
+        +-with_entry_list=
+        | +-WithEntry
+        |   +-with_query_name="$inlined_DefinerRightsTvf_scalar_args"
+        |   +-with_subquery=
+        |     +-ProjectScan
+        |       +-column_list=[$inlined_DefinerRightsTvf.a#9]
+        |       +-expr_list=
+        |       | +-a#9 :=
+        |       |   +-SubqueryExpr
+        |       |     +-type=INT64
+        |       |     +-subquery_type=SCALAR
+        |       |     +-subquery=
+        |       |       +-ProjectScan
+        |       |         +-column_list=[$aggregate.$agg1#3]
+        |       |         +-input_scan=
+        |       |           +-AggregateScan
+        |       |             +-column_list=[$aggregate.$agg1#3]
+        |       |             +-input_scan=
+        |       |             | +-TableScan(table=KeyValue)
+        |       |             +-aggregate_list=
+        |       |               +-$agg1#3 := AggregateFunctionCall(GoogleSQL:$count_star() -> INT64)
+        |       +-input_scan=
+        |         +-SingleRowScan
+        +-query=
+          +-ExecuteAsRoleScan
+            +-column_list=[DefinerRightsTvf.Key#4, KeyValue.Value#8]
+            +-input_scan=
+            | +-ProjectScan
+            |   +-column_list=[DefinerRightsTvf.Key#6, KeyValue.Value#7]
+            |   +-input_scan=
+            |     +-FilterScan
+            |       +-column_list=[DefinerRightsTvf.Key#6, KeyValue.Value#7]
+            |       +-input_scan=
+            |       | +-TableScan(column_list=[DefinerRightsTvf.Key#6, KeyValue.Value#7], table=KeyValue, column_index_list=[0, 1])
+            |       +-filter_expr=
+            |         +-FunctionCall(GoogleSQL:$equal(INT64, INT64) -> BOOL)
+            |           +-ColumnRef(type=INT64, column=DefinerRightsTvf.Key#6)
+            |           +-SubqueryExpr
+            |             +-type=INT64
+            |             +-subquery_type=SCALAR
+            |             +-subquery=
+            |               +-ProjectScan
+            |                 +-column_list=[$inlined_DefinerRightsTvf.a#10]
+            |                 +-input_scan=
+            |                   +-WithRefScan(column_list=[$inlined_DefinerRightsTvf.a#10], with_query_name="$inlined_DefinerRightsTvf_scalar_args")
             +-original_inlined_view=<null>
             +-original_inlined_tvf=DefinerRightsTvf
 ==
@@ -5062,6 +5156,39 @@ QueryStmt
         +-original_inlined_tvf=DupColsDefinerTvf
 ==
 
+# ExecuteAsRoleScan is not supported by SQLBuilder
+[no_run_sqlbuilder]
+[default use_database=db]
+SELECT k1 FROM DupColsDefinerTvf();
+--
+QueryStmt
++-output_column_list=
+| +-DupColsDefinerTvf.k1#1 AS k1 [INT64]
++-query=
+  +-ProjectScan
+    +-column_list=[DupColsDefinerTvf.k1#1]
+    +-input_scan=
+      +-TVFScan(column_list=[DupColsDefinerTvf.k1#1], tvf=DupColsDefinerTvf, signature=() -> TABLE<k1 INT64, k2 INT64>, column_index_list=[0], function_call_signature=() -> TABLE<k1 INT64, k2 INT64>)
+
+[REWRITTEN AST]
+QueryStmt
++-output_column_list=
+| +-DupColsDefinerTvf.k1#1 AS k1 [INT64]
++-query=
+  +-ProjectScan
+    +-column_list=[DupColsDefinerTvf.k1#1]
+    +-input_scan=
+      +-ExecuteAsRoleScan
+        +-column_list=DupColsDefinerTvf.[k1#1, k1#4]
+        +-input_scan=
+        | +-ProjectScan
+        |   +-column_list=DupColsDefinerTvf.[k1#3, k1#3]
+        |   +-input_scan=
+        |     +-TableScan(column_list=[DupColsDefinerTvf.k1#3], table=KeyValue, column_index_list=[0])
+        +-original_inlined_view=<null>
+        +-original_inlined_tvf=DupColsDefinerTvf
+==
+
 [prepare_database=db]
 CREATE TABLE FUNCTION NestedDupColsTvf()  AS SELECT k1 AS k3, k1 AS k4 FROM DupColsTvf();
 --
@@ -5207,3 +5334,97 @@ QueryStmt
                 +-column_list=CteDupColsTvf.[k1#1, k1#1]
                 +-input_scan=
                   +-WithRefScan(column_list=[t.k1#4, CteDupColsTvf.k1#1], with_query_name="t")
+
+==
+
+[prepare_database=db]
+CREATE TABLE FUNCTION DupColsOutOfOrderDefinerTvf() SQL SECURITY DEFINER AS SELECT key as k1, value, key as k2 FROM KeyValue;
+--
+CreateTableFunctionStmt
++-name_path=DupColsOutOfOrderDefinerTvf
++-signature=() -> TABLE<k1 INT64, value STRING, k2 INT64>
++-language="SQL"
++-code="SELECT key as k1, value, key as k2 FROM KeyValue"
++-query=
+| +-ProjectScan
+|   +-column_list=KeyValue.[Key#1, Value#2, Key#1]
+|   +-input_scan=
+|     +-TableScan(column_list=KeyValue.[Key#1, Value#2], table=KeyValue, column_index_list=[0, 1])
++-output_column_list=
+| +-KeyValue.Key#1 AS k1 [INT64]
+| +-KeyValue.Value#2 AS value [STRING]
+| +-KeyValue.Key#1 AS k2 [INT64]
++-sql_security=SQL_SECURITY_DEFINER
+==
+
+# ExecuteAsRoleScan is not supported by SQLBuilder
+[no_run_sqlbuilder]
+[default use_database=db]
+SELECT k2 FROM DupColsOutOfOrderDefinerTvf();
+--
+QueryStmt
++-output_column_list=
+| +-DupColsOutOfOrderDefinerTvf.k2#3 AS k2 [INT64]
++-query=
+  +-ProjectScan
+    +-column_list=[DupColsOutOfOrderDefinerTvf.k2#3]
+    +-input_scan=
+      +-TVFScan(column_list=[DupColsOutOfOrderDefinerTvf.k2#3], tvf=DupColsOutOfOrderDefinerTvf, signature=() -> TABLE<k1 INT64, value STRING, k2 INT64>, column_index_list=[2], function_call_signature=() -> TABLE<k1 INT64, value STRING, k2 INT64>)
+
+[REWRITTEN AST]
+QueryStmt
++-output_column_list=
+| +-DupColsOutOfOrderDefinerTvf.k2#3 AS k2 [INT64]
++-query=
+  +-ProjectScan
+    +-column_list=[DupColsOutOfOrderDefinerTvf.k2#3]
+    +-input_scan=
+      +-ExecuteAsRoleScan
+        +-column_list=[DupColsOutOfOrderDefinerTvf.k2#3, KeyValue.Value#6, DupColsOutOfOrderDefinerTvf.k2#7]
+        +-input_scan=
+        | +-ProjectScan
+        |   +-column_list=[DupColsOutOfOrderDefinerTvf.k2#4, KeyValue.Value#5, DupColsOutOfOrderDefinerTvf.k2#4]
+        |   +-input_scan=
+        |     +-TableScan(column_list=[DupColsOutOfOrderDefinerTvf.k2#4, KeyValue.Value#5], table=KeyValue, column_index_list=[0, 1])
+        +-original_inlined_view=<null>
+        +-original_inlined_tvf=DupColsOutOfOrderDefinerTvf
+==
+
+# ExecuteAsRoleScan is not supported by SQLBuilder
+[no_run_sqlbuilder]
+[default use_database=db]
+SELECT k1, k2 FROM DupColsOutOfOrderDefinerTvf();
+--
+QueryStmt
++-output_column_list=
+| +-DupColsOutOfOrderDefinerTvf.k1#1 AS k1 [INT64]
+| +-DupColsOutOfOrderDefinerTvf.k2#3 AS k2 [INT64]
++-query=
+  +-ProjectScan
+    +-column_list=DupColsOutOfOrderDefinerTvf.[k1#1, k2#3]
+    +-input_scan=
+      +-TVFScan(column_list=DupColsOutOfOrderDefinerTvf.[k1#1, k2#3], tvf=DupColsOutOfOrderDefinerTvf, signature=() -> TABLE<k1 INT64, value STRING, k2 INT64>, column_index_list=[0, 2], function_call_signature=() -> TABLE<k1 INT64, value STRING, k2 INT64>)
+
+[REWRITTEN AST]
+QueryStmt
++-output_column_list=
+| +-DupColsOutOfOrderDefinerTvf.k1#1 AS k1 [INT64]
+| +-DupColsOutOfOrderDefinerTvf.k2#3 AS k2 [INT64]
++-query=
+  +-ProjectScan
+    +-column_list=DupColsOutOfOrderDefinerTvf.[k1#1, k2#3]
+    +-input_scan=
+      +-ExecuteAsRoleScan
+        +-column_list=[DupColsOutOfOrderDefinerTvf.k1#1, KeyValue.Value#7, DupColsOutOfOrderDefinerTvf.k2#3]
+        +-input_scan=
+        | +-ProjectScan
+        |   +-column_list=[DupColsOutOfOrderDefinerTvf.k1#4, KeyValue.Value#6, DupColsOutOfOrderDefinerTvf.k2#5]
+        |   +-expr_list=
+        |   | +-k2#5 := ColumnRef(type=INT64, column=DupColsOutOfOrderDefinerTvf.k1#4)
+        |   +-input_scan=
+        |     +-ProjectScan
+        |       +-column_list=[DupColsOutOfOrderDefinerTvf.k1#4, KeyValue.Value#6, DupColsOutOfOrderDefinerTvf.k1#4]
+        |       +-input_scan=
+        |         +-TableScan(column_list=[DupColsOutOfOrderDefinerTvf.k1#4, KeyValue.Value#6], table=KeyValue, column_index_list=[0, 1])
+        +-original_inlined_view=<null>
+        +-original_inlined_tvf=DupColsOutOfOrderDefinerTvf

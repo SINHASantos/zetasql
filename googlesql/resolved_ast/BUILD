@@ -772,6 +772,7 @@ cc_test(
         "//googlesql/public:options_cc_proto",
         "//googlesql/public:simple_catalog",
         "//googlesql/public:value",
+        "//googlesql/public/annotation:collation",
         "//googlesql/public/proto:type_annotation_cc_proto",
         "//googlesql/public/types",
         "@com_google_absl//absl/status",

@@ -7719,16 +7719,9 @@ absl::StatusOr<TypeParameters> Resolver::ResolveTypeParameters(
                    ResolveParameterLiterals(*type_parameters));
 
   // Validate type parameters and get the resolved TypeParameters class.
-  absl::StatusOr<TypeParameters> type_params_or_status;
-  if (IsVectorType(&resolved_type)) {
-    // TODO: Design a generalized and declarative approach to
-    // resolve type parameters on declarative types.
-    type_params_or_status = ResolveVectorTypeParameters(
-        type_parameters, resolved_type_parameter_list);
-  } else {
-    type_params_or_status = resolved_type.ValidateAndResolveTypeParameters(
-        resolved_type_parameter_list, product_mode());
-  }
+  absl::StatusOr<TypeParameters> type_params_or_status =
+      resolved_type.ValidateAndResolveTypeParameters(
+          resolved_type_parameter_list, product_mode());
 
   // TODO: Modify ValidateAndResolveTypeParameters to
   // handle the attachment of the error location. This can be done by taking an
@@ -13501,55 +13494,4 @@ Resolver::ResolveMapBracedConstructorEntries(
 
   return entries;
 }
-
-absl::StatusOr<TypeParameters> Resolver::ResolveVectorTypeParameters(
-    const ASTTypeParameterList* type_parameters,
-    const std::vector<TypeParameterValue>& resolved_type_parameter_list) {
-  GOOGLESQL_RET_CHECK(!resolved_type_parameter_list.empty());
-  if (resolved_type_parameter_list.size() > 2) {
-    return MakeSqlErrorAt(type_parameters)
-           << "VECTOR type has too many type parameters. Found "
-           << resolved_type_parameter_list.size() << " parameters";
-  }
-  const TypeParameterValue& param = resolved_type_parameter_list[0];
-  if (param.IsSpecialLiteral() || !param.GetValue().has_int64_value()) {
-    return MakeSqlErrorAt(type_parameters)
-           << "VECTOR length parameter must be an integer literal";
-  }
-  int64_t length = param.GetValue().int64_value();
-  if (length <= 0) {
-    return MakeSqlErrorAt(type_parameters)
-           << "VECTOR length must be greater than 0";
-  }
-  VectorTypeParametersProto proto;
-  proto.set_length(length);
-
-  // Try parsing the encoding parameter.
-  if (resolved_type_parameter_list.size() > 1) {
-    const TypeParameterValue& encoding_param = resolved_type_parameter_list[1];
-    // TODO: Support NULL as length type parameter.
-    // It checks special literals first since we do not support passing NULL
-    // as a type parameter for now.
-    if (encoding_param.IsSpecialLiteral() ||
-        !encoding_param.GetValue().has_string_value()) {
-      return MakeSqlErrorAt(type_parameters)
-             << "VECTOR encoding parameter must be a string literal";
-    }
-    // The encoding string is case-insensitive, so we convert it to uppercase
-    // before parsing.
-    std::string encoding_str = encoding_param.GetValue().string_value();
-    absl::AsciiStrToUpper(&encoding_str);
-    googlesql::VectorEncodingId::Id encoding_enum;
-    if (!googlesql::VectorEncodingId_Id_Parse(encoding_str, &encoding_enum) ||
-        encoding_enum == googlesql::VectorEncodingId::UNKNOWN_VECTOR_ENCODING) {
-      return MakeSqlErrorAt(type_parameters)
-             << R"(Unrecognized VECTOR encoding: ")"
-             << encoding_param.GetValue().string_value() << R"(")";
-    }
-    proto.set_encoding(encoding_enum);
-  }
-
-  return TypeParameters::MakeVectorTypeParameters(proto);
-}
-
 }  // namespace googlesql

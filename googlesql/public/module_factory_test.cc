@@ -506,6 +506,152 @@ TEST_F(FetchAllModuleAndProtoContentsTest, InvalidProtoImport) {
               HasSubstr("IMPORT PROTO must be followed by a file path"));
 }
 
+TEST_F(FetchAllModuleAndProtoContentsTest,
+       FetchTransitiveProtoDependenciesEmpty) {
+  GOOGLESQL_EXPECT_OK(FetchTransitiveProtoDependencies({}, module_fetcher_.get(),
+                                             &proto_info_map_, &errors_));
+  EXPECT_TRUE(proto_info_map_.empty());
+  EXPECT_TRUE(errors_.empty());
+}
+
+TEST_F(FetchAllModuleAndProtoContentsTest,
+       FetchTransitiveProtoDependenciesMultipleInitialProtos) {
+  const std::vector<std::string> initial_proto_names = {
+      "googlesql/testdata/proto_dag_like/c.proto",
+      "googlesql/testdata/proto_dag_like/d.proto"};
+  GOOGLESQL_EXPECT_OK(FetchTransitiveProtoDependencies(
+      initial_proto_names, module_fetcher_.get(), &proto_info_map_, &errors_));
+  std::set<std::string> expected_proto_file_names = {
+      "googlesql/testdata/proto_dag_like/c.proto",
+      "googlesql/testdata/proto_dag_like/d.proto"};
+  EXPECT_EQ(proto_info_map_.size(), expected_proto_file_names.size());
+  CheckFetchedProtoFileNames(expected_proto_file_names);
+  EXPECT_TRUE(errors_.empty());
+}
+
+TEST_F(FetchAllModuleAndProtoContentsTest,
+       FetchTransitiveProtoDependenciesDag) {
+  const std::vector<std::string> initial_proto_names = {
+      "googlesql/testdata/proto_dag_like/a.proto"};
+  GOOGLESQL_EXPECT_OK(FetchTransitiveProtoDependencies(
+      initial_proto_names, module_fetcher_.get(), &proto_info_map_, &errors_));
+  std::set<std::string> expected_proto_file_names = {
+      "googlesql/testdata/proto_dag_like/a.proto",
+      "googlesql/testdata/proto_dag_like/b1.proto",
+      "googlesql/testdata/proto_dag_like/b2.proto",
+      "googlesql/testdata/proto_dag_like/c.proto",
+      "googlesql/testdata/proto_dag_like/d.proto"};
+  EXPECT_EQ(proto_info_map_.size(), expected_proto_file_names.size());
+  CheckFetchedProtoFileNames(expected_proto_file_names);
+  EXPECT_TRUE(errors_.empty());
+}
+
+TEST_F(FetchAllModuleAndProtoContentsTest,
+       FetchTransitiveProtoDependenciesClearsInputMaps) {
+  const std::string existing_proto = "unrelated/proto.proto";
+  ProtoContentsInfo existing_info;
+  existing_info.filename = existing_proto;
+  proto_info_map_[existing_proto] = std::move(existing_info);
+  errors_.push_back(absl::InternalError("stale error"));
+
+  // c.proto depends on d.proto.
+  const std::vector<std::string> initial_proto_names = {
+      "googlesql/testdata/proto_dag_like/c.proto"};
+  GOOGLESQL_EXPECT_OK(FetchTransitiveProtoDependencies(
+      initial_proto_names, module_fetcher_.get(), &proto_info_map_, &errors_));
+  std::set<std::string> expected_proto_file_names = {
+      "googlesql/testdata/proto_dag_like/c.proto",
+      "googlesql/testdata/proto_dag_like/d.proto"};
+  EXPECT_EQ(proto_info_map_.size(), expected_proto_file_names.size());
+  CheckFetchedProtoFileNames(expected_proto_file_names);
+  EXPECT_TRUE(errors_.empty());
+}
+
+TEST_F(FetchAllModuleAndProtoContentsTest,
+       FetchTransitiveProtoDependenciesProtoNotFound) {
+  const std::vector<std::string> initial_proto_names = {
+      "nonexistent/proto/file.proto"};
+  const absl::Status status = FetchTransitiveProtoDependencies(
+      initial_proto_names, module_fetcher_.get(), &proto_info_map_, &errors_);
+  EXPECT_TRUE(proto_info_map_.empty());
+  ASSERT_EQ(errors_.size(), 1);
+  EXPECT_THAT(
+      errors_[0],
+      StatusIs(
+          absl::StatusCode::kInvalidArgument,
+          HasSubstr(
+              "Fetching proto file 'nonexistent/proto/file.proto' failed")));
+  EXPECT_EQ(status, errors_[0]);
+}
+
+class DefaultModuleContentsFetcher : public ModuleContentsFetcher {
+ public:
+  absl::Status FetchModuleContents(
+      const std::vector<std::string>& module_name_path,
+      ModuleContentsInfo* module_contents) override {
+    return absl::OkStatus();
+  }
+};
+
+class ErrorModuleContentsFetcher : public ModuleContentsFetcher {
+ public:
+  explicit ErrorModuleContentsFetcher(absl::Status error_status)
+      : error_status_(std::move(error_status)) {}
+  absl::Status FetchModuleContents(
+      const std::vector<std::string>& module_name_path,
+      ModuleContentsInfo* module_contents) override {
+    return error_status_;
+  }
+  absl::Status FetchProtoFileDescriptor(
+      const std::string& proto_file_name,
+      const google::protobuf::FileDescriptor** proto_file_descriptor) override {
+    return error_status_;
+  }
+
+ private:
+  absl::Status error_status_;
+};
+
+TEST(ModuleContentsFetcherTest, DefaultFetchProtoFileDescriptorReturnsError) {
+  DefaultModuleContentsFetcher fetcher;
+  const google::protobuf::FileDescriptor* descriptor = nullptr;
+  EXPECT_THAT(fetcher.FetchProtoFileDescriptor("test.proto", &descriptor),
+              StatusIs(absl::StatusCode::kInvalidArgument,
+                       HasSubstr("The IMPORT PROTO statement is not supported "
+                                 "inside of modules")));
+}
+
+TEST_F(FetchAllModuleAndProtoContentsTest,
+       FetchTransitiveProtoDependenciesWithDefaultFetcherErrors) {
+  DefaultModuleContentsFetcher default_fetcher;
+  const std::vector<std::string> initial_proto_names = {
+      "googlesql/testdata/test_schema.proto"};
+  const absl::Status status = FetchTransitiveProtoDependencies(
+      initial_proto_names, &default_fetcher, &proto_info_map_, &errors_);
+  EXPECT_TRUE(proto_info_map_.empty());
+  ASSERT_EQ(errors_.size(), 1);
+  EXPECT_THAT(errors_[0],
+              StatusIs(absl::StatusCode::kInvalidArgument,
+                       HasSubstr("The IMPORT PROTO statement is not supported "
+                                 "inside of modules")));
+  EXPECT_EQ(status, errors_[0]);
+}
+
+TEST_F(FetchAllModuleAndProtoContentsTest,
+       FetchTransitiveProtoDependenciesCustomFetcherError) {
+  ErrorModuleContentsFetcher error_fetcher(
+      absl::PermissionDeniedError("custom permission denied"));
+  const std::vector<std::string> initial_proto_names = {
+      "googlesql/testdata/test_schema.proto"};
+  const absl::Status status = FetchTransitiveProtoDependencies(
+      initial_proto_names, &error_fetcher, &proto_info_map_, &errors_);
+  EXPECT_TRUE(proto_info_map_.empty());
+  ASSERT_EQ(errors_.size(), 1);
+  EXPECT_THAT(errors_[0], StatusIs(absl::StatusCode::kPermissionDenied,
+                                   HasSubstr("custom permission denied")));
+  EXPECT_EQ(status, errors_[0]);
+}
+
 class FetchAllModuleContentsTest : public ::testing::Test {
  protected:
   FetchAllModuleContentsTest() {

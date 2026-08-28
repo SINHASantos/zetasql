@@ -3879,7 +3879,7 @@ FROM
      measuretable_derived_3.a_1 AS key,
      (
        SELECT
-         AGG(measuretable_derived_3.a_2) AS a_7
+         AGG(measuretable_derived_3.a_2) AS a_8
        FROM
          (
            FROM
@@ -3889,9 +3889,9 @@ FROM
            |> AS measuretable_singlekey_6
          )
        GROUP BY measuretable_singlekey_6.a_5
-       |> AS aggregatescan_8
+       |> AS aggregatescan_9
        |> SELECT
-            aggregatescan_8.a_7 AS a_7
+            aggregatescan_9.a_8 AS a_8
        |> LIMIT 1) AS a_4;
 
 [REWRITTEN AST]
@@ -4090,7 +4090,7 @@ FROM
          SUM(ANY_VALUE(projectscan_12.a_11.referenced_columns.price)
            WHERE
              NOT((projectscan_12.a_11) IS NULL)
-           GROUP BY projectscan_12.a_11.key_columns) AS a_13
+           GROUP BY projectscan_12.a_11.key_columns) AS a_14
        FROM
          (
            FROM
@@ -4104,9 +4104,9 @@ FROM
            |> AS projectscan_12
          )
        GROUP BY projectscan_12.a_9
-       |> AS aggregatescan_14
+       |> AS aggregatescan_15
        |> SELECT
-            (aggregatescan_14.a_13) + 1 AS a_15
+            (aggregatescan_15.a_14) + 1 AS a_16
        |> LIMIT 1) AS a_8;
 ==
 
@@ -4167,7 +4167,7 @@ GROUP BY measuretable_derived_3.a_1;
 [SQLBUILDER_TARGET_SYNTAX_MODE pipe]
 [SQLBUILDER_OUTPUT]
 SELECT
-  AGG(measuretable_derived_3.a_2) AS a_4
+  AGG(measuretable_derived_3.a_2) AS a_5
 FROM
   (
     FROM
@@ -4178,9 +4178,9 @@ FROM
     |> AS measuretable_derived_3
   )
 GROUP BY measuretable_derived_3.a_1
-|> AS aggregatescan_5
+|> AS aggregatescan_6
 |> SELECT
-     aggregatescan_5.a_4 AS a_4;
+     aggregatescan_6.a_5 AS a_5;
 
 [REWRITTEN AST]
 QueryStmt
@@ -4381,11 +4381,11 @@ SELECT
   SUM(ANY_VALUE(projectscan_11.a_8.referenced_columns.price)
     WHERE
       NOT((projectscan_11.a_8) IS NULL)
-    GROUP BY projectscan_11.a_8.key_columns) AS a_12,
+    GROUP BY projectscan_11.a_8.key_columns) AS a_13,
   SUM(ANY_VALUE(projectscan_11.a_10.referenced_columns.price)
     WHERE
       NOT((projectscan_11.a_10) IS NULL)
-    GROUP BY projectscan_11.a_10.key_columns) AS a_13
+    GROUP BY projectscan_11.a_10.key_columns) AS a_14
 FROM
   (
     FROM
@@ -4419,9 +4419,9 @@ FROM
     |> AS projectscan_11
   )
 GROUP BY projectscan_11.a_1
-|> AS aggregatescan_14
+|> AS aggregatescan_15
 |> SELECT
-     (aggregatescan_14.a_12) + (aggregatescan_14.a_13) AS a_15;
+     (aggregatescan_15.a_13) + (aggregatescan_15.a_14) AS a_16;
 ==
 
 # Test 1.B: m := n + n (Direct derived measure duplication)
@@ -4464,7 +4464,7 @@ GROUP BY measuretable_derived_3.a_1;
 [SQLBUILDER_TARGET_SYNTAX_MODE pipe]
 [SQLBUILDER_OUTPUT]
 SELECT
-  AGG(measuretable_derived_3.a_2) AS a_4
+  AGG(measuretable_derived_3.a_2) AS a_5
 FROM
   (
     FROM
@@ -4475,9 +4475,9 @@ FROM
     |> AS measuretable_derived_3
   )
 GROUP BY measuretable_derived_3.a_1
-|> AS aggregatescan_5
+|> AS aggregatescan_6
 |> SELECT
-     aggregatescan_5.a_4 AS a_4;
+     aggregatescan_6.a_5 AS a_5;
 
 [REWRITTEN AST]
 QueryStmt
@@ -4755,11 +4755,11 @@ SELECT
   SUM(ANY_VALUE(projectscan_17.a_12.referenced_columns.price)
     WHERE
       NOT((projectscan_17.a_12) IS NULL)
-    GROUP BY projectscan_17.a_12.key_columns) AS a_18,
+    GROUP BY projectscan_17.a_12.key_columns) AS a_19,
   SUM(ANY_VALUE(projectscan_17.a_16.referenced_columns.price)
     WHERE
       NOT((projectscan_17.a_16) IS NULL)
-    GROUP BY projectscan_17.a_16.key_columns) AS a_19
+    GROUP BY projectscan_17.a_16.key_columns) AS a_20
 FROM
   (
     FROM
@@ -4816,9 +4816,9 @@ FROM
     |> AS projectscan_17
   )
 GROUP BY projectscan_17.a_1
-|> AS aggregatescan_20
+|> AS aggregatescan_21
 |> SELECT
-     ((aggregatescan_20.a_18) + 1) + ((aggregatescan_20.a_19) + 1) AS a_21;
+     ((aggregatescan_21.a_19) + 1) + ((aggregatescan_21.a_20) + 1) AS a_22;
 ==
 
 # Test 1.C: m := n1 + n2 (Shared transitive base measure)
@@ -4862,7 +4862,7 @@ GROUP BY measuretable_derived_3.a_1;
 [SQLBUILDER_TARGET_SYNTAX_MODE pipe]
 [SQLBUILDER_OUTPUT]
 SELECT
-  AGG(measuretable_derived_3.a_2) AS a_4
+  AGG(measuretable_derived_3.a_2) AS a_5
 FROM
   (
     FROM
@@ -4873,9 +4873,9 @@ FROM
     |> AS measuretable_derived_3
   )
 GROUP BY measuretable_derived_3.a_1
-|> AS aggregatescan_5
+|> AS aggregatescan_6
 |> SELECT
-     aggregatescan_5.a_4 AS a_4;
+     aggregatescan_6.a_5 AS a_5;
 
 [REWRITTEN AST]
 QueryStmt
@@ -5174,11 +5174,11 @@ SELECT
   SUM(ANY_VALUE(projectscan_18.a_13.referenced_columns.price)
     WHERE
       NOT((projectscan_18.a_13) IS NULL)
-    GROUP BY projectscan_18.a_13.key_columns) AS a_19,
+    GROUP BY projectscan_18.a_13.key_columns) AS a_20,
   SUM(ANY_VALUE(projectscan_18.a_17.referenced_columns.price)
     WHERE
       NOT((projectscan_18.a_17) IS NULL)
-    GROUP BY projectscan_18.a_17.key_columns) AS a_20
+    GROUP BY projectscan_18.a_17.key_columns) AS a_21
 FROM
   (
     FROM
@@ -5243,9 +5243,9 @@ FROM
     |> AS projectscan_18
   )
 GROUP BY projectscan_18.a_1
-|> AS aggregatescan_21
+|> AS aggregatescan_22
 |> SELECT
-     ((aggregatescan_21.a_19) + 1) + ((aggregatescan_21.a_20) + 2) AS a_22;
+     ((aggregatescan_22.a_20) + 1) + ((aggregatescan_22.a_21) + 2) AS a_23;
 ==
 
 # Test 1.D: m := b + n (Mixed direct and transitive duplication)
@@ -5288,7 +5288,7 @@ GROUP BY measuretable_derived_3.a_1;
 [SQLBUILDER_TARGET_SYNTAX_MODE pipe]
 [SQLBUILDER_OUTPUT]
 SELECT
-  AGG(measuretable_derived_3.a_2) AS a_4
+  AGG(measuretable_derived_3.a_2) AS a_5
 FROM
   (
     FROM
@@ -5299,9 +5299,9 @@ FROM
     |> AS measuretable_derived_3
   )
 GROUP BY measuretable_derived_3.a_1
-|> AS aggregatescan_5
+|> AS aggregatescan_6
 |> SELECT
-     aggregatescan_5.a_4 AS a_4;
+     aggregatescan_6.a_5 AS a_5;
 
 [REWRITTEN AST]
 QueryStmt
@@ -5558,11 +5558,11 @@ SELECT
   SUM(ANY_VALUE(projectscan_15.a_10.referenced_columns.price)
     WHERE
       NOT((projectscan_15.a_10) IS NULL)
-    GROUP BY projectscan_15.a_10.key_columns) AS a_16,
+    GROUP BY projectscan_15.a_10.key_columns) AS a_17,
   SUM(ANY_VALUE(projectscan_15.a_14.referenced_columns.price)
     WHERE
       NOT((projectscan_15.a_14) IS NULL)
-    GROUP BY projectscan_15.a_14.key_columns) AS a_17
+    GROUP BY projectscan_15.a_14.key_columns) AS a_18
 FROM
   (
     FROM
@@ -5615,9 +5615,9 @@ FROM
     |> AS projectscan_15
   )
 GROUP BY projectscan_15.a_1
-|> AS aggregatescan_18
+|> AS aggregatescan_19
 |> SELECT
-     (aggregatescan_18.a_16) + ((aggregatescan_18.a_17) + 1) AS a_19;
+     (aggregatescan_19.a_17) + ((aggregatescan_19.a_18) + 1) AS a_20;
 ==
 
 # Test 1.E: SELECT AGG(n1), AGG(n2) (Top-level query duplication)
@@ -5666,8 +5666,8 @@ GROUP BY measuretable_derived_4.a_1;
 [SQLBUILDER_TARGET_SYNTAX_MODE pipe]
 [SQLBUILDER_OUTPUT]
 SELECT
-  AGG(measuretable_derived_4.a_2) AS a_5,
-  AGG(measuretable_derived_4.a_3) AS a_6
+  AGG(measuretable_derived_4.a_2) AS a_6,
+  AGG(measuretable_derived_4.a_3) AS a_7
 FROM
   (
     FROM
@@ -5679,10 +5679,10 @@ FROM
     |> AS measuretable_derived_4
   )
 GROUP BY measuretable_derived_4.a_1
-|> AS aggregatescan_7
+|> AS aggregatescan_8
 |> SELECT
-     aggregatescan_7.a_5 AS a_5,
-     aggregatescan_7.a_6 AS a_6;
+     aggregatescan_8.a_6 AS a_6,
+     aggregatescan_8.a_7 AS a_7;
 
 [REWRITTEN AST]
 QueryStmt
@@ -5907,11 +5907,11 @@ SELECT
   SUM(ANY_VALUE(projectscan_12.a_9.referenced_columns.price)
     WHERE
       NOT((projectscan_12.a_9) IS NULL)
-    GROUP BY projectscan_12.a_9.key_columns) AS a_13,
+    GROUP BY projectscan_12.a_9.key_columns) AS a_14,
   SUM(ANY_VALUE(projectscan_12.a_11.referenced_columns.price)
     WHERE
       NOT((projectscan_12.a_11) IS NULL)
-    GROUP BY projectscan_12.a_11.key_columns) AS a_14
+    GROUP BY projectscan_12.a_11.key_columns) AS a_15
 FROM
   (
     FROM
@@ -5951,10 +5951,10 @@ FROM
     |> AS projectscan_12
   )
 GROUP BY projectscan_12.a_1
-|> AS aggregatescan_15
+|> AS aggregatescan_16
 |> SELECT
-     (aggregatescan_15.a_13) + 1 AS a_16,
-     (aggregatescan_15.a_14) + 2 AS a_17;
+     (aggregatescan_16.a_14) + 1 AS a_17,
+     (aggregatescan_16.a_15) + 2 AS a_18;
 ==
 
 # Group 2: Linear Propagation (via WITH)
@@ -6019,16 +6019,16 @@ WITH
          MeasureTable_Derived.measure_derived_twice_sum_price AS a_2
   )
 SELECT
-  AGG(withrefscan_3.a_2) AS a_4
+  AGG(withrefscan_3.a_2) AS a_5
 FROM
   (
     FROM
       W AS withrefscan_3
   )
 GROUP BY withrefscan_3.a_1
-|> AS aggregatescan_5
+|> AS aggregatescan_6
 |> SELECT
-     aggregatescan_5.a_4 AS a_4;
+     aggregatescan_6.a_5 AS a_5;
 
 [REWRITTEN AST]
 QueryStmt
@@ -6262,11 +6262,11 @@ SELECT
   SUM(ANY_VALUE(projectscan_11.a_8.referenced_columns.price)
     WHERE
       NOT((projectscan_11.a_8) IS NULL)
-    GROUP BY projectscan_11.a_8.key_columns) AS a_12,
+    GROUP BY projectscan_11.a_8.key_columns) AS a_13,
   SUM(ANY_VALUE(projectscan_11.a_10.referenced_columns.price)
     WHERE
       NOT((projectscan_11.a_10) IS NULL)
-    GROUP BY projectscan_11.a_10.key_columns) AS a_13
+    GROUP BY projectscan_11.a_10.key_columns) AS a_14
 FROM
   (
     FROM
@@ -6284,9 +6284,9 @@ FROM
     |> AS projectscan_11
   )
 GROUP BY projectscan_11.a_1
-|> AS aggregatescan_14
+|> AS aggregatescan_15
 |> SELECT
-     (aggregatescan_14.a_12) + (aggregatescan_14.a_13) AS a_15;
+     (aggregatescan_15.a_13) + (aggregatescan_15.a_14) AS a_16;
 ==
 
 # Test 2.B: m := n + n (Direct derived measure duplication)
@@ -6351,16 +6351,16 @@ WITH
          MeasureTable_Derived.measure_derived_twice_sum_price_plus_one AS a_2
   )
 SELECT
-  AGG(withrefscan_3.a_2) AS a_4
+  AGG(withrefscan_3.a_2) AS a_5
 FROM
   (
     FROM
       W AS withrefscan_3
   )
 GROUP BY withrefscan_3.a_1
-|> AS aggregatescan_5
+|> AS aggregatescan_6
 |> SELECT
-     aggregatescan_5.a_4 AS a_4;
+     aggregatescan_6.a_5 AS a_5;
 
 [REWRITTEN AST]
 QueryStmt
@@ -6679,11 +6679,11 @@ SELECT
   SUM(ANY_VALUE(projectscan_17.a_12.referenced_columns.price)
     WHERE
       NOT((projectscan_17.a_12) IS NULL)
-    GROUP BY projectscan_17.a_12.key_columns) AS a_18,
+    GROUP BY projectscan_17.a_12.key_columns) AS a_19,
   SUM(ANY_VALUE(projectscan_17.a_16.referenced_columns.price)
     WHERE
       NOT((projectscan_17.a_16) IS NULL)
-    GROUP BY projectscan_17.a_16.key_columns) AS a_19
+    GROUP BY projectscan_17.a_16.key_columns) AS a_20
 FROM
   (
     FROM
@@ -6716,9 +6716,9 @@ FROM
     |> AS projectscan_17
   )
 GROUP BY projectscan_17.a_1
-|> AS aggregatescan_20
+|> AS aggregatescan_21
 |> SELECT
-     ((aggregatescan_20.a_18) + 1) + ((aggregatescan_20.a_19) + 1) AS a_21;
+     ((aggregatescan_21.a_19) + 1) + ((aggregatescan_21.a_20) + 1) AS a_22;
 ==
 
 # Test 2.C: m := n1 + n2 (Shared transitive base measure)
@@ -6784,16 +6784,16 @@ WITH
          MeasureTable_Derived.measure_derived_sum_price_plus_one_plus_two AS a_2
   )
 SELECT
-  AGG(withrefscan_3.a_2) AS a_4
+  AGG(withrefscan_3.a_2) AS a_5
 FROM
   (
     FROM
       W AS withrefscan_3
   )
 GROUP BY withrefscan_3.a_1
-|> AS aggregatescan_5
+|> AS aggregatescan_6
 |> SELECT
-     aggregatescan_5.a_4 AS a_4;
+     aggregatescan_6.a_5 AS a_5;
 
 [REWRITTEN AST]
 QueryStmt
@@ -7141,11 +7141,11 @@ SELECT
   SUM(ANY_VALUE(projectscan_18.a_13.referenced_columns.price)
     WHERE
       NOT((projectscan_18.a_13) IS NULL)
-    GROUP BY projectscan_18.a_13.key_columns) AS a_19,
+    GROUP BY projectscan_18.a_13.key_columns) AS a_20,
   SUM(ANY_VALUE(projectscan_18.a_17.referenced_columns.price)
     WHERE
       NOT((projectscan_18.a_17) IS NULL)
-    GROUP BY projectscan_18.a_17.key_columns) AS a_20
+    GROUP BY projectscan_18.a_17.key_columns) AS a_21
 FROM
   (
     FROM
@@ -7178,9 +7178,9 @@ FROM
     |> AS projectscan_18
   )
 GROUP BY projectscan_18.a_1
-|> AS aggregatescan_21
+|> AS aggregatescan_22
 |> SELECT
-     ((aggregatescan_21.a_19) + 1) + ((aggregatescan_21.a_20) + 2) AS a_22;
+     ((aggregatescan_22.a_20) + 1) + ((aggregatescan_22.a_21) + 2) AS a_23;
 ==
 
 # Group 3: Branching Propagation (via Join of WITH)

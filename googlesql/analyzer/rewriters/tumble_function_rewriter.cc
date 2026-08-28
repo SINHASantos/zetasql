@@ -22,6 +22,7 @@
 #include <utility>
 #include <vector>
 
+#include "googlesql/analyzer/builtin_only_catalog.h"
 #include "googlesql/analyzer/substitute.h"
 #include "googlesql/common/errors.h"
 #include "googlesql/public/analyzer_options.h"
@@ -480,12 +481,18 @@ class TumbleFunctionRewriter : public Rewriter {
     if (input != nullptr) {
       GOOGLESQL_RETURN_IF_ERROR(input->Accept(&cte_name_generator));
     }
-    TumbleRewriteVisitor rewriter(options, catalog, type_factory,
+
+    BuiltinOnlyCatalog builtin_catalog("builtin_catalog", catalog);
+    TumbleRewriteVisitor rewriter(options, builtin_catalog, type_factory,
                                   column_factory, cte_name_generator);
     return rewriter.VisitAll(std::move(input));
   }
 
   std::string Name() const override { return "TumbleFunctionRewriter"; }
+
+  bool ProvideUnfilteredCatalogToBuiltinRewriter() const override {
+    return true;
+  }
 };
 
 const Rewriter* GetTumbleFunctionRewriter() {

@@ -3485,9 +3485,9 @@ QueryStmt
 ==
 
 # Collated STRING from RowType.
-# TODO: Update the RowType rewriter to handle annotations.
+# TODO: Enable SQL Builder when it supports STRUCTs+annotations.
+[no_run_sqlbuilder]
 [language_features=MAXIMUM,+ROW_TYPE,+ANNOTATION_FRAMEWORK,+COLLATION_SUPPORT]
-[enabled_ast_rewrites=NONE]
 FROM CollatedTableLazy
 |> SELECT string_ci
 --
@@ -3507,12 +3507,40 @@ QueryStmt
     |     +-column=CollatedTable.string_ci
     +-input_scan=
       +-TableScan(column_list=[CollatedTableLazy.$row#1], table=CollatedTableLazy, read_as_row_type=TRUE)
+
+[REWRITTEN AST]
+QueryStmt
++-output_column_list=
+| +-$pipe_select.string_ci#2{Collation:"und:ci"} AS string_ci [STRING]
++-query=
+  +-ProjectScan
+    +-column_list=[$pipe_select.string_ci#2{Collation:"und:ci"}]
+    +-expr_list=
+    | +-string_ci#2 :=
+    |   +-GetStructField
+    |     +-type=STRING
+    |     +-type_annotation_map={Collation:"und:ci"}
+    |     +-expr=
+    |     | +-ColumnRef(type=STRUCT<string_ci STRING>, type_annotation_map=<{Collation:"und:ci"}>, column=CollatedTableLazy.$row$scanrow#3<{Collation:"und:ci"}>)
+    |     +-field_idx=0
+    +-input_scan=
+      +-ProjectScan
+        +-column_list=[CollatedTableLazy.$row$scanrow#3<{Collation:"und:ci"}>]
+        +-expr_list=
+        | +-$row$scanrow#3 :=
+        |   +-MakeStruct
+        |     +-type=STRUCT<string_ci STRING>
+        |     +-type_annotation_map=<{Collation:"und:ci"}>
+        |     +-field_list=
+        |       +-ColumnRef(type=STRING, type_annotation_map={Collation:"und:ci"}, column=CollatedTableLazy.string_ci#4{Collation:"und:ci"})
+        +-input_scan=
+          +-TableScan(column_list=[CollatedTableLazy.string_ci#4{Collation:"und:ci"}], table=CollatedTableLazy, table_column_list=[CollatedTable.string_ci])
 ==
 
 # STRUCT with collated STRING from RowType.
-# TODO: Update the RowType rewriter to handle annotations.
+# TODO: Enable SQL Builder when it supports STRUCTs+annotations.
+[no_run_sqlbuilder]
 [language_features=MAXIMUM,+ROW_TYPE,+ANNOTATION_FRAMEWORK,+COLLATION_SUPPORT]
-[enabled_ast_rewrites=NONE]
 FROM CollatedTableLazy
 |> SELECT struct_with_string_ci
 --
@@ -3532,12 +3560,40 @@ QueryStmt
     |     +-column=CollatedTable.struct_with_string_ci
     +-input_scan=
       +-TableScan(column_list=[CollatedTableLazy.$row#1], table=CollatedTableLazy, read_as_row_type=TRUE)
+
+[REWRITTEN AST]
+QueryStmt
++-output_column_list=
+| +-$pipe_select.struct_with_string_ci#2<_,{Collation:"und:ci"}> AS struct_with_string_ci [STRUCT<a INT32, b STRING>]
++-query=
+  +-ProjectScan
+    +-column_list=[$pipe_select.struct_with_string_ci#2<_,{Collation:"und:ci"}>]
+    +-expr_list=
+    | +-struct_with_string_ci#2 :=
+    |   +-GetStructField
+    |     +-type=STRUCT<a INT32, b STRING>
+    |     +-type_annotation_map=<_,{Collation:"und:ci"}>
+    |     +-expr=
+    |     | +-ColumnRef(type=STRUCT<struct_with_string_ci STRUCT<a INT32, b STRING>>, type_annotation_map=<<_,{Collation:"und:ci"}>>, column=CollatedTableLazy.$row$scanrow#3<<_,{Collation:"und:ci"}>>)
+    |     +-field_idx=0
+    +-input_scan=
+      +-ProjectScan
+        +-column_list=[CollatedTableLazy.$row$scanrow#3<<_,{Collation:"und:ci"}>>]
+        +-expr_list=
+        | +-$row$scanrow#3 :=
+        |   +-MakeStruct
+        |     +-type=STRUCT<struct_with_string_ci STRUCT<a INT32, b STRING>>
+        |     +-type_annotation_map=<<_,{Collation:"und:ci"}>>
+        |     +-field_list=
+        |       +-ColumnRef(type=STRUCT<a INT32, b STRING>, type_annotation_map=<_,{Collation:"und:ci"}>, column=CollatedTableLazy.struct_with_string_ci#4<_,{Collation:"und:ci"}>)
+        +-input_scan=
+          +-TableScan(column_list=[CollatedTableLazy.struct_with_string_ci#4<_,{Collation:"und:ci"}>], table=CollatedTableLazy, table_column_list=[CollatedTable.struct_with_string_ci])
 ==
 
 # ARRAY with collated STRING from RowType.
-# TODO: Update the RowType rewriter to handle annotations.
+# TODO: Enable SQL Builder when it supports STRUCTs+annotations.
+[no_run_sqlbuilder]
 [language_features=MAXIMUM,+ROW_TYPE,+ANNOTATION_FRAMEWORK,+COLLATION_SUPPORT]
-[enabled_ast_rewrites=NONE]
 FROM CollatedTableLazy
 |> SELECT array_with_string_ci
 --
@@ -3557,3 +3613,285 @@ QueryStmt
     |     +-column=CollatedTable.array_with_string_ci
     +-input_scan=
       +-TableScan(column_list=[CollatedTableLazy.$row#1], table=CollatedTableLazy, read_as_row_type=TRUE)
+
+[REWRITTEN AST]
+QueryStmt
++-output_column_list=
+| +-$pipe_select.array_with_string_ci#2<{Collation:"und:ci"}> AS array_with_string_ci [ARRAY<STRING>]
++-query=
+  +-ProjectScan
+    +-column_list=[$pipe_select.array_with_string_ci#2<{Collation:"und:ci"}>]
+    +-expr_list=
+    | +-array_with_string_ci#2 :=
+    |   +-GetStructField
+    |     +-type=ARRAY<STRING>
+    |     +-type_annotation_map=<{Collation:"und:ci"}>
+    |     +-expr=
+    |     | +-ColumnRef(type=STRUCT<array_with_string_ci ARRAY<STRING>>, type_annotation_map=<<{Collation:"und:ci"}>>, column=CollatedTableLazy.$row$scanrow#3<<{Collation:"und:ci"}>>)
+    |     +-field_idx=0
+    +-input_scan=
+      +-ProjectScan
+        +-column_list=[CollatedTableLazy.$row$scanrow#3<<{Collation:"und:ci"}>>]
+        +-expr_list=
+        | +-$row$scanrow#3 :=
+        |   +-MakeStruct
+        |     +-type=STRUCT<array_with_string_ci ARRAY<STRING>>
+        |     +-type_annotation_map=<<{Collation:"und:ci"}>>
+        |     +-field_list=
+        |       +-ColumnRef(type=ARRAY<STRING>, type_annotation_map=<{Collation:"und:ci"}>, column=CollatedTableLazy.array_with_string_ci#4<{Collation:"und:ci"}>)
+        +-input_scan=
+          +-TableScan(column_list=[CollatedTableLazy.array_with_string_ci#4<{Collation:"und:ci"}>], table=CollatedTableLazy, table_column_list=[CollatedTable.array_with_string_ci])
+==
+
+# Annotation propagated through CTE/WithRefScan.
+# TODO: Enable SQL Builder when it supports STRUCTs+annotations.
+[no_run_sqlbuilder]
+[language_features=MAXIMUM,+ROW_TYPE,+ANNOTATION_FRAMEWORK,+COLLATION_SUPPORT]
+WITH Cte AS (
+  FROM CollatedTableLazy AS CT
+  |> SELECT CT
+)
+FROM Cte
+|> SELECT CT.string_ci
+--
+QueryStmt
++-output_column_list=
+| +-$pipe_select.string_ci#3{Collation:"und:ci"} AS string_ci [STRING]
++-query=
+  +-WithScan
+    +-column_list=[$pipe_select.string_ci#3{Collation:"und:ci"}]
+    +-with_entry_list=
+    | +-WithEntry
+    |   +-with_query_name="Cte"
+    |   +-with_subquery=
+    |     +-ProjectScan
+    |       +-column_list=[CollatedTableLazy.$row#1]
+    |       +-input_scan=
+    |         +-TableScan(column_list=[CollatedTableLazy.$row#1], table=CollatedTableLazy, alias="CT", read_as_row_type=TRUE)
+    +-query=
+      +-ProjectScan
+        +-column_list=[$pipe_select.string_ci#3{Collation:"und:ci"}]
+        +-expr_list=
+        | +-string_ci#3 :=
+        |   +-GetRowField
+        |     +-type=STRING
+        |     +-type_annotation_map={Collation:"und:ci"}
+        |     +-expr=
+        |     | +-ColumnRef(type=ROW<CollatedTableLazy>, column=Cte.CT#2)
+        |     +-column=CollatedTable.string_ci
+        +-input_scan=
+          +-WithRefScan(column_list=[Cte.CT#2], with_query_name="Cte")
+
+[REWRITTEN AST]
+QueryStmt
++-output_column_list=
+| +-$pipe_select.string_ci#3{Collation:"und:ci"} AS string_ci [STRING]
++-query=
+  +-WithScan
+    +-column_list=[$pipe_select.string_ci#3{Collation:"und:ci"}]
+    +-with_entry_list=
+    | +-WithEntry
+    |   +-with_query_name="Cte"
+    |   +-with_subquery=
+    |     +-ProjectScan
+    |       +-column_list=[CollatedTableLazy.$row$scanrow#4<{Collation:"und:ci"}>]
+    |       +-input_scan=
+    |         +-ProjectScan
+    |           +-column_list=[CollatedTableLazy.$row$scanrow#4<{Collation:"und:ci"}>]
+    |           +-expr_list=
+    |           | +-$row$scanrow#4 :=
+    |           |   +-MakeStruct
+    |           |     +-type=STRUCT<string_ci STRING>
+    |           |     +-type_annotation_map=<{Collation:"und:ci"}>
+    |           |     +-field_list=
+    |           |       +-ColumnRef(type=STRING, type_annotation_map={Collation:"und:ci"}, column=CollatedTableLazy.string_ci#5{Collation:"und:ci"})
+    |           +-input_scan=
+    |             +-TableScan(column_list=[CollatedTableLazy.string_ci#5{Collation:"und:ci"}], table=CollatedTableLazy, alias="CT", table_column_list=[CollatedTable.string_ci])
+    +-query=
+      +-ProjectScan
+        +-column_list=[$pipe_select.string_ci#3{Collation:"und:ci"}]
+        +-expr_list=
+        | +-string_ci#3 :=
+        |   +-GetStructField
+        |     +-type=STRING
+        |     +-type_annotation_map={Collation:"und:ci"}
+        |     +-expr=
+        |     | +-ColumnRef(type=STRUCT<string_ci STRING>, type_annotation_map=<{Collation:"und:ci"}>, column=Cte.$CT$scanrow#6<{Collation:"und:ci"}>)
+        |     +-field_idx=0
+        +-input_scan=
+          +-WithRefScan(column_list=[Cte.$CT$scanrow#6<{Collation:"und:ci"}>], with_query_name="Cte")
+==
+
+# Annotation propagated through SubqueryExpr.
+# TODO: Enable SQL Builder when it supports STRUCTs+annotations.
+[no_run_sqlbuilder]
+[language_features=MAXIMUM,+ROW_TYPE,+ANNOTATION_FRAMEWORK,+COLLATION_SUPPORT]
+FROM CollatedTableLazy AS CT
+|> SELECT (SELECT CT) AS CT2
+|> SELECT CT2.string_ci
+--
+QueryStmt
++-output_column_list=
+| +-$pipe_select.string_ci#4{Collation:"und:ci"} AS string_ci [STRING]
++-query=
+  +-ProjectScan
+    +-column_list=[$pipe_select.string_ci#4{Collation:"und:ci"}]
+    +-expr_list=
+    | +-string_ci#4 :=
+    |   +-GetRowField
+    |     +-type=STRING
+    |     +-type_annotation_map={Collation:"und:ci"}
+    |     +-expr=
+    |     | +-ColumnRef(type=ROW<CollatedTableLazy>, column=$pipe_select.CT2#3)
+    |     +-column=CollatedTable.string_ci
+    +-input_scan=
+      +-ProjectScan
+        +-column_list=[$pipe_select.CT2#3]
+        +-expr_list=
+        | +-CT2#3 :=
+        |   +-SubqueryExpr
+        |     +-type=ROW<CollatedTableLazy>
+        |     +-subquery_type=SCALAR
+        |     +-parameter_list=
+        |     | +-ColumnRef(type=ROW<CollatedTableLazy>, column=CollatedTableLazy.$row#1)
+        |     +-subquery=
+        |       +-ProjectScan
+        |         +-column_list=[$expr_subquery.CT#2]
+        |         +-expr_list=
+        |         | +-CT#2 := ColumnRef(type=ROW<CollatedTableLazy>, column=CollatedTableLazy.$row#1, is_correlated=TRUE)
+        |         +-input_scan=
+        |           +-SingleRowScan
+        +-input_scan=
+          +-TableScan(column_list=[CollatedTableLazy.$row#1], table=CollatedTableLazy, alias="CT", read_as_row_type=TRUE)
+
+[REWRITTEN AST]
+QueryStmt
++-output_column_list=
+| +-$pipe_select.string_ci#4{Collation:"und:ci"} AS string_ci [STRING]
++-query=
+  +-ProjectScan
+    +-column_list=[$pipe_select.string_ci#4{Collation:"und:ci"}]
+    +-expr_list=
+    | +-string_ci#4 :=
+    |   +-GetStructField
+    |     +-type=STRING
+    |     +-type_annotation_map={Collation:"und:ci"}
+    |     +-expr=
+    |     | +-ColumnRef(type=STRUCT<string_ci STRING>, type_annotation_map=<{Collation:"und:ci"}>, column=$pipe_select.$CT2$scanrow#5<{Collation:"und:ci"}>)
+    |     +-field_idx=0
+    +-input_scan=
+      +-ProjectScan
+        +-column_list=[$pipe_select.$CT2$scanrow#5<{Collation:"und:ci"}>]
+        +-expr_list=
+        | +-$CT2$scanrow#5 :=
+        |   +-SubqueryExpr
+        |     +-type=STRUCT<string_ci STRING>
+        |     +-type_annotation_map=<{Collation:"und:ci"}>
+        |     +-subquery_type=SCALAR
+        |     +-parameter_list=
+        |     | +-ColumnRef(type=STRUCT<string_ci STRING>, type_annotation_map=<{Collation:"und:ci"}>, column=CollatedTableLazy.$row$scanrow#6<{Collation:"und:ci"}>)
+        |     +-subquery=
+        |       +-ProjectScan
+        |         +-column_list=[$expr_subquery.$CT$scanrow#8<{Collation:"und:ci"}>]
+        |         +-expr_list=
+        |         | +-$CT$scanrow#8 := ColumnRef(type=STRUCT<string_ci STRING>, type_annotation_map=<{Collation:"und:ci"}>, column=CollatedTableLazy.$row$scanrow#6<{Collation:"und:ci"}>, is_correlated=TRUE)
+        |         +-input_scan=
+        |           +-SingleRowScan
+        +-input_scan=
+          +-ProjectScan
+            +-column_list=[CollatedTableLazy.$row$scanrow#6<{Collation:"und:ci"}>]
+            +-expr_list=
+            | +-$row$scanrow#6 :=
+            |   +-MakeStruct
+            |     +-type=STRUCT<string_ci STRING>
+            |     +-type_annotation_map=<{Collation:"und:ci"}>
+            |     +-field_list=
+            |       +-ColumnRef(type=STRING, type_annotation_map={Collation:"und:ci"}, column=CollatedTableLazy.string_ci#7{Collation:"und:ci"})
+            +-input_scan=
+              +-TableScan(column_list=[CollatedTableLazy.string_ci#7{Collation:"und:ci"}], table=CollatedTableLazy, alias="CT", table_column_list=[CollatedTable.string_ci])
+==
+
+# Annotated column in recursive RowType.
+# TODO: Enable SQL Builder when it supports STRUCTs+annotations.
+[no_run_sqlbuilder]
+[language_features=MAXIMUM,+ROW_TYPE,+ANNOTATION_FRAMEWORK,+COLLATION_SUPPORT]
+FROM tvf_returning_row_type_recursive_collated()
+|> SELECT row_col.string_ci, row_col.middle.middle.middle.string_ci
+--
+QueryStmt
++-output_column_list=
+| +-$pipe_select.string_ci#4{Collation:"und:ci"} AS string_ci [STRING]
+| +-$pipe_select.string_ci#5{Collation:"und:ci"} AS string_ci [STRING]
++-query=
+  +-ProjectScan
+    +-column_list=$pipe_select.[string_ci#4, string_ci#5]
+    +-expr_list=
+    | +-string_ci#4 :=
+    | | +-GetRowField
+    | |   +-type=STRING
+    | |   +-type_annotation_map={Collation:"und:ci"}
+    | |   +-expr=
+    | |   | +-ColumnRef(type=ROW<RowTypeRecursiveCollated>, column=tvf_returning_row_type_recursive_collated.row_col#2)
+    | |   +-column=RowTypeRecursiveCollated.string_ci
+    | +-string_ci#5 :=
+    |   +-GetRowField
+    |     +-type=STRING
+    |     +-type_annotation_map={Collation:"und:ci"}
+    |     +-expr=
+    |     | +-GetRowField
+    |     |   +-type=ROW<RowTypeRecursiveCollated>
+    |     |   +-expr=
+    |     |   | +-GetRowField
+    |     |   |   +-type=ROW<RowTypeRecursiveCollated>
+    |     |   |   +-expr=
+    |     |   |   | +-GetRowField
+    |     |   |   |   +-type=ROW<RowTypeRecursiveCollated>
+    |     |   |   |   +-expr=
+    |     |   |   |   | +-ColumnRef(type=ROW<RowTypeRecursiveCollated>, column=tvf_returning_row_type_recursive_collated.row_col#2)
+    |     |   |   |   +-column=RowTypeRecursiveCollated.middle
+    |     |   |   +-column=RowTypeRecursiveCollated.middle
+    |     |   +-column=RowTypeRecursiveCollated.middle
+    |     +-column=RowTypeRecursiveCollated.string_ci
+    +-input_scan=
+      +-TVFScan(column_list=[tvf_returning_row_type_recursive_collated.row_col#2], tvf=RowTypeTest:tvf_returning_row_type_recursive_collated, signature=() -> TABLE<normal_col_1 STRING, row_col ROW<RowTypeRecursiveCollated>, normal_col_2 INT64>, column_index_list=[1], function_call_signature=() -> ANY TABLE)
+
+[REWRITTEN AST]
+QueryStmt
++-output_column_list=
+| +-$pipe_select.string_ci#4{Collation:"und:ci"} AS string_ci [STRING]
+| +-$pipe_select.string_ci#5{Collation:"und:ci"} AS string_ci [STRING]
++-query=
+  +-ProjectScan
+    +-column_list=$pipe_select.[string_ci#4, string_ci#5]
+    +-expr_list=
+    | +-string_ci#4 :=
+    | | +-GetStructField
+    | |   +-type=STRING
+    | |   +-type_annotation_map={Collation:"und:ci"}
+    | |   +-expr=
+    | |   | +-ColumnRef(type=STRUCT<string_ci STRING, middle STRUCT<middle STRUCT<middle STRUCT<string_ci STRING>>>>, type_annotation_map=<{Collation:"und:ci"},<<<{Collation:"und:ci"}>>>>, column=tvf_returning_row_type_recursive_collated.$row_col$scanrow#6<{Collation:"und:ci"},<<<{Collation:"und:ci"}>>>>)
+    | |   +-field_idx=0
+    | +-string_ci#5 :=
+    |   +-GetStructField
+    |     +-type=STRING
+    |     +-type_annotation_map={Collation:"und:ci"}
+    |     +-expr=
+    |     | +-GetStructField
+    |     |   +-type=STRUCT<string_ci STRING>
+    |     |   +-type_annotation_map=<{Collation:"und:ci"}>
+    |     |   +-expr=
+    |     |   | +-GetStructField
+    |     |   |   +-type=STRUCT<middle STRUCT<string_ci STRING>>
+    |     |   |   +-type_annotation_map=<<{Collation:"und:ci"}>>
+    |     |   |   +-expr=
+    |     |   |   | +-GetStructField
+    |     |   |   |   +-type=STRUCT<middle STRUCT<middle STRUCT<string_ci STRING>>>
+    |     |   |   |   +-type_annotation_map=<<<{Collation:"und:ci"}>>>
+    |     |   |   |   +-expr=
+    |     |   |   |   | +-ColumnRef(type=STRUCT<string_ci STRING, middle STRUCT<middle STRUCT<middle STRUCT<string_ci STRING>>>>, type_annotation_map=<{Collation:"und:ci"},<<<{Collation:"und:ci"}>>>>, column=tvf_returning_row_type_recursive_collated.$row_col$scanrow#6<{Collation:"und:ci"},<<<{Collation:"und:ci"}>>>>)
+    |     |   |   |   +-field_idx=1
+    |     |   |   +-field_idx=0
+    |     |   +-field_idx=0
+    |     +-field_idx=0
+    +-input_scan=
+      +-TVFScan(column_list=[tvf_returning_row_type_recursive_collated.$row_col$scanrow#6<{Collation:"und:ci"},<<<{Collation:"und:ci"}>>>>], tvf=RowTypeTest:tvf_returning_row_type_recursive_collated, signature=() -> TABLE<normal_col_1 STRING, row_col STRUCT<string_ci STRING, middle STRUCT<middle STRUCT<middle STRUCT<string_ci STRING>>>>, normal_col_2 INT64>, column_index_list=[1], function_call_signature=() -> ANY TABLE)

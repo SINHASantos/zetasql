@@ -81,7 +81,7 @@ class DebugStrings {
   // TODO: Remove the flag once it is rolled out in external tests.
   private static final boolean OMIT_TVF_SIGNATURES =
       Boolean.parseBoolean(
-          System.getProperty("googlesql.omitTvfSignaturesInResolvedAstDebugString", "false"));
+          System.getProperty("googlesql.omitTvfSignaturesInResolvedAstDebugString", "true"));
 
   // isDefaultValue functions for different node field types, similar to the C++ implementations in
   // googlesql/resolved_ast/resolved_ast.cc.template
@@ -129,6 +129,10 @@ class DebugStrings {
 
   static boolean isDefaultValue(ResolvedColumn column) {
     return column.isDefaultValue();
+  }
+
+  static boolean isDefaultValue(Column column) {
+    return column == null;
   }
 
   // Used for positional parameters.

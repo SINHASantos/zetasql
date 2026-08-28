@@ -2020,8 +2020,7 @@ absl::Status TableNameResolver::FindInTableClause(
     GOOGLESQL_RETURN_IF_ERROR(FindInTVF(table_clause->tvf(), external_visible_aliases,
                               local_visible_aliases));
   }
-  return FindInExpressionsUnder(table_clause->where_clause(),
-                                external_visible_aliases);
+  return absl::OkStatus();
 }
 
 absl::Status TableNameResolver::FindInGqlCallsOnNamedTvfsUnder(

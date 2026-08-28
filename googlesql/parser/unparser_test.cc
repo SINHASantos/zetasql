@@ -204,4 +204,19 @@ KEY(SingerId, AlbumId) REFERENCES Album
   EXPECT_EQ(result, expected_unparsed_create_graph_statement);
 }
 
+TEST(TestUnparser, MultiConnection) {
+  const std::string sql =
+      "CREATE TABLE T\n"
+      "(\n"
+      "  a INT64\n"
+      ") WITH CONNECTION (k1 = 'v1', k2 = 123, k3 = 1 + 2) OPTIONS(opt = "
+      "'val')";
+  std::unique_ptr<ParserOutput> output;
+  GOOGLESQL_ASSERT_OK(ParseStatement(sql, ParserOptions(), &output));
+  const std::string unparsed = Unparse(output->statement());
+  std::unique_ptr<ParserOutput> unparsed_output;
+  GOOGLESQL_ASSERT_OK(ParseStatement(unparsed, ParserOptions(), &unparsed_output));
+  CompareParseTrees(output->node(), unparsed_output->node(), sql, unparsed);
+}
+
 }  // namespace googlesql

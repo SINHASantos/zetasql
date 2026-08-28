@@ -16,7 +16,7 @@
 
 module(
     name = "googlesql",
-    version = "2026.8.3",
+    version = "2026.8.4",
 )
 
 GOOGLESQL_JAVA_ARTIFACTS = [
@@ -44,6 +44,7 @@ GOOGLESQL_JAVA_ARTIFACTS = [
     "com.google.truth:truth:1.1.5",
     "com.google.truth.extensions:truth-proto-extension:1.4.4",
     "junit:junit:4.13.2",
+    "com.google.testparameterinjector:test-parameter-injector:1.18",
 ]
 
 bazel_dep(name = "abseil-cpp", version = "20260107.0", repo_name = "com_google_absl")

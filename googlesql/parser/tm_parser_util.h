@@ -178,7 +178,7 @@ inline ParseLocationRange MakeLocationRange(const ParseLocationRange& start,
 // parse tree.
 class SeparatedIdentifierTmpNode final : public googlesql::ASTNode {
  public:
-  static inline constexpr googlesql::ASTNodeKind kConcreteNodeKind =
+  static constexpr googlesql::ASTNodeKind kConcreteNodeKind =
       googlesql::AST_FAKE;
 
   SeparatedIdentifierTmpNode() : ASTNode(kConcreteNodeKind) {}
@@ -240,7 +240,7 @@ class SeparatedIdentifierTmpNode final : public googlesql::ASTNode {
   // concatenate the components of each sublist together to form a single
   // identifier and return a list of these identifiers, which can be used to
   // build an ASTPathExpression.
-  static inline absl::StatusOr<std::vector<googlesql::ASTNode*>> BuildPathParts(
+  static absl::StatusOr<std::vector<googlesql::ASTNode*>> BuildPathParts(
       const ParseLocationRange& bison_location, PathParts raw_parts,
       ASTNodeFactory& node_factory) {
     if (raw_parts.empty()) {

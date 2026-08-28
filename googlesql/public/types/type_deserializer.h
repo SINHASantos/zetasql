@@ -17,8 +17,11 @@
 #ifndef GOOGLESQL_PUBLIC_TYPES_TYPE_DESERIALIZER_H_
 #define GOOGLESQL_PUBLIC_TYPES_TYPE_DESERIALIZER_H_
 
+#include <optional>
+
 #include "googlesql/base/logging.h"
 #include "googlesql/public/type.pb.h"
+#include "googlesql/public/types/declarative_type.h"
 #include "googlesql/public/types/extended_type.h"
 #include "googlesql/public/types/type.h"
 #include "googlesql/public/types/type_factory.h"
@@ -63,6 +66,29 @@ class ExtendedTypeDeserializer {
  protected:
   ExtendedTypeDeserializer() = default;
 };
+// Registry for declarative types which have custom opaque callbacks.
+// Used for GoogleSQL built-in types and engine built-in types.
+//
+// Because these callbacks are not serialized in the TypeProtos, the callbacks
+// need to be set "statically" to retain type consistency.
+//
+// IMPORTANT: Keep this class small and copyable, and constexpr constructible.
+class DeclarativeTypeCallbacksRegistry {
+ public:
+  using GetEngineTypeParameterHandlers =
+      absl::StatusOr<std::optional<TypeParameterHandlers>> (*)(
+          const DeclarativeTypeId&);
+
+  constexpr explicit DeclarativeTypeCallbacksRegistry(
+      GetEngineTypeParameterHandlers get_engine_handlers = nullptr)
+      : get_engine_handlers_(get_engine_handlers) {}
+
+  absl::StatusOr<std::optional<TypeParameterHandlers>> GetTypeParameterHandlers(
+      const DeclarativeTypeId& type_id) const;
+
+ private:
+  GetEngineTypeParameterHandlers get_engine_handlers_;
+};
 
 // TypeDeserializer is responsible for deserialization of GoogleSQL built-in
 // and extended types. Types will be deserialized using the TypeFactory, list of
@@ -80,10 +106,14 @@ class TypeDeserializer {
   constexpr TypeDeserializer(
       TypeFactory* type_factory,
       absl::Span<const google::protobuf::DescriptorPool* const> descriptor_pools,
-      const ExtendedTypeDeserializer* extended_type_deserializer = nullptr)
+      const ExtendedTypeDeserializer* extended_type_deserializer = nullptr,
+      DeclarativeTypeCallbacksRegistry decl_type_opaque_callback_registry =
+          DeclarativeTypeCallbacksRegistry())
       : type_factory_(type_factory),
         descriptor_pools_(descriptor_pools),
-        extended_type_deserializer_(extended_type_deserializer) {
+        extended_type_deserializer_(extended_type_deserializer),
+        decl_type_opaque_callback_registry_(
+            decl_type_opaque_callback_registry) {
     // In release code we still check type_factory using GOOGLESQL_RET_CHECK in
     // Deserialize.
     ABSL_DCHECK(type_factory);
@@ -95,8 +125,11 @@ class TypeDeserializer {
   //    this object.
   constexpr explicit TypeDeserializer(
       TypeFactory* type_factory,
-      const ExtendedTypeDeserializer* extended_type_deserializer = nullptr)
-      : TypeDeserializer(type_factory, {}, extended_type_deserializer) {}
+      const ExtendedTypeDeserializer* extended_type_deserializer = nullptr,
+      DeclarativeTypeCallbacksRegistry decl_type_opaque_callback_registry =
+          DeclarativeTypeCallbacksRegistry())
+      : TypeDeserializer(type_factory, {}, extended_type_deserializer,
+                         decl_type_opaque_callback_registry) {}
 
   // Explicitly copiable.
   TypeDeserializer(const TypeDeserializer&) = default;
@@ -141,6 +174,7 @@ class TypeDeserializer {
   absl::Span<const google::protobuf::DescriptorPool* const> descriptor_pools_;
   // Not owned.
   const ExtendedTypeDeserializer* extended_type_deserializer_ = nullptr;
+  DeclarativeTypeCallbacksRegistry decl_type_opaque_callback_registry_;
 };
 
 }  // namespace googlesql

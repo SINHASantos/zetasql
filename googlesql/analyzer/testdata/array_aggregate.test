@@ -117,7 +117,7 @@ SELECT
   ARRAY_AGG(DISTINCT projectscan_7.a_6 IGNORE NULLS
     HAVING MAX 3
     ORDER BY projectscan_7.a_6
-    LIMIT 10) AS a_8
+    LIMIT 10) AS a_9
 FROM
   (
     FROM
@@ -141,9 +141,9 @@ FROM
     |> AS projectscan_7
   )
 GROUP BY CAST(projectscan_7.a_3 AS UINT64) - (projectscan_7.a_5)
-|> AS aggregatescan_9
+|> AS aggregatescan_10
 |> SELECT
-     aggregatescan_9.a_8 AS a_8;
+     aggregatescan_10.a_9 AS a_9;
 
 [REWRITTEN AST]
 QueryStmt
@@ -352,7 +352,7 @@ FROM
 [SQLBUILDER_OUTPUT]
 SELECT
   ARRAY_AGG(STRUCT< `$orderbycol1_0` INT64 > (projectscan_7.a_6)
-    HAVING MAX 3) AS a_8
+    HAVING MAX 3) AS a_9
 FROM
   (
     FROM
@@ -376,31 +376,31 @@ FROM
     |> AS projectscan_7
   )
 GROUP BY CAST(projectscan_7.a_3 AS UINT64) - (projectscan_7.a_5)
-|> AS aggregatescan_9
+|> AS aggregatescan_10
 |> SELECT
      (
        SELECT
          ARRAY(
            FROM
-             UNNEST(aggregatescan_9.a_8) AS a_12
+             UNNEST(aggregatescan_10.a_9) AS a_13
            |> SELECT
-                a_12.`$orderbycol1_0` AS a_13
-           |> AS projectscan_14
+                a_13.`$orderbycol1_0` AS a_14
+           |> AS projectscan_15
            |> WHERE
-                NOT((projectscan_14.a_13) IS NULL)
+                NOT((projectscan_15.a_14) IS NULL)
            |> EXTEND
-                projectscan_14.a_13 AS a_15
+                projectscan_15.a_14 AS a_16
            |> AGGREGATE
-              GROUP BY a_15
-           |> AS aggregatescan_16
-           |> ORDER BY aggregatescan_16.a_15
+              GROUP BY a_16
+           |> AS aggregatescan_17
+           |> ORDER BY aggregatescan_17.a_16
            |> SELECT
-                aggregatescan_16.a_15 AS a_15
-           |> LIMIT 10 OFFSET 0) AS a_11
-       |> AS projectscan_17
+                aggregatescan_17.a_16 AS a_16
+           |> LIMIT 10 OFFSET 0) AS a_12
+       |> AS projectscan_18
        |> SELECT
-            `IF`((ARRAY_LENGTH(projectscan_17.a_11)) >= 1, projectscan_17.a_11, CAST(NULL AS ARRAY< INT64 >)) AS a_18
-     ) AS a_10;
+            `IF`((ARRAY_LENGTH(projectscan_18.a_12)) >= 1, projectscan_18.a_12, CAST(NULL AS ARRAY< INT64 >)) AS a_19
+     ) AS a_11;
 ==
 
 # Duplicate ARRAY_AGGs in the same AggregateScan

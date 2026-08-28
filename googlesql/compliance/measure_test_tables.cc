@@ -34,20 +34,22 @@
 
 namespace googlesql {
 
-TestDatabase GetMeasureTablesTestDatabase(bool add_measures_with_udas) {
+TestDatabase GetMeasureTablesTestDatabase(bool add_measures_with_udas,
+                                          bool add_derived_measures) {
   TestDatabase test_db;
   Value measure_table_single_key_as_value = test_values::StructArray(
-      {"key", "country", "quantity", "price", "date_str", "nullable_str"},
-      {{1ll, "USA", 5ll, 10ll, "Jan 2024", Value::NullString()},
-       {2ll, "USA", 15ll, 20ll, "Jan 2024", "not_null"},
-       {3ll, "USA", 30ll, 30ll, "Feb 2024", "not_null"},
-       {4ll, "Canada", 20ll, 40ll, "Jan 2024", "not_null"},
-       {5ll, "Canada", 20ll, 50ll, "Jan 2024", Value::NullString()},
-       {6ll, "Canada", 35ll, 60ll, "Feb 2024", Value::NullString()},
-       {7ll, "Canada", 25ll, 70ll, "Feb 2024", "not_null"},
-       {8ll, "Mexico", 25ll, 80ll, "Jan 2024", "not_null"},
-       {9ll, "Mexico", 25ll, 90ll, "Jan 2024", Value::NullString()},
-       {10ll, "Mexico", 50ll, 100ll, "Feb 2024", "not_null"}},
+      {"key", "country", "quantity", "price", "date_str", "nullable_str", "tax",
+       "shipping"},
+      {{1ll, "USA", 5ll, 10ll, "Jan 2024", Value::NullString(), 1ll, 2ll},
+       {2ll, "USA", 15ll, 20ll, "Jan 2024", "not_null", 2ll, 2ll},
+       {3ll, "USA", 30ll, 30ll, "Feb 2024", "not_null", 3ll, 3ll},
+       {4ll, "Canada", 20ll, 40ll, "Jan 2024", "not_null", 4ll, 3ll},
+       {5ll, "Canada", 20ll, 50ll, "Jan 2024", Value::NullString(), 5ll, 4ll},
+       {6ll, "Canada", 35ll, 60ll, "Feb 2024", Value::NullString(), 6ll, 4ll},
+       {7ll, "Canada", 25ll, 70ll, "Feb 2024", "not_null", 7ll, 5ll},
+       {8ll, "Mexico", 25ll, 80ll, "Jan 2024", "not_null", 8ll, 5ll},
+       {9ll, "Mexico", 25ll, 90ll, "Jan 2024", Value::NullString(), 9ll, 6ll},
+       {10ll, "Mexico", 50ll, 100ll, "Feb 2024", "not_null", 10ll, 6ll}},
       InternalValue::kIgnoresOrder);
   std::vector<MeasureColumnDef> measure_column_defs = {
       {"measure_sum_price", "SUM(price)"},
@@ -82,7 +84,73 @@ TestDatabase GetMeasureTablesTestDatabase(bool add_measures_with_udas) {
       {"measure_with_enum_in_function_signature", "BIT_XOR(quantity)",
        /*is_pseudo_column=*/true},
       {"measure_aggregation_in_in_expr", "SUM(price) IN ((SELECT 1))"},
+
+      {"measure_with_multi_level_aggregation",
+       "SUM(SUM(price) GROUP BY country)"},
+
+      {"measure_total_price", "SUM(price)"},
+      {"measure_total_tax", "SUM(tax)"},
+      {"measure_total_shipping", "SUM(shipping)"},
   };
+  if (add_derived_measures) {
+    std::vector<MeasureColumnDef> derived_measure_column_defs = {
+        // Derived Measures for Measure Composition
+        // Tests a derived measure depending on multiple base measures.
+        {"measure_derived_subtotal",
+         "AGG(measure_total_price) + AGG(measure_total_tax)"},
+        // Tests recursive expansion of derived measures.
+        {"measure_derived_grand_total",
+         "AGG(measure_derived_subtotal) + AGG(measure_total_shipping)"},
+        // Tests a derived measure depending on a single base measure.
+        {"measure_derived_sum_price_plus_one", "AGG(measure_total_price) + 1"},
+        // Tests repeated references to the same measure.
+        {"measure_derived_twice_sum_price",
+         "AGG(measure_total_price) + AGG(measure_total_price)"},
+        // Tests complex nesting of derived measures.
+        {"measure_derived_twice_sum_price_plus_one",
+         "AGG(measure_derived_sum_price_plus_one) + "
+         "AGG(measure_derived_sum_price_plus_one)"},
+        // Tests mixing base and derived measures.
+        {"measure_derived_mixed_sum_price",
+         "AGG(measure_total_price) + AGG(measure_derived_sum_price_plus_one)"},
+        // Tests type coercion (DOUBLE + INT64) in derived measure expansion.
+        {"measure_derived_ratio_plus_sum",
+         "AGG(measure_ratio_price_to_quantity) + AGG(measure_total_price)"},
+        // Tests extraction of standard aggregations as implicit base measures.
+        {"measure_derived_implicit_tax", "SUM(tax) + AGG(measure_total_price)"},
+        // Tests extraction of multiple implicit base measures.
+        {"measure_derived_implicit_multiple",
+         "SUM(tax) + AGG(measure_total_price) + AVG(quantity)"},
+        // Tests null handling in derived measure expressions.
+        {"measure_derived_sum_price_plus_null",
+         "AGG(measure_total_price) + CAST(NULL AS INT64)"},
+        // Tests string operations on nullable measures.
+        {"measure_derived_concat_nullable",
+         "CONCAT(AGG(measure_array_agg_nullable_str_ignore_nulls)[OFFSET(0)], "
+         "' "
+         "suffix')"},
+        // Tests complex nesting with different derived measures.
+        {"measure_derived_complex_nesting_different",
+         "AGG(measure_derived_subtotal) + "
+         "AGG(measure_derived_sum_price_plus_one)"},
+        // Tests derived measure depending on a multi-level base measure.
+        {"measure_derived_avg_monthly_price_plus_one",
+         "AGG(measure_avg_monthly_price) + 1"},
+        // Tests derived measure with conditional expression.
+        {"measure_derived_conditional",
+         "CASE WHEN AGG(measure_total_price) > 100 THEN AGG(measure_total_tax) "
+         "ELSE 0 END"},
+        // Tests derived measure with division.
+        {"measure_derived_division",
+         "AGG(measure_total_price) / AGG(measure_total_shipping)"},
+        // Tests derived measure containing subquery.
+        {"measure_derived_with_subquery",
+         "AGG(measure_total_price) + (SELECT SUM(1) FROM UNNEST([1]))"},
+    };
+    measure_column_defs.insert(measure_column_defs.end(),
+                               derived_measure_column_defs.begin(),
+                               derived_measure_column_defs.end());
+  }
   if (add_measures_with_udas) {
     test_db.measure_function_defs = {
         "CREATE TEMP FUNCTION AddUdf(a INT64, b INT64) AS (a + b);",
@@ -270,6 +338,33 @@ TestDatabase GetMeasureTablesTestDatabase(bool add_measures_with_udas) {
               std::vector<int>{kStoreIdIndex, kProductIdIndex},
       },
   };
+  if (add_derived_measures) {
+    std::vector<MeasureColumnDef> derived_sales_denormalized_measure_defs = {
+        // New Derived Measures for Measure Composition
+        {
+            .name = "measure_derived_total_revenue_plus_one",
+            .expression = "AGG(measure_total_revenue) + 1",
+        },
+        {
+            .name = "measure_derived_categories_count",
+            .expression = "ARRAY_LENGTH(AGG(measure_categories))",
+        },
+        {
+            // Tests that standard aggregates in derived measures inherit grain
+            // locking keys.
+            .name = "measure_derived_implicit_category_and_region",
+            .expression =
+                "ARRAY_CONCAT(ARRAY_AGG(CONCAT(product_category, ', ', "
+                "store_region)), AGG(measure_categories))",
+            .row_identity_column_indices =
+                std::vector<int>{kStoreIdIndex, kProductIdIndex},
+        },
+    };
+    sales_denormalized_measure_defs.insert(
+        sales_denormalized_measure_defs.end(),
+        derived_sales_denormalized_measure_defs.begin(),
+        derived_sales_denormalized_measure_defs.end());
+  }
 
   std::vector<int> sales_denormalized_row_identity_columns = {
       kStoreIdIndex, kProductIdIndex, kSaleDateIndex};

@@ -2038,10 +2038,8 @@ enum LanguageFeature {
 
   // Allows for query constant expressions in window framing clauses.
   // See: (broken link)
-  FEATURE_QUERY_CONSTANT_WINDOW_FRAME_EXPRESSIONS = 15001 [
-    (language_feature_options).language_version = VERSION_1_5,
-    (language_feature_options).in_development = true
-  ];
+  FEATURE_QUERY_CONSTANT_WINDOW_FRAME_EXPRESSIONS = 15001
+      [(language_feature_options).language_version = VERSION_1_5];
 
   // Enables DESCRIBE pipe operator.
   FEATURE_PIPE_DESCRIBE = 14098
@@ -2154,10 +2152,8 @@ enum LanguageFeature {
   // Enables derived measures.
   //
   // See (broken link) for more details.
-  FEATURE_DERIVED_MEASURE = 14134 [
-    (language_feature_options).language_version = VERSION_1_5,
-    (language_feature_options).in_development = true
-  ];
+  FEATURE_DERIVED_MEASURE = 14134
+      [(language_feature_options).language_version = VERSION_1_5];
 
   // Enable JAROWINKLER_SIMILARITY(STRING, STRING) and
   // JAROWINKLER_SIMILARITY(BYTES, BYTES) signatures.
@@ -2503,6 +2499,9 @@ enum ResolvedASTRewrite {
   // Rewrite ROW and TABLE types. The ROW and TABLE types, and all references to
   // them, are replaced with STRUCTs.
   // This depends on REWRITE_FLATTEN happening first.
+  // Known issues:
+  //   b/546263673 - Annotations (e.g. collation) are dropped when post-rewrite
+  //     AST with STRUCTs is passed through SQL Builder.
   REWRITE_ROW_TYPE = 40 [
     (rewrite_options).default_enabled = true,
     (rewrite_options).in_development = true

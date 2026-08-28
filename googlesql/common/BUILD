@@ -214,6 +214,7 @@ cc_library(
         "//googlesql/resolved_ast",
         "//googlesql/resolved_ast:resolved_node_kind_cc_proto",
         "@com_google_absl//absl/container:flat_hash_set",
+        "@com_google_absl//absl/container:linked_hash_set",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
@@ -227,6 +228,7 @@ cc_test(
     name = "measure_analysis_utils_test",
     srcs = ["measure_analysis_utils_test.cc"],
     deps = [
+        ":internal_value",
         ":measure_analysis_utils",
         "//googlesql/base/testing:googlesql_gtest_main",
         "//googlesql/base/testing:status_matchers",

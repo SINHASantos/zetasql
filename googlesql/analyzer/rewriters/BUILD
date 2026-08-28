@@ -95,6 +95,7 @@ cc_library(
     srcs = ["row_type_rewriter.cc"],
     hdrs = ["row_type_rewriter.h"],
     deps = [
+        "//googlesql/analyzer:annotation_propagator",
         "//googlesql/base:check",
         "//googlesql/base:map_util",
         "//googlesql/base:ret_check",
@@ -497,6 +498,7 @@ cc_library(
     srcs = ["tumble_function_rewriter.cc"],
     hdrs = ["tumble_function_rewriter.h"],
     deps = [
+        "//googlesql/analyzer:builtin_only_catalog",
         "//googlesql/analyzer:substitute",
         "//googlesql/base:ret_check",
         "//googlesql/base:status",
@@ -527,6 +529,7 @@ cc_library(
     srcs = ["hop_function_rewriter.cc"],
     hdrs = ["hop_function_rewriter.h"],
     deps = [
+        "//googlesql/analyzer:builtin_only_catalog",
         "//googlesql/analyzer:substitute",
         "//googlesql/base:ret_check",
         "//googlesql/base:status",

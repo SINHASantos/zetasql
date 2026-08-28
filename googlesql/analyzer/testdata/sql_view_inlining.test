@@ -1990,6 +1990,43 @@ QueryStmt
 ==
 
 [no_run_sqlbuilder]
+SELECT a, c FROM DefinerRightsView;
+--
+QueryStmt
++-output_column_list=
+| +-DefinerRightsView.a#1 AS a [INT64]
+| +-DefinerRightsView.c#3 AS c [BOOL]
++-query=
+  +-ProjectScan
+    +-column_list=DefinerRightsView.[a#1, c#3]
+    +-input_scan=
+      +-TableScan(column_list=DefinerRightsView.[a#1, c#3], table=DefinerRightsView, column_index_list=[0, 2])
+
+[REWRITTEN AST]
+QueryStmt
++-output_column_list=
+| +-DefinerRightsView.a#1 AS a [INT64]
+| +-DefinerRightsView.c#3 AS c [BOOL]
++-query=
+  +-ProjectScan
+    +-column_list=DefinerRightsView.[a#1, c#3]
+    +-input_scan=
+      +-ExecuteAsRoleScan
+        +-column_list=[DefinerRightsView.a#1, $view.b#7, DefinerRightsView.c#3]
+        +-input_scan=
+        | +-ProjectScan
+        |   +-column_list=[DefinerRightsView.a#4, $view.b#6, DefinerRightsView.c#5]
+        |   +-expr_list=
+        |   | +-a#4 := Literal(type=INT64, value=1)
+        |   | +-b#6 := Literal(type=STRING, value="x")
+        |   | +-c#5 := Literal(type=BOOL, value=false)
+        |   +-input_scan=
+        |     +-SingleRowScan
+        +-original_inlined_view=DefinerRightsView
+        +-original_inlined_tvf=<null>
+==
+
+[no_run_sqlbuilder]
 SELECT * FROM UnspecifiedRightsView;
 --
 QueryStmt
@@ -2118,8 +2155,38 @@ QueryStmt
             +-column_list=DuplicateColumnsView.[k1#1, k1#1, k1#1]
             +-input_scan=
               +-TableScan(column_list=[DuplicateColumnsView.k1#1, KeyValue.Value#4], table=KeyValue, column_index_list=[0, 1])
+==
 
+SELECT k1, k3 FROM DuplicateColumnsView
+--
+QueryStmt
++-output_column_list=
+| +-DuplicateColumnsView.k1#1 AS k1 [INT64]
+| +-DuplicateColumnsView.k3#3 AS k3 [INT64]
++-query=
+  +-ProjectScan
+    +-column_list=DuplicateColumnsView.[k1#1, k3#3]
+    +-input_scan=
+      +-TableScan(column_list=DuplicateColumnsView.[k1#1, k3#3], table=DuplicateColumnsView, column_index_list=[0, 2])
 
+[REWRITTEN AST]
+QueryStmt
++-output_column_list=
+| +-DuplicateColumnsView.k1#1 AS k1 [INT64]
+| +-DuplicateColumnsView.k3#3 AS k3 [INT64]
++-query=
+  +-ProjectScan
+    +-column_list=DuplicateColumnsView.[k1#1, k3#3]
+    +-input_scan=
+      +-ProjectScan
+        +-column_list=DuplicateColumnsView.[k1#1, k1#1, k3#3]
+        +-expr_list=
+        | +-k3#3 := ColumnRef(type=INT64, column=DuplicateColumnsView.k1#1)
+        +-input_scan=
+          +-ProjectScan
+            +-column_list=DuplicateColumnsView.[k1#1, k1#1, k1#1]
+            +-input_scan=
+              +-TableScan(column_list=[DuplicateColumnsView.k1#1, KeyValue.Value#4], table=KeyValue, column_index_list=[0, 1])
 ==
 
 # ExecuteAsRoleScan is not supported by SQLBuilder
@@ -2241,3 +2308,43 @@ QueryStmt
         |       +-original_inlined_view=DuplicateColumnsDefinerView
         |       +-original_inlined_tvf=<null>
         +-output_column_list=DuplicateColumnsDefinerView.[k1#4, k2#5, k3#6]
+
+==
+
+# ExecuteAsRoleScan is not supported by SQLBuilder
+[no_run_sqlbuilder]
+SELECT k1, k3 FROM DuplicateColumnsDefinerView
+--
+QueryStmt
++-output_column_list=
+| +-DuplicateColumnsDefinerView.k1#1 AS k1 [INT64]
+| +-DuplicateColumnsDefinerView.k3#3 AS k3 [INT64]
++-query=
+  +-ProjectScan
+    +-column_list=DuplicateColumnsDefinerView.[k1#1, k3#3]
+    +-input_scan=
+      +-TableScan(column_list=DuplicateColumnsDefinerView.[k1#1, k3#3], table=DuplicateColumnsDefinerView, column_index_list=[0, 2])
+
+[REWRITTEN AST]
+QueryStmt
++-output_column_list=
+| +-DuplicateColumnsDefinerView.k1#1 AS k1 [INT64]
+| +-DuplicateColumnsDefinerView.k3#3 AS k3 [INT64]
++-query=
+  +-ProjectScan
+    +-column_list=DuplicateColumnsDefinerView.[k1#1, k3#3]
+    +-input_scan=
+      +-ExecuteAsRoleScan
+        +-column_list=DuplicateColumnsDefinerView.[k1#1, k1#7, k3#3]
+        +-input_scan=
+        | +-ProjectScan
+        |   +-column_list=DuplicateColumnsDefinerView.[k1#4, k1#4, k3#5]
+        |   +-expr_list=
+        |   | +-k3#5 := ColumnRef(type=INT64, column=DuplicateColumnsDefinerView.k1#4)
+        |   +-input_scan=
+        |     +-ProjectScan
+        |       +-column_list=DuplicateColumnsDefinerView.[k1#4, k1#4, k1#4]
+        |       +-input_scan=
+        |         +-TableScan(column_list=[DuplicateColumnsDefinerView.k1#4, KeyValue.Value#6], table=KeyValue, column_index_list=[0, 1])
+        +-original_inlined_view=DuplicateColumnsDefinerView
+        +-original_inlined_tvf=<null>

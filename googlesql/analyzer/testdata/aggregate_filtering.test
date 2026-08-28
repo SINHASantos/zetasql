@@ -517,7 +517,7 @@ FROM
 [SQLBUILDER_TARGET_SYNTAX_MODE pipe]
 [SQLBUILDER_OUTPUT]
 SELECT
-  simpletypes_3.a_2 AS a_4
+  simpletypes_3.a_2 AS a_5
 FROM
   (
     FROM
@@ -528,15 +528,15 @@ FROM
     |> AS simpletypes_3
   )
 GROUP BY simpletypes_3.a_1, 1
-|> AS aggregatescan_5
+|> AS aggregatescan_6
 |> SELECT
-     aggregatescan_5.a_4 AS a_4,
+     aggregatescan_6.a_5 AS a_5,
      COUNT(*
        WHERE
-         aggregatescan_5.a_4) OVER (ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) AS a_6
-|> AS analyticscan_7
+         aggregatescan_6.a_5) OVER (ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) AS a_7
+|> AS analyticscan_8
 |> SELECT
-     analyticscan_7.a_6 AS a_6;
+     analyticscan_8.a_7 AS a_7;
 --
 ALTERNATION GROUP: *,
 --
@@ -985,11 +985,11 @@ SELECT
   SUM(CAST(doublynestedstructtable_2.a_1.e AS INT64) + CAST(doublynestedstructtable_2.a_1.f.d.a AS INT64)
     WHERE
       (doublynestedstructtable_2.a_1.f.c) = CAST(1 AS INT32)
-    GROUP BY doublynestedstructtable_2.a_1.f, doublynestedstructtable_2.a_1) AS a_3,
+    GROUP BY doublynestedstructtable_2.a_1.f, doublynestedstructtable_2.a_1) AS a_4,
   SUM(CAST(doublynestedstructtable_2.a_1.f.c AS INT64) + CAST(doublynestedstructtable_2.a_1.f.d.a AS INT64)
     WHERE
       (doublynestedstructtable_2.a_1.f.d.b) LIKE "%filter_expr%"
-    GROUP BY doublynestedstructtable_2.a_1.f, doublynestedstructtable_2.a_1.f.c) AS a_4
+    GROUP BY doublynestedstructtable_2.a_1.f, doublynestedstructtable_2.a_1.f.c) AS a_5
 FROM
   (
     FROM
@@ -999,10 +999,10 @@ FROM
     |> AS doublynestedstructtable_2
   )
 GROUP BY doublynestedstructtable_2.a_1.f
-|> AS aggregatescan_5
+|> AS aggregatescan_6
 |> SELECT
-     aggregatescan_5.a_3 AS a_3,
-     aggregatescan_5.a_4 AS a_4;
+     aggregatescan_6.a_4 AS a_4,
+     aggregatescan_6.a_5 AS a_5;
 ==
 
 # WHERE filtering supported in aggregate functions in ORDER BY clause.
@@ -1069,10 +1069,10 @@ ORDER BY aggregatescan_8.a_7;
 [SQLBUILDER_TARGET_SYNTAX_MODE pipe]
 [SQLBUILDER_OUTPUT]
 SELECT
-  SUM(simpletypes_5.a_2) AS a_6,
+  SUM(simpletypes_5.a_2) AS a_7,
   AVG(simpletypes_5.a_4
     WHERE
-      simpletypes_5.a_3) AS a_7
+      simpletypes_5.a_3) AS a_8
 FROM
   (
     FROM
@@ -1085,10 +1085,10 @@ FROM
     |> AS simpletypes_5
   )
 GROUP BY simpletypes_5.a_1
-|> AS aggregatescan_8
-|> ORDER BY aggregatescan_8.a_7
+|> AS aggregatescan_9
+|> ORDER BY aggregatescan_9.a_8
 |> SELECT
-     aggregatescan_8.a_6 AS a_6;
+     aggregatescan_9.a_7 AS a_7;
 ==
 
 
@@ -1159,10 +1159,10 @@ WHERE
 [SQLBUILDER_TARGET_SYNTAX_MODE pipe]
 [SQLBUILDER_OUTPUT]
 SELECT
-  SUM(simpletypes_5.a_2) AS a_6,
+  SUM(simpletypes_5.a_2) AS a_7,
   AVG(simpletypes_5.a_4
     WHERE
-      simpletypes_5.a_3) AS a_7
+      simpletypes_5.a_3) AS a_8
 FROM
   (
     FROM
@@ -1175,11 +1175,11 @@ FROM
     |> AS simpletypes_5
   )
 GROUP BY simpletypes_5.a_1
-|> AS aggregatescan_8
+|> AS aggregatescan_9
 |> WHERE
-     (aggregatescan_8.a_7) > 100.0
+     (aggregatescan_9.a_8) > 100.0
 |> SELECT
-     aggregatescan_8.a_6 AS a_6;
+     aggregatescan_9.a_7 AS a_7;
 ==
 
 # WHERE filtering works in GROUP BY queries with QUALIFY clause.
@@ -1481,7 +1481,7 @@ GROUP BY simpletypes_4.a_1;
 SELECT
   SUM(ANY_VALUE(simpletypes_4.a_3)
     GROUP BY simpletypes_4.a_1, simpletypes_4.a_2
-    HAVING(simpletypes_4.a_1) > CAST(10 AS INT32)) AS a_5
+    HAVING(simpletypes_4.a_1) > CAST(10 AS INT32)) AS a_6
 FROM
   (
     FROM
@@ -1493,9 +1493,9 @@ FROM
     |> AS simpletypes_4
   )
 GROUP BY simpletypes_4.a_1
-|> AS aggregatescan_6
+|> AS aggregatescan_7
 |> SELECT
-     aggregatescan_6.a_5 AS a_5;
+     aggregatescan_7.a_6 AS a_6;
 ==
 
 # HAVING filter works with multiple nested aggregates.
@@ -1600,7 +1600,7 @@ SELECT
       GROUP BY enumtable_5.a_4, enumtable_5.a_3
       HAVING(COUNT(*)) > 10)
     GROUP BY enumtable_5.a_4
-    HAVING(MAX(enumtable_5.a_3)) > CAST("ANOTHERTESTENUM0" AS `googlesql_test.AnotherTestEnum`)) AS a_6
+    HAVING(MAX(enumtable_5.a_3)) > CAST("ANOTHERTESTENUM0" AS `googlesql_test.AnotherTestEnum`)) AS a_7
 FROM
   (
     FROM
@@ -1613,9 +1613,9 @@ FROM
     |> AS enumtable_5
   )
 GROUP BY enumtable_5.a_4
-|> AS aggregatescan_7
+|> AS aggregatescan_8
 |> SELECT
-     aggregatescan_7.a_6 AS a_6;
+     aggregatescan_8.a_7 AS a_7;
 ==
 
 # HAVING filtering supported in aggregate functions in ORDER BY clause.
@@ -1696,10 +1696,10 @@ ORDER BY aggregatescan_8.a_7;
 [SQLBUILDER_TARGET_SYNTAX_MODE pipe]
 [SQLBUILDER_OUTPUT]
 SELECT
-  SUM(simpletypes_5.a_2) AS a_6,
+  SUM(simpletypes_5.a_2) AS a_7,
   AVG(ANY_VALUE(simpletypes_5.a_4)
     GROUP BY simpletypes_5.a_1, simpletypes_5.a_3
-    HAVING((simpletypes_5.a_1) > CAST(10 AS INT32)) AND ((COUNT(*)) = 10)) AS a_7
+    HAVING((simpletypes_5.a_1) > CAST(10 AS INT32)) AND ((COUNT(*)) = 10)) AS a_8
 FROM
   (
     FROM
@@ -1712,10 +1712,10 @@ FROM
     |> AS simpletypes_5
   )
 GROUP BY simpletypes_5.a_1
-|> AS aggregatescan_8
-|> ORDER BY aggregatescan_8.a_7
+|> AS aggregatescan_9
+|> ORDER BY aggregatescan_9.a_8
 |> SELECT
-     aggregatescan_8.a_6 AS a_6;
+     aggregatescan_9.a_7 AS a_7;
 ==
 
 # HAVING filtering works in GROUP BY queries with query level HAVING clause.
@@ -1814,10 +1814,10 @@ WHERE
 SELECT
   SUM(MIN(simpletypes_5.a_2)
     GROUP BY simpletypes_5.a_1, simpletypes_5.a_3
-    HAVING(simpletypes_5.a_1) > CAST(10 AS INT32)) AS a_6,
+    HAVING(simpletypes_5.a_1) > CAST(10 AS INT32)) AS a_7,
   AVG(ANY_VALUE(simpletypes_5.a_4)
     GROUP BY simpletypes_5.a_1, simpletypes_5.a_3
-    HAVING((simpletypes_5.a_1) > CAST(10 AS INT32)) AND ((COUNT(*)) = 10)) AS a_7
+    HAVING((simpletypes_5.a_1) > CAST(10 AS INT32)) AND ((COUNT(*)) = 10)) AS a_8
 FROM
   (
     FROM
@@ -1830,11 +1830,11 @@ FROM
     |> AS simpletypes_5
   )
 GROUP BY simpletypes_5.a_1
-|> AS aggregatescan_8
+|> AS aggregatescan_9
 |> WHERE
-     (aggregatescan_8.a_7) > 100.0
+     (aggregatescan_9.a_8) > 100.0
 |> SELECT
-     aggregatescan_8.a_6 AS a_6;
+     aggregatescan_9.a_7 AS a_7;
 ==
 
 # HAVING filtering HAVING expressions.
@@ -1922,10 +1922,10 @@ WHERE
 SELECT
   SUM(MAX(simpletypes_5.a_2)
     GROUP BY simpletypes_5.a_1, simpletypes_5.a_3
-    HAVING(COUNT(*)) > 100) AS a_6,
+    HAVING(COUNT(*)) > 100) AS a_7,
   AVG(simpletypes_5.a_4
     WHERE
-      simpletypes_5.a_3) AS a_7
+      simpletypes_5.a_3) AS a_8
 FROM
   (
     FROM
@@ -1938,8 +1938,8 @@ FROM
     |> AS simpletypes_5
   )
 GROUP BY simpletypes_5.a_1
-|> AS aggregatescan_8
+|> AS aggregatescan_9
 |> WHERE
-     (aggregatescan_8.a_7) > 100.0
+     (aggregatescan_9.a_8) > 100.0
 |> SELECT
-     aggregatescan_8.a_6 AS a_6;
+     aggregatescan_9.a_7 AS a_7;

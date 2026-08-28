@@ -108,6 +108,7 @@ cc_library(
         "@com_google_absl//absl/base:core_headers",
         "@com_google_absl//absl/base:no_destructor",
         "@com_google_absl//absl/base:nullability",
+        "@com_google_absl//absl/cleanup",
         "@com_google_absl//absl/container:flat_hash_map",
         "@com_google_absl//absl/container:flat_hash_set",
         "@com_google_absl//absl/container:inlined_vector",
@@ -162,6 +163,23 @@ cc_library(
     ],
 )
 
+cc_library(
+    name = "builtin_declarative_types",
+    srcs = ["builtin_declarative_types.cc"],
+    hdrs = ["builtin_declarative_types.h"],
+    deps = [
+        ":type",
+        "//googlesql/base:ret_check",
+        "//googlesql/common:errors",
+        "//googlesql/public/proto:vector_encoding_id_cc_proto",
+        "@com_google_absl//absl/base:no_destructor",
+        "@com_google_absl//absl/container:flat_hash_map",
+        "@com_google_absl//absl/status",
+        "@com_google_absl//absl/status:statusor",
+        "@com_google_absl//absl/strings",
+    ],
+)
+
 filegroup(
     name = "type_factory_headers",
     srcs = [
@@ -190,6 +208,7 @@ cc_library(
         ":type_factory_headers",
     ],
     deps = [
+        ":builtin_declarative_types",
         ":internal_proto_utils",
         ":type",
         ":value_representations",
@@ -331,8 +350,10 @@ cc_library(
     srcs = ["vector_type_util.cc"],
     hdrs = ["vector_type_util.h"],
     deps = [
+        ":builtin_declarative_types",
         ":type",
         ":type_factory",
+        "//googlesql/base:ret_check",
         "//googlesql/public:options_cc_proto",
         "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings:string_view",

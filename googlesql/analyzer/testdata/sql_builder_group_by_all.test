@@ -719,17 +719,17 @@ WITH
 FROM
   T AS withrefscan_3
 |> EXTEND
-     withrefscan_3.a_1.a2.b1 AS a_5,
+     withrefscan_3.a_1.a2.b1 AS a_4,
      (
        SELECT
-         withrefscan_3.a_1 AS a_4
+         withrefscan_3.a_1 AS a_5
      ) AS a_6
 |> AGGREGATE
      SUM(withrefscan_3.a_2) AS a_7
-   GROUP BY a_5, a_6
+   GROUP BY a_4, a_6
 |> AS aggregatescan_8
 |> SELECT
-     aggregatescan_8.a_5 AS b1,
+     aggregatescan_8.a_4 AS b1,
      aggregatescan_8.a_6 AS a_6,
      aggregatescan_8.a_7 AS a_7;
 ==

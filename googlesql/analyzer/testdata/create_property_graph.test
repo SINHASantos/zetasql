@@ -7098,7 +7098,7 @@ ERROR: Name age is ambiguous because it exists as both a column and a graph prop
 
 # no_java because MeasureTable_SingleKey has a measure column, which does not
 # support serialization yet.
-[language_features=MAXIMUM]
+[language_features=MAXIMUM,-DERIVED_MEASURE]
 [no_java]
 CREATE PROPERTY GRAPH catalog.aml
 NODE TABLES (

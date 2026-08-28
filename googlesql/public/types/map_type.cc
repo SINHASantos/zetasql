@@ -502,7 +502,41 @@ void MapType::FormatValueContentDebugModeImpl(
 void MapType::FormatValueContentSqlModeImpl(
     const internal::ValueContentMap* value_content_map,
     const FormatValueContentOptions& options, std::string* result) const {
-  // TODO: b/413134417 - Use MAP literal syntax once it is implemented.
+  if (options.language_options().LanguageFeatureEnabled(FEATURE_MAP_LITERAL)) {
+    if (options.mode == Type::FormatValueContentOptions::Mode::kSQLExpression ||
+        value_content_map->num_elements() == 0) {
+      absl::StrAppend(result, "NEW MAP<",
+                      key_type_->TypeName(options.product_mode(),
+                                          options.use_external_float32),
+                      ", ",
+                      value_type_->TypeName(options.product_mode(),
+                                            options.use_external_float32),
+                      ">{");
+    } else {
+      absl::StrAppend(result, "MAP{");
+    }
+
+    if (value_content_map->num_elements() > 0) {
+      absl::StrAppend(
+          result,
+          absl::StrJoin(
+              *value_content_map, ",",
+              [options, this](std::string* out, const auto& map_entry) {
+                const auto& [key, value] = map_entry;
+                absl::StrAppend(
+                    out,
+                    FormatNullableValueContent(key, this->key_type_, options),
+                    ":",
+                    FormatNullableValueContent(value, this->value_type_,
+                                               options));
+              }),
+          "}");
+    } else {
+      absl::StrAppend(result, "}");
+    }
+    return;
+  }
+
   absl::StrAppend(result, "MAP_FROM_ARRAY(");
 
   // Include explicit type for the ARRAY<STRUCT<K, V>> argument to

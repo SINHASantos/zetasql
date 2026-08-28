@@ -18,13 +18,16 @@
 
 #include <cstddef>
 #include <memory>
+#include <optional>
 #include <string>
 #include <utility>
+#include <vector>
 
 #include "googlesql/public/options.pb.h"
 #include "googlesql/public/type.pb.h"
 #include "googlesql/public/type_parameters.pb.h"
 #include "googlesql/public/types/collation.h"
+#include "googlesql/public/types/simple_value.h"
 #include "googlesql/public/types/type.h"
 #include "googlesql/public/types/type_deserializer.h"
 #include "googlesql/public/types/type_factory.h"
@@ -35,6 +38,8 @@
 #include "testing/base/public/malloc_counter.h"
 #include "absl/hash/hash.h"
 #include "absl/status/status.h"
+#include "googlesql/base/status_macros.h"
+#include "absl/types/span.h"
 #include "google/protobuf/descriptor.h"
 
 using ::testing::HasSubstr;
@@ -86,13 +91,11 @@ TEST(DeclarativeTypeTest, TypeNameWithModifiersSupportsTypeModifiers) {
                        TypeParameters::MakeNumericTypeParameters(
                            std::move(numeric_type_params_proto)));
 
-  // TODO: The generalized declarative type validation is coming
-  // up and may restore this to an error.
   EXPECT_THAT(t1->TypeNameWithModifiers(
                   TypeModifiers::MakeTypeModifiers(
                       std::move(numeric_type_parameters), Collation()),
                   ProductMode::PRODUCT_INTERNAL),
-              IsOkAndHolds("t1(5, 3)"));
+              StatusIs(absl::StatusCode::kInternal));
 }
 
 TEST(DeclarativeTypeTest, DeclarativeTypeDisallowingReturning) {
@@ -740,6 +743,239 @@ TEST(TypeTest, TypeFactoryDoesNotAllowConflictingDeclarativeTypes) {
 
   EXPECT_THAT(factory.MakeDeclarativeType(descriptor),
               StatusIs(absl::StatusCode::kInternal, HasSubstr("Conflicting")));
+}
+
+static absl::StatusOr<TypeParameters> ResolveEmptyTypeParameters1(
+    const std::vector<TypeParameterValue>&, ProductMode) {
+  return TypeParameters();
+}
+
+static absl::StatusOr<TypeParameters> ResolveEmptyTypeParameters2(
+    const std::vector<TypeParameterValue>&, ProductMode) {
+  return TypeParameters();
+}
+
+static absl::Status ValidateOkTypeParameters(const TypeParameters&,
+                                             ProductMode) {
+  return absl::OkStatus();
+}
+
+TEST(DeclarativeTypeTest, TypeParameterHandlersCreateNullCallbacksFails) {
+  EXPECT_THAT(TypeParameterHandlers::Create(nullptr, nullptr),
+              StatusIs(absl::StatusCode::kInvalidArgument));
+  EXPECT_THAT(
+      TypeParameterHandlers::Create(&ResolveEmptyTypeParameters1, nullptr),
+      StatusIs(absl::StatusCode::kInvalidArgument));
+  EXPECT_THAT(TypeParameterHandlers::Create(nullptr, &ValidateOkTypeParameters),
+              StatusIs(absl::StatusCode::kInvalidArgument));
+}
+
+TEST(DeclarativeTypeTest, TypeParameterHandlersNonBuiltinTypeRejected) {
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(
+      const TypeParameterHandlers handlers,
+      TypeParameterHandlers::Create(&ResolveEmptyTypeParameters1,
+                                    &ValidateOkTypeParameters));
+
+  auto descriptor = DeclarativeTypeDescriptor()
+                        .set_type_id({"CUSTOM_NS", "VEC"})
+                        .set_display_name("VEC")
+                        .set_backing_type(types::BytesType())
+                        .set_type_parameter_handlers(handlers);
+
+  ASSERT_FALSE(descriptor.type_id().IsGoogleSQLBuiltin());
+
+  TypeId type_id = descriptor.type_id();
+
+  // Create t1 from factory1.
+  TypeFactory factory1;
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(const Type* t1,
+                       factory1.MakeDeclarativeType(descriptor));
+
+  // Create t2 from factory2.
+  TypeFactory factory2;
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(const Type* t2,
+                       factory2.MakeDeclarativeType(descriptor));
+  // Pointers are not equal, but the type still compares equal.
+  EXPECT_NE(t1, t2);
+  EXPECT_TRUE(t1->Equals(t2));
+
+  // Round-trip through serialization and ensure deserialization rehydrates it
+  // correctly by adding the correct type parameter handlers.
+  TypeProto type_proto;
+  GOOGLESQL_ASSERT_OK(t1->SerializeToSelfContainedProto(&type_proto));
+
+  {
+    // Deserializing without the opaque handlers will lead to a wrong
+    // descriptor, different from the original type.
+    TypeDeserializer incomplete_deserializer(&factory1);
+    EXPECT_THAT(incomplete_deserializer.Deserialize(type_proto),
+                StatusIs(absl::StatusCode::kInternal,
+                         HasSubstr("Conflicting declarative types")));
+  }
+
+  {
+    // Providing different handlers also leads to conflict.
+    const auto get_decl_type_param_handlers_cb_wrong =
+        [](const DeclarativeTypeId& id)
+        -> absl::StatusOr<std::optional<TypeParameterHandlers>> {
+      return TypeParameterHandlers::Create(&ResolveEmptyTypeParameters2,
+                                           &ValidateOkTypeParameters);
+    };
+    DeclarativeTypeCallbacksRegistry registry(
+        get_decl_type_param_handlers_cb_wrong);
+    TypeDeserializer incorrect_deserializer(
+        &factory1, /*descriptor_pools=*/{},
+        /*extended_type_deserializer=*/nullptr, registry);
+    EXPECT_THAT(incorrect_deserializer.Deserialize(type_proto),
+                StatusIs(absl::StatusCode::kInternal,
+                         HasSubstr("Conflicting declarative types")));
+  }
+
+  {
+    // Providing the correct handlers succeeds.
+    const auto get_decl_type_param_handlers_cb = [](const DeclarativeTypeId& id)
+        -> absl::StatusOr<std::optional<TypeParameterHandlers>> {
+      return TypeParameterHandlers::Create(&ResolveEmptyTypeParameters1,
+                                           &ValidateOkTypeParameters);
+    };
+    DeclarativeTypeCallbacksRegistry registry(get_decl_type_param_handlers_cb);
+
+    TypeDeserializer deserializer(&factory1, /*descriptor_pools=*/{},
+                                  /*extended_type_deserializer=*/nullptr,
+                                  registry);
+    GOOGLESQL_ASSERT_OK_AND_ASSIGN(const Type* deserialized_type,
+                         deserializer.Deserialize(type_proto));
+    EXPECT_EQ(deserialized_type, t1);
+  }
+}
+
+static absl::StatusOr<TypeParameters> ResolveMyVecTypeParameters(
+    const std::vector<TypeParameterValue>& values, ProductMode) {
+  if (values.size() != 1 || !values[0].GetValue().has_int64_value()) {
+    return absl::InvalidArgumentError("Expected 1 int64 parameter");
+  }
+  StringTypeParametersProto proto;
+  proto.set_max_length(values[0].GetValue().int64_value());
+  return TypeParameters::MakeStringTypeParameters(proto);
+}
+
+static absl::Status ValidateMyVecTypeParameters(const TypeParameters& params,
+                                                ProductMode) {
+  if (params.IsStringTypeParameters() &&
+      params.string_type_parameters().max_length() == 999) {
+    return absl::InvalidArgumentError("Invalid dimension 999");
+  }
+  return absl::OkStatus();
+}
+
+TEST(DeclarativeTypeTest, TypeParameterHandlersBuiltinTypeSuccessAndExecution) {
+  TypeFactory factory;
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(
+      TypeParameterHandlers handlers,
+      TypeParameterHandlers::Create(&ResolveMyVecTypeParameters,
+                                    &ValidateMyVecTypeParameters));
+
+  auto builtin_descriptor =
+      DeclarativeTypeDescriptor()
+          .set_type_id({std::string(TypeId::kGoogleSqlNamespace), "MY_VEC"})
+          .set_display_name("MY_VEC")
+          .set_backing_type(types::BytesType())
+          .set_type_parameter_handlers(std::move(handlers));
+
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(const Type* my_vec,
+                       factory.MakeDeclarativeType(builtin_descriptor));
+
+  std::vector<TypeParameterValue> params = {
+      TypeParameterValue(SimpleValue::Int64(128))};
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(
+      TypeParameters resolved_params,
+      my_vec->ValidateAndResolveTypeParameters(params, PRODUCT_INTERNAL));
+  EXPECT_EQ(resolved_params.DebugString(), "(max_length=128)");
+
+  GOOGLESQL_EXPECT_OK(my_vec->ValidateResolvedTypeParameters(resolved_params,
+                                                   PRODUCT_INTERNAL));
+  StringTypeParametersProto bad_proto;
+  bad_proto.set_max_length(999);
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(TypeParameters bad_params,
+                       TypeParameters::MakeStringTypeParameters(bad_proto));
+  EXPECT_THAT(
+      my_vec->ValidateResolvedTypeParameters(bad_params, PRODUCT_INTERNAL),
+      StatusIs(absl::StatusCode::kInvalidArgument,
+               HasSubstr("Invalid dimension 999")));
+
+  EXPECT_THAT(my_vec->TypeNameWithModifiers(TypeModifiers::MakeTypeModifiers(
+                                                resolved_params, Collation()),
+                                            PRODUCT_INTERNAL),
+              IsOkAndHolds("MY_VEC(128)"));
+  EXPECT_THAT(my_vec->TypeNameWithModifiers(
+                  TypeModifiers::MakeTypeModifiers(bad_params, Collation()),
+                  PRODUCT_INTERNAL),
+              StatusIs(absl::StatusCode::kInvalidArgument,
+                       HasSubstr("Invalid dimension 999")));
+}
+
+TEST(DeclarativeTypeTest, TypeParameterHandlersIsIdenticalTo) {
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(
+      TypeParameterHandlers handlers1,
+      TypeParameterHandlers::Create(&ResolveEmptyTypeParameters1,
+                                    &ValidateOkTypeParameters));
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(
+      TypeParameterHandlers handlers2,
+      TypeParameterHandlers::Create(&ResolveEmptyTypeParameters2,
+                                    &ValidateOkTypeParameters));
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(
+      TypeParameterHandlers handlers1_copy,
+      TypeParameterHandlers::Create(&ResolveEmptyTypeParameters1,
+                                    &ValidateOkTypeParameters));
+
+  auto desc_with_handlers1 =
+      DeclarativeTypeDescriptor()
+          .set_type_id({std::string(TypeId::kGoogleSqlNamespace), "VEC"})
+          .set_display_name("VEC")
+          .set_backing_type(types::BytesType())
+          .set_type_parameter_handlers(std::move(handlers1));
+  auto desc_with_handlers2 = desc_with_handlers1;
+  desc_with_handlers2.set_type_parameter_handlers(std::move(handlers2));
+  auto desc_with_handlers1_copy = desc_with_handlers1;
+  desc_with_handlers1_copy.set_type_parameter_handlers(
+      std::move(handlers1_copy));
+  auto desc_without_handlers =
+      DeclarativeTypeDescriptor()
+          .set_type_id({std::string(TypeId::kGoogleSqlNamespace), "VEC"})
+          .set_display_name("VEC")
+          .set_backing_type(types::BytesType());
+
+  EXPECT_TRUE(desc_with_handlers1.IsIdenticalTo(desc_with_handlers1_copy));
+  EXPECT_FALSE(desc_with_handlers1.IsIdenticalTo(desc_with_handlers2));
+  EXPECT_FALSE(desc_with_handlers1.IsIdenticalTo(desc_without_handlers));
+  EXPECT_FALSE(desc_without_handlers.IsIdenticalTo(desc_with_handlers1));
+}
+
+TEST(DeclarativeTypeTest, TypeFactoryRejectsConflictingTypeParameterHandlers) {
+  TypeFactory factory;
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(
+      TypeParameterHandlers handlers1,
+      TypeParameterHandlers::Create(&ResolveEmptyTypeParameters1,
+                                    &ValidateOkTypeParameters));
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(
+      TypeParameterHandlers handlers2,
+      TypeParameterHandlers::Create(&ResolveEmptyTypeParameters2,
+                                    &ValidateOkTypeParameters));
+
+  auto desc1 = DeclarativeTypeDescriptor()
+                   .set_type_id({std::string(TypeId::kGoogleSqlNamespace),
+                                 "MY_VEC_COPY"})
+                   .set_display_name("MY_VEC_COPY")
+                   .set_backing_type(types::BytesType())
+                   .set_type_parameter_handlers(std::move(handlers1));
+  auto desc2 = desc1;
+  desc2.set_type_parameter_handlers(std::move(handlers2));
+
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(const Type* t1, factory.MakeDeclarativeType(desc1));
+  EXPECT_TRUE(t1 != nullptr);
+  EXPECT_THAT(factory.MakeDeclarativeType(desc2),
+              StatusIs(absl::StatusCode::kInternal,
+                       HasSubstr("Conflicting declarative types")));
 }
 
 }  // namespace googlesql

@@ -991,7 +991,7 @@ inline const std::string& Value::json_value_unparsed() const {
 inline JSONValueConstRef Value::json_value() const {
   ABSL_CHECK_EQ(TYPE_JSON, metadata_.type_kind()) << "Not a json type";
   ABSL_CHECK(!metadata_.is_null()) << "Null value";
-  ABSL_CHECK(is_validated_json()) << "Non a validated json value";
+  ABSL_CHECK(is_validated_json()) << "Not a validated json value";
   return json_ptr_->document().value();
 }
 

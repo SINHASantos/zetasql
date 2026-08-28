@@ -41,6 +41,7 @@
 #include "googlesql/public/functions/date_time_util.h"
 #include "googlesql/public/json_value.h"
 #include "googlesql/public/options.pb.h"
+#include "googlesql/public/strings.h"
 #include "googlesql/public/timestamp_picos_value.h"
 #include "googlesql/public/type.h"
 #include "googlesql/public/type.pb.h"
@@ -672,6 +673,16 @@ const std::vector<Value>& Value::elements() const {
       container_ptr_->value();
   const TypedList* const list_ptr =
       static_cast<const TypedList* const>(container_ptr);
+  return list_ptr->values();
+}
+
+absl::StatusOr<const std::vector<Value>&> Value::column_list_spec_columns()
+    const {
+  GOOGLESQL_RET_CHECK_EQ(TYPE_COLUMN_LIST_SPEC, metadata_.type_kind());
+  GOOGLESQL_RET_CHECK(!is_null());
+  const internal::ValueContentOrderedList* const container_ptr =
+      container_ptr_->value();
+  const TypedList* const list_ptr = container_ptr->GetAs<TypedList>();
   return list_ptr->values();
 }
 
@@ -2024,6 +2035,36 @@ Value DateArray(absl::Span<const absl::CivilDay> values) {
 
 }  // namespace values
 
+absl::StatusOr<Value> Value::MakeColumnListSpec(const Value& value) {
+  GOOGLESQL_RET_CHECK(!value.is_null());
+  GOOGLESQL_RET_CHECK(value.type()->IsArray());
+
+  const ArrayType* array_type = value.type()->AsArray();
+  GOOGLESQL_RET_CHECK(value.is_empty_array() || array_type->element_type()->IsString());
+
+  std::vector<Value> elements;
+
+  if (!value.is_empty_array()) {
+    // Create a deep copy of the elements
+    elements = value.elements();
+    for (const Value& element : elements) {
+      if (element.is_null() || element.string_value().empty()) {
+        return absl::Status(
+            absl::StatusCode::kInvalidArgument,
+            "Column name in Column list spec cannot be empty string");
+      }
+    }
+  }
+
+  // Create a new container for the COLUMN_LIST_SPEC value
+  Value result(types::ColumnListSpecType(), /*is_null =*/false,
+               kPreservesOrder);
+  result.container_ptr_ = new internal::ValueContentOrderedListRef(
+      std::make_unique<TypedList>(std::move(elements)),
+      value.order_kind() == kPreservesOrder);
+  return result;
+}
+
 absl::Status Value::Serialize(ValueProto* value_proto) const {
   value_proto->Clear();
   if (is_null()) {
@@ -2120,6 +2161,15 @@ absl::StatusOr<Value> Value::Deserialize(const ValueProto& value_proto,
       GOOGLESQL_ASSIGN_OR_RETURN(Value backing_value,
                        Deserialize(value_proto, decl_type->backing_type()));
       return Declarative(decl_type, backing_value);
+    }
+    case TYPE_COLUMN_LIST_SPEC: {
+      if (!value_proto.has_column_list_spec_value()) {
+        return type->TypeMismatchError(value_proto);
+      }
+      std::vector<std::string> column_names(
+          value_proto.column_list_spec_value().column_names().begin(),
+          value_proto.column_list_spec_value().column_names().end());
+      return MakeColumnListSpec(values::StringArray(column_names));
     }
     // TODO: b/365163099 - The cases above are tech debt, and should be moved
     // into their respective DeserializeValueContent implementations.

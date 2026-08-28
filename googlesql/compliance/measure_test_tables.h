@@ -28,8 +28,12 @@ namespace googlesql {
 // `add_measures_with_udas` indicates whether to add measure columns with UDA
 // functions to the test database.
 //
+// `add_derived_measures` indicates whether to add derived measure columns to
+// the test database.
+//
 // This function is used to generate measure test tables for compliance testing.
-TestDatabase GetMeasureTablesTestDatabase(bool add_measures_with_udas);
+TestDatabase GetMeasureTablesTestDatabase(bool add_measures_with_udas,
+                                          bool add_derived_measures);
 
 }  // namespace googlesql
 

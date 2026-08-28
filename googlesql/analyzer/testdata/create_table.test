@@ -5887,6 +5887,16 @@ CreateTableStmt
 
 ==
 
+# TODO: Support multi-connection syntax.
+[language_features=NONE,+CREATE_TABLE_WITH_CONNECTION]
+create table t (a int64) with connection (key1="connection2", key2="connection2");
+--
+ERROR: Multiple connections in CONNECTION clause is not supported [at 1:31]
+create table t (a int64) with connection (key1="connection2", key2="connectio...
+                              ^
+
+==
+
 [language_features=NONE,+CREATE_TABLE_WITH_CONNECTION]
 create table t (a int64) with connection conn;
 --

@@ -29,6 +29,7 @@
 #include "googlesql/public/language_options.h"
 #include "googlesql/public/options.pb.h"
 #include "googlesql/public/parse_resume_location.h"
+#include "googlesql/base/check.h"
 #include "absl/status/status.h"
 #include "googlesql/base/status_macros.h"
 #include "absl/types/span.h"
@@ -133,6 +134,47 @@ static void AppendImportedModuleNamePaths(
   }
 }
 
+static void FetchAndAppendTransitiveProtoDependencies(
+    std::set<std::string> proto_names,
+    ModuleContentsFetcher* module_contents_fetcher,
+    ProtoContentsInfoMap* proto_contents_info_map,
+    std::vector<absl::Status>* errors) {
+  while (!proto_names.empty()) {
+    const std::string& proto_name = *proto_names.begin();
+    if (proto_contents_info_map->contains(proto_name)) {
+      proto_names.erase(proto_name);
+      continue;
+    }
+
+    const google::protobuf::FileDescriptor* file_descriptor = nullptr;
+    const absl::Status fetch_status =
+        module_contents_fetcher->FetchProtoFileDescriptor(proto_name,
+                                                          &file_descriptor);
+    if (!fetch_status.ok()) {
+      errors->push_back(fetch_status);
+      proto_names.erase(proto_name);
+      continue;
+    }
+    ProtoContentsInfo proto_contents_info;
+    proto_contents_info.filename = proto_name;
+    file_descriptor->CopyTo(&proto_contents_info.file_descriptor_proto);
+    // Add transitively imported proto names to the name set for further
+    // analysis.
+    for (int idx = 0;
+         idx < proto_contents_info.file_descriptor_proto.dependency_size();
+         ++idx) {
+      const std::string& dependency_name =
+          proto_contents_info.file_descriptor_proto.dependency(idx);
+      googlesql_base::InsertIfNotPresent(&proto_names, dependency_name);
+    }
+    // Check validated.  If <proto_name> is already present in the map, then
+    // we continued the loop above and do not get to here.
+    ABSL_CHECK(googlesql_base::InsertIfNotPresent(proto_contents_info_map, proto_name,
+                                  proto_contents_info));
+    proto_names.erase(proto_name);
+  }
+}
+
 static void FetchAndAppendAllModuleAndProtoContents(
     const std::vector<std::string>& module_name_path,
     ModuleContentsFetcher* module_contents_fetcher,
@@ -179,40 +221,9 @@ static void FetchAndAppendAllModuleAndProtoContents(
   // We may have some imported proto names, and now we need to populate the
   // ProtoContentsInfoMap with these protos and all transitively imported
   // protos.
-  while (!proto_names.empty()) {
-    const std::string& proto_name = *proto_names.begin();
-    if (proto_contents_info_map->contains(proto_name)) {
-      proto_names.erase(proto_name);
-      continue;
-    }
-
-    const google::protobuf::FileDescriptor* file_descriptor = nullptr;
-    const absl::Status fetch_status =
-        module_contents_fetcher->FetchProtoFileDescriptor(proto_name,
-                                                          &file_descriptor);
-    if (!fetch_status.ok()) {
-      errors->push_back(fetch_status);
-      proto_names.erase(proto_name);
-      continue;
-    }
-    ProtoContentsInfo proto_contents_info;
-    proto_contents_info.filename = proto_name;
-    file_descriptor->CopyTo(&proto_contents_info.file_descriptor_proto);
-    // Add transitively imported proto names to the name set for further
-    // analysis.
-    for (int idx = 0;
-         idx < proto_contents_info.file_descriptor_proto.dependency_size();
-         ++idx) {
-      const std::string& dependency_name =
-          proto_contents_info.file_descriptor_proto.dependency(idx);
-      googlesql_base::InsertIfNotPresent(&proto_names, dependency_name);
-    }
-    // Check validated.  If <proto_name> is already present in the map, then
-    // we continued the loop above and do not get to here.
-    ABSL_CHECK(googlesql_base::InsertIfNotPresent(proto_contents_info_map, proto_name,
-                                  proto_contents_info));
-    proto_names.erase(proto_name);
-  }
+  FetchAndAppendTransitiveProtoDependencies(std::move(proto_names),
+                                            module_contents_fetcher,
+                                            proto_contents_info_map, errors);
 }
 
 absl::Status FetchAllModuleContents(
@@ -265,6 +276,24 @@ absl::Status FetchAllModuleAndProtoContents(
   }
   if (!errors->empty()) {
     // If we found one or more errors then return the first one.
+    return (*errors)[0];
+  }
+  return absl::OkStatus();
+}
+
+absl::Status FetchTransitiveProtoDependencies(
+    absl::Span<const std::string> initial_proto_names,
+    ModuleContentsFetcher* module_contents_fetcher,
+    ProtoContentsInfoMap* proto_contents_info_map,
+    std::vector<absl::Status>* errors) {
+  errors->clear();
+  proto_contents_info_map->clear();
+  std::set<std::string> proto_names(initial_proto_names.begin(),
+                                    initial_proto_names.end());
+  FetchAndAppendTransitiveProtoDependencies(std::move(proto_names),
+                                            module_contents_fetcher,
+                                            proto_contents_info_map, errors);
+  if (!errors->empty()) {
     return (*errors)[0];
   }
   return absl::OkStatus();

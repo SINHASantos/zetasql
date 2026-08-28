@@ -1162,12 +1162,9 @@ Deletes a property graph. For more information, see
 
 ### Primary key
 
-A primary key constraint is an attribute of a table. A table can have at most
-one primary key constraint that includes one or more columns of that table.
-Each row in the table has a tuple that's the row's primary key. The primary key
-tuple has values that correspond to the columns in the primary key constraint.
-The primary key of all rows must be unique among the primary keys of all rows in
-the table.
+A primary key constraint identifies one or more columns on a table, such that
+the values for these columns are distinct across all rows of the table. A table
+can have at most one primary key constraint.
 
 **Examples**
 
@@ -1186,5 +1183,124 @@ primary key. For each row in this table, the tuple of values in the `title` and
 
 ```googlesql
 CREATE TABLE books (title STRING, name STRING, PRIMARY KEY (title, name));
+```
+
+### Unique key
+
+A unique key constraint identifies one or more columns on a table, such that the
+values for these columns are distinct across all rows of the table. Unlike
+primary key constraints, a table can have multiple unique key constraints.
+
+**Examples**
+
+In this example, a column in a table called `books` is assigned to a unique
+key. For each row in this table, the value in the `isbn` column must be distinct
+from the value in the `isbn` column of all other rows in the table.
+
+```googlesql
+CREATE TABLE books (title STRING, isbn STRING, UNIQUE (isbn));
+```
+
+In this example, multiple columns in a table called `books` are assigned to a
+unique key. For each row in this table, the tuple of values in the `title` and
+`author` columns must together be distinct from the values in the respective
+`title` and `author` columns of all other rows in the table.
+
+```googlesql
+CREATE TABLE books (title STRING, author STRING, UNIQUE (title, author));
+```
+
+### Secondary index
+
+A secondary index is a specialized data structure that allows the database
+engine to find and retrieve rows from a table more quickly. A table can have
+multiple secondary indexes defined on various columns or expressions.
+
+**Examples**
+
+In this example, a secondary index called `i_author` is created on the `author`
+column of a table called `books` to speed up lookups by author.
+
+```googlesql
+CREATE INDEX i_author ON books (author);
+```
+
+In this example, a unique secondary index called `i_isbn` is created on the
+`isbn` column of a table called `books`, ensuring that no two rows can have the
+same indexed value.
+
+```googlesql
+CREATE UNIQUE INDEX i_isbn ON books (isbn);
+```
+
+### Foreign key
+
+A foreign key constraint links two tables together by defining a relationship
+between columns in a child table and corresponding columns in a parent table. A
+foreign key constraint requires that the values in one or more columns of the
+table refer to existing primary key or unique key values in another table,
+ensuring referential integrity across related data.
+
+**Examples**
+
+In this example, a table called `books` has a foreign key constraint on the
+`author_id` column that references the `id` column in the `authors` table.
+
+```googlesql
+CREATE TABLE books (
+  id STRING,
+  title STRING,
+  author_id STRING,
+  PRIMARY KEY (id),
+  FOREIGN KEY (author_id) REFERENCES authors (id)
+);
+```
+
+In this example, a table called `top_authors` creates a named foreign key
+constraint, `fk_top_authors_name`, across multiple columns that reference
+corresponding columns in the `authors` table.
+
+```googlesql
+CREATE TABLE top_authors (
+  author_first_name STRING,
+  author_last_name STRING,
+  CONSTRAINT fk_top_authors_name
+    FOREIGN KEY (author_first_name, author_last_name)
+    REFERENCES authors (first_name, last_name)
+);
+```
+
+### Check constraint
+
+A check constraint is a rule enforced on column values in a table. It specifies
+a Boolean expression that must evaluate to `TRUE` or `NULL` for each row
+inserted into or updated in the table. If the expression evaluates to `FALSE`,
+the write operation fails. Check constraints are useful to maintain data
+invariants.
+
+**Examples**
+
+In this example, an unnamed check constraint on a table called
+`page_count_average` ensures that the value in the `words_per_chapter` column is
+less than the value in the `words_per_book` column.
+
+```googlesql
+CREATE TABLE page_count_average (
+  words_per_chapter INT64,
+  words_per_book INT64,
+  CHECK (words_per_chapter < words_per_book)
+);
+```
+
+In this example, a table called `products` defines a named check constraint,
+`valid_price_range`, which ensures that the `price` column is always greater
+than zero.
+
+```googlesql
+CREATE TABLE products (
+  product_id STRING,
+  price NUMERIC,
+  CONSTRAINT valid_price_range CHECK (price > 0)
+);
 ```
 

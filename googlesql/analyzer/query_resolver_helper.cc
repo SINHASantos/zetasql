@@ -253,7 +253,8 @@ class DeferredResolutionFinder : public NonRecursiveParseTreeVisitor {
 
 class GroupRowsFinder : public NonRecursiveParseTreeVisitor {
  public:
-  GroupRowsFinder() = default;
+  explicit GroupRowsFinder(const LanguageOptions& language_options)
+      : language_options_(language_options) {}
   GroupRowsFinder(const GroupRowsFinder&) = delete;
   GroupRowsFinder(GroupRowsFinder&&) = delete;
   GroupRowsFinder& operator=(const GroupRowsFinder&) = delete;
@@ -272,6 +273,9 @@ class GroupRowsFinder : public NonRecursiveParseTreeVisitor {
 
   absl::StatusOr<VisitResult> visitASTGroupRows(
       const ASTGroupRows* node) override {
+    if (!language_options_.LanguageFeatureEnabled(FEATURE_WITH_GROUP_ROWS)) {
+      return MakeSqlErrorAt(node) << "GROUP ROWS is not supported";
+    }
     found_group_rows_ = true;
     return VisitResult::Empty();
   }
@@ -279,6 +283,7 @@ class GroupRowsFinder : public NonRecursiveParseTreeVisitor {
   bool found_group_rows() const { return found_group_rows_; }
 
  private:
+  const LanguageOptions& language_options_;
   bool found_group_rows_ = false;
 };
 
@@ -1027,12 +1032,14 @@ GetDeferredResolutionSelectColumnInfo(const ASTSelectColumn* column) {
   return deferred_resolution_finder.GetDeferredResolutionSelectColumnInfo();
 }
 
-absl::StatusOr<bool> HasGroupRowsInQuery(const ASTQueryExpression* query_expr) {
+absl::StatusOr<bool> HasGroupRowsInQuery(
+    const ASTQueryExpression* query_expr,
+    const LanguageOptions& language_options) {
   // Per spec: The FROM GROUP ROWS construct may only appear in a leading pipes
   // FROM or the FROM clause of the top level SELECT...
   if (query_expr != nullptr && (query_expr->node_kind() == AST_SELECT ||
                                 query_expr->node_kind() == AST_FROM_QUERY)) {
-    GroupRowsFinder visitor;
+    GroupRowsFinder visitor(language_options);
     GOOGLESQL_RETURN_IF_ERROR(query_expr->TraverseNonRecursive(&visitor));
     return visitor.found_group_rows();
   }

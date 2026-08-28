@@ -1603,6 +1603,35 @@ FROM
 
 ==
 
+# Valid "CONNECTION (key = value, ...)" syntax for table-valued function arguments.
+select * from tvf_one_relation_arg_with_fixed_output(connection (k1 = 'v1', k2 = 123))
+--
+QueryStatement [0-86] [select * from...k2 = 123))]
+  Query [0-86] [select * from...k2 = 123))]
+    Select [0-86] [select * from...k2 = 123))]
+      SelectList [7-8] [*]
+        SelectColumn [7-8] [*]
+          Star(*) [7-8] [*]
+      FromClause [9-86] [from tvf_one_rela...k2 = 123))]
+        TVF [14-86] [tvf_one_relation_...k2 = 123))]
+          PathExpression [14-52] [tvf_one_relation_...xed_output]
+            Identifier(tvf_one_relation_arg_with_fixed_output) [14-52] [tvf_one_relation_...xed_output]
+          TVFArgument [53-85] [connection...k2 = 123)]
+            ConnectionClause [53-85] [connection...k2 = 123)]
+              ConnectionKeyValuePair [65-74] [k1 = 'v1']
+                Identifier(k1) [65-67] [k1]
+                StringLiteral [70-74] ['v1']
+                  StringLiteralComponent('v1') [70-74] ['v1']
+              ConnectionKeyValuePair [76-84] [k2 = 123]
+                Identifier(k2) [76-78] [k2]
+                IntLiteral(123) [81-84] [123]
+--
+SELECT
+  *
+FROM
+  tvf_one_relation_arg_with_fixed_output(CONNECTION (k1 = 'v1', k2 = 123))
+==
+
 # Valid "GRAPH path" syntax for table-valued function arguments.
 select * from tvf_one_relation_arg_with_fixed_output(graph graph_name)
 --

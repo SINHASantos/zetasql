@@ -369,6 +369,7 @@ cc_library(
         ":language_options",
         ":options_cc_proto",
         ":parse_resume_location",
+        "//googlesql/base:check",
         "//googlesql/base:logging",
         "//googlesql/base:map_util",
         "//googlesql/base:status",
@@ -1204,6 +1205,7 @@ cc_library(
         ":numeric_value",
         ":options_cc_proto",
         ":simple_token_list",
+        ":strings",
         ":timestamp_picos_value",
         ":type",
         ":type_cc_proto",
@@ -1280,6 +1282,7 @@ cc_test(
         ":uuid_value",
         ":value",
         "//googlesql/base",
+        "//googlesql/base:check",
         "//googlesql/base/testing:googlesql_gtest_main",
         "//googlesql/base/testing:status_matchers",
         "//googlesql/common:float_margin",
@@ -1517,7 +1520,9 @@ java_proto_library(
 proto_library(
     name = "type_proto",
     srcs = ["type.proto"],
-    deps = ["@com_google_protobuf//:descriptor_proto"],
+    deps = [
+        "@com_google_protobuf//:descriptor_proto",
+    ],
 )
 
 cc_proto_library(

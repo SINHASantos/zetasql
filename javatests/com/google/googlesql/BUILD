@@ -65,6 +65,7 @@ java_library(
         "@io_grpc_grpc_java//core",
         "@maven//:joda_time_joda_time",
         "@maven//:junit_junit",
+        "@maven//:com_google_testparameterinjector_test_parameter_injector",
         "@maven//:com_google_truth_truth",
         "@maven//:com_google_truth_extensions_truth_proto_extension",
     ],

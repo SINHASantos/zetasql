@@ -59,6 +59,24 @@ class TypeRewriter;
 ABSL_DEPRECATED("Inline me!")
 typedef StructAnnotationMap ArrayAnnotationMap;
 
+// Built-in annotation IDs.
+enum class AnnotationKind {
+  // Annotation id for googlesql::CollationAnnotation.
+  kCollation = 1,
+  // Annotation ID for the SampleAnnotation, which is used for testing
+  // purposes only.
+  kSampleAnnotation = 2,
+  // Annotation ID for googlesql::TimestampPrecisionAnnotation.
+  kTimestampPrecision = 3,
+  // Annotation ID for googlesql::IsVersionedAnnotation.
+  kIsVersioned = 4,
+  // Annotation ID for googlesql::VectorLengthAnnotation.
+  kVectorLength = 5,
+  // Annotation ID up to kMaxBuiltinAnnotationKind are reserved for googlesql
+  // built-in annotations.
+  kMaxBuiltinAnnotationKind = 10000,
+};
+
 // Maps from AnnotationSpec ID to SimpleValue.
 class AnnotationMap {
  public:
@@ -486,22 +504,6 @@ class AnnotationSpec {
       const ResolvedCast& cast, AnnotationMap* result_annotation_map) = 0;
 
   // TODO: add more functions to handle different resolved nodes.
-};
-
-// Built-in annotation IDs.
-enum class AnnotationKind {
-  // Annotation id for googlesql::CollationAnnotation.
-  kCollation = 1,
-  // Annotation ID for the SampleAnnotation, which is used for testing
-  // purposes only.
-  kSampleAnnotation = 2,
-  // Annotation ID for googlesql::TimestampPrecisionAnnotation.
-  kTimestampPrecision = 3,
-  // Annotation ID for googlesql::IsVersionedAnnotation.
-  kIsVersioned = 4,
-  // Annotation ID up to kMaxBuiltinAnnotationKind are reserved for googlesql
-  // built-in annotations.
-  kMaxBuiltinAnnotationKind = 10000,
 };
 
 // Returns the kind's name.

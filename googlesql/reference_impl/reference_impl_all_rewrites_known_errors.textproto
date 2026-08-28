@@ -409,6 +409,7 @@ known_errors {
 known_errors {
   mode: ALLOW_UNIMPLEMENTED
   reason: "Measure type rewriter does not support WITH expressions emitting a measure type"
+  label: "derived_measures_test:derived_measure_with_expr"
   label: "measures_test:measure_from_with_expr_assignment_list_as_column_ref"
   label: "measures_test:measure_from_with_expr_from_column_ref"
 }
@@ -416,6 +417,7 @@ known_errors {
 known_errors {
   mode: ALLOW_UNIMPLEMENTED
   reason: "Measure type rewriter expects argument to AGG function to be a direct column reference"
+  label: "derived_measures_test:aggregate_derived_measure_from_scalar_subquery"
   label: "measures_test:null_measure_value_from_limit_zero"
   label: "measures_test:null_measure_value_from_where_false"
 }
@@ -496,4 +498,11 @@ known_errors {
   mode: ALLOW_UNIMPLEMENTED
   reason: "TVF arguments that reference columns are not supported"
   label: "annotations_in_sql_functions_test:tokenlist_in_concrete_tvf"
+}
+
+known_errors {
+  mode: ALLOW_UNIMPLEMENTED
+  reason: "Measure type rewriter does not support WITH scans emitting duplicate measure columns"
+  label: "derived_measures_test:branching_propagation_with_clause_both_aggregated"
+  label: "derived_measures_test:branching_propagation_with_clause_one_aggregated"
 }

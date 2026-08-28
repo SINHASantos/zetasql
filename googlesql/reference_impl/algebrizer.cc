@@ -44,6 +44,7 @@
 #include "googlesql/public/types/annotation.h"
 #include "googlesql/public/types/collation.h"
 #include "googlesql/public/types/measure_type.h"
+#include "googlesql/reference_impl/measure_evaluation.h"
 #include "googlesql/resolved_ast/column_factory.h"
 #include "googlesql/resolved_ast/rewrite_utils.h"
 #include "googlesql/common/measure_utils.h"
@@ -350,16 +351,21 @@ absl::StatusOr<std::vector<int64_t>> ConvertGroupingSetToGroupingSetIds(
 
 }  // namespace
 
-Algebrizer::Algebrizer(const LanguageOptions& language_options,
-                       const AlgebrizerOptions& algebrizer_options,
-                       TypeFactory* type_factory, Parameters* parameters,
-                       ParameterMap* column_map,
-                       SystemVariablesAlgebrizerMap* system_variables_map)
+Algebrizer::Algebrizer(
+    const LanguageOptions& language_options,
+    const AlgebrizerOptions& algebrizer_options, TypeFactory* type_factory,
+    Parameters* parameters, ParameterMap* column_map,
+    SystemVariablesAlgebrizerMap* system_variables_map,
+    std::shared_ptr<MeasureColumnToExprMapping> measure_column_to_expr)
     : language_options_(language_options),
       algebrizer_options_(algebrizer_options),
       column_to_variable_(std::make_unique<ColumnToVariableMapping>(
           std::make_unique<VariableGenerator>())),
       variable_gen_(column_to_variable_->variable_generator()),
+      measure_column_to_expr_(
+          measure_column_to_expr != nullptr
+              ? std::move(measure_column_to_expr)
+              : std::make_shared<MeasureColumnToExprMapping>()),
       parameters_(parameters),
       column_map_(column_map),
       system_variables_map_(system_variables_map),
@@ -1660,7 +1666,7 @@ absl::StatusOr<std::unique_ptr<AggregateArg>> Algebrizer::AlgebrizeAggregateFn(
                      AlgebrizeExpression(argument_expr));
     if (argument_expr->type()->IsMeasureType()) {
       GOOGLESQL_RET_CHECK(measure_expr == nullptr);
-      GOOGLESQL_ASSIGN_OR_RETURN(measure_expr, measure_column_to_expr_.GetMeasureExpr(
+      GOOGLESQL_ASSIGN_OR_RETURN(measure_expr, measure_column_to_expr_->GetMeasureExpr(
                                          argument_expr->type()->AsMeasure()));
     }
     arguments.push_back(std::move(argument));
@@ -1689,6 +1695,8 @@ absl::Status Algebrizer::PopulateArgumentsFromColumnList(
 absl::StatusOr<std::unique_ptr<AggregateArg>>
 Algebrizer::AlgebrizeAggregateSubquery(
     const VariableId& variable, const ResolvedSubqueryExpr* subquery_expr) {
+  subquery_depth_++;
+  absl::Cleanup decrement_subquery_depth = [this] { subquery_depth_--; };
   // Access 'parameters' to suppress the resolver check for non-accessed
   // expressions.
   for (const auto& parameter : subquery_expr->parameter_list()) {
@@ -1948,12 +1956,14 @@ Algebrizer::AlgebrizeUdaOrMeasureCall(
     std::function<absl::StatusOr<std::unique_ptr<RelationalOp>>(Algebrizer&)>
         create_input_op,
     const LanguageOptions& language_options,
-    const AlgebrizerOptions& algebrizer_options, TypeFactory* type_factory) {
+    const AlgebrizerOptions& algebrizer_options, TypeFactory* type_factory,
+    std::shared_ptr<MeasureColumnToExprMapping> measure_column_to_expr) {
   Parameters parameters;
   ParameterMap column_map;
   SystemVariablesAlgebrizerMap system_variables_map;
   Algebrizer algebrizer(language_options, algebrizer_options, type_factory,
-                        &parameters, &column_map, &system_variables_map);
+                        &parameters, &column_map, &system_variables_map,
+                        std::move(measure_column_to_expr));
 
   // Construct the input op for the UDA or Measure call.
   GOOGLESQL_ASSIGN_OR_RETURN(std::unique_ptr<RelationalOp> input,
@@ -2036,7 +2046,7 @@ Algebrizer::CreateInputOpForMeasureCall(const MeasureType* measure_type) {
   GOOGLESQL_RET_CHECK(measure_type_ == nullptr);
   measure_type_ = measure_type;
   measure_variable_ = variable_gen_->GetNewVariableName("measure");
-  return GrainLockingOp::Create(measure_variable_);
+  return RowsForUdaOp::Create({measure_variable_});
 }
 
 absl::StatusOr<std::unique_ptr<AggregateFunctionBody>>
@@ -2228,6 +2238,8 @@ Algebrizer::CreateMeasureAggregateFn(
   const LanguageOptions& language_options = this->language_options_;
   const AlgebrizerOptions& algebrizer_options = this->algebrizer_options_;
   TypeFactory* type_factory = this->type_factory_;
+  std::shared_ptr<MeasureColumnToExprMapping> measure_column_to_expr =
+      this->measure_column_to_expr_;
 
   // Create a lambda function to algebrize the measure expression and returns an
   // `AggregateFunctionEvaluator`. It's worth noting that this lambda function
@@ -2236,7 +2248,7 @@ Algebrizer::CreateMeasureAggregateFn(
   // objects that outlive the algebrizer.
   AggregateFunctionEvaluatorFactory measure_aggregate_fn =
       [measure_expr, measure_type, language_options, algebrizer_options,
-       type_factory](const FunctionSignature& unused)
+       type_factory, measure_column_to_expr](const FunctionSignature& unused)
       -> absl::StatusOr<std::unique_ptr<AggregateFunctionEvaluator>> {
     if (!algebrizer_options.max_seen_column_id) {
       return absl::InvalidArgumentError(
@@ -2291,12 +2303,13 @@ Algebrizer::CreateMeasureAggregateFn(
       return algebrizer.CreateInputOpForMeasureCall(measure_type);
     };
 
-    GOOGLESQL_ASSIGN_OR_RETURN(std::unique_ptr<RelationalOp> algebrized_measure,
-                     AlgebrizeUdaOrMeasureCall(
-                         /*anonymization_options=*/nullptr,
-                         *rewritten_measure_expr, extracted_aggregates_raw_ptrs,
-                         extracted_aggregates_columns, create_grain_locking_op,
-                         language_options, algebrizer_options, type_factory));
+    GOOGLESQL_ASSIGN_OR_RETURN(
+        std::unique_ptr<RelationalOp> algebrized_measure,
+        AlgebrizeUdaOrMeasureCall(
+            /*anonymization_options=*/nullptr, *rewritten_measure_expr,
+            extracted_aggregates_raw_ptrs, extracted_aggregates_columns,
+            create_grain_locking_op, language_options, algebrizer_options,
+            type_factory, measure_column_to_expr));
 
     return MakeUserDefinedAggregateFunctionEvaluator(
         std::move(algebrized_measure), /*argument_infos=*/{});
@@ -2625,6 +2638,18 @@ Algebrizer::AlgebrizeAggregateFnWithAlgebrizedArguments(
         {std::move(collation_list[i]), collation_key_type});
   }
 
+  VariableId grain_locking_measure_variable;
+  // If we are algebrizing a top-level standard aggregate function call inside a
+  // measure definition expression, we need to apply grain locking to the input
+  // rows to avoid over-counting.
+  //
+  // The nested FN_AGG calls, do not need to be grain locked here. They are
+  // grain locked separately using their own grain locking keys.
+  if (measure_variable_.is_valid() && kind != FunctionKind::kMeasureAgg &&
+      subquery_depth_ == 0) {
+    grain_locking_measure_variable = measure_variable_;
+  }
+
   return AggregateArg::Create(
       variable, std::move(function), std::move(arguments), distinctness,
       std::move(having_expr), having_kind, std::move(order_by_keys),
@@ -2632,7 +2657,7 @@ Algebrizer::AlgebrizeAggregateFnWithAlgebrizedArguments(
       std::move(inner_grouping_keys), std::move(inner_aggregators),
       aggregate_function->error_mode(), std::move(filter),
       std::move(having_filter), std::move(collator_info_list),
-      side_effects_variable);
+      side_effects_variable, grain_locking_measure_variable);
 }
 
 absl::StatusOr<std::unique_ptr<NewStructExpr>> Algebrizer::AlgebrizeMakeStruct(
@@ -2933,6 +2958,8 @@ Algebrizer::AlgebrizeGetProtoFieldOfPath(
 
 absl::StatusOr<std::unique_ptr<ValueExpr>> Algebrizer::AlgebrizeSubqueryExpr(
     const ResolvedSubqueryExpr* subquery_expr) {
+  subquery_depth_++;
+  absl::Cleanup decrement_subquery_depth = [this] { subquery_depth_--; };
   // Access 'parameters' to suppress the resolver check for non-accessed
   // expressions.
   for (const auto& parameter : subquery_expr->parameter_list()) {
@@ -3863,8 +3890,9 @@ absl::StatusOr<std::unique_ptr<RelationalOp>> Algebrizer::AlgebrizeTableScan(
     }
   }
 
-  GOOGLESQL_RETURN_IF_ERROR(measure_column_to_expr_.TrackMeasureColumnsEmittedByTableScan(
-      *table_scan));
+  GOOGLESQL_RETURN_IF_ERROR(
+      measure_column_to_expr_->TrackMeasureColumnsEmittedByTableScan(
+          *table_scan));
 
   if (algebrizer_options_.use_arrays_for_tables) {
     // Construct the list of fields of the SELECT and place a scan operator
@@ -8635,7 +8663,7 @@ absl::StatusOr<std::unique_ptr<RelationalOp>> Algebrizer::AlgebrizeTVFScan(
   // Track measure columns emitted by the TVF scan so that they can be
   // correctly aggregated later.
   GOOGLESQL_RETURN_IF_ERROR(
-      measure_column_to_expr_.TrackMeasureColumnsEmittedByTVFScan(*tvf_scan));
+      measure_column_to_expr_->TrackMeasureColumnsEmittedByTVFScan(*tvf_scan));
   // Algebrize input arguments.
   std::vector<TvfAlgebraArgument> arguments;
   std::vector<TvfArgumentInfo> arg_infos;

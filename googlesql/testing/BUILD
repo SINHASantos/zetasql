@@ -163,6 +163,7 @@ cc_library(
         "//googlesql/public:type",
         "//googlesql/public:type_cc_proto",
         "//googlesql/public/types",
+        "//googlesql/testdata:test_hop_tumble_cc_proto",
         "//googlesql/testdata:test_proto3_cc_proto",
         "//googlesql/testdata:test_schema_cc_proto",
         "@com_google_absl//absl/strings",

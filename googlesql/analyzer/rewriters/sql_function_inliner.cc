@@ -836,26 +836,20 @@ class SqlTableFunctionInlineVistor : public ResolvedASTDeepCopyVisitor {
           "Inlining only supports SQL TVFs and TemplateTVFs.");
     }
 
-    // The input function body is potentially owned by a catalog or some other
-    // component. Copy the body so that its column ids are compatible with the
-    // invoking query and the scan is locally owned.
-    ColumnReplacementMap column_map;
-    for (int i = 0; i < scan->column_list_size(); ++i) {
-      column_map.insert({query->column_list()[scan->column_index_list()[i]],
-                         scan->column_list()[i]});
-    }
-
     std::unique_ptr<ResolvedScan> body_scan;
     if (scan->tvf()->sql_security() ==
         ResolvedCreateStatementEnums::SQL_SECURITY_DEFINER) {
+      ColumnReplacementMap column_map;
       GOOGLESQL_ASSIGN_OR_RETURN(
           body_scan,
           ReplaceScanColumns(
               *column_factory_, *query, scan->column_index_list(),
-              CreateReplacementColumns(*column_factory_, scan->column_list())));
-      body_scan = MakeResolvedExecuteAsRoleScan(
-          scan->column_list(), std::move(body_scan),
-          /*original_inlined_view=*/nullptr, scan->tvf());
+              CreateReplacementColumns(*column_factory_, scan->column_list(),
+                                       column_map)));
+      GOOGLESQL_ASSIGN_OR_RETURN(body_scan,
+                       CreateResolvedExecuteAsRoleScan(
+                           *column_factory_, column_map, std::move(body_scan),
+                           /*original_inlined_view=*/nullptr, scan->tvf()));
     } else {
       // TODO We should decide what to do in the case of
       // UNSPECIFIED, to be consistent with VIEWs and the desired behavior.

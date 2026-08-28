@@ -26,6 +26,7 @@
 #include "google/protobuf/timestamp.pb.h"
 #include "googlesql/base/testing/status_matchers.h"
 #include "googlesql/public/analyzer_options.h"
+#include "googlesql/public/annotation/collation.h"
 #include "googlesql/public/builtin_function.pb.h"
 #include "googlesql/public/builtin_function_options.h"
 #include "googlesql/public/function.h"
@@ -40,6 +41,7 @@
 #include "googlesql/public/table_valued_function.h"
 #include "googlesql/public/types/annotation.h"
 #include "googlesql/public/types/simple_type.h"
+#include "googlesql/public/types/simple_value.h"
 #include "googlesql/public/types/type.h"
 #include "googlesql/public/types/type_factory.h"
 #include "googlesql/public/value.h"
@@ -715,6 +717,49 @@ TEST_F(FunctionCallBuilderTest, NotTest) {
 FunctionCall(GoogleSQL:$not(BOOL) -> BOOL)
 +-Literal(type=BOOL, value=true, has_explicit_type=TRUE)
 )"));
+}
+
+TEST_F(FunctionCallBuilderTest, IfNullTest) {
+  std::unique_ptr<ResolvedExpr> arg =
+      MakeResolvedLiteral(types::StringType(), Value::StringValue("test"),
+                          /*has_explicit_type=*/true);
+  auto annotation_map = AnnotationMap::Create(types::StringType());
+  annotation_map->SetAnnotation<CollationAnnotation>(
+      googlesql::SimpleValue::String("und_ci"));
+  arg->set_type_annotation_map(annotation_map.get());
+  std::unique_ptr<ResolvedExpr> null_case =
+      MakeResolvedLiteral(types::StringType(), Value::StringValue("default"),
+                          /*has_explicit_type=*/true);
+
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(
+      std::unique_ptr<const ResolvedExpr> ifnull_fn,
+      fn_builder_.IfNull(std::move(arg), std::move(null_case)));
+  EXPECT_EQ(ifnull_fn->DebugString(), absl::StripLeadingAsciiWhitespace(R"(
+FunctionCall(GoogleSQL:ifnull(STRING, STRING) -> STRING)
++-type_annotation_map={Collation:"und_ci"}
++-Literal(type=STRING, type_annotation_map={Collation:"und_ci"}, value="test", has_explicit_type=TRUE)
++-Literal(type=STRING, value="default", has_explicit_type=TRUE)
+)"));
+}
+
+TEST_F(FunctionCallBuilderTest, IfNullTestConflictingCollations) {
+  std::unique_ptr<ResolvedExpr> arg =
+      MakeResolvedLiteral(types::StringType(), Value::StringValue("test"),
+                          /*has_explicit_type=*/true);
+  auto annotation_map = AnnotationMap::Create(types::StringType());
+  annotation_map->SetAnnotation<CollationAnnotation>(
+      googlesql::SimpleValue::String("und_ci"));
+  arg->set_type_annotation_map(annotation_map.get());
+  std::unique_ptr<ResolvedExpr> null_case =
+      MakeResolvedLiteral(types::StringType(), Value::StringValue("default"),
+                          /*has_explicit_type=*/true);
+  auto annotation_map_case = AnnotationMap::Create(types::StringType());
+  annotation_map_case->SetAnnotation<CollationAnnotation>(
+      googlesql::SimpleValue::String("binary"));
+  null_case->set_type_annotation_map(annotation_map_case.get());
+
+  EXPECT_THAT(fn_builder_.IfNull(std::move(arg), std::move(null_case)),
+              StatusIs(absl::StatusCode::kInternal));
 }
 
 TEST_F(FunctionCallBuilderTest, NullIfErrorTest) {
@@ -3286,6 +3331,371 @@ TEST(RewriteUtilsTest, ReplaceScanColumnsMultipleDuplicateColumns) {
                 ->column()
                 .column_id(),
             2);
+}
+
+TEST(RewriteUtilsTest, CreateReplacementColumnsEmpty) {
+  IdStringPool id_string_pool;
+  googlesql_base::SequenceNumber sequence;
+  ColumnFactory factory(0, id_string_pool, sequence);
+
+  ColumnReplacementMap replaced_column_map;
+  std::vector<ResolvedColumn> replacement_columns = CreateReplacementColumns(
+      factory, /*column_list=*/{}, replaced_column_map);
+
+  EXPECT_THAT(replacement_columns, IsEmpty());
+  EXPECT_TRUE(replaced_column_map.empty());
+}
+
+TEST(RewriteUtilsTest, CreateReplacementColumnsBasic) {
+  IdStringPool id_string_pool;
+  googlesql_base::SequenceNumber sequence;
+  ColumnFactory factory(0, id_string_pool, sequence);
+
+  ResolvedColumn col1 =
+      factory.MakeCol("tab", "col1", types::Int64Type());  // id 1
+  ResolvedColumn col2 =
+      factory.MakeCol("tab", "col2", types::StringType());  // id 2
+
+  ColumnReplacementMap replaced_column_map;
+  std::vector<ResolvedColumn> replacement_columns = CreateReplacementColumns(
+      factory, /*column_list=*/{col1, col2}, replaced_column_map);
+
+  ASSERT_THAT(replacement_columns, SizeIs(2));
+  EXPECT_EQ(replacement_columns[0].column_id(), 3);
+  EXPECT_EQ(replacement_columns[0].table_name(), "tab");
+  EXPECT_EQ(replacement_columns[0].name(), "col1");
+  EXPECT_TRUE(replacement_columns[0].type()->Equals(types::Int64Type()));
+
+  EXPECT_EQ(replacement_columns[1].column_id(), 4);
+  EXPECT_EQ(replacement_columns[1].table_name(), "tab");
+  EXPECT_EQ(replacement_columns[1].name(), "col2");
+  EXPECT_TRUE(replacement_columns[1].type()->Equals(types::StringType()));
+
+  EXPECT_EQ(replaced_column_map.size(), 2);
+  EXPECT_EQ(replaced_column_map[replacement_columns[0]], col1);
+  EXPECT_EQ(replaced_column_map[replacement_columns[1]], col2);
+}
+
+TEST(RewriteUtilsTest, CreateReplacementColumnsWithDuplicates) {
+  IdStringPool id_string_pool;
+  googlesql_base::SequenceNumber sequence;
+  ColumnFactory factory(0, id_string_pool, sequence);
+
+  ResolvedColumn col1 =
+      factory.MakeCol("tab", "col1", types::Int64Type());  // id 1
+
+  ColumnReplacementMap replaced_column_map;
+  std::vector<ResolvedColumn> replacement_columns = CreateReplacementColumns(
+      factory, /*column_list=*/{col1, col1}, replaced_column_map);
+
+  ASSERT_THAT(replacement_columns, SizeIs(2));
+  EXPECT_EQ(replacement_columns[0].column_id(), 2);
+  EXPECT_EQ(replacement_columns[1].column_id(), 3);
+  EXPECT_NE(replacement_columns[0], replacement_columns[1]);
+
+  EXPECT_EQ(replaced_column_map.size(), 2);
+  EXPECT_EQ(replaced_column_map[replacement_columns[0]], col1);
+  EXPECT_EQ(replaced_column_map[replacement_columns[1]], col1);
+}
+
+TEST(RewriteUtilsTest, CreateResolvedExecuteAsRoleScanEmptyScan) {
+  IdStringPool id_string_pool;
+  googlesql_base::SequenceNumber sequence;
+  ColumnFactory factory(0, id_string_pool, sequence);
+  SimpleTable table("tab");
+  std::unique_ptr<ResolvedTableScan> scan = MakeResolvedTableScan(
+      /*column_list=*/{},
+      /*table=*/&table,
+      /*for_system_time_expr=*/nullptr);
+
+  ColumnReplacementMap column_map;
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(
+      std::unique_ptr<ResolvedExecuteAsRoleScan> result,
+      CreateResolvedExecuteAsRoleScan(factory, column_map, std::move(scan),
+                                      /*original_inlined_view=*/&table,
+                                      /*original_inlined_tvf=*/nullptr));
+
+  ASSERT_NE(result, nullptr);
+  EXPECT_THAT(result->column_list(), IsEmpty());
+  EXPECT_EQ(result->original_inlined_view(), &table);
+  EXPECT_EQ(result->original_inlined_tvf(), nullptr);
+  ASSERT_NE(result->input_scan(), nullptr);
+  EXPECT_THAT(result->input_scan()->column_list(), IsEmpty());
+}
+
+TEST(RewriteUtilsTest, CreateResolvedExecuteAsRoleScanAllColumnsMapped) {
+  IdStringPool id_string_pool;
+  googlesql_base::SequenceNumber sequence;
+  ColumnFactory factory(0, id_string_pool, sequence);
+  SimpleTable table(
+      "tab", {{"col1", types::Int64Type()}, {"col2", types::StringType()}});
+
+  ResolvedColumn scan_col1 =
+      factory.MakeCol("tab", "col1", types::Int64Type());  // id 1
+  ResolvedColumn scan_col2 =
+      factory.MakeCol("tab", "col2", types::StringType());  // id 2
+  std::unique_ptr<ResolvedTableScan> scan = MakeResolvedTableScan(
+      /*column_list=*/{scan_col1, scan_col2},
+      /*table=*/&table,
+      /*for_system_time_expr=*/nullptr);
+
+  ResolvedColumn orig_col1 =
+      factory.MakeCol("orig_tab", "orig_col1", types::Int64Type());  // id 3
+  ResolvedColumn orig_col2 =
+      factory.MakeCol("orig_tab", "orig_col2", types::StringType());  // id 4
+
+  ColumnReplacementMap column_map;
+  column_map.insert({scan_col1, orig_col1});
+  column_map.insert({scan_col2, orig_col2});
+
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(
+      std::unique_ptr<ResolvedExecuteAsRoleScan> result,
+      CreateResolvedExecuteAsRoleScan(factory, column_map, std::move(scan),
+                                      /*original_inlined_view=*/&table,
+                                      /*original_inlined_tvf=*/nullptr));
+
+  ASSERT_NE(result, nullptr);
+  ASSERT_THAT(result->column_list(), SizeIs(2));
+  EXPECT_EQ(result->column_list(0), orig_col1);
+  EXPECT_EQ(result->column_list(0).table_name(), "orig_tab");
+  EXPECT_EQ(result->column_list(0).name(), "orig_col1");
+  EXPECT_TRUE(result->column_list(0).type()->Equals(types::Int64Type()));
+
+  EXPECT_EQ(result->column_list(1), orig_col2);
+  EXPECT_EQ(result->column_list(1).table_name(), "orig_tab");
+  EXPECT_EQ(result->column_list(1).name(), "orig_col2");
+  EXPECT_TRUE(result->column_list(1).type()->Equals(types::StringType()));
+
+  // No new columns should have been allocated during execute as role scan
+  // creation.
+  EXPECT_EQ(factory.max_column_id(), orig_col2.column_id());
+}
+
+TEST(RewriteUtilsTest, CreateResolvedExecuteAsRoleScanNoColumnsMapped) {
+  IdStringPool id_string_pool;
+  googlesql_base::SequenceNumber sequence;
+  ColumnFactory factory(0, id_string_pool, sequence);
+  SimpleTable table(
+      "tab", {{"col1", types::Int64Type()}, {"col2", types::StringType()}});
+
+  ResolvedColumn scan_col1 =
+      factory.MakeCol("tab", "col1", types::Int64Type());  // id 1
+  ResolvedColumn scan_col2 =
+      factory.MakeCol("tab", "col2", types::StringType());  // id 2
+  std::unique_ptr<ResolvedTableScan> scan = MakeResolvedTableScan(
+      /*column_list=*/{scan_col1, scan_col2},
+      /*table=*/&table,
+      /*for_system_time_expr=*/nullptr);
+
+  ColumnReplacementMap column_map;
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(
+      std::unique_ptr<ResolvedExecuteAsRoleScan> result,
+      CreateResolvedExecuteAsRoleScan(factory, column_map, std::move(scan),
+                                      /*original_inlined_view=*/&table,
+                                      /*original_inlined_tvf=*/nullptr));
+
+  ASSERT_NE(result, nullptr);
+  ASSERT_THAT(result->column_list(), SizeIs(2));
+
+  // First column should have same attributes as scan_col1 but a newly allocated
+  // column ID.
+  EXPECT_EQ(result->column_list(0).column_id(), 3);
+  EXPECT_NE(result->column_list(0), scan_col1);
+  EXPECT_EQ(result->column_list(0).table_name(), "tab");
+  EXPECT_EQ(result->column_list(0).name(), "col1");
+  EXPECT_TRUE(result->column_list(0).type()->Equals(types::Int64Type()));
+
+  // Second column should have same attributes as scan_col2 but a newly
+  // allocated column ID.
+  EXPECT_EQ(result->column_list(1).column_id(), 4);
+  EXPECT_NE(result->column_list(1), scan_col2);
+  EXPECT_EQ(result->column_list(1).table_name(), "tab");
+  EXPECT_EQ(result->column_list(1).name(), "col2");
+  EXPECT_TRUE(result->column_list(1).type()->Equals(types::StringType()));
+
+  EXPECT_EQ(factory.max_column_id(), 4);
+}
+
+TEST(RewriteUtilsTest, CreateResolvedExecuteAsRoleScanSubsetColumnsMapped) {
+  IdStringPool id_string_pool;
+  googlesql_base::SequenceNumber sequence;
+  ColumnFactory factory(0, id_string_pool, sequence);
+  SimpleTable table("tab", {{"c0", types::Int64Type()},
+                            {"c1", types::StringType()},
+                            {"c2", types::BoolType()},
+                            {"c3", types::DoubleType()}});
+
+  ResolvedColumn scan_c0 =
+      factory.MakeCol("tab", "c0", types::Int64Type());  // id 1
+  ResolvedColumn scan_c1 =
+      factory.MakeCol("tab", "c1", types::StringType());  // id 2
+  ResolvedColumn scan_c2 =
+      factory.MakeCol("tab", "c2", types::BoolType());  // id 3
+  ResolvedColumn scan_c3 =
+      factory.MakeCol("tab", "c3", types::DoubleType());  // id 4
+
+  std::unique_ptr<ResolvedTableScan> scan = MakeResolvedTableScan(
+      /*column_list=*/{scan_c0, scan_c1, scan_c2, scan_c3},
+      /*table=*/&table,
+      /*for_system_time_expr=*/nullptr);
+
+  ResolvedColumn orig_c0 =
+      factory.MakeCol("orig", "orig0", types::Int64Type());  // id 5
+  ResolvedColumn orig_c2 =
+      factory.MakeCol("orig", "orig2", types::BoolType());  // id 6
+
+  ColumnReplacementMap column_map;
+  column_map.insert({scan_c0, orig_c0});
+  column_map.insert({scan_c2, orig_c2});
+
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(
+      std::unique_ptr<ResolvedExecuteAsRoleScan> result,
+      CreateResolvedExecuteAsRoleScan(factory, column_map, std::move(scan),
+                                      /*original_inlined_view=*/&table,
+                                      /*original_inlined_tvf=*/nullptr));
+
+  ASSERT_NE(result, nullptr);
+  ASSERT_THAT(result->column_list(), SizeIs(4));
+
+  // Index 0: matched scan_c0 -> orig_c0
+  EXPECT_EQ(result->column_list(0), orig_c0);
+  EXPECT_EQ(result->column_list(0).column_id(), 5);
+  EXPECT_EQ(result->column_list(0).table_name(), "orig");
+  EXPECT_EQ(result->column_list(0).name(), "orig0");
+  EXPECT_TRUE(result->column_list(0).type()->Equals(types::Int64Type()));
+
+  // Index 1: not mapped -> new column with attributes of scan_c1
+  EXPECT_EQ(result->column_list(1).column_id(), 7);
+  EXPECT_EQ(result->column_list(1).table_name(), "tab");
+  EXPECT_EQ(result->column_list(1).name(), "c1");
+  EXPECT_TRUE(result->column_list(1).type()->Equals(types::StringType()));
+
+  // Index 2: matched scan_c2 -> orig_c2
+  EXPECT_EQ(result->column_list(2), orig_c2);
+  EXPECT_EQ(result->column_list(2).column_id(), 6);
+  EXPECT_EQ(result->column_list(2).table_name(), "orig");
+  EXPECT_EQ(result->column_list(2).name(), "orig2");
+  EXPECT_TRUE(result->column_list(2).type()->Equals(types::BoolType()));
+
+  // Index 3: not mapped -> new column with attributes of scan_c3
+  EXPECT_EQ(result->column_list(3).column_id(), 8);
+  EXPECT_EQ(result->column_list(3).table_name(), "tab");
+  EXPECT_EQ(result->column_list(3).name(), "c3");
+  EXPECT_TRUE(result->column_list(3).type()->Equals(types::DoubleType()));
+}
+
+TEST(RewriteUtilsTest, CreateResolvedExecuteAsRoleScanDuplicateColumns) {
+  IdStringPool id_string_pool;
+  googlesql_base::SequenceNumber sequence;
+  ColumnFactory factory(0, id_string_pool, sequence);
+  SimpleTable table("tab", {{"c0", types::Int64Type()}});
+
+  ResolvedColumn scan_c0 =
+      factory.MakeCol("tab", "c0", types::Int64Type());  // id 1
+
+  // Scan with duplicated column scan_c0
+  std::unique_ptr<ResolvedTableScan> scan = MakeResolvedTableScan(
+      /*column_list=*/{scan_c0, scan_c0},
+      /*table=*/&table,
+      /*for_system_time_expr=*/nullptr);
+
+  ResolvedColumn orig_c0 =
+      factory.MakeCol("orig", "orig0", types::Int64Type());  // id 2
+
+  ColumnReplacementMap column_map;
+  column_map.insert({scan_c0, orig_c0});
+
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(
+      std::unique_ptr<ResolvedExecuteAsRoleScan> result,
+      CreateResolvedExecuteAsRoleScan(factory, column_map, std::move(scan),
+                                      /*original_inlined_view=*/&table,
+                                      /*original_inlined_tvf=*/nullptr));
+
+  ASSERT_NE(result, nullptr);
+  ASSERT_THAT(result->column_list(), SizeIs(2));
+
+  // First occurrence of scan_c0 matches column_map -> orig_c0
+  EXPECT_EQ(result->column_list(0), orig_c0);
+  EXPECT_EQ(result->column_list(0).column_id(), 2);
+  EXPECT_EQ(result->column_list(0).table_name(), "orig");
+  EXPECT_EQ(result->column_list(0).name(), "orig0");
+  EXPECT_TRUE(result->column_list(0).type()->Equals(types::Int64Type()));
+
+  // Second occurrence of scan_c0 was already seen, so it receives a newly
+  // allocated column ID instead of duplicating orig_c0.
+  EXPECT_EQ(result->column_list(1).column_id(), 3);
+  EXPECT_NE(result->column_list(1), orig_c0);
+  EXPECT_NE(result->column_list(1), scan_c0);
+  EXPECT_EQ(result->column_list(1).table_name(), "tab");
+  EXPECT_EQ(result->column_list(1).name(), "c0");
+  EXPECT_TRUE(result->column_list(1).type()->Equals(types::Int64Type()));
+}
+
+TEST(RewriteUtilsTest, CreateResolvedExecuteAsRoleScanWithTVF) {
+  IdStringPool id_string_pool;
+  googlesql_base::SequenceNumber sequence;
+  ColumnFactory factory(0, id_string_pool, sequence);
+  SimpleTable table("tab", {{"c0", types::Int64Type()}});
+
+  ResolvedColumn scan_c0 =
+      factory.MakeCol("tab", "c0", types::Int64Type());  // id 1
+  std::unique_ptr<ResolvedTableScan> scan = MakeResolvedTableScan(
+      /*column_list=*/{scan_c0},
+      /*table=*/&table,
+      /*for_system_time_expr=*/nullptr);
+
+  TvfFakes tvf("my_tvf");
+  ColumnReplacementMap column_map;
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(
+      std::unique_ptr<ResolvedExecuteAsRoleScan> result,
+      CreateResolvedExecuteAsRoleScan(factory, column_map, std::move(scan),
+                                      /*original_inlined_view=*/nullptr,
+                                      /*original_inlined_tvf=*/&tvf));
+
+  ASSERT_NE(result, nullptr);
+  EXPECT_EQ(result->original_inlined_view(), nullptr);
+  EXPECT_EQ(result->original_inlined_tvf(), &tvf);
+}
+
+TEST(RewriteUtilsTest, CreateResolvedExecuteAsRoleScanBothViewAndTVFNull) {
+  IdStringPool id_string_pool;
+  googlesql_base::SequenceNumber sequence;
+  ColumnFactory factory(0, id_string_pool, sequence);
+  SimpleTable table("tab");
+  std::unique_ptr<ResolvedTableScan> scan = MakeResolvedTableScan(
+      /*column_list=*/{},
+      /*table=*/&table,
+      /*for_system_time_expr=*/nullptr);
+
+  ColumnReplacementMap column_map;
+  EXPECT_THAT(
+      CreateResolvedExecuteAsRoleScan(factory, column_map, std::move(scan),
+                                      /*original_inlined_view=*/nullptr,
+                                      /*original_inlined_tvf=*/nullptr),
+      StatusIs(absl::StatusCode::kInternal,
+               HasSubstr("Only one of original_inlined_view or "
+                         "original_inlined_tvf should be set.")));
+}
+
+TEST(RewriteUtilsTest, CreateResolvedExecuteAsRoleScanBothViewAndTVFSet) {
+  IdStringPool id_string_pool;
+  googlesql_base::SequenceNumber sequence;
+  ColumnFactory factory(0, id_string_pool, sequence);
+  SimpleTable table("tab");
+  std::unique_ptr<ResolvedTableScan> scan = MakeResolvedTableScan(
+      /*column_list=*/{},
+      /*table=*/&table,
+      /*for_system_time_expr=*/nullptr);
+
+  TvfFakes tvf("my_tvf");
+  ColumnReplacementMap column_map;
+  EXPECT_THAT(
+      CreateResolvedExecuteAsRoleScan(factory, column_map, std::move(scan),
+                                      /*original_inlined_view=*/&table,
+                                      /*original_inlined_tvf=*/&tvf),
+      StatusIs(absl::StatusCode::kInternal,
+               HasSubstr("Only one of original_inlined_view or "
+                         "original_inlined_tvf should be set.")));
 }
 
 }  // namespace

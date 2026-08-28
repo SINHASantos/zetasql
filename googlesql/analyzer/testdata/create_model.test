@@ -143,6 +143,16 @@ create model t1 remote with connection connection1
 ^
 ==
 
+# TODO: Support multi-connection syntax.
+[language_features=NONE,+REMOTE_MODEL,+REMOTE_FUNCTION]
+create model t1 remote with connection (key1="connection1", key2="connection1")
+--
+ERROR: Multiple connections in CONNECTION clause is not supported [at 1:29]
+create model t1 remote with connection (key1="connection1", key2="connection1")
+                            ^
+
+==
+
 [language_features=NONE,{{+REMOTE_MODEL,|}}+REMOTE_FUNCTION]
 create model t1 options (abc = def)
 --

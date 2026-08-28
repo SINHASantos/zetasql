@@ -491,105 +491,38 @@ QueryStmt
             +-column_list=hop.[ts_col#2, WINDOW_START#3, WINDOW_END#4]
             +-expr_list=
             | +-ts_col#2 := ColumnRef(type=TIMESTAMP, column=TableWithTimestampColumn.ts_col#1)
-            | +-WINDOW_START#3 := ColumnRef(type=TIMESTAMP, column=$hop.window_start#54)
+            | +-WINDOW_START#3 := ColumnRef(type=TIMESTAMP, column=$hop.window_start#23)
             | +-WINDOW_END#4 :=
             |   +-FunctionCall(GoogleSQL:$add(TIMESTAMP, INTERVAL) -> TIMESTAMP)
-            |     +-ColumnRef(type=TIMESTAMP, column=$hop.window_start#54)
-            |     +-SubqueryExpr
-            |       +-type=INTERVAL
-            |       +-subquery_type=SCALAR
-            |       +-subquery=
-            |         +-ProjectScan
-            |           +-column_list=[_hop_params.window_size#59]
-            |           +-expr_list=
-            |           | +-window_size#59 := ColumnRef(type=INTERVAL, column=_hop_params.window_size#55)
-            |           +-input_scan=
-            |             +-WithRefScan(column_list=_hop_params.[window_size#55, step_size#56, step_nanos#57, origin#58], with_query_name="_hop_params")
+            |     +-ColumnRef(type=TIMESTAMP, column=$hop.window_start#23)
+            |     +-ColumnRef(type=INTERVAL, column=_hop_params.window_size#19)
             +-input_scan=
               +-ArrayScan
-                +-column_list=[TableWithTimestampColumn.ts_col#1, $hop.window_start#54]
+                +-column_list=[TableWithTimestampColumn.ts_col#1, _hop_params.window_size#19, _hop_params.step_size#20, _hop_params.step_nanos#21, _hop_params.origin#22, $hop.window_start#23]
                 +-input_scan=
-                | +-TableScan(column_list=[TableWithTimestampColumn.ts_col#1], node_source="table_clause", table=TableWithTimestampColumn, column_index_list=[0])
+                | +-JoinScan
+                |   +-column_list=[TableWithTimestampColumn.ts_col#1, _hop_params.window_size#19, _hop_params.step_size#20, _hop_params.step_nanos#21, _hop_params.origin#22]
+                |   +-left_scan=
+                |   | +-TableScan(column_list=[TableWithTimestampColumn.ts_col#1], node_source="table_clause", table=TableWithTimestampColumn, column_index_list=[0])
+                |   +-right_scan=
+                |     +-WithRefScan(column_list=_hop_params.[window_size#19, step_size#20, step_nanos#21, origin#22], with_query_name="_hop_params")
                 +-array_expr_list=
                 | +-FunctionCall(GoogleSQL:generate_timestamp_array(TIMESTAMP, TIMESTAMP, INT64, ENUM<googlesql.functions.DateTimestampPart>) -> ARRAY<TIMESTAMP>)
                 |   +-FunctionCall(GoogleSQL:$add(TIMESTAMP, INTERVAL) -> TIMESTAMP)
                 |   | +-FunctionCall(GoogleSQL:timestamp_bucket(TIMESTAMP, INTERVAL, optional(1) TIMESTAMP) -> TIMESTAMP)
                 |   | | +-FunctionCall(GoogleSQL:$subtract(TIMESTAMP, INTERVAL) -> TIMESTAMP)
                 |   | | | +-ColumnRef(type=TIMESTAMP, column=TableWithTimestampColumn.ts_col#1)
-                |   | | | +-SubqueryExpr
-                |   | | |   +-type=INTERVAL
-                |   | | |   +-subquery_type=SCALAR
-                |   | | |   +-subquery=
-                |   | | |     +-ProjectScan
-                |   | | |       +-column_list=[_hop_params.window_size#23]
-                |   | | |       +-expr_list=
-                |   | | |       | +-window_size#23 := ColumnRef(type=INTERVAL, column=_hop_params.window_size#19)
-                |   | | |       +-input_scan=
-                |   | | |         +-WithRefScan(column_list=_hop_params.[window_size#19, step_size#20, step_nanos#21, origin#22], with_query_name="_hop_params")
-                |   | | +-SubqueryExpr
-                |   | | | +-type=INTERVAL
-                |   | | | +-subquery_type=SCALAR
-                |   | | | +-subquery=
-                |   | | |   +-ProjectScan
-                |   | | |     +-column_list=[_hop_params.step_size#28]
-                |   | | |     +-expr_list=
-                |   | | |     | +-step_size#28 := ColumnRef(type=INTERVAL, column=_hop_params.step_size#25)
-                |   | | |     +-input_scan=
-                |   | | |       +-WithRefScan(column_list=_hop_params.[window_size#24, step_size#25, step_nanos#26, origin#27], with_query_name="_hop_params")
-                |   | | +-SubqueryExpr
-                |   | |   +-type=TIMESTAMP
-                |   | |   +-subquery_type=SCALAR
-                |   | |   +-subquery=
-                |   | |     +-ProjectScan
-                |   | |       +-column_list=[_hop_params.origin#33]
-                |   | |       +-expr_list=
-                |   | |       | +-origin#33 := ColumnRef(type=TIMESTAMP, column=_hop_params.origin#32)
-                |   | |       +-input_scan=
-                |   | |         +-WithRefScan(column_list=_hop_params.[window_size#29, step_size#30, step_nanos#31, origin#32], with_query_name="_hop_params")
-                |   | +-SubqueryExpr
-                |   |   +-type=INTERVAL
-                |   |   +-subquery_type=SCALAR
-                |   |   +-subquery=
-                |   |     +-ProjectScan
-                |   |       +-column_list=[_hop_params.step_size#38]
-                |   |       +-expr_list=
-                |   |       | +-step_size#38 := ColumnRef(type=INTERVAL, column=_hop_params.step_size#35)
-                |   |       +-input_scan=
-                |   |         +-WithRefScan(column_list=_hop_params.[window_size#34, step_size#35, step_nanos#36, origin#37], with_query_name="_hop_params")
+                |   | | | +-ColumnRef(type=INTERVAL, column=_hop_params.window_size#19)
+                |   | | +-ColumnRef(type=INTERVAL, column=_hop_params.step_size#20)
+                |   | | +-ColumnRef(type=TIMESTAMP, column=_hop_params.origin#22)
+                |   | +-ColumnRef(type=INTERVAL, column=_hop_params.step_size#20)
                 |   +-FunctionCall(GoogleSQL:timestamp_bucket(TIMESTAMP, INTERVAL, optional(1) TIMESTAMP) -> TIMESTAMP)
                 |   | +-ColumnRef(type=TIMESTAMP, column=TableWithTimestampColumn.ts_col#1)
-                |   | +-SubqueryExpr
-                |   | | +-type=INTERVAL
-                |   | | +-subquery_type=SCALAR
-                |   | | +-subquery=
-                |   | |   +-ProjectScan
-                |   | |     +-column_list=[_hop_params.step_size#43]
-                |   | |     +-expr_list=
-                |   | |     | +-step_size#43 := ColumnRef(type=INTERVAL, column=_hop_params.step_size#40)
-                |   | |     +-input_scan=
-                |   | |       +-WithRefScan(column_list=_hop_params.[window_size#39, step_size#40, step_nanos#41, origin#42], with_query_name="_hop_params")
-                |   | +-SubqueryExpr
-                |   |   +-type=TIMESTAMP
-                |   |   +-subquery_type=SCALAR
-                |   |   +-subquery=
-                |   |     +-ProjectScan
-                |   |       +-column_list=[_hop_params.origin#48]
-                |   |       +-expr_list=
-                |   |       | +-origin#48 := ColumnRef(type=TIMESTAMP, column=_hop_params.origin#47)
-                |   |       +-input_scan=
-                |   |         +-WithRefScan(column_list=_hop_params.[window_size#44, step_size#45, step_nanos#46, origin#47], with_query_name="_hop_params")
-                |   +-SubqueryExpr
-                |   | +-type=INT64
-                |   | +-subquery_type=SCALAR
-                |   | +-subquery=
-                |   |   +-ProjectScan
-                |   |     +-column_list=[_hop_params.step_nanos#53]
-                |   |     +-expr_list=
-                |   |     | +-step_nanos#53 := ColumnRef(type=INT64, column=_hop_params.step_nanos#51)
-                |   |     +-input_scan=
-                |   |       +-WithRefScan(column_list=_hop_params.[window_size#49, step_size#50, step_nanos#51, origin#52], with_query_name="_hop_params")
+                |   | +-ColumnRef(type=INTERVAL, column=_hop_params.step_size#20)
+                |   | +-ColumnRef(type=TIMESTAMP, column=_hop_params.origin#22)
+                |   +-ColumnRef(type=INT64, column=_hop_params.step_nanos#21)
                 |   +-Literal(type=ENUM<googlesql.functions.DateTimestampPart>, value=NANOSECOND)
-                +-element_column_list=[$hop.window_start#54]
+                +-element_column_list=[$hop.window_start#23]
                 +-is_outer=TRUE
 ==
 
@@ -1085,105 +1018,38 @@ QueryStmt
             +-column_list=hop.[ts_col#2, WINDOW_START#3, WINDOW_END#4]
             +-expr_list=
             | +-ts_col#2 := ColumnRef(type=TIMESTAMP, column=TableWithTimestampColumn.ts_col#1)
-            | +-WINDOW_START#3 := ColumnRef(type=TIMESTAMP, column=$hop.window_start#54)
+            | +-WINDOW_START#3 := ColumnRef(type=TIMESTAMP, column=$hop.window_start#23)
             | +-WINDOW_END#4 :=
             |   +-FunctionCall(GoogleSQL:$add(TIMESTAMP, INTERVAL) -> TIMESTAMP)
-            |     +-ColumnRef(type=TIMESTAMP, column=$hop.window_start#54)
-            |     +-SubqueryExpr
-            |       +-type=INTERVAL
-            |       +-subquery_type=SCALAR
-            |       +-subquery=
-            |         +-ProjectScan
-            |           +-column_list=[_hop_params.window_size#59]
-            |           +-expr_list=
-            |           | +-window_size#59 := ColumnRef(type=INTERVAL, column=_hop_params.window_size#55)
-            |           +-input_scan=
-            |             +-WithRefScan(column_list=_hop_params.[window_size#55, step_size#56, step_nanos#57, origin#58], with_query_name="_hop_params")
+            |     +-ColumnRef(type=TIMESTAMP, column=$hop.window_start#23)
+            |     +-ColumnRef(type=INTERVAL, column=_hop_params.window_size#19)
             +-input_scan=
               +-ArrayScan
-                +-column_list=[TableWithTimestampColumn.ts_col#1, $hop.window_start#54]
+                +-column_list=[TableWithTimestampColumn.ts_col#1, _hop_params.window_size#19, _hop_params.step_size#20, _hop_params.step_nanos#21, _hop_params.origin#22, $hop.window_start#23]
                 +-input_scan=
-                | +-TableScan(column_list=[TableWithTimestampColumn.ts_col#1], node_source="table_clause", table=TableWithTimestampColumn, column_index_list=[0])
+                | +-JoinScan
+                |   +-column_list=[TableWithTimestampColumn.ts_col#1, _hop_params.window_size#19, _hop_params.step_size#20, _hop_params.step_nanos#21, _hop_params.origin#22]
+                |   +-left_scan=
+                |   | +-TableScan(column_list=[TableWithTimestampColumn.ts_col#1], node_source="table_clause", table=TableWithTimestampColumn, column_index_list=[0])
+                |   +-right_scan=
+                |     +-WithRefScan(column_list=_hop_params.[window_size#19, step_size#20, step_nanos#21, origin#22], with_query_name="_hop_params")
                 +-array_expr_list=
                 | +-FunctionCall(GoogleSQL:generate_timestamp_array(TIMESTAMP, TIMESTAMP, INT64, ENUM<googlesql.functions.DateTimestampPart>) -> ARRAY<TIMESTAMP>)
                 |   +-FunctionCall(GoogleSQL:$add(TIMESTAMP, INTERVAL) -> TIMESTAMP)
                 |   | +-FunctionCall(GoogleSQL:timestamp_bucket(TIMESTAMP, INTERVAL, optional(1) TIMESTAMP) -> TIMESTAMP)
                 |   | | +-FunctionCall(GoogleSQL:$subtract(TIMESTAMP, INTERVAL) -> TIMESTAMP)
                 |   | | | +-ColumnRef(type=TIMESTAMP, column=TableWithTimestampColumn.ts_col#1)
-                |   | | | +-SubqueryExpr
-                |   | | |   +-type=INTERVAL
-                |   | | |   +-subquery_type=SCALAR
-                |   | | |   +-subquery=
-                |   | | |     +-ProjectScan
-                |   | | |       +-column_list=[_hop_params.window_size#23]
-                |   | | |       +-expr_list=
-                |   | | |       | +-window_size#23 := ColumnRef(type=INTERVAL, column=_hop_params.window_size#19)
-                |   | | |       +-input_scan=
-                |   | | |         +-WithRefScan(column_list=_hop_params.[window_size#19, step_size#20, step_nanos#21, origin#22], with_query_name="_hop_params")
-                |   | | +-SubqueryExpr
-                |   | | | +-type=INTERVAL
-                |   | | | +-subquery_type=SCALAR
-                |   | | | +-subquery=
-                |   | | |   +-ProjectScan
-                |   | | |     +-column_list=[_hop_params.step_size#28]
-                |   | | |     +-expr_list=
-                |   | | |     | +-step_size#28 := ColumnRef(type=INTERVAL, column=_hop_params.step_size#25)
-                |   | | |     +-input_scan=
-                |   | | |       +-WithRefScan(column_list=_hop_params.[window_size#24, step_size#25, step_nanos#26, origin#27], with_query_name="_hop_params")
-                |   | | +-SubqueryExpr
-                |   | |   +-type=TIMESTAMP
-                |   | |   +-subquery_type=SCALAR
-                |   | |   +-subquery=
-                |   | |     +-ProjectScan
-                |   | |       +-column_list=[_hop_params.origin#33]
-                |   | |       +-expr_list=
-                |   | |       | +-origin#33 := ColumnRef(type=TIMESTAMP, column=_hop_params.origin#32)
-                |   | |       +-input_scan=
-                |   | |         +-WithRefScan(column_list=_hop_params.[window_size#29, step_size#30, step_nanos#31, origin#32], with_query_name="_hop_params")
-                |   | +-SubqueryExpr
-                |   |   +-type=INTERVAL
-                |   |   +-subquery_type=SCALAR
-                |   |   +-subquery=
-                |   |     +-ProjectScan
-                |   |       +-column_list=[_hop_params.step_size#38]
-                |   |       +-expr_list=
-                |   |       | +-step_size#38 := ColumnRef(type=INTERVAL, column=_hop_params.step_size#35)
-                |   |       +-input_scan=
-                |   |         +-WithRefScan(column_list=_hop_params.[window_size#34, step_size#35, step_nanos#36, origin#37], with_query_name="_hop_params")
+                |   | | | +-ColumnRef(type=INTERVAL, column=_hop_params.window_size#19)
+                |   | | +-ColumnRef(type=INTERVAL, column=_hop_params.step_size#20)
+                |   | | +-ColumnRef(type=TIMESTAMP, column=_hop_params.origin#22)
+                |   | +-ColumnRef(type=INTERVAL, column=_hop_params.step_size#20)
                 |   +-FunctionCall(GoogleSQL:timestamp_bucket(TIMESTAMP, INTERVAL, optional(1) TIMESTAMP) -> TIMESTAMP)
                 |   | +-ColumnRef(type=TIMESTAMP, column=TableWithTimestampColumn.ts_col#1)
-                |   | +-SubqueryExpr
-                |   | | +-type=INTERVAL
-                |   | | +-subquery_type=SCALAR
-                |   | | +-subquery=
-                |   | |   +-ProjectScan
-                |   | |     +-column_list=[_hop_params.step_size#43]
-                |   | |     +-expr_list=
-                |   | |     | +-step_size#43 := ColumnRef(type=INTERVAL, column=_hop_params.step_size#40)
-                |   | |     +-input_scan=
-                |   | |       +-WithRefScan(column_list=_hop_params.[window_size#39, step_size#40, step_nanos#41, origin#42], with_query_name="_hop_params")
-                |   | +-SubqueryExpr
-                |   |   +-type=TIMESTAMP
-                |   |   +-subquery_type=SCALAR
-                |   |   +-subquery=
-                |   |     +-ProjectScan
-                |   |       +-column_list=[_hop_params.origin#48]
-                |   |       +-expr_list=
-                |   |       | +-origin#48 := ColumnRef(type=TIMESTAMP, column=_hop_params.origin#47)
-                |   |       +-input_scan=
-                |   |         +-WithRefScan(column_list=_hop_params.[window_size#44, step_size#45, step_nanos#46, origin#47], with_query_name="_hop_params")
-                |   +-SubqueryExpr
-                |   | +-type=INT64
-                |   | +-subquery_type=SCALAR
-                |   | +-subquery=
-                |   |   +-ProjectScan
-                |   |     +-column_list=[_hop_params.step_nanos#53]
-                |   |     +-expr_list=
-                |   |     | +-step_nanos#53 := ColumnRef(type=INT64, column=_hop_params.step_nanos#51)
-                |   |     +-input_scan=
-                |   |       +-WithRefScan(column_list=_hop_params.[window_size#49, step_size#50, step_nanos#51, origin#52], with_query_name="_hop_params")
+                |   | +-ColumnRef(type=INTERVAL, column=_hop_params.step_size#20)
+                |   | +-ColumnRef(type=TIMESTAMP, column=_hop_params.origin#22)
+                |   +-ColumnRef(type=INT64, column=_hop_params.step_nanos#21)
                 |   +-Literal(type=ENUM<googlesql.functions.DateTimestampPart>, value=NANOSECOND)
-                +-element_column_list=[$hop.window_start#54]
+                +-element_column_list=[$hop.window_start#23]
                 +-is_outer=TRUE
 ==
 
@@ -1690,110 +1556,43 @@ QueryStmt
             +-column_list=hop.[ts_col#3, WINDOW_START#5, WINDOW_END#6]
             +-expr_list=
             | +-ts_col#3 := ColumnRef(type=TIMESTAMP, column=TableWithTimestampColumn.ts_col#1)
-            | +-WINDOW_START#5 := ColumnRef(type=TIMESTAMP, column=$hop.window_start#56)
+            | +-WINDOW_START#5 := ColumnRef(type=TIMESTAMP, column=$hop.window_start#25)
             | +-WINDOW_END#6 :=
             |   +-FunctionCall(GoogleSQL:$add(TIMESTAMP, INTERVAL) -> TIMESTAMP)
-            |     +-ColumnRef(type=TIMESTAMP, column=$hop.window_start#56)
-            |     +-SubqueryExpr
-            |       +-type=INTERVAL
-            |       +-subquery_type=SCALAR
-            |       +-subquery=
-            |         +-ProjectScan
-            |           +-column_list=[_hop_params.window_size#61]
-            |           +-expr_list=
-            |           | +-window_size#61 := ColumnRef(type=INTERVAL, column=_hop_params.window_size#57)
-            |           +-input_scan=
-            |             +-WithRefScan(column_list=_hop_params.[window_size#57, step_size#58, step_nanos#59, origin#60], with_query_name="_hop_params")
+            |     +-ColumnRef(type=TIMESTAMP, column=$hop.window_start#25)
+            |     +-ColumnRef(type=INTERVAL, column=_hop_params.window_size#21)
             +-input_scan=
               +-ArrayScan
-                +-column_list=[TableWithTimestampColumn.ts_col#1, $subquery1.Window_Start#2, $hop.window_start#56]
+                +-column_list=[TableWithTimestampColumn.ts_col#1, $subquery1.Window_Start#2, _hop_params.window_size#21, _hop_params.step_size#22, _hop_params.step_nanos#23, _hop_params.origin#24, $hop.window_start#25]
                 +-input_scan=
-                | +-ProjectScan
-                |   +-column_list=[TableWithTimestampColumn.ts_col#1, $subquery1.Window_Start#2]
-                |   +-expr_list=
-                |   | +-Window_Start#2 := Literal(type=INT64, value=1)
-                |   +-input_scan=
-                |     +-TableScan(column_list=[TableWithTimestampColumn.ts_col#1], table=TableWithTimestampColumn, column_index_list=[0])
+                | +-JoinScan
+                |   +-column_list=[TableWithTimestampColumn.ts_col#1, $subquery1.Window_Start#2, _hop_params.window_size#21, _hop_params.step_size#22, _hop_params.step_nanos#23, _hop_params.origin#24]
+                |   +-left_scan=
+                |   | +-ProjectScan
+                |   |   +-column_list=[TableWithTimestampColumn.ts_col#1, $subquery1.Window_Start#2]
+                |   |   +-expr_list=
+                |   |   | +-Window_Start#2 := Literal(type=INT64, value=1)
+                |   |   +-input_scan=
+                |   |     +-TableScan(column_list=[TableWithTimestampColumn.ts_col#1], table=TableWithTimestampColumn, column_index_list=[0])
+                |   +-right_scan=
+                |     +-WithRefScan(column_list=_hop_params.[window_size#21, step_size#22, step_nanos#23, origin#24], with_query_name="_hop_params")
                 +-array_expr_list=
                 | +-FunctionCall(GoogleSQL:generate_timestamp_array(TIMESTAMP, TIMESTAMP, INT64, ENUM<googlesql.functions.DateTimestampPart>) -> ARRAY<TIMESTAMP>)
                 |   +-FunctionCall(GoogleSQL:$add(TIMESTAMP, INTERVAL) -> TIMESTAMP)
                 |   | +-FunctionCall(GoogleSQL:timestamp_bucket(TIMESTAMP, INTERVAL, optional(1) TIMESTAMP) -> TIMESTAMP)
                 |   | | +-FunctionCall(GoogleSQL:$subtract(TIMESTAMP, INTERVAL) -> TIMESTAMP)
                 |   | | | +-ColumnRef(type=TIMESTAMP, column=TableWithTimestampColumn.ts_col#1)
-                |   | | | +-SubqueryExpr
-                |   | | |   +-type=INTERVAL
-                |   | | |   +-subquery_type=SCALAR
-                |   | | |   +-subquery=
-                |   | | |     +-ProjectScan
-                |   | | |       +-column_list=[_hop_params.window_size#25]
-                |   | | |       +-expr_list=
-                |   | | |       | +-window_size#25 := ColumnRef(type=INTERVAL, column=_hop_params.window_size#21)
-                |   | | |       +-input_scan=
-                |   | | |         +-WithRefScan(column_list=_hop_params.[window_size#21, step_size#22, step_nanos#23, origin#24], with_query_name="_hop_params")
-                |   | | +-SubqueryExpr
-                |   | | | +-type=INTERVAL
-                |   | | | +-subquery_type=SCALAR
-                |   | | | +-subquery=
-                |   | | |   +-ProjectScan
-                |   | | |     +-column_list=[_hop_params.step_size#30]
-                |   | | |     +-expr_list=
-                |   | | |     | +-step_size#30 := ColumnRef(type=INTERVAL, column=_hop_params.step_size#27)
-                |   | | |     +-input_scan=
-                |   | | |       +-WithRefScan(column_list=_hop_params.[window_size#26, step_size#27, step_nanos#28, origin#29], with_query_name="_hop_params")
-                |   | | +-SubqueryExpr
-                |   | |   +-type=TIMESTAMP
-                |   | |   +-subquery_type=SCALAR
-                |   | |   +-subquery=
-                |   | |     +-ProjectScan
-                |   | |       +-column_list=[_hop_params.origin#35]
-                |   | |       +-expr_list=
-                |   | |       | +-origin#35 := ColumnRef(type=TIMESTAMP, column=_hop_params.origin#34)
-                |   | |       +-input_scan=
-                |   | |         +-WithRefScan(column_list=_hop_params.[window_size#31, step_size#32, step_nanos#33, origin#34], with_query_name="_hop_params")
-                |   | +-SubqueryExpr
-                |   |   +-type=INTERVAL
-                |   |   +-subquery_type=SCALAR
-                |   |   +-subquery=
-                |   |     +-ProjectScan
-                |   |       +-column_list=[_hop_params.step_size#40]
-                |   |       +-expr_list=
-                |   |       | +-step_size#40 := ColumnRef(type=INTERVAL, column=_hop_params.step_size#37)
-                |   |       +-input_scan=
-                |   |         +-WithRefScan(column_list=_hop_params.[window_size#36, step_size#37, step_nanos#38, origin#39], with_query_name="_hop_params")
+                |   | | | +-ColumnRef(type=INTERVAL, column=_hop_params.window_size#21)
+                |   | | +-ColumnRef(type=INTERVAL, column=_hop_params.step_size#22)
+                |   | | +-ColumnRef(type=TIMESTAMP, column=_hop_params.origin#24)
+                |   | +-ColumnRef(type=INTERVAL, column=_hop_params.step_size#22)
                 |   +-FunctionCall(GoogleSQL:timestamp_bucket(TIMESTAMP, INTERVAL, optional(1) TIMESTAMP) -> TIMESTAMP)
                 |   | +-ColumnRef(type=TIMESTAMP, column=TableWithTimestampColumn.ts_col#1)
-                |   | +-SubqueryExpr
-                |   | | +-type=INTERVAL
-                |   | | +-subquery_type=SCALAR
-                |   | | +-subquery=
-                |   | |   +-ProjectScan
-                |   | |     +-column_list=[_hop_params.step_size#45]
-                |   | |     +-expr_list=
-                |   | |     | +-step_size#45 := ColumnRef(type=INTERVAL, column=_hop_params.step_size#42)
-                |   | |     +-input_scan=
-                |   | |       +-WithRefScan(column_list=_hop_params.[window_size#41, step_size#42, step_nanos#43, origin#44], with_query_name="_hop_params")
-                |   | +-SubqueryExpr
-                |   |   +-type=TIMESTAMP
-                |   |   +-subquery_type=SCALAR
-                |   |   +-subquery=
-                |   |     +-ProjectScan
-                |   |       +-column_list=[_hop_params.origin#50]
-                |   |       +-expr_list=
-                |   |       | +-origin#50 := ColumnRef(type=TIMESTAMP, column=_hop_params.origin#49)
-                |   |       +-input_scan=
-                |   |         +-WithRefScan(column_list=_hop_params.[window_size#46, step_size#47, step_nanos#48, origin#49], with_query_name="_hop_params")
-                |   +-SubqueryExpr
-                |   | +-type=INT64
-                |   | +-subquery_type=SCALAR
-                |   | +-subquery=
-                |   |   +-ProjectScan
-                |   |     +-column_list=[_hop_params.step_nanos#55]
-                |   |     +-expr_list=
-                |   |     | +-step_nanos#55 := ColumnRef(type=INT64, column=_hop_params.step_nanos#53)
-                |   |     +-input_scan=
-                |   |       +-WithRefScan(column_list=_hop_params.[window_size#51, step_size#52, step_nanos#53, origin#54], with_query_name="_hop_params")
+                |   | +-ColumnRef(type=INTERVAL, column=_hop_params.step_size#22)
+                |   | +-ColumnRef(type=TIMESTAMP, column=_hop_params.origin#24)
+                |   +-ColumnRef(type=INT64, column=_hop_params.step_nanos#23)
                 |   +-Literal(type=ENUM<googlesql.functions.DateTimestampPart>, value=NANOSECOND)
-                +-element_column_list=[$hop.window_start#56]
+                +-element_column_list=[$hop.window_start#25]
                 +-is_outer=TRUE
 ==
 
@@ -2300,110 +2099,43 @@ QueryStmt
             +-column_list=hop.[ts_col#3, WINDOW_START#5, WINDOW_END#6]
             +-expr_list=
             | +-ts_col#3 := ColumnRef(type=TIMESTAMP, column=TableWithTimestampColumn.ts_col#1)
-            | +-WINDOW_START#5 := ColumnRef(type=TIMESTAMP, column=$hop.window_start#56)
+            | +-WINDOW_START#5 := ColumnRef(type=TIMESTAMP, column=$hop.window_start#25)
             | +-WINDOW_END#6 :=
             |   +-FunctionCall(GoogleSQL:$add(TIMESTAMP, INTERVAL) -> TIMESTAMP)
-            |     +-ColumnRef(type=TIMESTAMP, column=$hop.window_start#56)
-            |     +-SubqueryExpr
-            |       +-type=INTERVAL
-            |       +-subquery_type=SCALAR
-            |       +-subquery=
-            |         +-ProjectScan
-            |           +-column_list=[_hop_params.window_size#61]
-            |           +-expr_list=
-            |           | +-window_size#61 := ColumnRef(type=INTERVAL, column=_hop_params.window_size#57)
-            |           +-input_scan=
-            |             +-WithRefScan(column_list=_hop_params.[window_size#57, step_size#58, step_nanos#59, origin#60], with_query_name="_hop_params")
+            |     +-ColumnRef(type=TIMESTAMP, column=$hop.window_start#25)
+            |     +-ColumnRef(type=INTERVAL, column=_hop_params.window_size#21)
             +-input_scan=
               +-ArrayScan
-                +-column_list=[TableWithTimestampColumn.ts_col#1, $subquery1.Window_End#2, $hop.window_start#56]
+                +-column_list=[TableWithTimestampColumn.ts_col#1, $subquery1.Window_End#2, _hop_params.window_size#21, _hop_params.step_size#22, _hop_params.step_nanos#23, _hop_params.origin#24, $hop.window_start#25]
                 +-input_scan=
-                | +-ProjectScan
-                |   +-column_list=[TableWithTimestampColumn.ts_col#1, $subquery1.Window_End#2]
-                |   +-expr_list=
-                |   | +-Window_End#2 := Literal(type=INT64, value=1)
-                |   +-input_scan=
-                |     +-TableScan(column_list=[TableWithTimestampColumn.ts_col#1], table=TableWithTimestampColumn, column_index_list=[0])
+                | +-JoinScan
+                |   +-column_list=[TableWithTimestampColumn.ts_col#1, $subquery1.Window_End#2, _hop_params.window_size#21, _hop_params.step_size#22, _hop_params.step_nanos#23, _hop_params.origin#24]
+                |   +-left_scan=
+                |   | +-ProjectScan
+                |   |   +-column_list=[TableWithTimestampColumn.ts_col#1, $subquery1.Window_End#2]
+                |   |   +-expr_list=
+                |   |   | +-Window_End#2 := Literal(type=INT64, value=1)
+                |   |   +-input_scan=
+                |   |     +-TableScan(column_list=[TableWithTimestampColumn.ts_col#1], table=TableWithTimestampColumn, column_index_list=[0])
+                |   +-right_scan=
+                |     +-WithRefScan(column_list=_hop_params.[window_size#21, step_size#22, step_nanos#23, origin#24], with_query_name="_hop_params")
                 +-array_expr_list=
                 | +-FunctionCall(GoogleSQL:generate_timestamp_array(TIMESTAMP, TIMESTAMP, INT64, ENUM<googlesql.functions.DateTimestampPart>) -> ARRAY<TIMESTAMP>)
                 |   +-FunctionCall(GoogleSQL:$add(TIMESTAMP, INTERVAL) -> TIMESTAMP)
                 |   | +-FunctionCall(GoogleSQL:timestamp_bucket(TIMESTAMP, INTERVAL, optional(1) TIMESTAMP) -> TIMESTAMP)
                 |   | | +-FunctionCall(GoogleSQL:$subtract(TIMESTAMP, INTERVAL) -> TIMESTAMP)
                 |   | | | +-ColumnRef(type=TIMESTAMP, column=TableWithTimestampColumn.ts_col#1)
-                |   | | | +-SubqueryExpr
-                |   | | |   +-type=INTERVAL
-                |   | | |   +-subquery_type=SCALAR
-                |   | | |   +-subquery=
-                |   | | |     +-ProjectScan
-                |   | | |       +-column_list=[_hop_params.window_size#25]
-                |   | | |       +-expr_list=
-                |   | | |       | +-window_size#25 := ColumnRef(type=INTERVAL, column=_hop_params.window_size#21)
-                |   | | |       +-input_scan=
-                |   | | |         +-WithRefScan(column_list=_hop_params.[window_size#21, step_size#22, step_nanos#23, origin#24], with_query_name="_hop_params")
-                |   | | +-SubqueryExpr
-                |   | | | +-type=INTERVAL
-                |   | | | +-subquery_type=SCALAR
-                |   | | | +-subquery=
-                |   | | |   +-ProjectScan
-                |   | | |     +-column_list=[_hop_params.step_size#30]
-                |   | | |     +-expr_list=
-                |   | | |     | +-step_size#30 := ColumnRef(type=INTERVAL, column=_hop_params.step_size#27)
-                |   | | |     +-input_scan=
-                |   | | |       +-WithRefScan(column_list=_hop_params.[window_size#26, step_size#27, step_nanos#28, origin#29], with_query_name="_hop_params")
-                |   | | +-SubqueryExpr
-                |   | |   +-type=TIMESTAMP
-                |   | |   +-subquery_type=SCALAR
-                |   | |   +-subquery=
-                |   | |     +-ProjectScan
-                |   | |       +-column_list=[_hop_params.origin#35]
-                |   | |       +-expr_list=
-                |   | |       | +-origin#35 := ColumnRef(type=TIMESTAMP, column=_hop_params.origin#34)
-                |   | |       +-input_scan=
-                |   | |         +-WithRefScan(column_list=_hop_params.[window_size#31, step_size#32, step_nanos#33, origin#34], with_query_name="_hop_params")
-                |   | +-SubqueryExpr
-                |   |   +-type=INTERVAL
-                |   |   +-subquery_type=SCALAR
-                |   |   +-subquery=
-                |   |     +-ProjectScan
-                |   |       +-column_list=[_hop_params.step_size#40]
-                |   |       +-expr_list=
-                |   |       | +-step_size#40 := ColumnRef(type=INTERVAL, column=_hop_params.step_size#37)
-                |   |       +-input_scan=
-                |   |         +-WithRefScan(column_list=_hop_params.[window_size#36, step_size#37, step_nanos#38, origin#39], with_query_name="_hop_params")
+                |   | | | +-ColumnRef(type=INTERVAL, column=_hop_params.window_size#21)
+                |   | | +-ColumnRef(type=INTERVAL, column=_hop_params.step_size#22)
+                |   | | +-ColumnRef(type=TIMESTAMP, column=_hop_params.origin#24)
+                |   | +-ColumnRef(type=INTERVAL, column=_hop_params.step_size#22)
                 |   +-FunctionCall(GoogleSQL:timestamp_bucket(TIMESTAMP, INTERVAL, optional(1) TIMESTAMP) -> TIMESTAMP)
                 |   | +-ColumnRef(type=TIMESTAMP, column=TableWithTimestampColumn.ts_col#1)
-                |   | +-SubqueryExpr
-                |   | | +-type=INTERVAL
-                |   | | +-subquery_type=SCALAR
-                |   | | +-subquery=
-                |   | |   +-ProjectScan
-                |   | |     +-column_list=[_hop_params.step_size#45]
-                |   | |     +-expr_list=
-                |   | |     | +-step_size#45 := ColumnRef(type=INTERVAL, column=_hop_params.step_size#42)
-                |   | |     +-input_scan=
-                |   | |       +-WithRefScan(column_list=_hop_params.[window_size#41, step_size#42, step_nanos#43, origin#44], with_query_name="_hop_params")
-                |   | +-SubqueryExpr
-                |   |   +-type=TIMESTAMP
-                |   |   +-subquery_type=SCALAR
-                |   |   +-subquery=
-                |   |     +-ProjectScan
-                |   |       +-column_list=[_hop_params.origin#50]
-                |   |       +-expr_list=
-                |   |       | +-origin#50 := ColumnRef(type=TIMESTAMP, column=_hop_params.origin#49)
-                |   |       +-input_scan=
-                |   |         +-WithRefScan(column_list=_hop_params.[window_size#46, step_size#47, step_nanos#48, origin#49], with_query_name="_hop_params")
-                |   +-SubqueryExpr
-                |   | +-type=INT64
-                |   | +-subquery_type=SCALAR
-                |   | +-subquery=
-                |   |   +-ProjectScan
-                |   |     +-column_list=[_hop_params.step_nanos#55]
-                |   |     +-expr_list=
-                |   |     | +-step_nanos#55 := ColumnRef(type=INT64, column=_hop_params.step_nanos#53)
-                |   |     +-input_scan=
-                |   |       +-WithRefScan(column_list=_hop_params.[window_size#51, step_size#52, step_nanos#53, origin#54], with_query_name="_hop_params")
+                |   | +-ColumnRef(type=INTERVAL, column=_hop_params.step_size#22)
+                |   | +-ColumnRef(type=TIMESTAMP, column=_hop_params.origin#24)
+                |   +-ColumnRef(type=INT64, column=_hop_params.step_nanos#23)
                 |   +-Literal(type=ENUM<googlesql.functions.DateTimestampPart>, value=NANOSECOND)
-                +-element_column_list=[$hop.window_start#56]
+                +-element_column_list=[$hop.window_start#25]
                 +-is_outer=TRUE
 ==
 
@@ -2911,25 +2643,21 @@ QueryStmt
             +-expr_list=
             | +-key#3 := ColumnRef(type=INT32, column=TableWithTestHopAndTumbleProto.key#1)
             | +-ProtoColumn#4 := ColumnRef(type=PROTO<googlesql_test.TestHopAndTumblePB>, column=TableWithTestHopAndTumbleProto.ProtoColumn#2)
-            | +-WINDOW_START#5 := ColumnRef(type=TIMESTAMP, column=$hop.window_start#56)
+            | +-WINDOW_START#5 := ColumnRef(type=TIMESTAMP, column=$hop.window_start#25)
             | +-WINDOW_END#6 :=
             |   +-FunctionCall(GoogleSQL:$add(TIMESTAMP, INTERVAL) -> TIMESTAMP)
-            |     +-ColumnRef(type=TIMESTAMP, column=$hop.window_start#56)
-            |     +-SubqueryExpr
-            |       +-type=INTERVAL
-            |       +-subquery_type=SCALAR
-            |       +-subquery=
-            |         +-ProjectScan
-            |           +-column_list=[_hop_params.window_size#61]
-            |           +-expr_list=
-            |           | +-window_size#61 := ColumnRef(type=INTERVAL, column=_hop_params.window_size#57)
-            |           +-input_scan=
-            |             +-WithRefScan(column_list=_hop_params.[window_size#57, step_size#58, step_nanos#59, origin#60], with_query_name="_hop_params")
+            |     +-ColumnRef(type=TIMESTAMP, column=$hop.window_start#25)
+            |     +-ColumnRef(type=INTERVAL, column=_hop_params.window_size#21)
             +-input_scan=
               +-ArrayScan
-                +-column_list=[TableWithTestHopAndTumbleProto.key#1, TableWithTestHopAndTumbleProto.ProtoColumn#2, $hop.window_start#56]
+                +-column_list=[TableWithTestHopAndTumbleProto.key#1, TableWithTestHopAndTumbleProto.ProtoColumn#2, _hop_params.window_size#21, _hop_params.step_size#22, _hop_params.step_nanos#23, _hop_params.origin#24, $hop.window_start#25]
                 +-input_scan=
-                | +-TableScan(column_list=TableWithTestHopAndTumbleProto.[key#1, ProtoColumn#2], node_source="table_clause", table=TableWithTestHopAndTumbleProto, column_index_list=[0, 1])
+                | +-JoinScan
+                |   +-column_list=[TableWithTestHopAndTumbleProto.key#1, TableWithTestHopAndTumbleProto.ProtoColumn#2, _hop_params.window_size#21, _hop_params.step_size#22, _hop_params.step_nanos#23, _hop_params.origin#24]
+                |   +-left_scan=
+                |   | +-TableScan(column_list=TableWithTestHopAndTumbleProto.[key#1, ProtoColumn#2], node_source="table_clause", table=TableWithTestHopAndTumbleProto, column_index_list=[0, 1])
+                |   +-right_scan=
+                |     +-WithRefScan(column_list=_hop_params.[window_size#21, step_size#22, step_nanos#23, origin#24], with_query_name="_hop_params")
                 +-array_expr_list=
                 | +-FunctionCall(GoogleSQL:generate_timestamp_array(TIMESTAMP, TIMESTAMP, INT64, ENUM<googlesql.functions.DateTimestampPart>) -> ARRAY<TIMESTAMP>)
                 |   +-FunctionCall(GoogleSQL:$add(TIMESTAMP, INTERVAL) -> TIMESTAMP)
@@ -2942,46 +2670,10 @@ QueryStmt
                 |   | | | |   | +-ColumnRef(type=PROTO<googlesql_test.TestHopAndTumblePB>, column=TableWithTestHopAndTumbleProto.ProtoColumn#2)
                 |   | | | |   +-field_descriptor=timestamp_val
                 |   | | | |   +-default_value=NULL
-                |   | | | +-SubqueryExpr
-                |   | | |   +-type=INTERVAL
-                |   | | |   +-subquery_type=SCALAR
-                |   | | |   +-subquery=
-                |   | | |     +-ProjectScan
-                |   | | |       +-column_list=[_hop_params.window_size#25]
-                |   | | |       +-expr_list=
-                |   | | |       | +-window_size#25 := ColumnRef(type=INTERVAL, column=_hop_params.window_size#21)
-                |   | | |       +-input_scan=
-                |   | | |         +-WithRefScan(column_list=_hop_params.[window_size#21, step_size#22, step_nanos#23, origin#24], with_query_name="_hop_params")
-                |   | | +-SubqueryExpr
-                |   | | | +-type=INTERVAL
-                |   | | | +-subquery_type=SCALAR
-                |   | | | +-subquery=
-                |   | | |   +-ProjectScan
-                |   | | |     +-column_list=[_hop_params.step_size#30]
-                |   | | |     +-expr_list=
-                |   | | |     | +-step_size#30 := ColumnRef(type=INTERVAL, column=_hop_params.step_size#27)
-                |   | | |     +-input_scan=
-                |   | | |       +-WithRefScan(column_list=_hop_params.[window_size#26, step_size#27, step_nanos#28, origin#29], with_query_name="_hop_params")
-                |   | | +-SubqueryExpr
-                |   | |   +-type=TIMESTAMP
-                |   | |   +-subquery_type=SCALAR
-                |   | |   +-subquery=
-                |   | |     +-ProjectScan
-                |   | |       +-column_list=[_hop_params.origin#35]
-                |   | |       +-expr_list=
-                |   | |       | +-origin#35 := ColumnRef(type=TIMESTAMP, column=_hop_params.origin#34)
-                |   | |       +-input_scan=
-                |   | |         +-WithRefScan(column_list=_hop_params.[window_size#31, step_size#32, step_nanos#33, origin#34], with_query_name="_hop_params")
-                |   | +-SubqueryExpr
-                |   |   +-type=INTERVAL
-                |   |   +-subquery_type=SCALAR
-                |   |   +-subquery=
-                |   |     +-ProjectScan
-                |   |       +-column_list=[_hop_params.step_size#40]
-                |   |       +-expr_list=
-                |   |       | +-step_size#40 := ColumnRef(type=INTERVAL, column=_hop_params.step_size#37)
-                |   |       +-input_scan=
-                |   |         +-WithRefScan(column_list=_hop_params.[window_size#36, step_size#37, step_nanos#38, origin#39], with_query_name="_hop_params")
+                |   | | | +-ColumnRef(type=INTERVAL, column=_hop_params.window_size#21)
+                |   | | +-ColumnRef(type=INTERVAL, column=_hop_params.step_size#22)
+                |   | | +-ColumnRef(type=TIMESTAMP, column=_hop_params.origin#24)
+                |   | +-ColumnRef(type=INTERVAL, column=_hop_params.step_size#22)
                 |   +-FunctionCall(GoogleSQL:timestamp_bucket(TIMESTAMP, INTERVAL, optional(1) TIMESTAMP) -> TIMESTAMP)
                 |   | +-FunctionCall(GoogleSQL:from_proto(PROTO<google.protobuf.Timestamp>) -> TIMESTAMP)
                 |   | | +-GetProtoField
@@ -2990,38 +2682,11 @@ QueryStmt
                 |   | |   | +-ColumnRef(type=PROTO<googlesql_test.TestHopAndTumblePB>, column=TableWithTestHopAndTumbleProto.ProtoColumn#2)
                 |   | |   +-field_descriptor=timestamp_val
                 |   | |   +-default_value=NULL
-                |   | +-SubqueryExpr
-                |   | | +-type=INTERVAL
-                |   | | +-subquery_type=SCALAR
-                |   | | +-subquery=
-                |   | |   +-ProjectScan
-                |   | |     +-column_list=[_hop_params.step_size#45]
-                |   | |     +-expr_list=
-                |   | |     | +-step_size#45 := ColumnRef(type=INTERVAL, column=_hop_params.step_size#42)
-                |   | |     +-input_scan=
-                |   | |       +-WithRefScan(column_list=_hop_params.[window_size#41, step_size#42, step_nanos#43, origin#44], with_query_name="_hop_params")
-                |   | +-SubqueryExpr
-                |   |   +-type=TIMESTAMP
-                |   |   +-subquery_type=SCALAR
-                |   |   +-subquery=
-                |   |     +-ProjectScan
-                |   |       +-column_list=[_hop_params.origin#50]
-                |   |       +-expr_list=
-                |   |       | +-origin#50 := ColumnRef(type=TIMESTAMP, column=_hop_params.origin#49)
-                |   |       +-input_scan=
-                |   |         +-WithRefScan(column_list=_hop_params.[window_size#46, step_size#47, step_nanos#48, origin#49], with_query_name="_hop_params")
-                |   +-SubqueryExpr
-                |   | +-type=INT64
-                |   | +-subquery_type=SCALAR
-                |   | +-subquery=
-                |   |   +-ProjectScan
-                |   |     +-column_list=[_hop_params.step_nanos#55]
-                |   |     +-expr_list=
-                |   |     | +-step_nanos#55 := ColumnRef(type=INT64, column=_hop_params.step_nanos#53)
-                |   |     +-input_scan=
-                |   |       +-WithRefScan(column_list=_hop_params.[window_size#51, step_size#52, step_nanos#53, origin#54], with_query_name="_hop_params")
+                |   | +-ColumnRef(type=INTERVAL, column=_hop_params.step_size#22)
+                |   | +-ColumnRef(type=TIMESTAMP, column=_hop_params.origin#24)
+                |   +-ColumnRef(type=INT64, column=_hop_params.step_nanos#23)
                 |   +-Literal(type=ENUM<googlesql.functions.DateTimestampPart>, value=NANOSECOND)
-                +-element_column_list=[$hop.window_start#56]
+                +-element_column_list=[$hop.window_start#25]
                 +-is_outer=TRUE
 ==
 
@@ -3529,25 +3194,21 @@ QueryStmt
             +-expr_list=
             | +-key#3 := ColumnRef(type=INT32, column=TableWithTestHopAndTumbleProto.key#1)
             | +-ProtoColumn#4 := ColumnRef(type=PROTO<googlesql_test.TestHopAndTumblePB>, column=TableWithTestHopAndTumbleProto.ProtoColumn#2)
-            | +-WINDOW_START#5 := ColumnRef(type=TIMESTAMP, column=$hop.window_start#56)
+            | +-WINDOW_START#5 := ColumnRef(type=TIMESTAMP, column=$hop.window_start#25)
             | +-WINDOW_END#6 :=
             |   +-FunctionCall(GoogleSQL:$add(TIMESTAMP, INTERVAL) -> TIMESTAMP)
-            |     +-ColumnRef(type=TIMESTAMP, column=$hop.window_start#56)
-            |     +-SubqueryExpr
-            |       +-type=INTERVAL
-            |       +-subquery_type=SCALAR
-            |       +-subquery=
-            |         +-ProjectScan
-            |           +-column_list=[_hop_params.window_size#61]
-            |           +-expr_list=
-            |           | +-window_size#61 := ColumnRef(type=INTERVAL, column=_hop_params.window_size#57)
-            |           +-input_scan=
-            |             +-WithRefScan(column_list=_hop_params.[window_size#57, step_size#58, step_nanos#59, origin#60], with_query_name="_hop_params")
+            |     +-ColumnRef(type=TIMESTAMP, column=$hop.window_start#25)
+            |     +-ColumnRef(type=INTERVAL, column=_hop_params.window_size#21)
             +-input_scan=
               +-ArrayScan
-                +-column_list=[TableWithTestHopAndTumbleProto.key#1, TableWithTestHopAndTumbleProto.ProtoColumn#2, $hop.window_start#56]
+                +-column_list=[TableWithTestHopAndTumbleProto.key#1, TableWithTestHopAndTumbleProto.ProtoColumn#2, _hop_params.window_size#21, _hop_params.step_size#22, _hop_params.step_nanos#23, _hop_params.origin#24, $hop.window_start#25]
                 +-input_scan=
-                | +-TableScan(column_list=TableWithTestHopAndTumbleProto.[key#1, ProtoColumn#2], node_source="table_clause", table=TableWithTestHopAndTumbleProto, column_index_list=[0, 1])
+                | +-JoinScan
+                |   +-column_list=[TableWithTestHopAndTumbleProto.key#1, TableWithTestHopAndTumbleProto.ProtoColumn#2, _hop_params.window_size#21, _hop_params.step_size#22, _hop_params.step_nanos#23, _hop_params.origin#24]
+                |   +-left_scan=
+                |   | +-TableScan(column_list=TableWithTestHopAndTumbleProto.[key#1, ProtoColumn#2], node_source="table_clause", table=TableWithTestHopAndTumbleProto, column_index_list=[0, 1])
+                |   +-right_scan=
+                |     +-WithRefScan(column_list=_hop_params.[window_size#21, step_size#22, step_nanos#23, origin#24], with_query_name="_hop_params")
                 +-array_expr_list=
                 | +-FunctionCall(GoogleSQL:generate_timestamp_array(TIMESTAMP, TIMESTAMP, INT64, ENUM<googlesql.functions.DateTimestampPart>) -> ARRAY<TIMESTAMP>)
                 |   +-FunctionCall(GoogleSQL:$add(TIMESTAMP, INTERVAL) -> TIMESTAMP)
@@ -3560,46 +3221,10 @@ QueryStmt
                 |   | | | | +-field_descriptor=annotated_timestamp_val
                 |   | | | | +-default_value=NULL
                 |   | | | | +-format=TIMESTAMP_MILLIS
-                |   | | | +-SubqueryExpr
-                |   | | |   +-type=INTERVAL
-                |   | | |   +-subquery_type=SCALAR
-                |   | | |   +-subquery=
-                |   | | |     +-ProjectScan
-                |   | | |       +-column_list=[_hop_params.window_size#25]
-                |   | | |       +-expr_list=
-                |   | | |       | +-window_size#25 := ColumnRef(type=INTERVAL, column=_hop_params.window_size#21)
-                |   | | |       +-input_scan=
-                |   | | |         +-WithRefScan(column_list=_hop_params.[window_size#21, step_size#22, step_nanos#23, origin#24], with_query_name="_hop_params")
-                |   | | +-SubqueryExpr
-                |   | | | +-type=INTERVAL
-                |   | | | +-subquery_type=SCALAR
-                |   | | | +-subquery=
-                |   | | |   +-ProjectScan
-                |   | | |     +-column_list=[_hop_params.step_size#30]
-                |   | | |     +-expr_list=
-                |   | | |     | +-step_size#30 := ColumnRef(type=INTERVAL, column=_hop_params.step_size#27)
-                |   | | |     +-input_scan=
-                |   | | |       +-WithRefScan(column_list=_hop_params.[window_size#26, step_size#27, step_nanos#28, origin#29], with_query_name="_hop_params")
-                |   | | +-SubqueryExpr
-                |   | |   +-type=TIMESTAMP
-                |   | |   +-subquery_type=SCALAR
-                |   | |   +-subquery=
-                |   | |     +-ProjectScan
-                |   | |       +-column_list=[_hop_params.origin#35]
-                |   | |       +-expr_list=
-                |   | |       | +-origin#35 := ColumnRef(type=TIMESTAMP, column=_hop_params.origin#34)
-                |   | |       +-input_scan=
-                |   | |         +-WithRefScan(column_list=_hop_params.[window_size#31, step_size#32, step_nanos#33, origin#34], with_query_name="_hop_params")
-                |   | +-SubqueryExpr
-                |   |   +-type=INTERVAL
-                |   |   +-subquery_type=SCALAR
-                |   |   +-subquery=
-                |   |     +-ProjectScan
-                |   |       +-column_list=[_hop_params.step_size#40]
-                |   |       +-expr_list=
-                |   |       | +-step_size#40 := ColumnRef(type=INTERVAL, column=_hop_params.step_size#37)
-                |   |       +-input_scan=
-                |   |         +-WithRefScan(column_list=_hop_params.[window_size#36, step_size#37, step_nanos#38, origin#39], with_query_name="_hop_params")
+                |   | | | +-ColumnRef(type=INTERVAL, column=_hop_params.window_size#21)
+                |   | | +-ColumnRef(type=INTERVAL, column=_hop_params.step_size#22)
+                |   | | +-ColumnRef(type=TIMESTAMP, column=_hop_params.origin#24)
+                |   | +-ColumnRef(type=INTERVAL, column=_hop_params.step_size#22)
                 |   +-FunctionCall(GoogleSQL:timestamp_bucket(TIMESTAMP, INTERVAL, optional(1) TIMESTAMP) -> TIMESTAMP)
                 |   | +-GetProtoField
                 |   | | +-type=TIMESTAMP
@@ -3608,38 +3233,11 @@ QueryStmt
                 |   | | +-field_descriptor=annotated_timestamp_val
                 |   | | +-default_value=NULL
                 |   | | +-format=TIMESTAMP_MILLIS
-                |   | +-SubqueryExpr
-                |   | | +-type=INTERVAL
-                |   | | +-subquery_type=SCALAR
-                |   | | +-subquery=
-                |   | |   +-ProjectScan
-                |   | |     +-column_list=[_hop_params.step_size#45]
-                |   | |     +-expr_list=
-                |   | |     | +-step_size#45 := ColumnRef(type=INTERVAL, column=_hop_params.step_size#42)
-                |   | |     +-input_scan=
-                |   | |       +-WithRefScan(column_list=_hop_params.[window_size#41, step_size#42, step_nanos#43, origin#44], with_query_name="_hop_params")
-                |   | +-SubqueryExpr
-                |   |   +-type=TIMESTAMP
-                |   |   +-subquery_type=SCALAR
-                |   |   +-subquery=
-                |   |     +-ProjectScan
-                |   |       +-column_list=[_hop_params.origin#50]
-                |   |       +-expr_list=
-                |   |       | +-origin#50 := ColumnRef(type=TIMESTAMP, column=_hop_params.origin#49)
-                |   |       +-input_scan=
-                |   |         +-WithRefScan(column_list=_hop_params.[window_size#46, step_size#47, step_nanos#48, origin#49], with_query_name="_hop_params")
-                |   +-SubqueryExpr
-                |   | +-type=INT64
-                |   | +-subquery_type=SCALAR
-                |   | +-subquery=
-                |   |   +-ProjectScan
-                |   |     +-column_list=[_hop_params.step_nanos#55]
-                |   |     +-expr_list=
-                |   |     | +-step_nanos#55 := ColumnRef(type=INT64, column=_hop_params.step_nanos#53)
-                |   |     +-input_scan=
-                |   |       +-WithRefScan(column_list=_hop_params.[window_size#51, step_size#52, step_nanos#53, origin#54], with_query_name="_hop_params")
+                |   | +-ColumnRef(type=INTERVAL, column=_hop_params.step_size#22)
+                |   | +-ColumnRef(type=TIMESTAMP, column=_hop_params.origin#24)
+                |   +-ColumnRef(type=INT64, column=_hop_params.step_nanos#23)
                 |   +-Literal(type=ENUM<googlesql.functions.DateTimestampPart>, value=NANOSECOND)
-                +-element_column_list=[$hop.window_start#56]
+                +-element_column_list=[$hop.window_start#25]
                 +-is_outer=TRUE
 ==
 
@@ -4341,105 +3939,38 @@ QueryStmt
             +-expr_list=
             | +-ts_col#3 := ColumnRef(type=TIMESTAMP, column=TableWithMixedCaseColumn.ts_col#1)
             | +-MiXeD_cAsE#4 := ColumnRef(type=STRING, column=TableWithMixedCaseColumn.MiXeD_cAsE#2)
-            | +-WINDOW_START#5 := ColumnRef(type=TIMESTAMP, column=$hop.window_start#56)
+            | +-WINDOW_START#5 := ColumnRef(type=TIMESTAMP, column=$hop.window_start#25)
             | +-WINDOW_END#6 :=
             |   +-FunctionCall(GoogleSQL:$add(TIMESTAMP, INTERVAL) -> TIMESTAMP)
-            |     +-ColumnRef(type=TIMESTAMP, column=$hop.window_start#56)
-            |     +-SubqueryExpr
-            |       +-type=INTERVAL
-            |       +-subquery_type=SCALAR
-            |       +-subquery=
-            |         +-ProjectScan
-            |           +-column_list=[_hop_params.window_size#61]
-            |           +-expr_list=
-            |           | +-window_size#61 := ColumnRef(type=INTERVAL, column=_hop_params.window_size#57)
-            |           +-input_scan=
-            |             +-WithRefScan(column_list=_hop_params.[window_size#57, step_size#58, step_nanos#59, origin#60], with_query_name="_hop_params")
+            |     +-ColumnRef(type=TIMESTAMP, column=$hop.window_start#25)
+            |     +-ColumnRef(type=INTERVAL, column=_hop_params.window_size#21)
             +-input_scan=
               +-ArrayScan
-                +-column_list=[TableWithMixedCaseColumn.ts_col#1, TableWithMixedCaseColumn.MiXeD_cAsE#2, $hop.window_start#56]
+                +-column_list=[TableWithMixedCaseColumn.ts_col#1, TableWithMixedCaseColumn.MiXeD_cAsE#2, _hop_params.window_size#21, _hop_params.step_size#22, _hop_params.step_nanos#23, _hop_params.origin#24, $hop.window_start#25]
                 +-input_scan=
-                | +-TableScan(column_list=TableWithMixedCaseColumn.[ts_col#1, MiXeD_cAsE#2], node_source="table_clause", table=TableWithMixedCaseColumn, column_index_list=[0, 1])
+                | +-JoinScan
+                |   +-column_list=[TableWithMixedCaseColumn.ts_col#1, TableWithMixedCaseColumn.MiXeD_cAsE#2, _hop_params.window_size#21, _hop_params.step_size#22, _hop_params.step_nanos#23, _hop_params.origin#24]
+                |   +-left_scan=
+                |   | +-TableScan(column_list=TableWithMixedCaseColumn.[ts_col#1, MiXeD_cAsE#2], node_source="table_clause", table=TableWithMixedCaseColumn, column_index_list=[0, 1])
+                |   +-right_scan=
+                |     +-WithRefScan(column_list=_hop_params.[window_size#21, step_size#22, step_nanos#23, origin#24], with_query_name="_hop_params")
                 +-array_expr_list=
                 | +-FunctionCall(GoogleSQL:generate_timestamp_array(TIMESTAMP, TIMESTAMP, INT64, ENUM<googlesql.functions.DateTimestampPart>) -> ARRAY<TIMESTAMP>)
                 |   +-FunctionCall(GoogleSQL:$add(TIMESTAMP, INTERVAL) -> TIMESTAMP)
                 |   | +-FunctionCall(GoogleSQL:timestamp_bucket(TIMESTAMP, INTERVAL, optional(1) TIMESTAMP) -> TIMESTAMP)
                 |   | | +-FunctionCall(GoogleSQL:$subtract(TIMESTAMP, INTERVAL) -> TIMESTAMP)
                 |   | | | +-ColumnRef(type=TIMESTAMP, column=TableWithMixedCaseColumn.ts_col#1)
-                |   | | | +-SubqueryExpr
-                |   | | |   +-type=INTERVAL
-                |   | | |   +-subquery_type=SCALAR
-                |   | | |   +-subquery=
-                |   | | |     +-ProjectScan
-                |   | | |       +-column_list=[_hop_params.window_size#25]
-                |   | | |       +-expr_list=
-                |   | | |       | +-window_size#25 := ColumnRef(type=INTERVAL, column=_hop_params.window_size#21)
-                |   | | |       +-input_scan=
-                |   | | |         +-WithRefScan(column_list=_hop_params.[window_size#21, step_size#22, step_nanos#23, origin#24], with_query_name="_hop_params")
-                |   | | +-SubqueryExpr
-                |   | | | +-type=INTERVAL
-                |   | | | +-subquery_type=SCALAR
-                |   | | | +-subquery=
-                |   | | |   +-ProjectScan
-                |   | | |     +-column_list=[_hop_params.step_size#30]
-                |   | | |     +-expr_list=
-                |   | | |     | +-step_size#30 := ColumnRef(type=INTERVAL, column=_hop_params.step_size#27)
-                |   | | |     +-input_scan=
-                |   | | |       +-WithRefScan(column_list=_hop_params.[window_size#26, step_size#27, step_nanos#28, origin#29], with_query_name="_hop_params")
-                |   | | +-SubqueryExpr
-                |   | |   +-type=TIMESTAMP
-                |   | |   +-subquery_type=SCALAR
-                |   | |   +-subquery=
-                |   | |     +-ProjectScan
-                |   | |       +-column_list=[_hop_params.origin#35]
-                |   | |       +-expr_list=
-                |   | |       | +-origin#35 := ColumnRef(type=TIMESTAMP, column=_hop_params.origin#34)
-                |   | |       +-input_scan=
-                |   | |         +-WithRefScan(column_list=_hop_params.[window_size#31, step_size#32, step_nanos#33, origin#34], with_query_name="_hop_params")
-                |   | +-SubqueryExpr
-                |   |   +-type=INTERVAL
-                |   |   +-subquery_type=SCALAR
-                |   |   +-subquery=
-                |   |     +-ProjectScan
-                |   |       +-column_list=[_hop_params.step_size#40]
-                |   |       +-expr_list=
-                |   |       | +-step_size#40 := ColumnRef(type=INTERVAL, column=_hop_params.step_size#37)
-                |   |       +-input_scan=
-                |   |         +-WithRefScan(column_list=_hop_params.[window_size#36, step_size#37, step_nanos#38, origin#39], with_query_name="_hop_params")
+                |   | | | +-ColumnRef(type=INTERVAL, column=_hop_params.window_size#21)
+                |   | | +-ColumnRef(type=INTERVAL, column=_hop_params.step_size#22)
+                |   | | +-ColumnRef(type=TIMESTAMP, column=_hop_params.origin#24)
+                |   | +-ColumnRef(type=INTERVAL, column=_hop_params.step_size#22)
                 |   +-FunctionCall(GoogleSQL:timestamp_bucket(TIMESTAMP, INTERVAL, optional(1) TIMESTAMP) -> TIMESTAMP)
                 |   | +-ColumnRef(type=TIMESTAMP, column=TableWithMixedCaseColumn.ts_col#1)
-                |   | +-SubqueryExpr
-                |   | | +-type=INTERVAL
-                |   | | +-subquery_type=SCALAR
-                |   | | +-subquery=
-                |   | |   +-ProjectScan
-                |   | |     +-column_list=[_hop_params.step_size#45]
-                |   | |     +-expr_list=
-                |   | |     | +-step_size#45 := ColumnRef(type=INTERVAL, column=_hop_params.step_size#42)
-                |   | |     +-input_scan=
-                |   | |       +-WithRefScan(column_list=_hop_params.[window_size#41, step_size#42, step_nanos#43, origin#44], with_query_name="_hop_params")
-                |   | +-SubqueryExpr
-                |   |   +-type=TIMESTAMP
-                |   |   +-subquery_type=SCALAR
-                |   |   +-subquery=
-                |   |     +-ProjectScan
-                |   |       +-column_list=[_hop_params.origin#50]
-                |   |       +-expr_list=
-                |   |       | +-origin#50 := ColumnRef(type=TIMESTAMP, column=_hop_params.origin#49)
-                |   |       +-input_scan=
-                |   |         +-WithRefScan(column_list=_hop_params.[window_size#46, step_size#47, step_nanos#48, origin#49], with_query_name="_hop_params")
-                |   +-SubqueryExpr
-                |   | +-type=INT64
-                |   | +-subquery_type=SCALAR
-                |   | +-subquery=
-                |   |   +-ProjectScan
-                |   |     +-column_list=[_hop_params.step_nanos#55]
-                |   |     +-expr_list=
-                |   |     | +-step_nanos#55 := ColumnRef(type=INT64, column=_hop_params.step_nanos#53)
-                |   |     +-input_scan=
-                |   |       +-WithRefScan(column_list=_hop_params.[window_size#51, step_size#52, step_nanos#53, origin#54], with_query_name="_hop_params")
+                |   | +-ColumnRef(type=INTERVAL, column=_hop_params.step_size#22)
+                |   | +-ColumnRef(type=TIMESTAMP, column=_hop_params.origin#24)
+                |   +-ColumnRef(type=INT64, column=_hop_params.step_nanos#23)
                 |   +-Literal(type=ENUM<googlesql.functions.DateTimestampPart>, value=NANOSECOND)
-                +-element_column_list=[$hop.window_start#56]
+                +-element_column_list=[$hop.window_start#25]
                 +-is_outer=TRUE
 ==
 
@@ -5925,111 +5456,44 @@ QueryStmt
             +-column_list=hop.[ts_col#3, WINDOW_START#5, WINDOW_END#6]
             +-expr_list=
             | +-ts_col#3 := ColumnRef(type=TIMESTAMP, column=rv.ts_col#2)
-            | +-WINDOW_START#5 := ColumnRef(type=TIMESTAMP, column=$hop.window_start#56)
+            | +-WINDOW_START#5 := ColumnRef(type=TIMESTAMP, column=$hop.window_start#25)
             | +-WINDOW_END#6 :=
             |   +-FunctionCall(GoogleSQL:$add(TIMESTAMP, INTERVAL) -> TIMESTAMP)
-            |     +-ColumnRef(type=TIMESTAMP, column=$hop.window_start#56)
-            |     +-SubqueryExpr
-            |       +-type=INTERVAL
-            |       +-subquery_type=SCALAR
-            |       +-subquery=
-            |         +-ProjectScan
-            |           +-column_list=[_hop_params.window_size#61]
-            |           +-expr_list=
-            |           | +-window_size#61 := ColumnRef(type=INTERVAL, column=_hop_params.window_size#57)
-            |           +-input_scan=
-            |             +-WithRefScan(column_list=_hop_params.[window_size#57, step_size#58, step_nanos#59, origin#60], with_query_name="_hop_params")
+            |     +-ColumnRef(type=TIMESTAMP, column=$hop.window_start#25)
+            |     +-ColumnRef(type=INTERVAL, column=_hop_params.window_size#21)
             +-input_scan=
               +-ArrayScan
-                +-column_list=[rv.a#1, rv.ts_col#2, $hop.window_start#56]
+                +-column_list=[rv.a#1, rv.ts_col#2, _hop_params.window_size#21, _hop_params.step_size#22, _hop_params.step_nanos#23, _hop_params.origin#24, $hop.window_start#25]
                 +-input_scan=
-                | +-ProjectScan
-                |   +-column_list=rv.[a#1, ts_col#2]
-                |   +-expr_list=
-                |   | +-a#1 := Literal(type=INT64, value=1)
-                |   | +-ts_col#2 := Literal(type=TIMESTAMP, value=2026-01-01 00:00:00+00, has_explicit_type=TRUE)
-                |   +-input_scan=
-                |     +-SingleRowScan
+                | +-JoinScan
+                |   +-column_list=[rv.a#1, rv.ts_col#2, _hop_params.window_size#21, _hop_params.step_size#22, _hop_params.step_nanos#23, _hop_params.origin#24]
+                |   +-left_scan=
+                |   | +-ProjectScan
+                |   |   +-column_list=rv.[a#1, ts_col#2]
+                |   |   +-expr_list=
+                |   |   | +-a#1 := Literal(type=INT64, value=1)
+                |   |   | +-ts_col#2 := Literal(type=TIMESTAMP, value=2026-01-01 00:00:00+00, has_explicit_type=TRUE)
+                |   |   +-input_scan=
+                |   |     +-SingleRowScan
+                |   +-right_scan=
+                |     +-WithRefScan(column_list=_hop_params.[window_size#21, step_size#22, step_nanos#23, origin#24], with_query_name="_hop_params")
                 +-array_expr_list=
                 | +-FunctionCall(GoogleSQL:generate_timestamp_array(TIMESTAMP, TIMESTAMP, INT64, ENUM<googlesql.functions.DateTimestampPart>) -> ARRAY<TIMESTAMP>)
                 |   +-FunctionCall(GoogleSQL:$add(TIMESTAMP, INTERVAL) -> TIMESTAMP)
                 |   | +-FunctionCall(GoogleSQL:timestamp_bucket(TIMESTAMP, INTERVAL, optional(1) TIMESTAMP) -> TIMESTAMP)
                 |   | | +-FunctionCall(GoogleSQL:$subtract(TIMESTAMP, INTERVAL) -> TIMESTAMP)
                 |   | | | +-ColumnRef(type=TIMESTAMP, column=rv.ts_col#2)
-                |   | | | +-SubqueryExpr
-                |   | | |   +-type=INTERVAL
-                |   | | |   +-subquery_type=SCALAR
-                |   | | |   +-subquery=
-                |   | | |     +-ProjectScan
-                |   | | |       +-column_list=[_hop_params.window_size#25]
-                |   | | |       +-expr_list=
-                |   | | |       | +-window_size#25 := ColumnRef(type=INTERVAL, column=_hop_params.window_size#21)
-                |   | | |       +-input_scan=
-                |   | | |         +-WithRefScan(column_list=_hop_params.[window_size#21, step_size#22, step_nanos#23, origin#24], with_query_name="_hop_params")
-                |   | | +-SubqueryExpr
-                |   | | | +-type=INTERVAL
-                |   | | | +-subquery_type=SCALAR
-                |   | | | +-subquery=
-                |   | | |   +-ProjectScan
-                |   | | |     +-column_list=[_hop_params.step_size#30]
-                |   | | |     +-expr_list=
-                |   | | |     | +-step_size#30 := ColumnRef(type=INTERVAL, column=_hop_params.step_size#27)
-                |   | | |     +-input_scan=
-                |   | | |       +-WithRefScan(column_list=_hop_params.[window_size#26, step_size#27, step_nanos#28, origin#29], with_query_name="_hop_params")
-                |   | | +-SubqueryExpr
-                |   | |   +-type=TIMESTAMP
-                |   | |   +-subquery_type=SCALAR
-                |   | |   +-subquery=
-                |   | |     +-ProjectScan
-                |   | |       +-column_list=[_hop_params.origin#35]
-                |   | |       +-expr_list=
-                |   | |       | +-origin#35 := ColumnRef(type=TIMESTAMP, column=_hop_params.origin#34)
-                |   | |       +-input_scan=
-                |   | |         +-WithRefScan(column_list=_hop_params.[window_size#31, step_size#32, step_nanos#33, origin#34], with_query_name="_hop_params")
-                |   | +-SubqueryExpr
-                |   |   +-type=INTERVAL
-                |   |   +-subquery_type=SCALAR
-                |   |   +-subquery=
-                |   |     +-ProjectScan
-                |   |       +-column_list=[_hop_params.step_size#40]
-                |   |       +-expr_list=
-                |   |       | +-step_size#40 := ColumnRef(type=INTERVAL, column=_hop_params.step_size#37)
-                |   |       +-input_scan=
-                |   |         +-WithRefScan(column_list=_hop_params.[window_size#36, step_size#37, step_nanos#38, origin#39], with_query_name="_hop_params")
+                |   | | | +-ColumnRef(type=INTERVAL, column=_hop_params.window_size#21)
+                |   | | +-ColumnRef(type=INTERVAL, column=_hop_params.step_size#22)
+                |   | | +-ColumnRef(type=TIMESTAMP, column=_hop_params.origin#24)
+                |   | +-ColumnRef(type=INTERVAL, column=_hop_params.step_size#22)
                 |   +-FunctionCall(GoogleSQL:timestamp_bucket(TIMESTAMP, INTERVAL, optional(1) TIMESTAMP) -> TIMESTAMP)
                 |   | +-ColumnRef(type=TIMESTAMP, column=rv.ts_col#2)
-                |   | +-SubqueryExpr
-                |   | | +-type=INTERVAL
-                |   | | +-subquery_type=SCALAR
-                |   | | +-subquery=
-                |   | |   +-ProjectScan
-                |   | |     +-column_list=[_hop_params.step_size#45]
-                |   | |     +-expr_list=
-                |   | |     | +-step_size#45 := ColumnRef(type=INTERVAL, column=_hop_params.step_size#42)
-                |   | |     +-input_scan=
-                |   | |       +-WithRefScan(column_list=_hop_params.[window_size#41, step_size#42, step_nanos#43, origin#44], with_query_name="_hop_params")
-                |   | +-SubqueryExpr
-                |   |   +-type=TIMESTAMP
-                |   |   +-subquery_type=SCALAR
-                |   |   +-subquery=
-                |   |     +-ProjectScan
-                |   |       +-column_list=[_hop_params.origin#50]
-                |   |       +-expr_list=
-                |   |       | +-origin#50 := ColumnRef(type=TIMESTAMP, column=_hop_params.origin#49)
-                |   |       +-input_scan=
-                |   |         +-WithRefScan(column_list=_hop_params.[window_size#46, step_size#47, step_nanos#48, origin#49], with_query_name="_hop_params")
-                |   +-SubqueryExpr
-                |   | +-type=INT64
-                |   | +-subquery_type=SCALAR
-                |   | +-subquery=
-                |   |   +-ProjectScan
-                |   |     +-column_list=[_hop_params.step_nanos#55]
-                |   |     +-expr_list=
-                |   |     | +-step_nanos#55 := ColumnRef(type=INT64, column=_hop_params.step_nanos#53)
-                |   |     +-input_scan=
-                |   |       +-WithRefScan(column_list=_hop_params.[window_size#51, step_size#52, step_nanos#53, origin#54], with_query_name="_hop_params")
+                |   | +-ColumnRef(type=INTERVAL, column=_hop_params.step_size#22)
+                |   | +-ColumnRef(type=TIMESTAMP, column=_hop_params.origin#24)
+                |   +-ColumnRef(type=INT64, column=_hop_params.step_nanos#23)
                 |   +-Literal(type=ENUM<googlesql.functions.DateTimestampPart>, value=NANOSECOND)
-                +-element_column_list=[$hop.window_start#56]
+                +-element_column_list=[$hop.window_start#25]
                 +-is_outer=TRUE
 ==
 
@@ -6366,105 +5830,38 @@ QueryStmt
             | +-event_time#12 := ColumnRef(type=TIMESTAMP, column=TimeSeries.event_time#1)
             | +-user_id#13 := ColumnRef(type=INT64, column=TimeSeries.user_id#2)
             | +-metric#14 := ColumnRef(type=DOUBLE, column=TimeSeries.metric#3)
-            | +-WINDOW_START#15 := ColumnRef(type=TIMESTAMP, column=$hop.window_start#66)
+            | +-WINDOW_START#15 := ColumnRef(type=TIMESTAMP, column=$hop.window_start#35)
             | +-WINDOW_END#16 :=
             |   +-FunctionCall(GoogleSQL:$add(TIMESTAMP, INTERVAL) -> TIMESTAMP)
-            |     +-ColumnRef(type=TIMESTAMP, column=$hop.window_start#66)
-            |     +-SubqueryExpr
-            |       +-type=INTERVAL
-            |       +-subquery_type=SCALAR
-            |       +-subquery=
-            |         +-ProjectScan
-            |           +-column_list=[_hop_params.window_size#71]
-            |           +-expr_list=
-            |           | +-window_size#71 := ColumnRef(type=INTERVAL, column=_hop_params.window_size#67)
-            |           +-input_scan=
-            |             +-WithRefScan(column_list=_hop_params.[window_size#67, step_size#68, step_nanos#69, origin#70], with_query_name="_hop_params")
+            |     +-ColumnRef(type=TIMESTAMP, column=$hop.window_start#35)
+            |     +-ColumnRef(type=INTERVAL, column=_hop_params.window_size#31)
             +-input_scan=
               +-ArrayScan
-                +-column_list=[TimeSeries.event_time#1, TimeSeries.user_id#2, TimeSeries.metric#3, $hop.window_start#66]
+                +-column_list=[TimeSeries.event_time#1, TimeSeries.user_id#2, TimeSeries.metric#3, _hop_params.window_size#31, _hop_params.step_size#32, _hop_params.step_nanos#33, _hop_params.origin#34, $hop.window_start#35]
                 +-input_scan=
-                | +-TableScan(column_list=TimeSeries.[event_time#1, user_id#2, metric#3], node_source="table_clause", table=TimeSeries, column_index_list=[0, 1, 2])
+                | +-JoinScan
+                |   +-column_list=[TimeSeries.event_time#1, TimeSeries.user_id#2, TimeSeries.metric#3, _hop_params.window_size#31, _hop_params.step_size#32, _hop_params.step_nanos#33, _hop_params.origin#34]
+                |   +-left_scan=
+                |   | +-TableScan(column_list=TimeSeries.[event_time#1, user_id#2, metric#3], node_source="table_clause", table=TimeSeries, column_index_list=[0, 1, 2])
+                |   +-right_scan=
+                |     +-WithRefScan(column_list=_hop_params.[window_size#31, step_size#32, step_nanos#33, origin#34], with_query_name="_hop_params")
                 +-array_expr_list=
                 | +-FunctionCall(GoogleSQL:generate_timestamp_array(TIMESTAMP, TIMESTAMP, INT64, ENUM<googlesql.functions.DateTimestampPart>) -> ARRAY<TIMESTAMP>)
                 |   +-FunctionCall(GoogleSQL:$add(TIMESTAMP, INTERVAL) -> TIMESTAMP)
                 |   | +-FunctionCall(GoogleSQL:timestamp_bucket(TIMESTAMP, INTERVAL, optional(1) TIMESTAMP) -> TIMESTAMP)
                 |   | | +-FunctionCall(GoogleSQL:$subtract(TIMESTAMP, INTERVAL) -> TIMESTAMP)
                 |   | | | +-ColumnRef(type=TIMESTAMP, column=TimeSeries.event_time#1)
-                |   | | | +-SubqueryExpr
-                |   | | |   +-type=INTERVAL
-                |   | | |   +-subquery_type=SCALAR
-                |   | | |   +-subquery=
-                |   | | |     +-ProjectScan
-                |   | | |       +-column_list=[_hop_params.window_size#35]
-                |   | | |       +-expr_list=
-                |   | | |       | +-window_size#35 := ColumnRef(type=INTERVAL, column=_hop_params.window_size#31)
-                |   | | |       +-input_scan=
-                |   | | |         +-WithRefScan(column_list=_hop_params.[window_size#31, step_size#32, step_nanos#33, origin#34], with_query_name="_hop_params")
-                |   | | +-SubqueryExpr
-                |   | | | +-type=INTERVAL
-                |   | | | +-subquery_type=SCALAR
-                |   | | | +-subquery=
-                |   | | |   +-ProjectScan
-                |   | | |     +-column_list=[_hop_params.step_size#40]
-                |   | | |     +-expr_list=
-                |   | | |     | +-step_size#40 := ColumnRef(type=INTERVAL, column=_hop_params.step_size#37)
-                |   | | |     +-input_scan=
-                |   | | |       +-WithRefScan(column_list=_hop_params.[window_size#36, step_size#37, step_nanos#38, origin#39], with_query_name="_hop_params")
-                |   | | +-SubqueryExpr
-                |   | |   +-type=TIMESTAMP
-                |   | |   +-subquery_type=SCALAR
-                |   | |   +-subquery=
-                |   | |     +-ProjectScan
-                |   | |       +-column_list=[_hop_params.origin#45]
-                |   | |       +-expr_list=
-                |   | |       | +-origin#45 := ColumnRef(type=TIMESTAMP, column=_hop_params.origin#44)
-                |   | |       +-input_scan=
-                |   | |         +-WithRefScan(column_list=_hop_params.[window_size#41, step_size#42, step_nanos#43, origin#44], with_query_name="_hop_params")
-                |   | +-SubqueryExpr
-                |   |   +-type=INTERVAL
-                |   |   +-subquery_type=SCALAR
-                |   |   +-subquery=
-                |   |     +-ProjectScan
-                |   |       +-column_list=[_hop_params.step_size#50]
-                |   |       +-expr_list=
-                |   |       | +-step_size#50 := ColumnRef(type=INTERVAL, column=_hop_params.step_size#47)
-                |   |       +-input_scan=
-                |   |         +-WithRefScan(column_list=_hop_params.[window_size#46, step_size#47, step_nanos#48, origin#49], with_query_name="_hop_params")
+                |   | | | +-ColumnRef(type=INTERVAL, column=_hop_params.window_size#31)
+                |   | | +-ColumnRef(type=INTERVAL, column=_hop_params.step_size#32)
+                |   | | +-ColumnRef(type=TIMESTAMP, column=_hop_params.origin#34)
+                |   | +-ColumnRef(type=INTERVAL, column=_hop_params.step_size#32)
                 |   +-FunctionCall(GoogleSQL:timestamp_bucket(TIMESTAMP, INTERVAL, optional(1) TIMESTAMP) -> TIMESTAMP)
                 |   | +-ColumnRef(type=TIMESTAMP, column=TimeSeries.event_time#1)
-                |   | +-SubqueryExpr
-                |   | | +-type=INTERVAL
-                |   | | +-subquery_type=SCALAR
-                |   | | +-subquery=
-                |   | |   +-ProjectScan
-                |   | |     +-column_list=[_hop_params.step_size#55]
-                |   | |     +-expr_list=
-                |   | |     | +-step_size#55 := ColumnRef(type=INTERVAL, column=_hop_params.step_size#52)
-                |   | |     +-input_scan=
-                |   | |       +-WithRefScan(column_list=_hop_params.[window_size#51, step_size#52, step_nanos#53, origin#54], with_query_name="_hop_params")
-                |   | +-SubqueryExpr
-                |   |   +-type=TIMESTAMP
-                |   |   +-subquery_type=SCALAR
-                |   |   +-subquery=
-                |   |     +-ProjectScan
-                |   |       +-column_list=[_hop_params.origin#60]
-                |   |       +-expr_list=
-                |   |       | +-origin#60 := ColumnRef(type=TIMESTAMP, column=_hop_params.origin#59)
-                |   |       +-input_scan=
-                |   |         +-WithRefScan(column_list=_hop_params.[window_size#56, step_size#57, step_nanos#58, origin#59], with_query_name="_hop_params")
-                |   +-SubqueryExpr
-                |   | +-type=INT64
-                |   | +-subquery_type=SCALAR
-                |   | +-subquery=
-                |   |   +-ProjectScan
-                |   |     +-column_list=[_hop_params.step_nanos#65]
-                |   |     +-expr_list=
-                |   |     | +-step_nanos#65 := ColumnRef(type=INT64, column=_hop_params.step_nanos#63)
-                |   |     +-input_scan=
-                |   |       +-WithRefScan(column_list=_hop_params.[window_size#61, step_size#62, step_nanos#63, origin#64], with_query_name="_hop_params")
+                |   | +-ColumnRef(type=INTERVAL, column=_hop_params.step_size#32)
+                |   | +-ColumnRef(type=TIMESTAMP, column=_hop_params.origin#34)
+                |   +-ColumnRef(type=INT64, column=_hop_params.step_nanos#33)
                 |   +-Literal(type=ENUM<googlesql.functions.DateTimestampPart>, value=NANOSECOND)
-                +-element_column_list=[$hop.window_start#66]
+                +-element_column_list=[$hop.window_start#35]
                 +-is_outer=TRUE
 ==
 
@@ -6831,105 +6228,38 @@ QueryStmt
             | +-event_time#4 := ColumnRef(type=TIMESTAMP, column=TimeSeries.event_time#1)
             | +-user_id#5 := ColumnRef(type=INT64, column=TimeSeries.user_id#2)
             | +-metric#6 := ColumnRef(type=DOUBLE, column=TimeSeries.metric#3)
-            | +-WINDOW_START#7 := ColumnRef(type=TIMESTAMP, column=$hop.window_start#58)
+            | +-WINDOW_START#7 := ColumnRef(type=TIMESTAMP, column=$hop.window_start#27)
             | +-WINDOW_END#8 :=
             |   +-FunctionCall(GoogleSQL:$add(TIMESTAMP, INTERVAL) -> TIMESTAMP)
-            |     +-ColumnRef(type=TIMESTAMP, column=$hop.window_start#58)
-            |     +-SubqueryExpr
-            |       +-type=INTERVAL
-            |       +-subquery_type=SCALAR
-            |       +-subquery=
-            |         +-ProjectScan
-            |           +-column_list=[_hop_params.window_size#63]
-            |           +-expr_list=
-            |           | +-window_size#63 := ColumnRef(type=INTERVAL, column=_hop_params.window_size#59)
-            |           +-input_scan=
-            |             +-WithRefScan(column_list=_hop_params.[window_size#59, step_size#60, step_nanos#61, origin#62], with_query_name="_hop_params")
+            |     +-ColumnRef(type=TIMESTAMP, column=$hop.window_start#27)
+            |     +-ColumnRef(type=INTERVAL, column=_hop_params.window_size#23)
             +-input_scan=
               +-ArrayScan
-                +-column_list=[TimeSeries.event_time#1, TimeSeries.user_id#2, TimeSeries.metric#3, $hop.window_start#58]
+                +-column_list=[TimeSeries.event_time#1, TimeSeries.user_id#2, TimeSeries.metric#3, _hop_params.window_size#23, _hop_params.step_size#24, _hop_params.step_nanos#25, _hop_params.origin#26, $hop.window_start#27]
                 +-input_scan=
-                | +-TableScan(column_list=TimeSeries.[event_time#1, user_id#2, metric#3], node_source="table_clause", table=TimeSeries, column_index_list=[0, 1, 2])
+                | +-JoinScan
+                |   +-column_list=[TimeSeries.event_time#1, TimeSeries.user_id#2, TimeSeries.metric#3, _hop_params.window_size#23, _hop_params.step_size#24, _hop_params.step_nanos#25, _hop_params.origin#26]
+                |   +-left_scan=
+                |   | +-TableScan(column_list=TimeSeries.[event_time#1, user_id#2, metric#3], node_source="table_clause", table=TimeSeries, column_index_list=[0, 1, 2])
+                |   +-right_scan=
+                |     +-WithRefScan(column_list=_hop_params.[window_size#23, step_size#24, step_nanos#25, origin#26], with_query_name="_hop_params")
                 +-array_expr_list=
                 | +-FunctionCall(GoogleSQL:generate_timestamp_array(TIMESTAMP, TIMESTAMP, INT64, ENUM<googlesql.functions.DateTimestampPart>) -> ARRAY<TIMESTAMP>)
                 |   +-FunctionCall(GoogleSQL:$add(TIMESTAMP, INTERVAL) -> TIMESTAMP)
                 |   | +-FunctionCall(GoogleSQL:timestamp_bucket(TIMESTAMP, INTERVAL, optional(1) TIMESTAMP) -> TIMESTAMP)
                 |   | | +-FunctionCall(GoogleSQL:$subtract(TIMESTAMP, INTERVAL) -> TIMESTAMP)
                 |   | | | +-ColumnRef(type=TIMESTAMP, column=TimeSeries.event_time#1)
-                |   | | | +-SubqueryExpr
-                |   | | |   +-type=INTERVAL
-                |   | | |   +-subquery_type=SCALAR
-                |   | | |   +-subquery=
-                |   | | |     +-ProjectScan
-                |   | | |       +-column_list=[_hop_params.window_size#27]
-                |   | | |       +-expr_list=
-                |   | | |       | +-window_size#27 := ColumnRef(type=INTERVAL, column=_hop_params.window_size#23)
-                |   | | |       +-input_scan=
-                |   | | |         +-WithRefScan(column_list=_hop_params.[window_size#23, step_size#24, step_nanos#25, origin#26], with_query_name="_hop_params")
-                |   | | +-SubqueryExpr
-                |   | | | +-type=INTERVAL
-                |   | | | +-subquery_type=SCALAR
-                |   | | | +-subquery=
-                |   | | |   +-ProjectScan
-                |   | | |     +-column_list=[_hop_params.step_size#32]
-                |   | | |     +-expr_list=
-                |   | | |     | +-step_size#32 := ColumnRef(type=INTERVAL, column=_hop_params.step_size#29)
-                |   | | |     +-input_scan=
-                |   | | |       +-WithRefScan(column_list=_hop_params.[window_size#28, step_size#29, step_nanos#30, origin#31], with_query_name="_hop_params")
-                |   | | +-SubqueryExpr
-                |   | |   +-type=TIMESTAMP
-                |   | |   +-subquery_type=SCALAR
-                |   | |   +-subquery=
-                |   | |     +-ProjectScan
-                |   | |       +-column_list=[_hop_params.origin#37]
-                |   | |       +-expr_list=
-                |   | |       | +-origin#37 := ColumnRef(type=TIMESTAMP, column=_hop_params.origin#36)
-                |   | |       +-input_scan=
-                |   | |         +-WithRefScan(column_list=_hop_params.[window_size#33, step_size#34, step_nanos#35, origin#36], with_query_name="_hop_params")
-                |   | +-SubqueryExpr
-                |   |   +-type=INTERVAL
-                |   |   +-subquery_type=SCALAR
-                |   |   +-subquery=
-                |   |     +-ProjectScan
-                |   |       +-column_list=[_hop_params.step_size#42]
-                |   |       +-expr_list=
-                |   |       | +-step_size#42 := ColumnRef(type=INTERVAL, column=_hop_params.step_size#39)
-                |   |       +-input_scan=
-                |   |         +-WithRefScan(column_list=_hop_params.[window_size#38, step_size#39, step_nanos#40, origin#41], with_query_name="_hop_params")
+                |   | | | +-ColumnRef(type=INTERVAL, column=_hop_params.window_size#23)
+                |   | | +-ColumnRef(type=INTERVAL, column=_hop_params.step_size#24)
+                |   | | +-ColumnRef(type=TIMESTAMP, column=_hop_params.origin#26)
+                |   | +-ColumnRef(type=INTERVAL, column=_hop_params.step_size#24)
                 |   +-FunctionCall(GoogleSQL:timestamp_bucket(TIMESTAMP, INTERVAL, optional(1) TIMESTAMP) -> TIMESTAMP)
                 |   | +-ColumnRef(type=TIMESTAMP, column=TimeSeries.event_time#1)
-                |   | +-SubqueryExpr
-                |   | | +-type=INTERVAL
-                |   | | +-subquery_type=SCALAR
-                |   | | +-subquery=
-                |   | |   +-ProjectScan
-                |   | |     +-column_list=[_hop_params.step_size#47]
-                |   | |     +-expr_list=
-                |   | |     | +-step_size#47 := ColumnRef(type=INTERVAL, column=_hop_params.step_size#44)
-                |   | |     +-input_scan=
-                |   | |       +-WithRefScan(column_list=_hop_params.[window_size#43, step_size#44, step_nanos#45, origin#46], with_query_name="_hop_params")
-                |   | +-SubqueryExpr
-                |   |   +-type=TIMESTAMP
-                |   |   +-subquery_type=SCALAR
-                |   |   +-subquery=
-                |   |     +-ProjectScan
-                |   |       +-column_list=[_hop_params.origin#52]
-                |   |       +-expr_list=
-                |   |       | +-origin#52 := ColumnRef(type=TIMESTAMP, column=_hop_params.origin#51)
-                |   |       +-input_scan=
-                |   |         +-WithRefScan(column_list=_hop_params.[window_size#48, step_size#49, step_nanos#50, origin#51], with_query_name="_hop_params")
-                |   +-SubqueryExpr
-                |   | +-type=INT64
-                |   | +-subquery_type=SCALAR
-                |   | +-subquery=
-                |   |   +-ProjectScan
-                |   |     +-column_list=[_hop_params.step_nanos#57]
-                |   |     +-expr_list=
-                |   |     | +-step_nanos#57 := ColumnRef(type=INT64, column=_hop_params.step_nanos#55)
-                |   |     +-input_scan=
-                |   |       +-WithRefScan(column_list=_hop_params.[window_size#53, step_size#54, step_nanos#55, origin#56], with_query_name="_hop_params")
+                |   | +-ColumnRef(type=INTERVAL, column=_hop_params.step_size#24)
+                |   | +-ColumnRef(type=TIMESTAMP, column=_hop_params.origin#26)
+                |   +-ColumnRef(type=INT64, column=_hop_params.step_nanos#25)
                 |   +-Literal(type=ENUM<googlesql.functions.DateTimestampPart>, value=NANOSECOND)
-                +-element_column_list=[$hop.window_start#58]
+                +-element_column_list=[$hop.window_start#27]
                 +-is_outer=TRUE
 ==
 
@@ -7230,105 +6560,38 @@ QueryStmt
             | +-event_time#4 := ColumnRef(type=TIMESTAMP, column=TimeSeries.event_time#1)
             | +-user_id#5 := ColumnRef(type=INT64, column=TimeSeries.user_id#2)
             | +-metric#6 := ColumnRef(type=DOUBLE, column=TimeSeries.metric#3)
-            | +-WINDOW_START#7 := ColumnRef(type=TIMESTAMP, column=$hop.window_start#58)
+            | +-WINDOW_START#7 := ColumnRef(type=TIMESTAMP, column=$hop.window_start#27)
             | +-WINDOW_END#8 :=
             |   +-FunctionCall(GoogleSQL:$add(TIMESTAMP, INTERVAL) -> TIMESTAMP)
-            |     +-ColumnRef(type=TIMESTAMP, column=$hop.window_start#58)
-            |     +-SubqueryExpr
-            |       +-type=INTERVAL
-            |       +-subquery_type=SCALAR
-            |       +-subquery=
-            |         +-ProjectScan
-            |           +-column_list=[_hop_params.window_size#63]
-            |           +-expr_list=
-            |           | +-window_size#63 := ColumnRef(type=INTERVAL, column=_hop_params.window_size#59)
-            |           +-input_scan=
-            |             +-WithRefScan(column_list=_hop_params.[window_size#59, step_size#60, step_nanos#61, origin#62], with_query_name="_hop_params")
+            |     +-ColumnRef(type=TIMESTAMP, column=$hop.window_start#27)
+            |     +-ColumnRef(type=INTERVAL, column=_hop_params.window_size#23)
             +-input_scan=
               +-ArrayScan
-                +-column_list=[TimeSeries.event_time#1, TimeSeries.user_id#2, TimeSeries.metric#3, $hop.window_start#58]
+                +-column_list=[TimeSeries.event_time#1, TimeSeries.user_id#2, TimeSeries.metric#3, _hop_params.window_size#23, _hop_params.step_size#24, _hop_params.step_nanos#25, _hop_params.origin#26, $hop.window_start#27]
                 +-input_scan=
-                | +-TableScan(column_list=TimeSeries.[event_time#1, user_id#2, metric#3], node_source="table_clause", table=TimeSeries, column_index_list=[0, 1, 2])
+                | +-JoinScan
+                |   +-column_list=[TimeSeries.event_time#1, TimeSeries.user_id#2, TimeSeries.metric#3, _hop_params.window_size#23, _hop_params.step_size#24, _hop_params.step_nanos#25, _hop_params.origin#26]
+                |   +-left_scan=
+                |   | +-TableScan(column_list=TimeSeries.[event_time#1, user_id#2, metric#3], node_source="table_clause", table=TimeSeries, column_index_list=[0, 1, 2])
+                |   +-right_scan=
+                |     +-WithRefScan(column_list=_hop_params.[window_size#23, step_size#24, step_nanos#25, origin#26], with_query_name="_hop_params")
                 +-array_expr_list=
                 | +-FunctionCall(GoogleSQL:generate_timestamp_array(TIMESTAMP, TIMESTAMP, INT64, ENUM<googlesql.functions.DateTimestampPart>) -> ARRAY<TIMESTAMP>)
                 |   +-FunctionCall(GoogleSQL:$add(TIMESTAMP, INTERVAL) -> TIMESTAMP)
                 |   | +-FunctionCall(GoogleSQL:timestamp_bucket(TIMESTAMP, INTERVAL, optional(1) TIMESTAMP) -> TIMESTAMP)
                 |   | | +-FunctionCall(GoogleSQL:$subtract(TIMESTAMP, INTERVAL) -> TIMESTAMP)
                 |   | | | +-ColumnRef(type=TIMESTAMP, column=TimeSeries.event_time#1)
-                |   | | | +-SubqueryExpr
-                |   | | |   +-type=INTERVAL
-                |   | | |   +-subquery_type=SCALAR
-                |   | | |   +-subquery=
-                |   | | |     +-ProjectScan
-                |   | | |       +-column_list=[_hop_params.window_size#27]
-                |   | | |       +-expr_list=
-                |   | | |       | +-window_size#27 := ColumnRef(type=INTERVAL, column=_hop_params.window_size#23)
-                |   | | |       +-input_scan=
-                |   | | |         +-WithRefScan(column_list=_hop_params.[window_size#23, step_size#24, step_nanos#25, origin#26], with_query_name="_hop_params")
-                |   | | +-SubqueryExpr
-                |   | | | +-type=INTERVAL
-                |   | | | +-subquery_type=SCALAR
-                |   | | | +-subquery=
-                |   | | |   +-ProjectScan
-                |   | | |     +-column_list=[_hop_params.step_size#32]
-                |   | | |     +-expr_list=
-                |   | | |     | +-step_size#32 := ColumnRef(type=INTERVAL, column=_hop_params.step_size#29)
-                |   | | |     +-input_scan=
-                |   | | |       +-WithRefScan(column_list=_hop_params.[window_size#28, step_size#29, step_nanos#30, origin#31], with_query_name="_hop_params")
-                |   | | +-SubqueryExpr
-                |   | |   +-type=TIMESTAMP
-                |   | |   +-subquery_type=SCALAR
-                |   | |   +-subquery=
-                |   | |     +-ProjectScan
-                |   | |       +-column_list=[_hop_params.origin#37]
-                |   | |       +-expr_list=
-                |   | |       | +-origin#37 := ColumnRef(type=TIMESTAMP, column=_hop_params.origin#36)
-                |   | |       +-input_scan=
-                |   | |         +-WithRefScan(column_list=_hop_params.[window_size#33, step_size#34, step_nanos#35, origin#36], with_query_name="_hop_params")
-                |   | +-SubqueryExpr
-                |   |   +-type=INTERVAL
-                |   |   +-subquery_type=SCALAR
-                |   |   +-subquery=
-                |   |     +-ProjectScan
-                |   |       +-column_list=[_hop_params.step_size#42]
-                |   |       +-expr_list=
-                |   |       | +-step_size#42 := ColumnRef(type=INTERVAL, column=_hop_params.step_size#39)
-                |   |       +-input_scan=
-                |   |         +-WithRefScan(column_list=_hop_params.[window_size#38, step_size#39, step_nanos#40, origin#41], with_query_name="_hop_params")
+                |   | | | +-ColumnRef(type=INTERVAL, column=_hop_params.window_size#23)
+                |   | | +-ColumnRef(type=INTERVAL, column=_hop_params.step_size#24)
+                |   | | +-ColumnRef(type=TIMESTAMP, column=_hop_params.origin#26)
+                |   | +-ColumnRef(type=INTERVAL, column=_hop_params.step_size#24)
                 |   +-FunctionCall(GoogleSQL:timestamp_bucket(TIMESTAMP, INTERVAL, optional(1) TIMESTAMP) -> TIMESTAMP)
                 |   | +-ColumnRef(type=TIMESTAMP, column=TimeSeries.event_time#1)
-                |   | +-SubqueryExpr
-                |   | | +-type=INTERVAL
-                |   | | +-subquery_type=SCALAR
-                |   | | +-subquery=
-                |   | |   +-ProjectScan
-                |   | |     +-column_list=[_hop_params.step_size#47]
-                |   | |     +-expr_list=
-                |   | |     | +-step_size#47 := ColumnRef(type=INTERVAL, column=_hop_params.step_size#44)
-                |   | |     +-input_scan=
-                |   | |       +-WithRefScan(column_list=_hop_params.[window_size#43, step_size#44, step_nanos#45, origin#46], with_query_name="_hop_params")
-                |   | +-SubqueryExpr
-                |   |   +-type=TIMESTAMP
-                |   |   +-subquery_type=SCALAR
-                |   |   +-subquery=
-                |   |     +-ProjectScan
-                |   |       +-column_list=[_hop_params.origin#52]
-                |   |       +-expr_list=
-                |   |       | +-origin#52 := ColumnRef(type=TIMESTAMP, column=_hop_params.origin#51)
-                |   |       +-input_scan=
-                |   |         +-WithRefScan(column_list=_hop_params.[window_size#48, step_size#49, step_nanos#50, origin#51], with_query_name="_hop_params")
-                |   +-SubqueryExpr
-                |   | +-type=INT64
-                |   | +-subquery_type=SCALAR
-                |   | +-subquery=
-                |   |   +-ProjectScan
-                |   |     +-column_list=[_hop_params.step_nanos#57]
-                |   |     +-expr_list=
-                |   |     | +-step_nanos#57 := ColumnRef(type=INT64, column=_hop_params.step_nanos#55)
-                |   |     +-input_scan=
-                |   |       +-WithRefScan(column_list=_hop_params.[window_size#53, step_size#54, step_nanos#55, origin#56], with_query_name="_hop_params")
+                |   | +-ColumnRef(type=INTERVAL, column=_hop_params.step_size#24)
+                |   | +-ColumnRef(type=TIMESTAMP, column=_hop_params.origin#26)
+                |   +-ColumnRef(type=INT64, column=_hop_params.step_nanos#25)
                 |   +-Literal(type=ENUM<googlesql.functions.DateTimestampPart>, value=NANOSECOND)
-                +-element_column_list=[$hop.window_start#58]
+                +-element_column_list=[$hop.window_start#27]
                 +-is_outer=TRUE
 ==
 
@@ -7633,105 +6896,38 @@ QueryStmt
                 +-column_list=HOP.[ts_col#11, WINDOW_START#16, WINDOW_END#17]
                 +-expr_list=
                 | +-ts_col#11 := ColumnRef(type=TIMESTAMP, column=t.ts_col#6)
-                | +-WINDOW_START#16 := ColumnRef(type=TIMESTAMP, column=$hop.window_start#67)
+                | +-WINDOW_START#16 := ColumnRef(type=TIMESTAMP, column=$hop.window_start#36)
                 | +-WINDOW_END#17 :=
                 |   +-FunctionCall(GoogleSQL:$add(TIMESTAMP, INTERVAL) -> TIMESTAMP)
-                |     +-ColumnRef(type=TIMESTAMP, column=$hop.window_start#67)
-                |     +-SubqueryExpr
-                |       +-type=INTERVAL
-                |       +-subquery_type=SCALAR
-                |       +-subquery=
-                |         +-ProjectScan
-                |           +-column_list=[_hop_params.window_size#72]
-                |           +-expr_list=
-                |           | +-window_size#72 := ColumnRef(type=INTERVAL, column=_hop_params.window_size#68)
-                |           +-input_scan=
-                |             +-WithRefScan(column_list=_hop_params.[window_size#68, step_size#69, step_nanos#70, origin#71], with_query_name="_hop_params")
+                |     +-ColumnRef(type=TIMESTAMP, column=$hop.window_start#36)
+                |     +-ColumnRef(type=INTERVAL, column=_hop_params.window_size#32)
                 +-input_scan=
                   +-ArrayScan
-                    +-column_list=[t.ts_col#6, t.winDow_start#7, t.Window_End#8, t.WINDOW_START#9, t.WINDOW_END#10, $hop.window_start#67]
+                    +-column_list=[t.ts_col#6, t.winDow_start#7, t.Window_End#8, t.WINDOW_START#9, t.WINDOW_END#10, _hop_params.window_size#32, _hop_params.step_size#33, _hop_params.step_nanos#34, _hop_params.origin#35, $hop.window_start#36]
                     +-input_scan=
-                    | +-WithRefScan(column_list=t.[ts_col#6, winDow_start#7, Window_End#8, WINDOW_START#9, WINDOW_END#10], node_source="table_clause", with_query_name="t")
+                    | +-JoinScan
+                    |   +-column_list=[t.ts_col#6, t.winDow_start#7, t.Window_End#8, t.WINDOW_START#9, t.WINDOW_END#10, _hop_params.window_size#32, _hop_params.step_size#33, _hop_params.step_nanos#34, _hop_params.origin#35]
+                    |   +-left_scan=
+                    |   | +-WithRefScan(column_list=t.[ts_col#6, winDow_start#7, Window_End#8, WINDOW_START#9, WINDOW_END#10], node_source="table_clause", with_query_name="t")
+                    |   +-right_scan=
+                    |     +-WithRefScan(column_list=_hop_params.[window_size#32, step_size#33, step_nanos#34, origin#35], with_query_name="_hop_params")
                     +-array_expr_list=
                     | +-FunctionCall(GoogleSQL:generate_timestamp_array(TIMESTAMP, TIMESTAMP, INT64, ENUM<googlesql.functions.DateTimestampPart>) -> ARRAY<TIMESTAMP>)
                     |   +-FunctionCall(GoogleSQL:$add(TIMESTAMP, INTERVAL) -> TIMESTAMP)
                     |   | +-FunctionCall(GoogleSQL:timestamp_bucket(TIMESTAMP, INTERVAL, optional(1) TIMESTAMP) -> TIMESTAMP)
                     |   | | +-FunctionCall(GoogleSQL:$subtract(TIMESTAMP, INTERVAL) -> TIMESTAMP)
                     |   | | | +-ColumnRef(type=TIMESTAMP, column=t.ts_col#6)
-                    |   | | | +-SubqueryExpr
-                    |   | | |   +-type=INTERVAL
-                    |   | | |   +-subquery_type=SCALAR
-                    |   | | |   +-subquery=
-                    |   | | |     +-ProjectScan
-                    |   | | |       +-column_list=[_hop_params.window_size#36]
-                    |   | | |       +-expr_list=
-                    |   | | |       | +-window_size#36 := ColumnRef(type=INTERVAL, column=_hop_params.window_size#32)
-                    |   | | |       +-input_scan=
-                    |   | | |         +-WithRefScan(column_list=_hop_params.[window_size#32, step_size#33, step_nanos#34, origin#35], with_query_name="_hop_params")
-                    |   | | +-SubqueryExpr
-                    |   | | | +-type=INTERVAL
-                    |   | | | +-subquery_type=SCALAR
-                    |   | | | +-subquery=
-                    |   | | |   +-ProjectScan
-                    |   | | |     +-column_list=[_hop_params.step_size#41]
-                    |   | | |     +-expr_list=
-                    |   | | |     | +-step_size#41 := ColumnRef(type=INTERVAL, column=_hop_params.step_size#38)
-                    |   | | |     +-input_scan=
-                    |   | | |       +-WithRefScan(column_list=_hop_params.[window_size#37, step_size#38, step_nanos#39, origin#40], with_query_name="_hop_params")
-                    |   | | +-SubqueryExpr
-                    |   | |   +-type=TIMESTAMP
-                    |   | |   +-subquery_type=SCALAR
-                    |   | |   +-subquery=
-                    |   | |     +-ProjectScan
-                    |   | |       +-column_list=[_hop_params.origin#46]
-                    |   | |       +-expr_list=
-                    |   | |       | +-origin#46 := ColumnRef(type=TIMESTAMP, column=_hop_params.origin#45)
-                    |   | |       +-input_scan=
-                    |   | |         +-WithRefScan(column_list=_hop_params.[window_size#42, step_size#43, step_nanos#44, origin#45], with_query_name="_hop_params")
-                    |   | +-SubqueryExpr
-                    |   |   +-type=INTERVAL
-                    |   |   +-subquery_type=SCALAR
-                    |   |   +-subquery=
-                    |   |     +-ProjectScan
-                    |   |       +-column_list=[_hop_params.step_size#51]
-                    |   |       +-expr_list=
-                    |   |       | +-step_size#51 := ColumnRef(type=INTERVAL, column=_hop_params.step_size#48)
-                    |   |       +-input_scan=
-                    |   |         +-WithRefScan(column_list=_hop_params.[window_size#47, step_size#48, step_nanos#49, origin#50], with_query_name="_hop_params")
+                    |   | | | +-ColumnRef(type=INTERVAL, column=_hop_params.window_size#32)
+                    |   | | +-ColumnRef(type=INTERVAL, column=_hop_params.step_size#33)
+                    |   | | +-ColumnRef(type=TIMESTAMP, column=_hop_params.origin#35)
+                    |   | +-ColumnRef(type=INTERVAL, column=_hop_params.step_size#33)
                     |   +-FunctionCall(GoogleSQL:timestamp_bucket(TIMESTAMP, INTERVAL, optional(1) TIMESTAMP) -> TIMESTAMP)
                     |   | +-ColumnRef(type=TIMESTAMP, column=t.ts_col#6)
-                    |   | +-SubqueryExpr
-                    |   | | +-type=INTERVAL
-                    |   | | +-subquery_type=SCALAR
-                    |   | | +-subquery=
-                    |   | |   +-ProjectScan
-                    |   | |     +-column_list=[_hop_params.step_size#56]
-                    |   | |     +-expr_list=
-                    |   | |     | +-step_size#56 := ColumnRef(type=INTERVAL, column=_hop_params.step_size#53)
-                    |   | |     +-input_scan=
-                    |   | |       +-WithRefScan(column_list=_hop_params.[window_size#52, step_size#53, step_nanos#54, origin#55], with_query_name="_hop_params")
-                    |   | +-SubqueryExpr
-                    |   |   +-type=TIMESTAMP
-                    |   |   +-subquery_type=SCALAR
-                    |   |   +-subquery=
-                    |   |     +-ProjectScan
-                    |   |       +-column_list=[_hop_params.origin#61]
-                    |   |       +-expr_list=
-                    |   |       | +-origin#61 := ColumnRef(type=TIMESTAMP, column=_hop_params.origin#60)
-                    |   |       +-input_scan=
-                    |   |         +-WithRefScan(column_list=_hop_params.[window_size#57, step_size#58, step_nanos#59, origin#60], with_query_name="_hop_params")
-                    |   +-SubqueryExpr
-                    |   | +-type=INT64
-                    |   | +-subquery_type=SCALAR
-                    |   | +-subquery=
-                    |   |   +-ProjectScan
-                    |   |     +-column_list=[_hop_params.step_nanos#66]
-                    |   |     +-expr_list=
-                    |   |     | +-step_nanos#66 := ColumnRef(type=INT64, column=_hop_params.step_nanos#64)
-                    |   |     +-input_scan=
-                    |   |       +-WithRefScan(column_list=_hop_params.[window_size#62, step_size#63, step_nanos#64, origin#65], with_query_name="_hop_params")
+                    |   | +-ColumnRef(type=INTERVAL, column=_hop_params.step_size#33)
+                    |   | +-ColumnRef(type=TIMESTAMP, column=_hop_params.origin#35)
+                    |   +-ColumnRef(type=INT64, column=_hop_params.step_nanos#34)
                     |   +-Literal(type=ENUM<googlesql.functions.DateTimestampPart>, value=NANOSECOND)
-                    +-element_column_list=[$hop.window_start#67]
+                    +-element_column_list=[$hop.window_start#36]
                     +-is_outer=TRUE
 ==
 
@@ -8059,105 +7255,38 @@ QueryStmt
         |       +-column_list=hop.[ts_col#2, WINDOW_START#3, WINDOW_END#4]
         |       +-expr_list=
         |       | +-ts_col#2 := ColumnRef(type=TIMESTAMP, column=TableWithTimestampColumn.ts_col#1)
-        |       | +-WINDOW_START#3 := ColumnRef(type=TIMESTAMP, column=$hop.window_start#58)
+        |       | +-WINDOW_START#3 := ColumnRef(type=TIMESTAMP, column=$hop.window_start#27)
         |       | +-WINDOW_END#4 :=
         |       |   +-FunctionCall(GoogleSQL:$add(TIMESTAMP, INTERVAL) -> TIMESTAMP)
-        |       |     +-ColumnRef(type=TIMESTAMP, column=$hop.window_start#58)
-        |       |     +-SubqueryExpr
-        |       |       +-type=INTERVAL
-        |       |       +-subquery_type=SCALAR
-        |       |       +-subquery=
-        |       |         +-ProjectScan
-        |       |           +-column_list=[_hop_params.window_size#63]
-        |       |           +-expr_list=
-        |       |           | +-window_size#63 := ColumnRef(type=INTERVAL, column=_hop_params.window_size#59)
-        |       |           +-input_scan=
-        |       |             +-WithRefScan(column_list=_hop_params.[window_size#59, step_size#60, step_nanos#61, origin#62], with_query_name="_hop_params")
+        |       |     +-ColumnRef(type=TIMESTAMP, column=$hop.window_start#27)
+        |       |     +-ColumnRef(type=INTERVAL, column=_hop_params.window_size#23)
         |       +-input_scan=
         |         +-ArrayScan
-        |           +-column_list=[TableWithTimestampColumn.ts_col#1, $hop.window_start#58]
+        |           +-column_list=[TableWithTimestampColumn.ts_col#1, _hop_params.window_size#23, _hop_params.step_size#24, _hop_params.step_nanos#25, _hop_params.origin#26, $hop.window_start#27]
         |           +-input_scan=
-        |           | +-TableScan(column_list=[TableWithTimestampColumn.ts_col#1], node_source="table_clause", table=TableWithTimestampColumn, column_index_list=[0])
+        |           | +-JoinScan
+        |           |   +-column_list=[TableWithTimestampColumn.ts_col#1, _hop_params.window_size#23, _hop_params.step_size#24, _hop_params.step_nanos#25, _hop_params.origin#26]
+        |           |   +-left_scan=
+        |           |   | +-TableScan(column_list=[TableWithTimestampColumn.ts_col#1], node_source="table_clause", table=TableWithTimestampColumn, column_index_list=[0])
+        |           |   +-right_scan=
+        |           |     +-WithRefScan(column_list=_hop_params.[window_size#23, step_size#24, step_nanos#25, origin#26], with_query_name="_hop_params")
         |           +-array_expr_list=
         |           | +-FunctionCall(GoogleSQL:generate_timestamp_array(TIMESTAMP, TIMESTAMP, INT64, ENUM<googlesql.functions.DateTimestampPart>) -> ARRAY<TIMESTAMP>)
         |           |   +-FunctionCall(GoogleSQL:$add(TIMESTAMP, INTERVAL) -> TIMESTAMP)
         |           |   | +-FunctionCall(GoogleSQL:timestamp_bucket(TIMESTAMP, INTERVAL, optional(1) TIMESTAMP) -> TIMESTAMP)
         |           |   | | +-FunctionCall(GoogleSQL:$subtract(TIMESTAMP, INTERVAL) -> TIMESTAMP)
         |           |   | | | +-ColumnRef(type=TIMESTAMP, column=TableWithTimestampColumn.ts_col#1)
-        |           |   | | | +-SubqueryExpr
-        |           |   | | |   +-type=INTERVAL
-        |           |   | | |   +-subquery_type=SCALAR
-        |           |   | | |   +-subquery=
-        |           |   | | |     +-ProjectScan
-        |           |   | | |       +-column_list=[_hop_params.window_size#27]
-        |           |   | | |       +-expr_list=
-        |           |   | | |       | +-window_size#27 := ColumnRef(type=INTERVAL, column=_hop_params.window_size#23)
-        |           |   | | |       +-input_scan=
-        |           |   | | |         +-WithRefScan(column_list=_hop_params.[window_size#23, step_size#24, step_nanos#25, origin#26], with_query_name="_hop_params")
-        |           |   | | +-SubqueryExpr
-        |           |   | | | +-type=INTERVAL
-        |           |   | | | +-subquery_type=SCALAR
-        |           |   | | | +-subquery=
-        |           |   | | |   +-ProjectScan
-        |           |   | | |     +-column_list=[_hop_params.step_size#32]
-        |           |   | | |     +-expr_list=
-        |           |   | | |     | +-step_size#32 := ColumnRef(type=INTERVAL, column=_hop_params.step_size#29)
-        |           |   | | |     +-input_scan=
-        |           |   | | |       +-WithRefScan(column_list=_hop_params.[window_size#28, step_size#29, step_nanos#30, origin#31], with_query_name="_hop_params")
-        |           |   | | +-SubqueryExpr
-        |           |   | |   +-type=TIMESTAMP
-        |           |   | |   +-subquery_type=SCALAR
-        |           |   | |   +-subquery=
-        |           |   | |     +-ProjectScan
-        |           |   | |       +-column_list=[_hop_params.origin#37]
-        |           |   | |       +-expr_list=
-        |           |   | |       | +-origin#37 := ColumnRef(type=TIMESTAMP, column=_hop_params.origin#36)
-        |           |   | |       +-input_scan=
-        |           |   | |         +-WithRefScan(column_list=_hop_params.[window_size#33, step_size#34, step_nanos#35, origin#36], with_query_name="_hop_params")
-        |           |   | +-SubqueryExpr
-        |           |   |   +-type=INTERVAL
-        |           |   |   +-subquery_type=SCALAR
-        |           |   |   +-subquery=
-        |           |   |     +-ProjectScan
-        |           |   |       +-column_list=[_hop_params.step_size#42]
-        |           |   |       +-expr_list=
-        |           |   |       | +-step_size#42 := ColumnRef(type=INTERVAL, column=_hop_params.step_size#39)
-        |           |   |       +-input_scan=
-        |           |   |         +-WithRefScan(column_list=_hop_params.[window_size#38, step_size#39, step_nanos#40, origin#41], with_query_name="_hop_params")
+        |           |   | | | +-ColumnRef(type=INTERVAL, column=_hop_params.window_size#23)
+        |           |   | | +-ColumnRef(type=INTERVAL, column=_hop_params.step_size#24)
+        |           |   | | +-ColumnRef(type=TIMESTAMP, column=_hop_params.origin#26)
+        |           |   | +-ColumnRef(type=INTERVAL, column=_hop_params.step_size#24)
         |           |   +-FunctionCall(GoogleSQL:timestamp_bucket(TIMESTAMP, INTERVAL, optional(1) TIMESTAMP) -> TIMESTAMP)
         |           |   | +-ColumnRef(type=TIMESTAMP, column=TableWithTimestampColumn.ts_col#1)
-        |           |   | +-SubqueryExpr
-        |           |   | | +-type=INTERVAL
-        |           |   | | +-subquery_type=SCALAR
-        |           |   | | +-subquery=
-        |           |   | |   +-ProjectScan
-        |           |   | |     +-column_list=[_hop_params.step_size#47]
-        |           |   | |     +-expr_list=
-        |           |   | |     | +-step_size#47 := ColumnRef(type=INTERVAL, column=_hop_params.step_size#44)
-        |           |   | |     +-input_scan=
-        |           |   | |       +-WithRefScan(column_list=_hop_params.[window_size#43, step_size#44, step_nanos#45, origin#46], with_query_name="_hop_params")
-        |           |   | +-SubqueryExpr
-        |           |   |   +-type=TIMESTAMP
-        |           |   |   +-subquery_type=SCALAR
-        |           |   |   +-subquery=
-        |           |   |     +-ProjectScan
-        |           |   |       +-column_list=[_hop_params.origin#52]
-        |           |   |       +-expr_list=
-        |           |   |       | +-origin#52 := ColumnRef(type=TIMESTAMP, column=_hop_params.origin#51)
-        |           |   |       +-input_scan=
-        |           |   |         +-WithRefScan(column_list=_hop_params.[window_size#48, step_size#49, step_nanos#50, origin#51], with_query_name="_hop_params")
-        |           |   +-SubqueryExpr
-        |           |   | +-type=INT64
-        |           |   | +-subquery_type=SCALAR
-        |           |   | +-subquery=
-        |           |   |   +-ProjectScan
-        |           |   |     +-column_list=[_hop_params.step_nanos#57]
-        |           |   |     +-expr_list=
-        |           |   |     | +-step_nanos#57 := ColumnRef(type=INT64, column=_hop_params.step_nanos#55)
-        |           |   |     +-input_scan=
-        |           |   |       +-WithRefScan(column_list=_hop_params.[window_size#53, step_size#54, step_nanos#55, origin#56], with_query_name="_hop_params")
+        |           |   | +-ColumnRef(type=INTERVAL, column=_hop_params.step_size#24)
+        |           |   | +-ColumnRef(type=TIMESTAMP, column=_hop_params.origin#26)
+        |           |   +-ColumnRef(type=INT64, column=_hop_params.step_nanos#25)
         |           |   +-Literal(type=ENUM<googlesql.functions.DateTimestampPart>, value=NANOSECOND)
-        |           +-element_column_list=[$hop.window_start#58]
+        |           +-element_column_list=[$hop.window_start#27]
         |           +-is_outer=TRUE
         +-right_scan=
         | +-WithScan
@@ -8167,27 +7296,27 @@ QueryStmt
         |   |   +-with_query_name="_hop_params_1"
         |   |   +-with_subquery=
         |   |     +-ProjectScan
-        |   |       +-column_list=_hop_params_1.[window_size#67, step_size#70, step_nanos#74, origin#75]
+        |   |       +-column_list=_hop_params_1.[window_size#31, step_size#34, step_nanos#38, origin#39]
         |   |       +-expr_list=
-        |   |       | +-window_size#67 :=
+        |   |       | +-window_size#31 :=
         |   |       | | +-SubqueryExpr
         |   |       | |   +-type=INTERVAL
         |   |       | |   +-subquery_type=SCALAR
         |   |       | |   +-parameter_list=
-        |   |       | |   | +-ColumnRef(type=INTERVAL, column=$precomputed_raw.window_size#64)
+        |   |       | |   | +-ColumnRef(type=INTERVAL, column=$precomputed_raw.window_size#28)
         |   |       | |   +-subquery=
         |   |       | |     +-ProjectScan
-        |   |       | |       +-column_list=[$expr_subquery.$col1#69]
+        |   |       | |       +-column_list=[$expr_subquery.$col1#33]
         |   |       | |       +-expr_list=
-        |   |       | |       | +-$col1#69 :=
+        |   |       | |       | +-$col1#33 :=
         |   |       | |       |   +-FunctionCall(GoogleSQL:$case_no_value(repeated(4) BOOL, repeated(4) INTERVAL, INTERVAL) -> INTERVAL)
         |   |       | |       |     +-FunctionCall(GoogleSQL:$is_null(INTERVAL) -> BOOL)
-        |   |       | |       |     | +-ColumnRef(type=INTERVAL, column=$subquery1.raw_ws#68)
+        |   |       | |       |     | +-ColumnRef(type=INTERVAL, column=$subquery1.raw_ws#32)
         |   |       | |       |     +-Cast(INTERVAL -> INTERVAL)
         |   |       | |       |     | +-FunctionCall(GoogleSQL:error(STRING) -> INTERVAL)
         |   |       | |       |     |   +-Literal(type=STRING, value="Window size cannot be null.")
         |   |       | |       |     +-FunctionCall(GoogleSQL:$equal(INTERVAL, INTERVAL) -> BOOL)
-        |   |       | |       |     | +-ColumnRef(type=INTERVAL, column=$subquery1.raw_ws#68)
+        |   |       | |       |     | +-ColumnRef(type=INTERVAL, column=$subquery1.raw_ws#32)
         |   |       | |       |     | +-FunctionCall(GoogleSQL:$interval(INT64, ENUM<googlesql.functions.DateTimestampPart>) -> INTERVAL)
         |   |       | |       |     |   +-Literal(type=INT64, value=0)
         |   |       | |       |     |   +-Literal(type=ENUM<googlesql.functions.DateTimestampPart>, value=DAY)
@@ -8195,7 +7324,7 @@ QueryStmt
         |   |       | |       |     | +-FunctionCall(GoogleSQL:error(STRING) -> INTERVAL)
         |   |       | |       |     |   +-Literal(type=STRING, value="Window size cannot be zero.")
         |   |       | |       |     +-FunctionCall(GoogleSQL:$less(INTERVAL, INTERVAL) -> BOOL)
-        |   |       | |       |     | +-ColumnRef(type=INTERVAL, column=$subquery1.raw_ws#68)
+        |   |       | |       |     | +-ColumnRef(type=INTERVAL, column=$subquery1.raw_ws#32)
         |   |       | |       |     | +-FunctionCall(GoogleSQL:$interval(INT64, ENUM<googlesql.functions.DateTimestampPart>) -> INTERVAL)
         |   |       | |       |     |   +-Literal(type=INT64, value=0)
         |   |       | |       |     |   +-Literal(type=ENUM<googlesql.functions.DateTimestampPart>, value=DAY)
@@ -8205,45 +7334,45 @@ QueryStmt
         |   |       | |       |     +-FunctionCall(GoogleSQL:$or(BOOL, repeated(1) BOOL) -> BOOL)
         |   |       | |       |     | +-FunctionCall(GoogleSQL:$not_equal(INT64, INT64) -> BOOL)
         |   |       | |       |     | | +-FunctionCall(GoogleSQL:$extract(INTERVAL, ENUM<googlesql.functions.DateTimestampPart>) -> INT64)
-        |   |       | |       |     | | | +-ColumnRef(type=INTERVAL, column=$subquery1.raw_ws#68)
+        |   |       | |       |     | | | +-ColumnRef(type=INTERVAL, column=$subquery1.raw_ws#32)
         |   |       | |       |     | | | +-Literal(type=ENUM<googlesql.functions.DateTimestampPart>, value=MONTH)
         |   |       | |       |     | | +-Literal(type=INT64, value=0)
         |   |       | |       |     | +-FunctionCall(GoogleSQL:$not_equal(INT64, INT64) -> BOOL)
         |   |       | |       |     |   +-FunctionCall(GoogleSQL:$extract(INTERVAL, ENUM<googlesql.functions.DateTimestampPart>) -> INT64)
-        |   |       | |       |     |   | +-ColumnRef(type=INTERVAL, column=$subquery1.raw_ws#68)
+        |   |       | |       |     |   | +-ColumnRef(type=INTERVAL, column=$subquery1.raw_ws#32)
         |   |       | |       |     |   | +-Literal(type=ENUM<googlesql.functions.DateTimestampPart>, value=YEAR)
         |   |       | |       |     |   +-Literal(type=INT64, value=0)
         |   |       | |       |     +-Cast(INTERVAL -> INTERVAL)
         |   |       | |       |     | +-FunctionCall(GoogleSQL:error(STRING) -> INTERVAL)
         |   |       | |       |     |   +-Literal(type=STRING, value="Window size cannot contain MONTH or YEAR parts.")
-        |   |       | |       |     +-ColumnRef(type=INTERVAL, column=$subquery1.raw_ws#68)
+        |   |       | |       |     +-ColumnRef(type=INTERVAL, column=$subquery1.raw_ws#32)
         |   |       | |       +-input_scan=
         |   |       | |         +-ProjectScan
-        |   |       | |           +-column_list=[$subquery1.raw_ws#68]
+        |   |       | |           +-column_list=[$subquery1.raw_ws#32]
         |   |       | |           +-expr_list=
-        |   |       | |           | +-raw_ws#68 := ColumnRef(type=INTERVAL, column=$precomputed_raw.window_size#64, is_correlated=TRUE)
+        |   |       | |           | +-raw_ws#32 := ColumnRef(type=INTERVAL, column=$precomputed_raw.window_size#28, is_correlated=TRUE)
         |   |       | |           +-input_scan=
         |   |       | |             +-SingleRowScan
-        |   |       | +-step_size#70 :=
+        |   |       | +-step_size#34 :=
         |   |       | | +-SubqueryExpr
         |   |       | |   +-type=INTERVAL
         |   |       | |   +-subquery_type=SCALAR
         |   |       | |   +-parameter_list=
-        |   |       | |   | +-ColumnRef(type=INTERVAL, column=$precomputed_raw.window_size#64)
-        |   |       | |   | +-ColumnRef(type=INTERVAL, column=$precomputed_raw.step_size#65)
+        |   |       | |   | +-ColumnRef(type=INTERVAL, column=$precomputed_raw.window_size#28)
+        |   |       | |   | +-ColumnRef(type=INTERVAL, column=$precomputed_raw.step_size#29)
         |   |       | |   +-subquery=
         |   |       | |     +-ProjectScan
-        |   |       | |       +-column_list=[$expr_subquery.$col1#73]
+        |   |       | |       +-column_list=[$expr_subquery.$col1#37]
         |   |       | |       +-expr_list=
-        |   |       | |       | +-$col1#73 :=
+        |   |       | |       | +-$col1#37 :=
         |   |       | |       |   +-FunctionCall(GoogleSQL:$case_no_value(repeated(5) BOOL, repeated(5) INTERVAL, INTERVAL) -> INTERVAL)
         |   |       | |       |     +-FunctionCall(GoogleSQL:$is_null(INTERVAL) -> BOOL)
-        |   |       | |       |     | +-ColumnRef(type=INTERVAL, column=$subquery1.raw_ss#71)
+        |   |       | |       |     | +-ColumnRef(type=INTERVAL, column=$subquery1.raw_ss#35)
         |   |       | |       |     +-Cast(INTERVAL -> INTERVAL)
         |   |       | |       |     | +-FunctionCall(GoogleSQL:error(STRING) -> INTERVAL)
         |   |       | |       |     |   +-Literal(type=STRING, value="Step size cannot be null.")
         |   |       | |       |     +-FunctionCall(GoogleSQL:$equal(INTERVAL, INTERVAL) -> BOOL)
-        |   |       | |       |     | +-ColumnRef(type=INTERVAL, column=$subquery1.raw_ss#71)
+        |   |       | |       |     | +-ColumnRef(type=INTERVAL, column=$subquery1.raw_ss#35)
         |   |       | |       |     | +-FunctionCall(GoogleSQL:$interval(INT64, ENUM<googlesql.functions.DateTimestampPart>) -> INTERVAL)
         |   |       | |       |     |   +-Literal(type=INT64, value=0)
         |   |       | |       |     |   +-Literal(type=ENUM<googlesql.functions.DateTimestampPart>, value=DAY)
@@ -8251,7 +7380,7 @@ QueryStmt
         |   |       | |       |     | +-FunctionCall(GoogleSQL:error(STRING) -> INTERVAL)
         |   |       | |       |     |   +-Literal(type=STRING, value="Step size cannot be zero.")
         |   |       | |       |     +-FunctionCall(GoogleSQL:$less(INTERVAL, INTERVAL) -> BOOL)
-        |   |       | |       |     | +-ColumnRef(type=INTERVAL, column=$subquery1.raw_ss#71)
+        |   |       | |       |     | +-ColumnRef(type=INTERVAL, column=$subquery1.raw_ss#35)
         |   |       | |       |     | +-FunctionCall(GoogleSQL:$interval(INT64, ENUM<googlesql.functions.DateTimestampPart>) -> INTERVAL)
         |   |       | |       |     |   +-Literal(type=INT64, value=0)
         |   |       | |       |     |   +-Literal(type=ENUM<googlesql.functions.DateTimestampPart>, value=DAY)
@@ -8261,12 +7390,12 @@ QueryStmt
         |   |       | |       |     +-FunctionCall(GoogleSQL:$or(BOOL, repeated(1) BOOL) -> BOOL)
         |   |       | |       |     | +-FunctionCall(GoogleSQL:$not_equal(INT64, INT64) -> BOOL)
         |   |       | |       |     | | +-FunctionCall(GoogleSQL:$extract(INTERVAL, ENUM<googlesql.functions.DateTimestampPart>) -> INT64)
-        |   |       | |       |     | | | +-ColumnRef(type=INTERVAL, column=$subquery1.raw_ss#71)
+        |   |       | |       |     | | | +-ColumnRef(type=INTERVAL, column=$subquery1.raw_ss#35)
         |   |       | |       |     | | | +-Literal(type=ENUM<googlesql.functions.DateTimestampPart>, value=MONTH)
         |   |       | |       |     | | +-Literal(type=INT64, value=0)
         |   |       | |       |     | +-FunctionCall(GoogleSQL:$not_equal(INT64, INT64) -> BOOL)
         |   |       | |       |     |   +-FunctionCall(GoogleSQL:$extract(INTERVAL, ENUM<googlesql.functions.DateTimestampPart>) -> INT64)
-        |   |       | |       |     |   | +-ColumnRef(type=INTERVAL, column=$subquery1.raw_ss#71)
+        |   |       | |       |     |   | +-ColumnRef(type=INTERVAL, column=$subquery1.raw_ss#35)
         |   |       | |       |     |   | +-Literal(type=ENUM<googlesql.functions.DateTimestampPart>, value=YEAR)
         |   |       | |       |     |   +-Literal(type=INT64, value=0)
         |   |       | |       |     +-Cast(INTERVAL -> INTERVAL)
@@ -8275,38 +7404,38 @@ QueryStmt
         |   |       | |       |     +-FunctionCall(GoogleSQL:$and(BOOL, repeated(2) BOOL) -> BOOL)
         |   |       | |       |     | +-FunctionCall(GoogleSQL:$not(BOOL) -> BOOL)
         |   |       | |       |     | | +-FunctionCall(GoogleSQL:$is_null(INTERVAL) -> BOOL)
-        |   |       | |       |     | |   +-ColumnRef(type=INTERVAL, column=$subquery1.raw_ws#72)
+        |   |       | |       |     | |   +-ColumnRef(type=INTERVAL, column=$subquery1.raw_ws#36)
         |   |       | |       |     | +-FunctionCall(GoogleSQL:$greater(INTERVAL, INTERVAL) -> BOOL)
-        |   |       | |       |     | | +-ColumnRef(type=INTERVAL, column=$subquery1.raw_ws#72)
+        |   |       | |       |     | | +-ColumnRef(type=INTERVAL, column=$subquery1.raw_ws#36)
         |   |       | |       |     | | +-FunctionCall(GoogleSQL:$interval(INT64, ENUM<googlesql.functions.DateTimestampPart>) -> INTERVAL)
         |   |       | |       |     | |   +-Literal(type=INT64, value=0)
         |   |       | |       |     | |   +-Literal(type=ENUM<googlesql.functions.DateTimestampPart>, value=DAY)
         |   |       | |       |     | +-FunctionCall(GoogleSQL:$greater(INTERVAL, INTERVAL) -> BOOL)
-        |   |       | |       |     |   +-ColumnRef(type=INTERVAL, column=$subquery1.raw_ss#71)
-        |   |       | |       |     |   +-ColumnRef(type=INTERVAL, column=$subquery1.raw_ws#72)
+        |   |       | |       |     |   +-ColumnRef(type=INTERVAL, column=$subquery1.raw_ss#35)
+        |   |       | |       |     |   +-ColumnRef(type=INTERVAL, column=$subquery1.raw_ws#36)
         |   |       | |       |     +-Cast(INTERVAL -> INTERVAL)
         |   |       | |       |     | +-FunctionCall(GoogleSQL:error(STRING) -> INTERVAL)
         |   |       | |       |     |   +-Literal(type=STRING, value="Window size must be greater than or equal to step size.")
-        |   |       | |       |     +-ColumnRef(type=INTERVAL, column=$subquery1.raw_ss#71)
+        |   |       | |       |     +-ColumnRef(type=INTERVAL, column=$subquery1.raw_ss#35)
         |   |       | |       +-input_scan=
         |   |       | |         +-ProjectScan
-        |   |       | |           +-column_list=$subquery1.[raw_ss#71, raw_ws#72]
+        |   |       | |           +-column_list=$subquery1.[raw_ss#35, raw_ws#36]
         |   |       | |           +-expr_list=
-        |   |       | |           | +-raw_ss#71 := ColumnRef(type=INTERVAL, column=$precomputed_raw.step_size#65, is_correlated=TRUE)
-        |   |       | |           | +-raw_ws#72 := ColumnRef(type=INTERVAL, column=$precomputed_raw.window_size#64, is_correlated=TRUE)
+        |   |       | |           | +-raw_ss#35 := ColumnRef(type=INTERVAL, column=$precomputed_raw.step_size#29, is_correlated=TRUE)
+        |   |       | |           | +-raw_ws#36 := ColumnRef(type=INTERVAL, column=$precomputed_raw.window_size#28, is_correlated=TRUE)
         |   |       | |           +-input_scan=
         |   |       | |             +-SingleRowScan
-        |   |       | +-step_nanos#74 :=
+        |   |       | +-step_nanos#38 :=
         |   |       | | +-FunctionCall(GoogleSQL:if(BOOL, INT64, INT64) -> INT64)
         |   |       | |   +-FunctionCall(GoogleSQL:$or(BOOL, repeated(1) BOOL) -> BOOL)
         |   |       | |   | +-FunctionCall(GoogleSQL:$not_equal(INT64, INT64) -> BOOL)
         |   |       | |   | | +-FunctionCall(GoogleSQL:$extract(INTERVAL, ENUM<googlesql.functions.DateTimestampPart>) -> INT64)
-        |   |       | |   | | | +-ColumnRef(type=INTERVAL, column=$precomputed_raw.step_size#65)
+        |   |       | |   | | | +-ColumnRef(type=INTERVAL, column=$precomputed_raw.step_size#29)
         |   |       | |   | | | +-Literal(type=ENUM<googlesql.functions.DateTimestampPart>, value=MONTH)
         |   |       | |   | | +-Literal(type=INT64, value=0)
         |   |       | |   | +-FunctionCall(GoogleSQL:$not_equal(INT64, INT64) -> BOOL)
         |   |       | |   |   +-FunctionCall(GoogleSQL:$extract(INTERVAL, ENUM<googlesql.functions.DateTimestampPart>) -> INT64)
-        |   |       | |   |   | +-ColumnRef(type=INTERVAL, column=$precomputed_raw.step_size#65)
+        |   |       | |   |   | +-ColumnRef(type=INTERVAL, column=$precomputed_raw.step_size#29)
         |   |       | |   |   | +-Literal(type=ENUM<googlesql.functions.DateTimestampPart>, value=YEAR)
         |   |       | |   |   +-Literal(type=INT64, value=0)
         |   |       | |   +-FunctionCall(GoogleSQL:error(STRING) -> INT64)
@@ -8317,65 +7446,65 @@ QueryStmt
         |   |       | |     | | +-FunctionCall(GoogleSQL:$add(INT64, INT64) -> INT64)
         |   |       | |     | | | +-FunctionCall(GoogleSQL:$multiply(INT64, INT64) -> INT64)
         |   |       | |     | | | | +-FunctionCall(GoogleSQL:$extract(INTERVAL, ENUM<googlesql.functions.DateTimestampPart>) -> INT64)
-        |   |       | |     | | | | | +-ColumnRef(type=INTERVAL, column=$precomputed_raw.step_size#65)
+        |   |       | |     | | | | | +-ColumnRef(type=INTERVAL, column=$precomputed_raw.step_size#29)
         |   |       | |     | | | | | +-Literal(type=ENUM<googlesql.functions.DateTimestampPart>, value=DAY)
         |   |       | |     | | | | +-Literal(type=INT64, value=86400000000000)
         |   |       | |     | | | +-FunctionCall(GoogleSQL:$multiply(INT64, INT64) -> INT64)
         |   |       | |     | | |   +-FunctionCall(GoogleSQL:$extract(INTERVAL, ENUM<googlesql.functions.DateTimestampPart>) -> INT64)
-        |   |       | |     | | |   | +-ColumnRef(type=INTERVAL, column=$precomputed_raw.step_size#65)
+        |   |       | |     | | |   | +-ColumnRef(type=INTERVAL, column=$precomputed_raw.step_size#29)
         |   |       | |     | | |   | +-Literal(type=ENUM<googlesql.functions.DateTimestampPart>, value=HOUR)
         |   |       | |     | | |   +-Literal(type=INT64, value=3600000000000)
         |   |       | |     | | +-FunctionCall(GoogleSQL:$multiply(INT64, INT64) -> INT64)
         |   |       | |     | |   +-FunctionCall(GoogleSQL:$extract(INTERVAL, ENUM<googlesql.functions.DateTimestampPart>) -> INT64)
-        |   |       | |     | |   | +-ColumnRef(type=INTERVAL, column=$precomputed_raw.step_size#65)
+        |   |       | |     | |   | +-ColumnRef(type=INTERVAL, column=$precomputed_raw.step_size#29)
         |   |       | |     | |   | +-Literal(type=ENUM<googlesql.functions.DateTimestampPart>, value=MINUTE)
         |   |       | |     | |   +-Literal(type=INT64, value=60000000000)
         |   |       | |     | +-FunctionCall(GoogleSQL:$multiply(INT64, INT64) -> INT64)
         |   |       | |     |   +-FunctionCall(GoogleSQL:$extract(INTERVAL, ENUM<googlesql.functions.DateTimestampPart>) -> INT64)
-        |   |       | |     |   | +-ColumnRef(type=INTERVAL, column=$precomputed_raw.step_size#65)
+        |   |       | |     |   | +-ColumnRef(type=INTERVAL, column=$precomputed_raw.step_size#29)
         |   |       | |     |   | +-Literal(type=ENUM<googlesql.functions.DateTimestampPart>, value=SECOND)
         |   |       | |     |   +-Literal(type=INT64, value=1000000000)
         |   |       | |     +-FunctionCall(GoogleSQL:$extract(INTERVAL, ENUM<googlesql.functions.DateTimestampPart>) -> INT64)
-        |   |       | |       +-ColumnRef(type=INTERVAL, column=$precomputed_raw.step_size#65)
+        |   |       | |       +-ColumnRef(type=INTERVAL, column=$precomputed_raw.step_size#29)
         |   |       | |       +-Literal(type=ENUM<googlesql.functions.DateTimestampPart>, value=NANOSECOND)
-        |   |       | +-origin#75 :=
+        |   |       | +-origin#39 :=
         |   |       |   +-SubqueryExpr
         |   |       |     +-type=TIMESTAMP
         |   |       |     +-subquery_type=SCALAR
         |   |       |     +-parameter_list=
-        |   |       |     | +-ColumnRef(type=TIMESTAMP, column=$precomputed_raw.origin#66)
+        |   |       |     | +-ColumnRef(type=TIMESTAMP, column=$precomputed_raw.origin#30)
         |   |       |     +-subquery=
         |   |       |       +-ProjectScan
-        |   |       |         +-column_list=[$expr_subquery.$col1#77]
+        |   |       |         +-column_list=[$expr_subquery.$col1#41]
         |   |       |         +-expr_list=
-        |   |       |         | +-$col1#77 :=
+        |   |       |         | +-$col1#41 :=
         |   |       |         |   +-FunctionCall(GoogleSQL:$case_no_value(repeated(1) BOOL, repeated(1) TIMESTAMP, TIMESTAMP) -> TIMESTAMP)
         |   |       |         |     +-FunctionCall(GoogleSQL:$is_null(TIMESTAMP) -> BOOL)
-        |   |       |         |     | +-ColumnRef(type=TIMESTAMP, column=$subquery1.raw_origin#76)
+        |   |       |         |     | +-ColumnRef(type=TIMESTAMP, column=$subquery1.raw_origin#40)
         |   |       |         |     +-Cast(TIMESTAMP -> TIMESTAMP)
         |   |       |         |     | +-FunctionCall(GoogleSQL:error(STRING) -> TIMESTAMP)
         |   |       |         |     |   +-Literal(type=STRING, value="Origin cannot be null.")
-        |   |       |         |     +-ColumnRef(type=TIMESTAMP, column=$subquery1.raw_origin#76)
+        |   |       |         |     +-ColumnRef(type=TIMESTAMP, column=$subquery1.raw_origin#40)
         |   |       |         +-input_scan=
         |   |       |           +-ProjectScan
-        |   |       |             +-column_list=[$subquery1.raw_origin#76]
+        |   |       |             +-column_list=[$subquery1.raw_origin#40]
         |   |       |             +-expr_list=
-        |   |       |             | +-raw_origin#76 := ColumnRef(type=TIMESTAMP, column=$precomputed_raw.origin#66, is_correlated=TRUE)
+        |   |       |             | +-raw_origin#40 := ColumnRef(type=TIMESTAMP, column=$precomputed_raw.origin#30, is_correlated=TRUE)
         |   |       |             +-input_scan=
         |   |       |               +-SingleRowScan
         |   |       +-input_scan=
         |   |         +-ProjectScan
-        |   |           +-column_list=$precomputed_raw.[window_size#64, step_size#65, origin#66]
+        |   |           +-column_list=$precomputed_raw.[window_size#28, step_size#29, origin#30]
         |   |           +-expr_list=
-        |   |           | +-window_size#64 :=
+        |   |           | +-window_size#28 :=
         |   |           | | +-FunctionCall(GoogleSQL:$interval(INT64, ENUM<googlesql.functions.DateTimestampPart>) -> INTERVAL)
         |   |           | |   +-Literal(type=INT64, value=1)
         |   |           | |   +-Literal(type=ENUM<googlesql.functions.DateTimestampPart>, value=DAY)
-        |   |           | +-step_size#65 :=
+        |   |           | +-step_size#29 :=
         |   |           | | +-FunctionCall(GoogleSQL:$interval(INT64, ENUM<googlesql.functions.DateTimestampPart>) -> INTERVAL)
         |   |           | |   +-Literal(type=INT64, value=1)
         |   |           | |   +-Literal(type=ENUM<googlesql.functions.DateTimestampPart>, value=HOUR)
-        |   |           | +-origin#66 := Literal(type=TIMESTAMP, value=1970-01-01 00:00:00+00)
+        |   |           | +-origin#30 := Literal(type=TIMESTAMP, value=1970-01-01 00:00:00+00)
         |   |           +-input_scan=
         |   |             +-SingleRowScan
         |   +-query=
@@ -8383,105 +7512,38 @@ QueryStmt
         |       +-column_list=hop.[ts_col#6, WINDOW_START#7, WINDOW_END#8]
         |       +-expr_list=
         |       | +-ts_col#6 := ColumnRef(type=TIMESTAMP, column=TableWithTimestampColumn.ts_col#5)
-        |       | +-WINDOW_START#7 := ColumnRef(type=TIMESTAMP, column=$hop.window_start#113)
+        |       | +-WINDOW_START#7 := ColumnRef(type=TIMESTAMP, column=$hop.window_start#46)
         |       | +-WINDOW_END#8 :=
         |       |   +-FunctionCall(GoogleSQL:$add(TIMESTAMP, INTERVAL) -> TIMESTAMP)
-        |       |     +-ColumnRef(type=TIMESTAMP, column=$hop.window_start#113)
-        |       |     +-SubqueryExpr
-        |       |       +-type=INTERVAL
-        |       |       +-subquery_type=SCALAR
-        |       |       +-subquery=
-        |       |         +-ProjectScan
-        |       |           +-column_list=[_hop_params_1.window_size#118]
-        |       |           +-expr_list=
-        |       |           | +-window_size#118 := ColumnRef(type=INTERVAL, column=_hop_params_1.window_size#114)
-        |       |           +-input_scan=
-        |       |             +-WithRefScan(column_list=_hop_params_1.[window_size#114, step_size#115, step_nanos#116, origin#117], with_query_name="_hop_params_1")
+        |       |     +-ColumnRef(type=TIMESTAMP, column=$hop.window_start#46)
+        |       |     +-ColumnRef(type=INTERVAL, column=_hop_params_1.window_size#42)
         |       +-input_scan=
         |         +-ArrayScan
-        |           +-column_list=[TableWithTimestampColumn.ts_col#5, $hop.window_start#113]
+        |           +-column_list=[TableWithTimestampColumn.ts_col#5, _hop_params_1.window_size#42, _hop_params_1.step_size#43, _hop_params_1.step_nanos#44, _hop_params_1.origin#45, $hop.window_start#46]
         |           +-input_scan=
-        |           | +-TableScan(column_list=[TableWithTimestampColumn.ts_col#5], node_source="table_clause", table=TableWithTimestampColumn, column_index_list=[0])
+        |           | +-JoinScan
+        |           |   +-column_list=[TableWithTimestampColumn.ts_col#5, _hop_params_1.window_size#42, _hop_params_1.step_size#43, _hop_params_1.step_nanos#44, _hop_params_1.origin#45]
+        |           |   +-left_scan=
+        |           |   | +-TableScan(column_list=[TableWithTimestampColumn.ts_col#5], node_source="table_clause", table=TableWithTimestampColumn, column_index_list=[0])
+        |           |   +-right_scan=
+        |           |     +-WithRefScan(column_list=_hop_params_1.[window_size#42, step_size#43, step_nanos#44, origin#45], with_query_name="_hop_params_1")
         |           +-array_expr_list=
         |           | +-FunctionCall(GoogleSQL:generate_timestamp_array(TIMESTAMP, TIMESTAMP, INT64, ENUM<googlesql.functions.DateTimestampPart>) -> ARRAY<TIMESTAMP>)
         |           |   +-FunctionCall(GoogleSQL:$add(TIMESTAMP, INTERVAL) -> TIMESTAMP)
         |           |   | +-FunctionCall(GoogleSQL:timestamp_bucket(TIMESTAMP, INTERVAL, optional(1) TIMESTAMP) -> TIMESTAMP)
         |           |   | | +-FunctionCall(GoogleSQL:$subtract(TIMESTAMP, INTERVAL) -> TIMESTAMP)
         |           |   | | | +-ColumnRef(type=TIMESTAMP, column=TableWithTimestampColumn.ts_col#5)
-        |           |   | | | +-SubqueryExpr
-        |           |   | | |   +-type=INTERVAL
-        |           |   | | |   +-subquery_type=SCALAR
-        |           |   | | |   +-subquery=
-        |           |   | | |     +-ProjectScan
-        |           |   | | |       +-column_list=[_hop_params_1.window_size#82]
-        |           |   | | |       +-expr_list=
-        |           |   | | |       | +-window_size#82 := ColumnRef(type=INTERVAL, column=_hop_params_1.window_size#78)
-        |           |   | | |       +-input_scan=
-        |           |   | | |         +-WithRefScan(column_list=_hop_params_1.[window_size#78, step_size#79, step_nanos#80, origin#81], with_query_name="_hop_params_1")
-        |           |   | | +-SubqueryExpr
-        |           |   | | | +-type=INTERVAL
-        |           |   | | | +-subquery_type=SCALAR
-        |           |   | | | +-subquery=
-        |           |   | | |   +-ProjectScan
-        |           |   | | |     +-column_list=[_hop_params_1.step_size#87]
-        |           |   | | |     +-expr_list=
-        |           |   | | |     | +-step_size#87 := ColumnRef(type=INTERVAL, column=_hop_params_1.step_size#84)
-        |           |   | | |     +-input_scan=
-        |           |   | | |       +-WithRefScan(column_list=_hop_params_1.[window_size#83, step_size#84, step_nanos#85, origin#86], with_query_name="_hop_params_1")
-        |           |   | | +-SubqueryExpr
-        |           |   | |   +-type=TIMESTAMP
-        |           |   | |   +-subquery_type=SCALAR
-        |           |   | |   +-subquery=
-        |           |   | |     +-ProjectScan
-        |           |   | |       +-column_list=[_hop_params_1.origin#92]
-        |           |   | |       +-expr_list=
-        |           |   | |       | +-origin#92 := ColumnRef(type=TIMESTAMP, column=_hop_params_1.origin#91)
-        |           |   | |       +-input_scan=
-        |           |   | |         +-WithRefScan(column_list=_hop_params_1.[window_size#88, step_size#89, step_nanos#90, origin#91], with_query_name="_hop_params_1")
-        |           |   | +-SubqueryExpr
-        |           |   |   +-type=INTERVAL
-        |           |   |   +-subquery_type=SCALAR
-        |           |   |   +-subquery=
-        |           |   |     +-ProjectScan
-        |           |   |       +-column_list=[_hop_params_1.step_size#97]
-        |           |   |       +-expr_list=
-        |           |   |       | +-step_size#97 := ColumnRef(type=INTERVAL, column=_hop_params_1.step_size#94)
-        |           |   |       +-input_scan=
-        |           |   |         +-WithRefScan(column_list=_hop_params_1.[window_size#93, step_size#94, step_nanos#95, origin#96], with_query_name="_hop_params_1")
+        |           |   | | | +-ColumnRef(type=INTERVAL, column=_hop_params_1.window_size#42)
+        |           |   | | +-ColumnRef(type=INTERVAL, column=_hop_params_1.step_size#43)
+        |           |   | | +-ColumnRef(type=TIMESTAMP, column=_hop_params_1.origin#45)
+        |           |   | +-ColumnRef(type=INTERVAL, column=_hop_params_1.step_size#43)
         |           |   +-FunctionCall(GoogleSQL:timestamp_bucket(TIMESTAMP, INTERVAL, optional(1) TIMESTAMP) -> TIMESTAMP)
         |           |   | +-ColumnRef(type=TIMESTAMP, column=TableWithTimestampColumn.ts_col#5)
-        |           |   | +-SubqueryExpr
-        |           |   | | +-type=INTERVAL
-        |           |   | | +-subquery_type=SCALAR
-        |           |   | | +-subquery=
-        |           |   | |   +-ProjectScan
-        |           |   | |     +-column_list=[_hop_params_1.step_size#102]
-        |           |   | |     +-expr_list=
-        |           |   | |     | +-step_size#102 := ColumnRef(type=INTERVAL, column=_hop_params_1.step_size#99)
-        |           |   | |     +-input_scan=
-        |           |   | |       +-WithRefScan(column_list=_hop_params_1.[window_size#98, step_size#99, step_nanos#100, origin#101], with_query_name="_hop_params_1")
-        |           |   | +-SubqueryExpr
-        |           |   |   +-type=TIMESTAMP
-        |           |   |   +-subquery_type=SCALAR
-        |           |   |   +-subquery=
-        |           |   |     +-ProjectScan
-        |           |   |       +-column_list=[_hop_params_1.origin#107]
-        |           |   |       +-expr_list=
-        |           |   |       | +-origin#107 := ColumnRef(type=TIMESTAMP, column=_hop_params_1.origin#106)
-        |           |   |       +-input_scan=
-        |           |   |         +-WithRefScan(column_list=_hop_params_1.[window_size#103, step_size#104, step_nanos#105, origin#106], with_query_name="_hop_params_1")
-        |           |   +-SubqueryExpr
-        |           |   | +-type=INT64
-        |           |   | +-subquery_type=SCALAR
-        |           |   | +-subquery=
-        |           |   |   +-ProjectScan
-        |           |   |     +-column_list=[_hop_params_1.step_nanos#112]
-        |           |   |     +-expr_list=
-        |           |   |     | +-step_nanos#112 := ColumnRef(type=INT64, column=_hop_params_1.step_nanos#110)
-        |           |   |     +-input_scan=
-        |           |   |       +-WithRefScan(column_list=_hop_params_1.[window_size#108, step_size#109, step_nanos#110, origin#111], with_query_name="_hop_params_1")
+        |           |   | +-ColumnRef(type=INTERVAL, column=_hop_params_1.step_size#43)
+        |           |   | +-ColumnRef(type=TIMESTAMP, column=_hop_params_1.origin#45)
+        |           |   +-ColumnRef(type=INT64, column=_hop_params_1.step_nanos#44)
         |           |   +-Literal(type=ENUM<googlesql.functions.DateTimestampPart>, value=NANOSECOND)
-        |           +-element_column_list=[$hop.window_start#113]
+        |           +-element_column_list=[$hop.window_start#46]
         |           +-is_outer=TRUE
         +-join_expr=
           +-FunctionCall(GoogleSQL:$equal(TIMESTAMP, TIMESTAMP) -> BOOL)
@@ -9092,111 +8154,44 @@ QueryStmt
                 +-column_list=HOP.[ts_col#4, WINDOW_START#5, WINDOW_END#6]
                 +-expr_list=
                 | +-ts_col#4 := ColumnRef(type=TIMESTAMP, column=TableWithTimestampColumn.ts_col#2)
-                | +-WINDOW_START#5 := ColumnRef(type=TIMESTAMP, column=$hop.window_start#56)
+                | +-WINDOW_START#5 := ColumnRef(type=TIMESTAMP, column=$hop.window_start#25)
                 | +-WINDOW_END#6 :=
                 |   +-FunctionCall(GoogleSQL:$add(TIMESTAMP, INTERVAL) -> TIMESTAMP)
-                |     +-ColumnRef(type=TIMESTAMP, column=$hop.window_start#56)
-                |     +-SubqueryExpr
-                |       +-type=INTERVAL
-                |       +-subquery_type=SCALAR
-                |       +-subquery=
-                |         +-ProjectScan
-                |           +-column_list=[_hop_params_1.window_size#61]
-                |           +-expr_list=
-                |           | +-window_size#61 := ColumnRef(type=INTERVAL, column=_hop_params_1.window_size#57)
-                |           +-input_scan=
-                |             +-WithRefScan(column_list=_hop_params_1.[window_size#57, step_size#58, step_nanos#59, origin#60], with_query_name="_hop_params_1")
+                |     +-ColumnRef(type=TIMESTAMP, column=$hop.window_start#25)
+                |     +-ColumnRef(type=INTERVAL, column=_hop_params_1.window_size#21)
                 +-input_scan=
                   +-ArrayScan
-                    +-column_list=[TableWithTimestampColumn.ts_col#2, $hop.window_start#56]
+                    +-column_list=[TableWithTimestampColumn.ts_col#2, _hop_params_1.window_size#21, _hop_params_1.step_size#22, _hop_params_1.step_nanos#23, _hop_params_1.origin#24, $hop.window_start#25]
                     +-input_scan=
-                    | +-ProjectScan
-                    |   +-column_list=[TableWithTimestampColumn.ts_col#2]
-                    |   +-input_scan=
-                    |     +-JoinScan
-                    |       +-column_list=[TableWithTimestampColumn.ts_col#2, _hop_params.a#3]
-                    |       +-left_scan=
-                    |       | +-TableScan(column_list=[TableWithTimestampColumn.ts_col#2], table=TableWithTimestampColumn, column_index_list=[0])
-                    |       +-right_scan=
-                    |         +-WithRefScan(column_list=[_hop_params.a#3], with_query_name="_hop_params")
+                    | +-JoinScan
+                    |   +-column_list=[TableWithTimestampColumn.ts_col#2, _hop_params_1.window_size#21, _hop_params_1.step_size#22, _hop_params_1.step_nanos#23, _hop_params_1.origin#24]
+                    |   +-left_scan=
+                    |   | +-ProjectScan
+                    |   |   +-column_list=[TableWithTimestampColumn.ts_col#2]
+                    |   |   +-input_scan=
+                    |   |     +-JoinScan
+                    |   |       +-column_list=[TableWithTimestampColumn.ts_col#2, _hop_params.a#3]
+                    |   |       +-left_scan=
+                    |   |       | +-TableScan(column_list=[TableWithTimestampColumn.ts_col#2], table=TableWithTimestampColumn, column_index_list=[0])
+                    |   |       +-right_scan=
+                    |   |         +-WithRefScan(column_list=[_hop_params.a#3], with_query_name="_hop_params")
+                    |   +-right_scan=
+                    |     +-WithRefScan(column_list=_hop_params_1.[window_size#21, step_size#22, step_nanos#23, origin#24], with_query_name="_hop_params_1")
                     +-array_expr_list=
                     | +-FunctionCall(GoogleSQL:generate_timestamp_array(TIMESTAMP, TIMESTAMP, INT64, ENUM<googlesql.functions.DateTimestampPart>) -> ARRAY<TIMESTAMP>)
                     |   +-FunctionCall(GoogleSQL:$add(TIMESTAMP, INTERVAL) -> TIMESTAMP)
                     |   | +-FunctionCall(GoogleSQL:timestamp_bucket(TIMESTAMP, INTERVAL, optional(1) TIMESTAMP) -> TIMESTAMP)
                     |   | | +-FunctionCall(GoogleSQL:$subtract(TIMESTAMP, INTERVAL) -> TIMESTAMP)
                     |   | | | +-ColumnRef(type=TIMESTAMP, column=TableWithTimestampColumn.ts_col#2)
-                    |   | | | +-SubqueryExpr
-                    |   | | |   +-type=INTERVAL
-                    |   | | |   +-subquery_type=SCALAR
-                    |   | | |   +-subquery=
-                    |   | | |     +-ProjectScan
-                    |   | | |       +-column_list=[_hop_params_1.window_size#25]
-                    |   | | |       +-expr_list=
-                    |   | | |       | +-window_size#25 := ColumnRef(type=INTERVAL, column=_hop_params_1.window_size#21)
-                    |   | | |       +-input_scan=
-                    |   | | |         +-WithRefScan(column_list=_hop_params_1.[window_size#21, step_size#22, step_nanos#23, origin#24], with_query_name="_hop_params_1")
-                    |   | | +-SubqueryExpr
-                    |   | | | +-type=INTERVAL
-                    |   | | | +-subquery_type=SCALAR
-                    |   | | | +-subquery=
-                    |   | | |   +-ProjectScan
-                    |   | | |     +-column_list=[_hop_params_1.step_size#30]
-                    |   | | |     +-expr_list=
-                    |   | | |     | +-step_size#30 := ColumnRef(type=INTERVAL, column=_hop_params_1.step_size#27)
-                    |   | | |     +-input_scan=
-                    |   | | |       +-WithRefScan(column_list=_hop_params_1.[window_size#26, step_size#27, step_nanos#28, origin#29], with_query_name="_hop_params_1")
-                    |   | | +-SubqueryExpr
-                    |   | |   +-type=TIMESTAMP
-                    |   | |   +-subquery_type=SCALAR
-                    |   | |   +-subquery=
-                    |   | |     +-ProjectScan
-                    |   | |       +-column_list=[_hop_params_1.origin#35]
-                    |   | |       +-expr_list=
-                    |   | |       | +-origin#35 := ColumnRef(type=TIMESTAMP, column=_hop_params_1.origin#34)
-                    |   | |       +-input_scan=
-                    |   | |         +-WithRefScan(column_list=_hop_params_1.[window_size#31, step_size#32, step_nanos#33, origin#34], with_query_name="_hop_params_1")
-                    |   | +-SubqueryExpr
-                    |   |   +-type=INTERVAL
-                    |   |   +-subquery_type=SCALAR
-                    |   |   +-subquery=
-                    |   |     +-ProjectScan
-                    |   |       +-column_list=[_hop_params_1.step_size#40]
-                    |   |       +-expr_list=
-                    |   |       | +-step_size#40 := ColumnRef(type=INTERVAL, column=_hop_params_1.step_size#37)
-                    |   |       +-input_scan=
-                    |   |         +-WithRefScan(column_list=_hop_params_1.[window_size#36, step_size#37, step_nanos#38, origin#39], with_query_name="_hop_params_1")
+                    |   | | | +-ColumnRef(type=INTERVAL, column=_hop_params_1.window_size#21)
+                    |   | | +-ColumnRef(type=INTERVAL, column=_hop_params_1.step_size#22)
+                    |   | | +-ColumnRef(type=TIMESTAMP, column=_hop_params_1.origin#24)
+                    |   | +-ColumnRef(type=INTERVAL, column=_hop_params_1.step_size#22)
                     |   +-FunctionCall(GoogleSQL:timestamp_bucket(TIMESTAMP, INTERVAL, optional(1) TIMESTAMP) -> TIMESTAMP)
                     |   | +-ColumnRef(type=TIMESTAMP, column=TableWithTimestampColumn.ts_col#2)
-                    |   | +-SubqueryExpr
-                    |   | | +-type=INTERVAL
-                    |   | | +-subquery_type=SCALAR
-                    |   | | +-subquery=
-                    |   | |   +-ProjectScan
-                    |   | |     +-column_list=[_hop_params_1.step_size#45]
-                    |   | |     +-expr_list=
-                    |   | |     | +-step_size#45 := ColumnRef(type=INTERVAL, column=_hop_params_1.step_size#42)
-                    |   | |     +-input_scan=
-                    |   | |       +-WithRefScan(column_list=_hop_params_1.[window_size#41, step_size#42, step_nanos#43, origin#44], with_query_name="_hop_params_1")
-                    |   | +-SubqueryExpr
-                    |   |   +-type=TIMESTAMP
-                    |   |   +-subquery_type=SCALAR
-                    |   |   +-subquery=
-                    |   |     +-ProjectScan
-                    |   |       +-column_list=[_hop_params_1.origin#50]
-                    |   |       +-expr_list=
-                    |   |       | +-origin#50 := ColumnRef(type=TIMESTAMP, column=_hop_params_1.origin#49)
-                    |   |       +-input_scan=
-                    |   |         +-WithRefScan(column_list=_hop_params_1.[window_size#46, step_size#47, step_nanos#48, origin#49], with_query_name="_hop_params_1")
-                    |   +-SubqueryExpr
-                    |   | +-type=INT64
-                    |   | +-subquery_type=SCALAR
-                    |   | +-subquery=
-                    |   |   +-ProjectScan
-                    |   |     +-column_list=[_hop_params_1.step_nanos#55]
-                    |   |     +-expr_list=
-                    |   |     | +-step_nanos#55 := ColumnRef(type=INT64, column=_hop_params_1.step_nanos#53)
-                    |   |     +-input_scan=
-                    |   |       +-WithRefScan(column_list=_hop_params_1.[window_size#51, step_size#52, step_nanos#53, origin#54], with_query_name="_hop_params_1")
+                    |   | +-ColumnRef(type=INTERVAL, column=_hop_params_1.step_size#22)
+                    |   | +-ColumnRef(type=TIMESTAMP, column=_hop_params_1.origin#24)
+                    |   +-ColumnRef(type=INT64, column=_hop_params_1.step_nanos#23)
                     |   +-Literal(type=ENUM<googlesql.functions.DateTimestampPart>, value=NANOSECOND)
-                    +-element_column_list=[$hop.window_start#56]
+                    +-element_column_list=[$hop.window_start#25]
                     +-is_outer=TRUE

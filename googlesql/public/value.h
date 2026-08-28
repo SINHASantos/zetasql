@@ -380,6 +380,9 @@ class Value {
   absl::StatusOr<ListView> elements_view() const;
 #endif
 
+  // ColumnListSpec-specific methods.
+  absl::StatusOr<const std::vector<Value>&> column_list_spec_columns() const;
+
   // Map-specific methods.
   // Returns the entries of the map. Note that a stable order is not guaranteed.
   // Requires (crashes otherwise): !is_null() && type_kind() == TYPE_MAP
@@ -925,6 +928,11 @@ class Value {
   // 'array_type' must outlive the returned object.
   static absl::StatusOr<Value> MakeArrayFromValidatedInputs(
       const ArrayType* array_type, std::vector<Value>&& values);
+
+  // Creates a Columns List spec from an array of strings.
+  // The input array must not be null, and must contain only string values or be
+  // empty.
+  static absl::StatusOr<Value> MakeColumnListSpec(const Value& value);
 
   // Creates an array of the given 'array_type' initialized with 'values'.
   // The type of each value must be the same as array_type->element_type().

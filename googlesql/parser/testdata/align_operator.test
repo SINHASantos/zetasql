@@ -2361,7 +2361,7 @@ SELECT * FROM ts_table ALIGN (
   METRICS SUM(key) WITHIN (), AVG(value) WITHIN ()
 )
 --
-ERROR: Syntax error: Unexpected "," [at 4:29]
+ERROR: Syntax error: Expected alias [at 4:29]
   METRICS SUM(key) WITHIN (), AVG(value) WITHIN ()
                             ^
 ==

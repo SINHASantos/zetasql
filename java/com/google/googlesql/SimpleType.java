@@ -39,6 +39,11 @@ public class SimpleType extends Type {
   }
 
   @Override
+  public SimpleType asSimpleType() {
+    return this;
+  }
+
+  @Override
   public void serialize(
       TypeProto.Builder typeProtoBuilder, FileDescriptorSetsBuilder fileDescriptorSetsBuilder) {
     typeProtoBuilder.setTypeKind(getKind());

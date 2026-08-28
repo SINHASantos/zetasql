@@ -1,0 +1,575 @@
+[default reserve_graph_table]
+[default language_features=NONE,+SQL_GRAPH]
+
+# INSERT is not allowed in places other than top-level GRAPH statement.
+# But this will be rejected in resolver.
+select * from graph_table(
+  my.graph.name
+  INSERT (a:Person {name: "John"})
+  RETURN 1 AS one
+)
+--
+QueryStatement [113-210] [select * from...1 AS one )]
+  Query [113-210] [select * from...1 AS one )]
+    Select [113-210] [select * from...1 AS one )]
+      SelectList [120-121] [*]
+        SelectColumn [120-121] [*]
+          Star(*) [120-121] [*]
+      FromClause [122-210] [from graph_table...1 AS one )]
+        GraphTableQuery [127-210] [graph_table...1 AS one )]
+          PathExpression [142-155] [my.graph.name]
+            Identifier(my) [142-144] [my]
+            Identifier(graph) [145-150] [graph]
+            Identifier(name) [151-155] [name]
+          GqlOperatorList [158-208] [INSERT (a:...RETURN 1 AS one]
+            GqlOperatorList [158-208] [INSERT (a:...RETURN 1 AS one]
+              GqlInsert [158-190] [INSERT (a:...: "John"})]
+                GraphInsertPathPattern [165-190] [(a:Person {name: "John"})]
+                  GraphInsertNodePattern [165-190] [(a:Person {name: "John"})]
+                    GraphInsertElementPatternFiller [166-189] [a:Person {name: "John"}]
+                      Identifier(a) [166-167] [a]
+                      GraphLabelFilter [167-174] [:Person]
+                        GraphElementLabel [168-174] [Person]
+                          Identifier(Person) [168-174] [Person]
+                      GraphPropertySpecification [175-189] [{name: "John"}]
+                        GraphPropertyNameAndValue [176-188] [name: "John"]
+                          Identifier(name) [176-180] [name]
+                          StringLiteral [182-188] ["John"]
+                            StringLiteralComponent("John") [182-188] ["John"]
+              GqlReturn [193-208] [RETURN 1 AS one]
+                Select [200-208] [1 AS one]
+                  SelectList [200-208] [1 AS one]
+                    SelectColumn [200-208] [1 AS one]
+                      IntLiteral(1) [200-201] [1]
+                      Alias [202-208] [AS one]
+                        Identifier(one) [205-208] [one]
+--
+SELECT
+  *
+FROM
+  GRAPH_TABLE(
+    my.graph.name
+    INSERT
+      (a IS Person { name : "John" })
+    RETURN
+      1 AS one
+  )
+==
+
+# INSERT in a top-level GRAPH statement.
+# FINISH syntax is not supported.
+GRAPH my.graph.name
+INSERT (a:Person {name: "John"})
+{{FINISH|RETURN 1 AS one|}}
+--
+ALTERNATION GROUP: FINISH
+--
+ERROR: Syntax error: Expected end of input but got keyword FINISH [at 3:1]
+FINISH
+^
+--
+ALTERNATION GROUP: RETURN 1 AS one
+--
+QueryStatement [0-68] [GRAPH my.graph...TURN 1 AS one]
+  Query [0-68] [GRAPH my.graph...TURN 1 AS one]
+    GqlQuery [0-68] [GRAPH my.graph...TURN 1 AS one]
+      GraphTableQuery [0-68] [GRAPH my.graph...TURN 1 AS one]
+        PathExpression [6-19] [my.graph.name]
+          Identifier(my) [6-8] [my]
+          Identifier(graph) [9-14] [graph]
+          Identifier(name) [15-19] [name]
+        GqlOperatorList [20-68] [INSERT (a:...RETURN 1 AS one]
+          GqlOperatorList [20-68] [INSERT (a:...RETURN 1 AS one]
+            GqlInsert [20-52] [INSERT (a:...: "John"})]
+              GraphInsertPathPattern [27-52] [(a:Person {name: "John"})]
+                GraphInsertNodePattern [27-52] [(a:Person {name: "John"})]
+                  GraphInsertElementPatternFiller [28-51] [a:Person {name: "John"}]
+                    Identifier(a) [28-29] [a]
+                    GraphLabelFilter [29-36] [:Person]
+                      GraphElementLabel [30-36] [Person]
+                        Identifier(Person) [30-36] [Person]
+                    GraphPropertySpecification [37-51] [{name: "John"}]
+                      GraphPropertyNameAndValue [38-50] [name: "John"]
+                        Identifier(name) [38-42] [name]
+                        StringLiteral [44-50] ["John"]
+                          StringLiteralComponent("John") [44-50] ["John"]
+            GqlReturn [53-68] [RETURN 1 AS one]
+              Select [60-68] [1 AS one]
+                SelectList [60-68] [1 AS one]
+                  SelectColumn [60-68] [1 AS one]
+                    IntLiteral(1) [60-61] [1]
+                    Alias [62-68] [AS one]
+                      Identifier(one) [65-68] [one]
+--
+GRAPH my.graph.name
+INSERT
+  (a IS Person { name : "John" })
+RETURN
+  1 AS one
+--
+ALTERNATION GROUP: <empty>
+--
+QueryStatement [0-52] [GRAPH my.graph...: "John"})]
+  Query [0-52] [GRAPH my.graph...: "John"})]
+    GqlQuery [0-52] [GRAPH my.graph...: "John"})]
+      GraphTableQuery [0-52] [GRAPH my.graph...: "John"})]
+        PathExpression [6-19] [my.graph.name]
+          Identifier(my) [6-8] [my]
+          Identifier(graph) [9-14] [graph]
+          Identifier(name) [15-19] [name]
+        GqlOperatorList [20-52] [INSERT (a:...: "John"})]
+          GqlOperatorList [20-52] [INSERT (a:...: "John"})]
+            GqlInsert [20-52] [INSERT (a:...: "John"})]
+              GraphInsertPathPattern [27-52] [(a:Person {name: "John"})]
+                GraphInsertNodePattern [27-52] [(a:Person {name: "John"})]
+                  GraphInsertElementPatternFiller [28-51] [a:Person {name: "John"}]
+                    Identifier(a) [28-29] [a]
+                    GraphLabelFilter [29-36] [:Person]
+                      GraphElementLabel [30-36] [Person]
+                        Identifier(Person) [30-36] [Person]
+                    GraphPropertySpecification [37-51] [{name: "John"}]
+                      GraphPropertyNameAndValue [38-50] [name: "John"]
+                        Identifier(name) [38-42] [name]
+                        StringLiteral [44-50] ["John"]
+                          StringLiteralComponent("John") [44-50] ["John"]
+--
+GRAPH my.graph.name
+INSERT
+  (a IS Person { name : "John" })
+==
+
+# Cases that should be rejected in resolver.
+# 1. Declaring variables without label or property specifications
+# 2. [] edge pattern
+# 3. () node pattern
+GRAPH my.graph.name
+INSERT (a)-[]->()
+--
+QueryStatement [0-37] [GRAPH my.graph...(a)-[]->()]
+  Query [0-37] [GRAPH my.graph...(a)-[]->()]
+    GqlQuery [0-37] [GRAPH my.graph...(a)-[]->()]
+      GraphTableQuery [0-37] [GRAPH my.graph...(a)-[]->()]
+        PathExpression [6-19] [my.graph.name]
+          Identifier(my) [6-8] [my]
+          Identifier(graph) [9-14] [graph]
+          Identifier(name) [15-19] [name]
+        GqlOperatorList [20-37] [INSERT (a)-[]->()]
+          GqlOperatorList [20-37] [INSERT (a)-[]->()]
+            GqlInsert [20-37] [INSERT (a)-[]->()]
+              GraphInsertPathPattern [27-37] [(a)-[]->()]
+                GraphInsertNodePattern [27-30] [(a)]
+                  GraphInsertElementPatternFiller [28-29] [a]
+                    Identifier(a) [28-29] [a]
+                GraphInsertEdgePattern [30-35] [-[]->]
+                  GraphInsertElementPatternFiller [32-32] []
+                GraphInsertNodePattern [35-37] [()]
+                  GraphInsertElementPatternFiller [36-36] []
+--
+GRAPH my.graph.name
+INSERT
+  (a) -[]-> ()
+==
+
+# Multiple path patterns within a single INSERT
+GRAPH my.graph.name
+INSERT (a), (b)-[:E]->(c)
+--
+QueryStatement [0-45] [GRAPH my.graph...-[:E]->(c)]
+  Query [0-45] [GRAPH my.graph...-[:E]->(c)]
+    GqlQuery [0-45] [GRAPH my.graph...-[:E]->(c)]
+      GraphTableQuery [0-45] [GRAPH my.graph...-[:E]->(c)]
+        PathExpression [6-19] [my.graph.name]
+          Identifier(my) [6-8] [my]
+          Identifier(graph) [9-14] [graph]
+          Identifier(name) [15-19] [name]
+        GqlOperatorList [20-45] [INSERT (a), (b)-[:E]->(c)]
+          GqlOperatorList [20-45] [INSERT (a), (b)-[:E]->(c)]
+            GqlInsert [20-45] [INSERT (a), (b)-[:E]->(c)]
+              GraphInsertPathPattern [27-30] [(a)]
+                GraphInsertNodePattern [27-30] [(a)]
+                  GraphInsertElementPatternFiller [28-29] [a]
+                    Identifier(a) [28-29] [a]
+              GraphInsertPathPattern [32-45] [(b)-[:E]->(c)]
+                GraphInsertNodePattern [32-35] [(b)]
+                  GraphInsertElementPatternFiller [33-34] [b]
+                    Identifier(b) [33-34] [b]
+                GraphInsertEdgePattern [35-42] [-[:E]->]
+                  GraphInsertElementPatternFiller [37-39] [:E]
+                    GraphLabelFilter [37-39] [:E]
+                      GraphElementLabel [38-39] [E]
+                        Identifier(E) [38-39] [E]
+                GraphInsertNodePattern [42-45] [(c)]
+                  GraphInsertElementPatternFiller [43-44] [c]
+                    Identifier(c) [43-44] [c]
+--
+GRAPH my.graph.name
+INSERT
+  (a), (b) -[IS E]-> (c)
+==
+
+# DML Terminality: Chaining multiple INSERT statements is not supported yet.
+GRAPH my.graph.name
+INSERT (a:LABEL1)
+INSERT (b:LABEL2)
+--
+ERROR: Syntax error: Expected end of input but got keyword INSERT [at 3:1]
+INSERT (b:LABEL2)
+^
+==
+
+# Direction-less edge should fail
+GRAPH my.graph.name
+INSERT (a)-[:E]-(b)
+--
+ERROR: Syntax error: Expected -> but got "-" [at 2:16]
+INSERT (a)-[:E]-(b)
+               ^
+==
+
+# MATCH-only features like label expressions (e.g. |) will be caught in resolver.
+GRAPH my.graph.name
+INSERT (a:Person|Robot)
+--
+QueryStatement [0-43] [GRAPH my.graph...Person|Robot)]
+  Query [0-43] [GRAPH my.graph...Person|Robot)]
+    GqlQuery [0-43] [GRAPH my.graph...Person|Robot)]
+      GraphTableQuery [0-43] [GRAPH my.graph...Person|Robot)]
+        PathExpression [6-19] [my.graph.name]
+          Identifier(my) [6-8] [my]
+          Identifier(graph) [9-14] [graph]
+          Identifier(name) [15-19] [name]
+        GqlOperatorList [20-43] [INSERT (a:Person|Robot)]
+          GqlOperatorList [20-43] [INSERT (a:Person|Robot)]
+            GqlInsert [20-43] [INSERT (a:Person|Robot)]
+              GraphInsertPathPattern [27-43] [(a:Person|Robot)]
+                GraphInsertNodePattern [27-43] [(a:Person|Robot)]
+                  GraphInsertElementPatternFiller [28-42] [a:Person|Robot]
+                    Identifier(a) [28-29] [a]
+                    GraphLabelFilter [29-42] [:Person|Robot]
+                      GraphLabelOperation(OR) [30-42] [Person|Robot]
+                        GraphElementLabel [30-36] [Person]
+                          Identifier(Person) [30-36] [Person]
+                        GraphElementLabel [37-42] [Robot]
+                          Identifier(Robot) [37-42] [Robot]
+--
+GRAPH my.graph.name
+INSERT
+  (a IS Person | Robot)
+==
+
+# Omitting variable name for node pattern is allowed
+GRAPH g.graph
+INSERT (:Person)
+--
+QueryStatement [0-30] [GRAPH g.graph INSERT (:Person)]
+  Query [0-30] [GRAPH g.graph INSERT (:Person)]
+    GqlQuery [0-30] [GRAPH g.graph INSERT (:Person)]
+      GraphTableQuery [0-30] [GRAPH g.graph INSERT (:Person)]
+        PathExpression [6-13] [g.graph]
+          Identifier(g) [6-7] [g]
+          Identifier(graph) [8-13] [graph]
+        GqlOperatorList [14-30] [INSERT (:Person)]
+          GqlOperatorList [14-30] [INSERT (:Person)]
+            GqlInsert [14-30] [INSERT (:Person)]
+              GraphInsertPathPattern [21-30] [(:Person)]
+                GraphInsertNodePattern [21-30] [(:Person)]
+                  GraphInsertElementPatternFiller [22-29] [:Person]
+                    GraphLabelFilter [22-29] [:Person]
+                      GraphElementLabel [23-29] [Person]
+                        Identifier(Person) [23-29] [Person]
+--
+GRAPH g.graph
+INSERT
+  (IS Person)
+==
+
+# Omitting variable name for edge pattern is allowed
+GRAPH g.graph
+INSERT (a:Customer) -[:Transaction]->(b:Merchant)
+--
+QueryStatement [0-63] [GRAPH g.graph...:Merchant)]
+  Query [0-63] [GRAPH g.graph...:Merchant)]
+    GqlQuery [0-63] [GRAPH g.graph...:Merchant)]
+      GraphTableQuery [0-63] [GRAPH g.graph...:Merchant)]
+        PathExpression [6-13] [g.graph]
+          Identifier(g) [6-7] [g]
+          Identifier(graph) [8-13] [graph]
+        GqlOperatorList [14-63] [INSERT (a:...:Merchant)]
+          GqlOperatorList [14-63] [INSERT (a:...:Merchant)]
+            GqlInsert [14-63] [INSERT (a:...:Merchant)]
+              GraphInsertPathPattern [21-63] [(a:Customer...:Merchant)]
+                GraphInsertNodePattern [21-33] [(a:Customer)]
+                  GraphInsertElementPatternFiller [22-32] [a:Customer]
+                    Identifier(a) [22-23] [a]
+                    GraphLabelFilter [23-32] [:Customer]
+                      GraphElementLabel [24-32] [Customer]
+                        Identifier(Customer) [24-32] [Customer]
+                GraphInsertEdgePattern [34-51] [-[:Transaction]->]
+                  GraphInsertElementPatternFiller [36-48] [:Transaction]
+                    GraphLabelFilter [36-48] [:Transaction]
+                      GraphElementLabel [37-48] [Transaction]
+                        Identifier(Transaction) [37-48] [Transaction]
+                GraphInsertNodePattern [51-63] [(b:Merchant)]
+                  GraphInsertElementPatternFiller [52-62] [b:Merchant]
+                    Identifier(b) [52-53] [b]
+                    GraphLabelFilter [53-62] [:Merchant]
+                      GraphElementLabel [54-62] [Merchant]
+                        Identifier(Merchant) [54-62] [Merchant]
+--
+GRAPH g.graph
+INSERT
+  (a IS Customer) -[IS Transaction]-> (b IS Merchant)
+==
+
+# Omitting label but not property specification will be rejected in resolver.
+GRAPH g.graph
+INSERT ({name: "John"})
+--
+QueryStatement [0-37] [GRAPH g.graph...: "John"})]
+  Query [0-37] [GRAPH g.graph...: "John"})]
+    GqlQuery [0-37] [GRAPH g.graph...: "John"})]
+      GraphTableQuery [0-37] [GRAPH g.graph...: "John"})]
+        PathExpression [6-13] [g.graph]
+          Identifier(g) [6-7] [g]
+          Identifier(graph) [8-13] [graph]
+        GqlOperatorList [14-37] [INSERT ({name: "John"})]
+          GqlOperatorList [14-37] [INSERT ({name: "John"})]
+            GqlInsert [14-37] [INSERT ({name: "John"})]
+              GraphInsertPathPattern [21-37] [({name: "John"})]
+                GraphInsertNodePattern [21-37] [({name: "John"})]
+                  GraphInsertElementPatternFiller [22-36] [{name: "John"}]
+                    GraphPropertySpecification [22-36] [{name: "John"}]
+                      GraphPropertyNameAndValue [23-35] [name: "John"]
+                        Identifier(name) [23-27] [name]
+                        StringLiteral [29-35] ["John"]
+                          StringLiteralComponent("John") [29-35] ["John"]
+--
+GRAPH g.graph
+INSERT
+  ({ name : "John" })
+==
+
+# Left-pointing edge
+GRAPH g.graph
+INSERT (a)<-[:E]-(b)
+--
+QueryStatement [0-34] [GRAPH g.graph...<-[:E]-(b)]
+  Query [0-34] [GRAPH g.graph...<-[:E]-(b)]
+    GqlQuery [0-34] [GRAPH g.graph...<-[:E]-(b)]
+      GraphTableQuery [0-34] [GRAPH g.graph...<-[:E]-(b)]
+        PathExpression [6-13] [g.graph]
+          Identifier(g) [6-7] [g]
+          Identifier(graph) [8-13] [graph]
+        GqlOperatorList [14-34] [INSERT (a)<-[:E]-(b)]
+          GqlOperatorList [14-34] [INSERT (a)<-[:E]-(b)]
+            GqlInsert [14-34] [INSERT (a)<-[:E]-(b)]
+              GraphInsertPathPattern [21-34] [(a)<-[:E]-(b)]
+                GraphInsertNodePattern [21-24] [(a)]
+                  GraphInsertElementPatternFiller [22-23] [a]
+                    Identifier(a) [22-23] [a]
+                GraphInsertEdgePattern [24-31] [<-[:E]-]
+                  GraphInsertElementPatternFiller [27-29] [:E]
+                    GraphLabelFilter [27-29] [:E]
+                      GraphElementLabel [28-29] [E]
+                        Identifier(E) [28-29] [E]
+                GraphInsertNodePattern [31-34] [(b)]
+                  GraphInsertElementPatternFiller [32-33] [b]
+                    Identifier(b) [32-33] [b]
+--
+GRAPH g.graph
+INSERT
+  (a) <-[IS E]- (b)
+==
+
+# Right-pointing edge
+GRAPH g.graph
+INSERT (a)-[:E]->(b)
+--
+QueryStatement [0-34] [GRAPH g.graph...-[:E]->(b)]
+  Query [0-34] [GRAPH g.graph...-[:E]->(b)]
+    GqlQuery [0-34] [GRAPH g.graph...-[:E]->(b)]
+      GraphTableQuery [0-34] [GRAPH g.graph...-[:E]->(b)]
+        PathExpression [6-13] [g.graph]
+          Identifier(g) [6-7] [g]
+          Identifier(graph) [8-13] [graph]
+        GqlOperatorList [14-34] [INSERT (a)-[:E]->(b)]
+          GqlOperatorList [14-34] [INSERT (a)-[:E]->(b)]
+            GqlInsert [14-34] [INSERT (a)-[:E]->(b)]
+              GraphInsertPathPattern [21-34] [(a)-[:E]->(b)]
+                GraphInsertNodePattern [21-24] [(a)]
+                  GraphInsertElementPatternFiller [22-23] [a]
+                    Identifier(a) [22-23] [a]
+                GraphInsertEdgePattern [24-31] [-[:E]->]
+                  GraphInsertElementPatternFiller [26-28] [:E]
+                    GraphLabelFilter [26-28] [:E]
+                      GraphElementLabel [27-28] [E]
+                        Identifier(E) [27-28] [E]
+                GraphInsertNodePattern [31-34] [(b)]
+                  GraphInsertElementPatternFiller [32-33] [b]
+                    Identifier(b) [32-33] [b]
+--
+GRAPH g.graph
+INSERT
+  (a) -[IS E]-> (b)
+==
+
+# INSERT following linear query operators.
+GRAPH my.graph
+MATCH (a)
+{{|MATCH (b)}}
+INSERT (a)-[e:E]->(b)
+--
+ALTERNATION GROUP: <empty>
+--
+QueryStatement [0-47] [GRAPH my.graph...[e:E]->(b)]
+  Query [0-47] [GRAPH my.graph...[e:E]->(b)]
+    GqlQuery [0-47] [GRAPH my.graph...[e:E]->(b)]
+      GraphTableQuery [0-47] [GRAPH my.graph...[e:E]->(b)]
+        PathExpression [6-14] [my.graph]
+          Identifier(my) [6-8] [my]
+          Identifier(graph) [9-14] [graph]
+        GqlOperatorList [15-47] [MATCH (a)...[e:E]->(b)]
+          GqlOperatorList [15-47] [MATCH (a)...[e:E]->(b)]
+            GqlMatch [15-24] [MATCH (a)]
+              GraphPattern [21-24] [(a)]
+                GraphPathPattern [21-24] [(a)]
+                  GraphNodePattern [21-24] [(a)]
+                    GraphElementPatternFiller [22-23] [a]
+                      Identifier(a) [22-23] [a]
+            GqlInsert [26-47] [INSERT (a)-[e:E]->(b)]
+              GraphInsertPathPattern [33-47] [(a)-[e:E]->(b)]
+                GraphInsertNodePattern [33-36] [(a)]
+                  GraphInsertElementPatternFiller [34-35] [a]
+                    Identifier(a) [34-35] [a]
+                GraphInsertEdgePattern [36-44] [-[e:E]->]
+                  GraphInsertElementPatternFiller [38-41] [e:E]
+                    Identifier(e) [38-39] [e]
+                    GraphLabelFilter [39-41] [:E]
+                      GraphElementLabel [40-41] [E]
+                        Identifier(E) [40-41] [E]
+                GraphInsertNodePattern [44-47] [(b)]
+                  GraphInsertElementPatternFiller [45-46] [b]
+                    Identifier(b) [45-46] [b]
+--
+GRAPH my.graph
+MATCH
+  (a)
+INSERT
+  (a) -[e IS E]-> (b)
+--
+ALTERNATION GROUP: MATCH (b)
+--
+QueryStatement [0-56] [GRAPH my.graph...[e:E]->(b)]
+  Query [0-56] [GRAPH my.graph...[e:E]->(b)]
+    GqlQuery [0-56] [GRAPH my.graph...[e:E]->(b)]
+      GraphTableQuery [0-56] [GRAPH my.graph...[e:E]->(b)]
+        PathExpression [6-14] [my.graph]
+          Identifier(my) [6-8] [my]
+          Identifier(graph) [9-14] [graph]
+        GqlOperatorList [15-56] [MATCH (a)...[e:E]->(b)]
+          GqlOperatorList [15-56] [MATCH (a)...[e:E]->(b)]
+            GqlMatch [15-24] [MATCH (a)]
+              GraphPattern [21-24] [(a)]
+                GraphPathPattern [21-24] [(a)]
+                  GraphNodePattern [21-24] [(a)]
+                    GraphElementPatternFiller [22-23] [a]
+                      Identifier(a) [22-23] [a]
+            GqlMatch [25-34] [MATCH (b)]
+              GraphPattern [31-34] [(b)]
+                GraphPathPattern [31-34] [(b)]
+                  GraphNodePattern [31-34] [(b)]
+                    GraphElementPatternFiller [32-33] [b]
+                      Identifier(b) [32-33] [b]
+            GqlInsert [35-56] [INSERT (a)-[e:E]->(b)]
+              GraphInsertPathPattern [42-56] [(a)-[e:E]->(b)]
+                GraphInsertNodePattern [42-45] [(a)]
+                  GraphInsertElementPatternFiller [43-44] [a]
+                    Identifier(a) [43-44] [a]
+                GraphInsertEdgePattern [45-53] [-[e:E]->]
+                  GraphInsertElementPatternFiller [47-50] [e:E]
+                    Identifier(e) [47-48] [e]
+                    GraphLabelFilter [48-50] [:E]
+                      GraphElementLabel [49-50] [E]
+                        Identifier(E) [49-50] [E]
+                GraphInsertNodePattern [53-56] [(b)]
+                  GraphInsertElementPatternFiller [54-55] [b]
+                    Identifier(b) [54-55] [b]
+--
+GRAPH my.graph
+MATCH
+  (a)
+MATCH
+  (b)
+INSERT
+  (a) -[e IS E]-> (b)
+==
+
+# DML Terminality: INSERT followed by linear ops is not allowed yet.
+GRAPH g.graph
+INSERT (n)
+{{MATCH (n)|LET x = 1|FILTER n.id = 100}}
+RETURN 1
+--
+ALTERNATION GROUP: MATCH (n)
+--
+ERROR: Syntax error: Expected end of input but got keyword MATCH [at 3:1]
+MATCH (n)
+^
+--
+ALTERNATION GROUP: LET x = 1
+--
+ERROR: Syntax error: Expected end of input but got keyword LET [at 3:1]
+LET x = 1
+^
+--
+ALTERNATION GROUP: FILTER n.id = 100
+--
+ERROR: Syntax error: Expected end of input but got keyword FILTER [at 3:1]
+FILTER n.id = 100
+^
+==
+
+# DML Terminality: INSERT followed by NEXT is not allowed, but will be rejected in resolver
+GRAPH g.graph
+INSERT (n)
+NEXT
+MATCH (n)
+RETURN 1
+--
+QueryStatement [0-48] [GRAPH g.graph...) RETURN 1]
+  Query [0-48] [GRAPH g.graph...) RETURN 1]
+    GqlQuery [0-48] [GRAPH g.graph...) RETURN 1]
+      GraphTableQuery [0-48] [GRAPH g.graph...) RETURN 1]
+        PathExpression [6-13] [g.graph]
+          Identifier(g) [6-7] [g]
+          Identifier(graph) [8-13] [graph]
+        GqlOperatorList [14-48] [INSERT (n)...) RETURN 1]
+          GqlOperatorList [14-24] [INSERT (n)]
+            GqlInsert [14-24] [INSERT (n)]
+              GraphInsertPathPattern [21-24] [(n)]
+                GraphInsertNodePattern [21-24] [(n)]
+                  GraphInsertElementPatternFiller [22-23] [n]
+                    Identifier(n) [22-23] [n]
+          GqlOperatorList [30-48] [MATCH (n) RETURN 1]
+            GqlMatch [30-39] [MATCH (n)]
+              GraphPattern [36-39] [(n)]
+                GraphPathPattern [36-39] [(n)]
+                  GraphNodePattern [36-39] [(n)]
+                    GraphElementPatternFiller [37-38] [n]
+                      Identifier(n) [37-38] [n]
+            GqlReturn [40-48] [RETURN 1]
+              Select [47-48] [1]
+                SelectList [47-48] [1]
+                  SelectColumn [47-48] [1]
+                    IntLiteral(1) [47-48] [1]
+--
+GRAPH g.graph
+INSERT
+  (n)
+NEXT
+MATCH
+  (n)
+RETURN
+  1
+==
+

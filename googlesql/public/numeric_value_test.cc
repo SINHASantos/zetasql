@@ -3613,7 +3613,7 @@ void TestFormatWithRandomValues(absl::BitGen* random) {
       R"([\+|\-]0*[0-9]+\.?[0-9]*(E[\+|\-][0-9][0-9])?)",
   };
 
-  constexpr uint kNumMatchers = ABSL_ARRAYSIZE(kRegExps);
+  constexpr uint kNumMatchers = std::size(kRegExps);
   Matcher<absl::string_view> matchers[kNumMatchers];
   for (int i = 0; i < kNumMatchers; ++i) {
     matchers[i] = MatchesRegex(std::string(kRegExps[i]));
@@ -3647,7 +3647,7 @@ void TestFormatWithRandomValues(absl::BitGen* random) {
     static constexpr FormatSpec::Mode kModes[] = {FormatSpec::DEFAULT, e, E, g,
                                                   G};
     uint mode_index = matcher_index >> 3;
-    ASSERT_LT(mode_index, ABSL_ARRAYSIZE(kModes));
+    ASSERT_LT(mode_index, std::size(kModes));
     spec.mode = kModes[mode_index];
     SetFormatFlag((matcher_index & 0x4) != 0, Flag::ALWAYS_PRINT_SIGN, &spec);
     SetFormatFlag((matcher_index & 0x2) != 0, Flag::SIGN_SPACE, &spec);
@@ -7862,7 +7862,7 @@ void TestBigNumericSumAggregatorSubtract(
 }
 
 TEST(BigNumericSumAggregatorTest, Subtract) {
-  constexpr int kNumInputs = ABSL_ARRAYSIZE(kBigNumericSumAggregatorTestData);
+  constexpr int kNumInputs = std::size(kBigNumericSumAggregatorTestData);
   // Test with sliding window size equals one
   BigNumericValue::SumAggregator aggregator;
   GOOGLESQL_ASSERT_OK_AND_ASSIGN(BigNumericValue previous_input,
