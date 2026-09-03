@@ -616,4 +616,54 @@ TEST(TableNameResolver, ExtractTableNamesFromValueQuery) {
   EXPECT_THAT(table_names, UnorderedElementsAre(ElementsAre("TableA")));
 }
 
+TEST(TableNameResolver, ExtractTableNamesFromDeleteStatementWithUsing) {
+  std::set<std::vector<std::string>> table_names;
+  std::string sql =
+      "DELETE TargetTable AS t USING SourceTable1 AS s1, SourceTable2 AS s2 "
+      "WHERE t.k = s1.k AND s1.x = s2.x";
+
+  AnalyzerOptions analyzer_options;
+  analyzer_options.mutable_language()->AddSupportedStatementKind(
+      RESOLVED_DELETE_STMT);
+  GOOGLESQL_ASSERT_OK(
+      ExtractTableNamesFromStatement(sql, analyzer_options, &table_names));
+  EXPECT_THAT(table_names, UnorderedElementsAre(ElementsAre("TargetTable"),
+                                                ElementsAre("SourceTable1"),
+                                                ElementsAre("SourceTable2")));
+}
+
+TEST(TableNameResolver,
+     ExtractTableNamesFromDeleteStatementWithUsingJoinAndSubquery) {
+  std::set<std::vector<std::string>> table_names;
+  std::string sql =
+      "DELETE TargetTable AS t "
+      "USING SourceTable1 AS s1 "
+      "JOIN (SELECT * FROM SubqueryTable) AS s2 ON s1.id = s2.id "
+      "WHERE t.k = s1.k";
+
+  AnalyzerOptions analyzer_options;
+  analyzer_options.mutable_language()->AddSupportedStatementKind(
+      RESOLVED_DELETE_STMT);
+  GOOGLESQL_ASSERT_OK(
+      ExtractTableNamesFromStatement(sql, analyzer_options, &table_names));
+  EXPECT_THAT(table_names, UnorderedElementsAre(ElementsAre("TargetTable"),
+                                                ElementsAre("SourceTable1"),
+                                                ElementsAre("SubqueryTable")));
+}
+
+TEST(TableNameResolver, ExtractTableNamesFromDeleteStatementWithUsingTvf) {
+  std::set<std::vector<std::string>> table_names;
+  std::set<std::vector<std::string>> tvf_names;
+  std::string sql =
+      "DELETE TargetTable AS t USING MyTvf(1) AS tvf WHERE t.k = tvf.k";
+
+  AnalyzerOptions analyzer_options;
+  analyzer_options.mutable_language()->AddSupportedStatementKind(
+      RESOLVED_DELETE_STMT);
+  GOOGLESQL_ASSERT_OK(ExtractTableNamesFromStatement(sql, analyzer_options, &table_names,
+                                           &tvf_names));
+  EXPECT_THAT(table_names, UnorderedElementsAre(ElementsAre("TargetTable")));
+  EXPECT_THAT(tvf_names, UnorderedElementsAre(ElementsAre("MyTvf")));
+}
+
 }  // namespace googlesql

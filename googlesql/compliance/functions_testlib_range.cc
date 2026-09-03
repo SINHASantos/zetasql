@@ -79,8 +79,14 @@ std::vector<FunctionTestCall> WrapFeatures(
   wrapped_tests.reserve(tests.size());
   for (auto call : tests) {
     call.params = call.params.WrapWithFeature(FEATURE_RANGE_TYPE);
-    if (HasDatetimeElementType(call.params.params().front()) ||
-        HasDatetimeElementType(call.params.params().back())) {
+    bool has_datetime_range = false;
+    for (const auto& param : call.params.params()) {
+      if (HasDatetimeElementType(param)) {
+        has_datetime_range = true;
+        break;
+      }
+    }
+    if (has_datetime_range) {
       call.params = call.params.WrapWithFeature(FEATURE_CIVIL_TIME);
     }
     wrapped_tests.emplace_back(call);
@@ -1148,6 +1154,82 @@ std::vector<FunctionTestCall> GetFunctionTestsRangeContains() {
   std::vector<FunctionTestCall> ts_contains_tests =
       RangeContainsTests(timestamps, null_timestamp, null_timestamp_range);
   tests.insert(tests.end(), ts_contains_tests.begin(), ts_contains_tests.end());
+
+  return WrapFeatures(tests);
+}
+
+std::vector<FunctionTestCall> GetFunctionTestsFormatRange() {
+  const Value date_range = Range(Date(1), Date(10));
+  const Value datetime_range =
+      Range(Datetime(DatetimeValue::FromYMDHMSAndMicros(2016, 4, 26, 14, 53, 38,
+                                                        123456)),
+            Datetime(DatetimeValue::FromYMDHMSAndMicros(2016, 4, 27, 14, 53, 38,
+                                                        123456)));
+  const Value timestamp_range =
+      Range(TimestampFromUnixMicros(1429322158123456),
+            TimestampFromUnixMicros(1429322158123457));
+
+  const Value unbounded_start_date_range = Range(NullDate(), Date(10));
+  const Value unbounded_end_date_range = Range(Date(1), NullDate());
+  const Value unbounded_date_range = Range(NullDate(), NullDate());
+
+  const Value array_range_date = Array({date_range, date_range});
+  const Value struct_range_date =
+      Struct({"r1", "r2"}, {date_range, date_range});
+
+  std::vector<FunctionTestCall> tests = {
+      // %t tests
+      {"format", {"%t", date_range}, "[1970-01-02, 1970-01-11)"},
+      {"format",
+       {"%t", datetime_range},
+       "[2016-04-26 14:53:38.123456, 2016-04-27 14:53:38.123456)"},
+      {"format",
+       {"%t", timestamp_range},
+       "[2015-04-18 01:55:58.123456+00, 2015-04-18 01:55:58.123457+00)"},
+      {"format", {"%t", unbounded_start_date_range}, "[NULL, 1970-01-11)"},
+      {"format", {"%t", unbounded_end_date_range}, "[1970-01-02, NULL)"},
+      {"format", {"%t", unbounded_date_range}, "[NULL, NULL)"},
+      {"format",
+       {"%t", array_range_date},
+       "[[1970-01-02, 1970-01-11), [1970-01-02, 1970-01-11)]"},
+      {"format",
+       {"%t", struct_range_date},
+       "([1970-01-02, 1970-01-11), [1970-01-02, 1970-01-11))"},
+
+      // %T tests
+      {"format",
+       {"%T", date_range},
+       "RANGE<DATE> \"[1970-01-02, 1970-01-11)\""},
+      {"format",
+       {"%T", datetime_range},
+       "RANGE<DATETIME> \"[2016-04-26 14:53:38.123456, 2016-04-27 "
+       "14:53:38.123456)\""},
+      {"format",
+       {"%T", timestamp_range},
+       "RANGE<TIMESTAMP> \"[2015-04-18 01:55:58.123456+00, 2015-04-18 "
+       "01:55:58.123457+00)\""},
+      {"format",
+       {"%T", unbounded_start_date_range},
+       "RANGE<DATE> \"[UNBOUNDED, 1970-01-11)\""},
+      {"format",
+       {"%T", unbounded_end_date_range},
+       "RANGE<DATE> \"[1970-01-02, UNBOUNDED)\""},
+      {"format",
+       {"%T", unbounded_date_range},
+       "RANGE<DATE> \"[UNBOUNDED, UNBOUNDED)\""},
+      {"format",
+       {"%T", array_range_date},
+       "[RANGE<DATE> \"[1970-01-02, 1970-01-11)\", RANGE<DATE> \"[1970-01-02, "
+       "1970-01-11)\"]"},
+      {"format",
+       {"%T", struct_range_date},
+       "(RANGE<DATE> \"[1970-01-02, 1970-01-11)\", RANGE<DATE> \"[1970-01-02, "
+       "1970-01-11)\")"},
+
+      // Null tests
+      {"format", {"%t", Value::Null(types::DateRangeType())}, "NULL"},
+      {"format", {"%T", Value::Null(types::DateRangeType())}, "NULL"},
+  };
 
   return WrapFeatures(tests);
 }

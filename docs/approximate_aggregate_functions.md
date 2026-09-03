@@ -19,9 +19,10 @@ already approximate.
 The approximate aggregate functions in this section work directly on the
 input data, rather than an intermediate estimation of the data. These functions
 _don't allow_ users to specify the precision for the estimation with
-sketches. If you would like to specify precision with sketches, see:
+sketches.
 
-+  [HyperLogLog++ functions][hll-functions] to estimate cardinality.
+To specify precision with sketches,
+use [HyperLogLog++ functions][hll-functions] to estimate cardinality.
 
 ## Function list
 
@@ -89,7 +90,7 @@ Returns the approximate result for `COUNT(DISTINCT expression)`. The value
 returned is a statistical estimate, not necessarily the actual value.
 
 This function is less accurate than `COUNT(DISTINCT expression)`, but performs
-better on huge input.
+better on very large input.
 
 **Supported Argument Types**
 

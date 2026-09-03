@@ -42,7 +42,7 @@ from googlesql.parser.generator_utils import UpperCamelCase
 
 # You can use `tag_id=GetTempTagId()` until doing the final submit.
 # That will avoid merge conflicts when syncing in other changes.
-NEXT_NODE_TAG_ID = 600
+NEXT_NODE_TAG_ID = 603
 
 
 def GetTempTagId():
@@ -2139,6 +2139,23 @@ def main(argv):
     )
 
   gen.AddNode(
+      name='ASTDeleteUsingClause',
+      tag_id=600,
+      parent='ASTNode',
+      comment="""
+      Represents the optional USING clause in a DELETE statement.
+      """,
+      fields=[
+          Field(
+              'table_expression',
+              'ASTTableExpression',
+              tag_id=2,
+              field_loader=FieldLoaderMethod.REQUIRED,
+          ),
+      ],
+  )
+
+  gen.AddNode(
       name='ASTWhereClause',
       tag_id=18,
       parent='ASTNode',
@@ -2147,9 +2164,10 @@ def main(argv):
               'expression',
               'ASTExpression',
               tag_id=2,
-              field_loader=FieldLoaderMethod.REQUIRED),
+              field_loader=FieldLoaderMethod.REQUIRED,
+          ),
       ],
-    )
+  )
 
   gen.AddNode(
       name='ASTBooleanLiteral',
@@ -7451,6 +7469,9 @@ def main(argv):
       This is used for both top-level DELETE statements and for nested DELETEs
       inside ASTUpdateItem. When used at the top-level, the target is always a
       path expression.
+
+      `using_clause` is the optional USING clause following the target table
+      for DELETE statements with joins (e.g. `DELETE target USING source WHERE ...`).
       """,
       fields=[
           Field(
@@ -7464,6 +7485,11 @@ def main(argv):
           Field('temporal_at', 'ASTTemporalAt', tag_id=9),
           Field('timestamp', 'ASTWithTimestamp', tag_id=10),
           Field('offset', 'ASTWithOffset', tag_id=4),
+          Field(
+              'using_clause',
+              'ASTDeleteUsingClause',
+              tag_id=11,
+          ),
           Field(
               'where',
               'ASTExpression',
@@ -13089,6 +13115,54 @@ def main(argv):
               'ASTGqlRemoveItem',
               tag_id=2,
               field_loader=FieldLoaderMethod.REST_AS_REPEATED,
+          ),
+      ],
+  )
+  gen.AddNode(
+      name='ASTGqlDeleteItem',
+      tag_id=601,
+      parent='ASTNode',
+      comment="""
+      Represents a single graph element to be deleted.
+      """,
+      fields=[
+          Field(
+              'element_variable',
+              'ASTIdentifier',
+              tag_id=2,
+              field_loader=FieldLoaderMethod.REQUIRED,
+          ),
+      ],
+  )
+  gen.AddNode(
+      name='ASTGqlDelete',
+      tag_id=602,
+      parent='ASTGqlOperator',
+      use_custom_debug_string=True,
+      comment="""
+      Represents a single GQL DELETE statement
+      (`[DETACH | NODETACH] DELETE <delete item list>`).
+      """,
+      fields=[
+          Field(
+              'delete_item_list',
+              'ASTGqlDeleteItem',
+              tag_id=2,
+              field_loader=FieldLoaderMethod.REST_AS_REPEATED,
+              comment="""
+              List of graph elements to be deleted.
+              """,
+          ),
+          Field(
+              'is_detach_mode',
+              SCALAR_BOOL,
+              tag_id=3,
+              comment="""
+              Indicates the deletion mode for the GQL DELETE operation.
+
+              This field is true if DETACH is specified as a keyword in front of
+              DELETE. Otherwise, this field is false for all other syntax.
+              """,
           ),
       ],
   )

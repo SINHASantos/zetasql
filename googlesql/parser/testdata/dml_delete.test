@@ -431,3 +431,661 @@ HintedStatement [0-21] [@{a=b} delete from t1]
 --
 @{ a = b }
 DELETE t1
+==
+
+# DELETE with USING single table
+DELETE target USING source WHERE target.k = source.k
+--
+DeleteStatement [0-52] [DELETE target...= source.k]
+  PathExpression [7-13] [target]
+    Identifier(target) [7-13] [target]
+  DeleteUsingClause [14-26] [USING source]
+    TablePathExpression [20-26] [source]
+      PathExpression [20-26] [source]
+        Identifier(source) [20-26] [source]
+  BinaryExpression(=) [33-52] [target.k = source.k]
+    PathExpression [33-41] [target.k]
+      Identifier(target) [33-39] [target]
+      Identifier(k) [40-41] [k]
+    PathExpression [44-52] [source.k]
+      Identifier(source) [44-50] [source]
+      Identifier(k) [51-52] [k]
+--
+DELETE target
+USING
+  source
+WHERE
+  target.k = source.k
+==
+
+# DELETE with USING and aliases
+DELETE target AS t USING source AS s WHERE t.k = s.k
+--
+DeleteStatement [0-52] [DELETE target...t.k = s.k]
+  PathExpression [7-13] [target]
+    Identifier(target) [7-13] [target]
+  Alias [14-18] [AS t]
+    Identifier(t) [17-18] [t]
+  DeleteUsingClause [19-36] [USING source AS s]
+    TablePathExpression [25-36] [source AS s]
+      PathExpression [25-31] [source]
+        Identifier(source) [25-31] [source]
+      Alias [32-36] [AS s]
+        Identifier(s) [35-36] [s]
+  BinaryExpression(=) [43-52] [t.k = s.k]
+    PathExpression [43-46] [t.k]
+      Identifier(t) [43-44] [t]
+      Identifier(k) [45-46] [k]
+    PathExpression [49-52] [s.k]
+      Identifier(s) [49-50] [s]
+      Identifier(k) [51-52] [k]
+--
+DELETE target AS t
+USING
+  source AS s
+WHERE
+  t.k = s.k
+==
+
+# DELETE with USING and comma joins
+DELETE target USING source1, source2 WHERE target.k = source1.k AND source1.x = source2.x
+--
+DeleteStatement [0-89] [DELETE target...source2.x]
+  PathExpression [7-13] [target]
+    Identifier(target) [7-13] [target]
+  DeleteUsingClause [14-36] [USING source1, source2]
+    Join(COMMA) [20-36] [source1, source2]
+      TablePathExpression [20-27] [source1]
+        PathExpression [20-27] [source1]
+          Identifier(source1) [20-27] [source1]
+      Location [27-28] [,]
+      TablePathExpression [29-36] [source2]
+        PathExpression [29-36] [source2]
+          Identifier(source2) [29-36] [source2]
+  AndExpr [43-89] [target.k =...source2.x]
+    BinaryExpression(=) [43-63] [target.k = source1.k]
+      PathExpression [43-51] [target.k]
+        Identifier(target) [43-49] [target]
+        Identifier(k) [50-51] [k]
+      PathExpression [54-63] [source1.k]
+        Identifier(source1) [54-61] [source1]
+        Identifier(k) [62-63] [k]
+    BinaryExpression(=) [68-89] [source1.x = source2.x]
+      PathExpression [68-77] [source1.x]
+        Identifier(source1) [68-75] [source1]
+        Identifier(x) [76-77] [x]
+      PathExpression [80-89] [source2.x]
+        Identifier(source2) [80-87] [source2]
+        Identifier(x) [88-89] [x]
+--
+DELETE target
+USING
+  source1,
+  source2
+WHERE
+  target.k = source1.k AND source1.x = source2.x
+==
+
+# DELETE with USING subquery
+DELETE target USING (SELECT 1 AS a) WHERE target.k = a
+--
+DeleteStatement [0-54] [DELETE target...target.k = a]
+  PathExpression [7-13] [target]
+    Identifier(target) [7-13] [target]
+  DeleteUsingClause [14-35] [USING (SELECT 1 AS a)]
+    TableSubquery [20-35] [(SELECT 1 AS a)]
+      Query [21-34] [SELECT 1 AS a]
+        Select [21-34] [SELECT 1 AS a]
+          SelectList [28-34] [1 AS a]
+            SelectColumn [28-34] [1 AS a]
+              IntLiteral(1) [28-29] [1]
+              Alias [30-34] [AS a]
+                Identifier(a) [33-34] [a]
+  BinaryExpression(=) [42-54] [target.k = a]
+    PathExpression [42-50] [target.k]
+      Identifier(target) [42-48] [target]
+      Identifier(k) [49-50] [k]
+    PathExpression [53-54] [a]
+      Identifier(a) [53-54] [a]
+--
+DELETE target
+USING
+  (
+    SELECT
+      1 AS a
+  )
+WHERE
+  target.k = a
+==
+
+# DELETE with USING joins
+DELETE target USING source1 {{JOIN|LEFT JOIN|RIGHT JOIN|FULL JOIN|CROSS JOIN}} source2 {{ON source1.k = source2.k|USING (k)}} WHERE target.k = source1.k
+--
+ALTERNATION GROUP: JOIN,ON source1.k = source2.k
+--
+DeleteStatement [0-92] [DELETE target...source1.k]
+  PathExpression [7-13] [target]
+    Identifier(target) [7-13] [target]
+  DeleteUsingClause [14-65] [USING source1...source2.k]
+    Join [20-65] [source1 JOIN...source2.k]
+      TablePathExpression [20-27] [source1]
+        PathExpression [20-27] [source1]
+          Identifier(source1) [20-27] [source1]
+      Location [28-32] [JOIN]
+      TablePathExpression [33-40] [source2]
+        PathExpression [33-40] [source2]
+          Identifier(source2) [33-40] [source2]
+      OnClause [41-65] [ON source1.k = source2.k]
+        BinaryExpression(=) [44-65] [source1.k = source2.k]
+          PathExpression [44-53] [source1.k]
+            Identifier(source1) [44-51] [source1]
+            Identifier(k) [52-53] [k]
+          PathExpression [56-65] [source2.k]
+            Identifier(source2) [56-63] [source2]
+            Identifier(k) [64-65] [k]
+  BinaryExpression(=) [72-92] [target.k = source1.k]
+    PathExpression [72-80] [target.k]
+      Identifier(target) [72-78] [target]
+      Identifier(k) [79-80] [k]
+    PathExpression [83-92] [source1.k]
+      Identifier(source1) [83-90] [source1]
+      Identifier(k) [91-92] [k]
+--
+DELETE target
+USING
+  source1
+  JOIN
+  source2
+  ON source1.k = source2.k
+WHERE
+  target.k = source1.k
+--
+ALTERNATION GROUP: JOIN,USING (k)
+--
+DeleteStatement [0-77] [DELETE target...source1.k]
+  PathExpression [7-13] [target]
+    Identifier(target) [7-13] [target]
+  DeleteUsingClause [14-50] [USING source1...USING (k)]
+    Join [20-50] [source1 JOIN source2 USING (k)]
+      TablePathExpression [20-27] [source1]
+        PathExpression [20-27] [source1]
+          Identifier(source1) [20-27] [source1]
+      Location [28-32] [JOIN]
+      TablePathExpression [33-40] [source2]
+        PathExpression [33-40] [source2]
+          Identifier(source2) [33-40] [source2]
+      UsingClause [41-50] [USING (k)]
+        Identifier(k) [48-49] [k]
+  BinaryExpression(=) [57-77] [target.k = source1.k]
+    PathExpression [57-65] [target.k]
+      Identifier(target) [57-63] [target]
+      Identifier(k) [64-65] [k]
+    PathExpression [68-77] [source1.k]
+      Identifier(source1) [68-75] [source1]
+      Identifier(k) [76-77] [k]
+--
+DELETE target
+USING
+  source1
+  JOIN
+  source2
+  USING(k)
+WHERE
+  target.k = source1.k
+--
+ALTERNATION GROUP: LEFT JOIN,ON source1.k = source2.k
+--
+DeleteStatement [0-97] [DELETE target...source1.k]
+  PathExpression [7-13] [target]
+    Identifier(target) [7-13] [target]
+  DeleteUsingClause [14-70] [USING source1...source2.k]
+    Join(LEFT) [20-70] [source1 LEFT...source2.k]
+      TablePathExpression [20-27] [source1]
+        PathExpression [20-27] [source1]
+          Identifier(source1) [20-27] [source1]
+      Location [28-37] [LEFT JOIN]
+      TablePathExpression [38-45] [source2]
+        PathExpression [38-45] [source2]
+          Identifier(source2) [38-45] [source2]
+      OnClause [46-70] [ON source1.k = source2.k]
+        BinaryExpression(=) [49-70] [source1.k = source2.k]
+          PathExpression [49-58] [source1.k]
+            Identifier(source1) [49-56] [source1]
+            Identifier(k) [57-58] [k]
+          PathExpression [61-70] [source2.k]
+            Identifier(source2) [61-68] [source2]
+            Identifier(k) [69-70] [k]
+  BinaryExpression(=) [77-97] [target.k = source1.k]
+    PathExpression [77-85] [target.k]
+      Identifier(target) [77-83] [target]
+      Identifier(k) [84-85] [k]
+    PathExpression [88-97] [source1.k]
+      Identifier(source1) [88-95] [source1]
+      Identifier(k) [96-97] [k]
+--
+DELETE target
+USING
+  source1
+  LEFT JOIN
+  source2
+  ON source1.k = source2.k
+WHERE
+  target.k = source1.k
+--
+ALTERNATION GROUP: LEFT JOIN,USING (k)
+--
+DeleteStatement [0-82] [DELETE target...source1.k]
+  PathExpression [7-13] [target]
+    Identifier(target) [7-13] [target]
+  DeleteUsingClause [14-55] [USING source1...USING (k)]
+    Join(LEFT) [20-55] [source1 LEFT...USING (k)]
+      TablePathExpression [20-27] [source1]
+        PathExpression [20-27] [source1]
+          Identifier(source1) [20-27] [source1]
+      Location [28-37] [LEFT JOIN]
+      TablePathExpression [38-45] [source2]
+        PathExpression [38-45] [source2]
+          Identifier(source2) [38-45] [source2]
+      UsingClause [46-55] [USING (k)]
+        Identifier(k) [53-54] [k]
+  BinaryExpression(=) [62-82] [target.k = source1.k]
+    PathExpression [62-70] [target.k]
+      Identifier(target) [62-68] [target]
+      Identifier(k) [69-70] [k]
+    PathExpression [73-82] [source1.k]
+      Identifier(source1) [73-80] [source1]
+      Identifier(k) [81-82] [k]
+--
+DELETE target
+USING
+  source1
+  LEFT JOIN
+  source2
+  USING(k)
+WHERE
+  target.k = source1.k
+--
+ALTERNATION GROUP: RIGHT JOIN,ON source1.k = source2.k
+--
+DeleteStatement [0-98] [DELETE target...source1.k]
+  PathExpression [7-13] [target]
+    Identifier(target) [7-13] [target]
+  DeleteUsingClause [14-71] [USING source1...source2.k]
+    Join(RIGHT) [20-71] [source1 RIGHT...source2.k]
+      TablePathExpression [20-27] [source1]
+        PathExpression [20-27] [source1]
+          Identifier(source1) [20-27] [source1]
+      Location [28-38] [RIGHT JOIN]
+      TablePathExpression [39-46] [source2]
+        PathExpression [39-46] [source2]
+          Identifier(source2) [39-46] [source2]
+      OnClause [47-71] [ON source1.k = source2.k]
+        BinaryExpression(=) [50-71] [source1.k = source2.k]
+          PathExpression [50-59] [source1.k]
+            Identifier(source1) [50-57] [source1]
+            Identifier(k) [58-59] [k]
+          PathExpression [62-71] [source2.k]
+            Identifier(source2) [62-69] [source2]
+            Identifier(k) [70-71] [k]
+  BinaryExpression(=) [78-98] [target.k = source1.k]
+    PathExpression [78-86] [target.k]
+      Identifier(target) [78-84] [target]
+      Identifier(k) [85-86] [k]
+    PathExpression [89-98] [source1.k]
+      Identifier(source1) [89-96] [source1]
+      Identifier(k) [97-98] [k]
+--
+DELETE target
+USING
+  source1
+  RIGHT JOIN
+  source2
+  ON source1.k = source2.k
+WHERE
+  target.k = source1.k
+--
+ALTERNATION GROUP: RIGHT JOIN,USING (k)
+--
+DeleteStatement [0-83] [DELETE target...source1.k]
+  PathExpression [7-13] [target]
+    Identifier(target) [7-13] [target]
+  DeleteUsingClause [14-56] [USING source1...USING (k)]
+    Join(RIGHT) [20-56] [source1 RIGHT...USING (k)]
+      TablePathExpression [20-27] [source1]
+        PathExpression [20-27] [source1]
+          Identifier(source1) [20-27] [source1]
+      Location [28-38] [RIGHT JOIN]
+      TablePathExpression [39-46] [source2]
+        PathExpression [39-46] [source2]
+          Identifier(source2) [39-46] [source2]
+      UsingClause [47-56] [USING (k)]
+        Identifier(k) [54-55] [k]
+  BinaryExpression(=) [63-83] [target.k = source1.k]
+    PathExpression [63-71] [target.k]
+      Identifier(target) [63-69] [target]
+      Identifier(k) [70-71] [k]
+    PathExpression [74-83] [source1.k]
+      Identifier(source1) [74-81] [source1]
+      Identifier(k) [82-83] [k]
+--
+DELETE target
+USING
+  source1
+  RIGHT JOIN
+  source2
+  USING(k)
+WHERE
+  target.k = source1.k
+--
+ALTERNATION GROUP: FULL JOIN,ON source1.k = source2.k
+--
+DeleteStatement [0-97] [DELETE target...source1.k]
+  PathExpression [7-13] [target]
+    Identifier(target) [7-13] [target]
+  DeleteUsingClause [14-70] [USING source1...source2.k]
+    Join(FULL) [20-70] [source1 FULL...source2.k]
+      TablePathExpression [20-27] [source1]
+        PathExpression [20-27] [source1]
+          Identifier(source1) [20-27] [source1]
+      Location [28-37] [FULL JOIN]
+      TablePathExpression [38-45] [source2]
+        PathExpression [38-45] [source2]
+          Identifier(source2) [38-45] [source2]
+      OnClause [46-70] [ON source1.k = source2.k]
+        BinaryExpression(=) [49-70] [source1.k = source2.k]
+          PathExpression [49-58] [source1.k]
+            Identifier(source1) [49-56] [source1]
+            Identifier(k) [57-58] [k]
+          PathExpression [61-70] [source2.k]
+            Identifier(source2) [61-68] [source2]
+            Identifier(k) [69-70] [k]
+  BinaryExpression(=) [77-97] [target.k = source1.k]
+    PathExpression [77-85] [target.k]
+      Identifier(target) [77-83] [target]
+      Identifier(k) [84-85] [k]
+    PathExpression [88-97] [source1.k]
+      Identifier(source1) [88-95] [source1]
+      Identifier(k) [96-97] [k]
+--
+DELETE target
+USING
+  source1
+  FULL JOIN
+  source2
+  ON source1.k = source2.k
+WHERE
+  target.k = source1.k
+--
+ALTERNATION GROUP: FULL JOIN,USING (k)
+--
+DeleteStatement [0-82] [DELETE target...source1.k]
+  PathExpression [7-13] [target]
+    Identifier(target) [7-13] [target]
+  DeleteUsingClause [14-55] [USING source1...USING (k)]
+    Join(FULL) [20-55] [source1 FULL...USING (k)]
+      TablePathExpression [20-27] [source1]
+        PathExpression [20-27] [source1]
+          Identifier(source1) [20-27] [source1]
+      Location [28-37] [FULL JOIN]
+      TablePathExpression [38-45] [source2]
+        PathExpression [38-45] [source2]
+          Identifier(source2) [38-45] [source2]
+      UsingClause [46-55] [USING (k)]
+        Identifier(k) [53-54] [k]
+  BinaryExpression(=) [62-82] [target.k = source1.k]
+    PathExpression [62-70] [target.k]
+      Identifier(target) [62-68] [target]
+      Identifier(k) [69-70] [k]
+    PathExpression [73-82] [source1.k]
+      Identifier(source1) [73-80] [source1]
+      Identifier(k) [81-82] [k]
+--
+DELETE target
+USING
+  source1
+  FULL JOIN
+  source2
+  USING(k)
+WHERE
+  target.k = source1.k
+--
+ALTERNATION GROUP: CROSS JOIN,ON source1.k = source2.k
+--
+DeleteStatement [0-98] [DELETE target...source1.k]
+  PathExpression [7-13] [target]
+    Identifier(target) [7-13] [target]
+  DeleteUsingClause [14-71] [USING source1...source2.k]
+    Join(CROSS) [20-71] [source1 CROSS...source2.k]
+      TablePathExpression [20-27] [source1]
+        PathExpression [20-27] [source1]
+          Identifier(source1) [20-27] [source1]
+      Location [28-38] [CROSS JOIN]
+      TablePathExpression [39-46] [source2]
+        PathExpression [39-46] [source2]
+          Identifier(source2) [39-46] [source2]
+      OnClause [47-71] [ON source1.k = source2.k]
+        BinaryExpression(=) [50-71] [source1.k = source2.k]
+          PathExpression [50-59] [source1.k]
+            Identifier(source1) [50-57] [source1]
+            Identifier(k) [58-59] [k]
+          PathExpression [62-71] [source2.k]
+            Identifier(source2) [62-69] [source2]
+            Identifier(k) [70-71] [k]
+  BinaryExpression(=) [78-98] [target.k = source1.k]
+    PathExpression [78-86] [target.k]
+      Identifier(target) [78-84] [target]
+      Identifier(k) [85-86] [k]
+    PathExpression [89-98] [source1.k]
+      Identifier(source1) [89-96] [source1]
+      Identifier(k) [97-98] [k]
+--
+DELETE target
+USING
+  source1
+  CROSS JOIN
+  source2
+  ON source1.k = source2.k
+WHERE
+  target.k = source1.k
+--
+ALTERNATION GROUP: CROSS JOIN,USING (k)
+--
+DeleteStatement [0-83] [DELETE target...source1.k]
+  PathExpression [7-13] [target]
+    Identifier(target) [7-13] [target]
+  DeleteUsingClause [14-56] [USING source1...USING (k)]
+    Join(CROSS) [20-56] [source1 CROSS...USING (k)]
+      TablePathExpression [20-27] [source1]
+        PathExpression [20-27] [source1]
+          Identifier(source1) [20-27] [source1]
+      Location [28-38] [CROSS JOIN]
+      TablePathExpression [39-46] [source2]
+        PathExpression [39-46] [source2]
+          Identifier(source2) [39-46] [source2]
+      UsingClause [47-56] [USING (k)]
+        Identifier(k) [54-55] [k]
+  BinaryExpression(=) [63-83] [target.k = source1.k]
+    PathExpression [63-71] [target.k]
+      Identifier(target) [63-69] [target]
+      Identifier(k) [70-71] [k]
+    PathExpression [74-83] [source1.k]
+      Identifier(source1) [74-81] [source1]
+      Identifier(k) [82-83] [k]
+--
+DELETE target
+USING
+  source1
+  CROSS JOIN
+  source2
+  USING(k)
+WHERE
+  target.k = source1.k
+==
+
+# DELETE with USING TVF
+DELETE target USING tvf_key_value() WHERE target.k = tvf_key_value.k
+--
+DeleteStatement [0-68] [DELETE target...vf_key_value.k]
+  PathExpression [7-13] [target]
+    Identifier(target) [7-13] [target]
+  DeleteUsingClause [14-35] [USING tvf_key_value()]
+    TVF [20-35] [tvf_key_value()]
+      PathExpression [20-33] [tvf_key_value]
+        Identifier(tvf_key_value) [20-33] [tvf_key_value]
+  BinaryExpression(=) [42-68] [target.k = tvf_key_value.k]
+    PathExpression [42-50] [target.k]
+      Identifier(target) [42-48] [target]
+      Identifier(k) [49-50] [k]
+    PathExpression [53-68] [tvf_key_value.k]
+      Identifier(tvf_key_value) [53-66] [tvf_key_value]
+      Identifier(k) [67-68] [k]
+--
+DELETE target
+USING
+  tvf_key_value()
+WHERE
+  target.k = tvf_key_value.k
+==
+
+# DELETE with USING TVF and alias
+DELETE target USING tvf_key_value() AS tvf WHERE target.k = tvf.k
+--
+DeleteStatement [0-65] [DELETE target....k = tvf.k]
+  PathExpression [7-13] [target]
+    Identifier(target) [7-13] [target]
+  DeleteUsingClause [14-42] [USING tvf_key_value() AS tvf]
+    TVF [20-42] [tvf_key_value() AS tvf]
+      PathExpression [20-33] [tvf_key_value]
+        Identifier(tvf_key_value) [20-33] [tvf_key_value]
+      Alias [36-42] [AS tvf]
+        Identifier(tvf) [39-42] [tvf]
+  BinaryExpression(=) [49-65] [target.k = tvf.k]
+    PathExpression [49-57] [target.k]
+      Identifier(target) [49-55] [target]
+      Identifier(k) [56-57] [k]
+    PathExpression [60-65] [tvf.k]
+      Identifier(tvf) [60-63] [tvf]
+      Identifier(k) [64-65] [k]
+--
+DELETE target
+USING
+  tvf_key_value() AS tvf
+WHERE
+  target.k = tvf.k
+==
+
+# DELETE FROM with USING
+DELETE FROM target USING source WHERE target.k = source.k
+--
+DeleteStatement [0-57] [DELETE FROM...= source.k]
+  PathExpression [12-18] [target]
+    Identifier(target) [12-18] [target]
+  DeleteUsingClause [19-31] [USING source]
+    TablePathExpression [25-31] [source]
+      PathExpression [25-31] [source]
+        Identifier(source) [25-31] [source]
+  BinaryExpression(=) [38-57] [target.k = source.k]
+    PathExpression [38-46] [target.k]
+      Identifier(target) [38-44] [target]
+      Identifier(k) [45-46] [k]
+    PathExpression [49-57] [source.k]
+      Identifier(source) [49-55] [source]
+      Identifier(k) [56-57] [k]
+--
+DELETE target
+USING
+  source
+WHERE
+  target.k = source.k
+==
+
+# DELETE with USING and table hints
+DELETE target@{hint=1} USING source@{hint=2} WHERE target.k = source.k
+--
+DeleteStatement [0-70] [DELETE target...= source.k]
+  PathExpression [7-13] [target]
+    Identifier(target) [7-13] [target]
+  Hint [13-22] [@{hint=1}]
+    HintEntry [15-21] [hint=1]
+      Identifier(hint) [15-19] [hint]
+      IntLiteral(1) [20-21] [1]
+  DeleteUsingClause [23-44] [USING source@{hint=2}]
+    TablePathExpression [29-44] [source@{hint=2}]
+      PathExpression [29-35] [source]
+        Identifier(source) [29-35] [source]
+      Hint [35-44] [@{hint=2}]
+        HintEntry [37-43] [hint=2]
+          Identifier(hint) [37-41] [hint]
+          IntLiteral(2) [42-43] [2]
+  BinaryExpression(=) [51-70] [target.k = source.k]
+    PathExpression [51-59] [target.k]
+      Identifier(target) [51-57] [target]
+      Identifier(k) [58-59] [k]
+    PathExpression [62-70] [source.k]
+      Identifier(source) [62-68] [source]
+      Identifier(k) [69-70] [k]
+--
+DELETE target @{ hint = 1 }
+USING
+  source @{ hint = 2 }
+WHERE
+  target.k = source.k
+==
+
+# DELETE with USING implicit alias
+DELETE target USING source s WHERE target.k = s.k
+--
+DeleteStatement [0-49] [DELETE target...target.k = s.k]
+  PathExpression [7-13] [target]
+    Identifier(target) [7-13] [target]
+  DeleteUsingClause [14-28] [USING source s]
+    TablePathExpression [20-28] [source s]
+      PathExpression [20-26] [source]
+        Identifier(source) [20-26] [source]
+      Alias [27-28] [s]
+        Identifier(s) [27-28] [s]
+  BinaryExpression(=) [35-49] [target.k = s.k]
+    PathExpression [35-43] [target.k]
+      Identifier(target) [35-41] [target]
+      Identifier(k) [42-43] [k]
+    PathExpression [46-49] [s.k]
+      Identifier(s) [46-47] [s]
+      Identifier(k) [48-49] [k]
+--
+DELETE target
+USING
+  source AS s
+WHERE
+  target.k = s.k
+==
+
+# Error: Trailing USING at EOF
+DELETE target USING
+--
+ERROR: Syntax error: Unexpected end of statement [at 1:20]
+DELETE target USING
+                   ^
+==
+
+# Error: Missing table expression after USING
+DELETE target USING WHERE target.k = 1
+--
+ERROR: Syntax error: Unexpected keyword WHERE [at 1:21]
+DELETE target USING WHERE target.k = 1
+                    ^
+==
+
+# Error: Duplicate USING clauses
+DELETE target USING source1 USING source2 WHERE target.k = 1
+--
+ERROR: Syntax error: Expected keyword JOIN but got keyword USING [at 1:29]
+DELETE target USING source1 USING source2 WHERE target.k = 1
+                            ^
+==
+
+# Error: Misplaced USING clause after WHERE
+DELETE target WHERE target.k = 1 USING source
+--
+ERROR: Syntax error: Expected end of input but got keyword USING [at 1:34]
+DELETE target WHERE target.k = 1 USING source
+                                 ^

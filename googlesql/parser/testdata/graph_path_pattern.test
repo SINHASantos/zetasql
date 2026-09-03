@@ -550,7 +550,7 @@ SELECT one FROM GRAPH_TABLE(
   COLUMNS(1 AS one)
   )
 --
-ERROR: Syntax error: Expected keyword INSERT or keyword REMOVE or keyword RETURN or keyword SET but got "[" [at 3:19]
+ERROR: Syntax error: Unexpected "[" [at 3:19]
   MATCH (a)-[]->->[]->(c)
                   ^
 ==

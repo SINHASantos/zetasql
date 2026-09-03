@@ -671,6 +671,12 @@ absl::Status Catalog::GetConstant(const std::string& name,
   return absl::OkStatus();
 }
 
+absl::Status Catalog::GetMacro(const std::string& name, const Macro** macro,
+                               const FindOptions& options) {
+  *macro = nullptr;
+  return absl::OkStatus();
+}
+
 absl::Status Catalog::GetPropertyGraph(absl::string_view name,
                                        const PropertyGraph*& property_graph,
                                        const FindOptions& options) {

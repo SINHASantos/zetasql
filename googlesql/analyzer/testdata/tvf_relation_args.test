@@ -8467,4 +8467,63 @@ QueryStmt
     +-column_list=[t.a#1{Collation:"und:ci"}]
     +-input_scan=
       +-RelationArgumentScan(column_list=[t.a#1{Collation:"und:ci"}], name="t")
+==
 
+# Regression test for b/555252595
+[prepare_database=db_tvf_coercion_bug]
+[language_features=MAXIMUM]
+CREATE TABLE FUNCTION StructArgAfterRelationArg(t TABLE<d DOUBLE>, s STRUCT<a DOUBLE>)
+RETURNS TABLE<d DOUBLE>
+LANGUAGE python;
+--
+CreateTableFunctionStmt(name_path=StructArgAfterRelationArg, argument_name_list=[t, s], signature=(TABLE<d DOUBLE> t, STRUCT<a DOUBLE> s) -> TABLE<d DOUBLE>, has_explicit_return_schema=TRUE, language="python")
+==
+
+[use_database=db_tvf_coercion_bug]
+[language_features=MAXIMUM]
+# Verifies that coercion map for relation arguments is preserved when followed
+# by a struct argument that also requires coercion.
+WITH t AS (SELECT 1 AS d)
+SELECT * FROM StructArgAfterRelationArg(TABLE t, STRUCT(2 AS a));
+--
+QueryStmt
++-output_column_list=
+| +-StructArgAfterRelationArg.d#4 AS d [DOUBLE]
++-query=
+  +-WithScan
+    +-column_list=[StructArgAfterRelationArg.d#4]
+    +-with_entry_list=
+    | +-WithEntry
+    |   +-with_query_name="t"
+    |   +-with_subquery=
+    |     +-ProjectScan
+    |       +-column_list=[t.d#1]
+    |       +-expr_list=
+    |       | +-d#1 := Literal(type=INT64, value=1)
+    |       +-input_scan=
+    |         +-SingleRowScan
+    +-query=
+      +-ProjectScan
+        +-column_list=[StructArgAfterRelationArg.d#4]
+        +-input_scan=
+          +-TVFScan
+            +-column_list=[StructArgAfterRelationArg.d#4]
+            +-tvf=StructArgAfterRelationArg
+            +-signature=(TABLE<d DOUBLE>, STRUCT<a DOUBLE>) -> TABLE<d DOUBLE>
+            +-argument_list=
+            | +-FunctionArgument
+            | | +-scan=
+            | | | +-ProjectScan
+            | | |   +-column_list=[$subquery1.d#3]
+            | | |   +-expr_list=
+            | | |   | +-d#3 :=
+            | | |   |   +-Cast(INT64 -> DOUBLE)
+            | | |   |     +-ColumnRef(type=INT64, column=t.d#2)
+            | | |   +-input_scan=
+            | | |     +-WithRefScan(column_list=[t.d#2], node_source="table_clause", with_query_name="t")
+            | | +-argument_column_list=[$subquery1.d#3]
+            | +-FunctionArgument
+            |   +-expr=
+            |     +-Literal(type=STRUCT<a DOUBLE>, value={a:2})
+            +-column_index_list=[0]
+            +-function_call_signature=(TABLE<d DOUBLE> t, STRUCT<a DOUBLE> s) -> TABLE<d DOUBLE>

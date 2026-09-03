@@ -2797,7 +2797,7 @@ SHARDED_TEST_F(ComplianceCodebasedTests, TestJaroWinklerSimilarity, 1) {
 // test case so that the original expected result requires
 // FEATURE_CIVIL_TIME in the feature set, and an empty feature set should
 // expect to result in an error.
-ABSL_MUST_USE_RESULT static const std::vector<QueryParamsWithResult>
+[[nodiscard]] static const std::vector<QueryParamsWithResult>
 WrapProtoFieldTestCasesForCivilTime(
     const std::vector<QueryParamsWithResult>& original_results) {
   std::vector<QueryParamsWithResult> results(original_results);

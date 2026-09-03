@@ -78,10 +78,6 @@ import javax.annotation.Nullable;
  * Helper functions for generating debug strings for {@link ResolvedNode}s.
  */
 class DebugStrings {
-  // TODO: Remove the flag once it is rolled out in external tests.
-  private static final boolean OMIT_TVF_SIGNATURES =
-      Boolean.parseBoolean(
-          System.getProperty("googlesql.omitTvfSignaturesInResolvedAstDebugString", "true"));
 
   // isDefaultValue functions for different node field types, similar to the C++ implementations in
   // googlesql/resolved_ast/resolved_ast.cc.template
@@ -256,7 +252,7 @@ class DebugStrings {
   }
 
   static String toStringImpl(TableValuedFunction tvf) {
-    return OMIT_TVF_SIGNATURES ? tvf.getFullName() : tvf.toString();
+    return tvf.getFullName();
   }
 
   static String toStringImpl(TVFSignature signature) {

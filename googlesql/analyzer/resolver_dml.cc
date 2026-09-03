@@ -228,6 +228,10 @@ absl::Status Resolver::ResolveDeleteStatement(
     return MakeSqlErrorAt(ast_statement->offset())
            << "Non-nested DELETE statement does not support WITH OFFSET";
   }
+  if (ast_statement->using_clause() != nullptr) {
+    return MakeSqlErrorAt(ast_statement->using_clause())
+           << "DELETE with USING clause is not supported";
+  }
 
   const std::unique_ptr<const NameScope> delete_scope(
       new NameScope(*name_list));
@@ -2601,6 +2605,12 @@ absl::Status Resolver::MergeWithUpdateItem(
       if (ast_input_update_item->delete_statement()->hint() != nullptr) {
         return MakeSqlErrorAt(ast_input_update_item->delete_statement()->hint())
                << "Nested DELETE statement does not support hints";
+      }
+      if (ast_input_update_item->delete_statement()->using_clause() !=
+          nullptr) {
+        return MakeSqlErrorAt(
+                   ast_input_update_item->delete_statement()->using_clause())
+               << "Nested DELETE statement does not support USING clause";
       }
 
       std::unique_ptr<ResolvedDeleteStmt> resolved_stmt;

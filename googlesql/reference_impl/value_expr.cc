@@ -3746,22 +3746,6 @@ absl::Status DMLUpdateValueExpr::AddToUpdateMap(
     GOOGLESQL_ASSIGN_OR_RETURN(const ValueExpr* subscript_expr,
                      LookupResolvedExpr(update_item_element->subscript()));
 
-    if (update_item->target()->type()->IsJson()) {
-      GOOGLESQL_RET_CHECK(update_item_element->update_item_mode() ==
-                ResolvedUpdateItemElementEnums::ELEMENT_PRESENCE_OPTIONAL);
-    } else if (update_item->target()->type()->IsArray()) {
-      GOOGLESQL_RET_CHECK(update_item_element->update_item_mode() ==
-                ResolvedUpdateItemElementEnums::ELEMENT_PRESENCE_REQUIRED);
-    } else if (update_item->target()->type()->IsMap()) {
-      GOOGLESQL_RET_CHECK(update_item_element->update_item_mode() ==
-                    ResolvedUpdateItemElementEnums::ELEMENT_PRESENCE_REQUIRED ||
-                update_item_element->update_item_mode() ==
-                    ResolvedUpdateItemElementEnums::ELEMENT_PRESENCE_OPTIONAL);
-    } else {
-      GOOGLESQL_RET_CHECK_FAIL() << "Unsupported subscripted type: "
-                       << update_item->target()->type()->DebugString();
-    }
-
     GOOGLESQL_ASSIGN_OR_RETURN(const Value subscript_value,
                      EvalExpr(*subscript_expr, tuples_for_row, context));
     if (subscript_value.is_null() &&

@@ -130,12 +130,12 @@ class QueryParamsWithResult {
   QueryParamsWithResult CopyWithInvertedResult() const;
 
   // Returns a copy of this test case with 'feature' made a required feature.
-  ABSL_DEPRECATED("AddRequiredFeature is more efficient and more idiomatic.")
+  [[deprecated("AddRequiredFeature is more efficient and more idiomatic.")]]
   QueryParamsWithResult WrapWithFeature(LanguageFeature feature) const;
 
   // Returns a copy of this test case with 'feature_set' added to required
   // features.
-  ABSL_DEPRECATED("AddRequiredFeatures is more efficient and more idiomatic.")
+  [[deprecated("AddRequiredFeatures is more efficient and more idiomatic.")]]
   QueryParamsWithResult WrapWithFeatureSet(FeatureSet feature_set) const;
 
   // Adds a required feature to this test in-place and returns a reference
@@ -201,8 +201,10 @@ class QueryParamsWithResult {
 
   // Accessor/setter for the ResultMap. We do not allow mutating the ResultMap
   // directly because we need to ensure that it can never be empty.
-  ABSL_DEPRECATED("Access result directly.")
-  ResultMap results() const { return {{required_features(), result_}}; }
+  [[deprecated("Access result directly.")]]
+  ResultMap results() const {
+    return {{required_features(), result_}};
+  }
 
   // Returns the set of features that must be enabled for the test statement to
   // return correct results.

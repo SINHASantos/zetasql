@@ -1507,7 +1507,7 @@ absl::StatusOr<bool> Coercer::Context::StructCoercesTo(
           return false;
         }
       }
-      result->UpdateFromResult(local_result);
+      GOOGLESQL_RET_CHECK_OK(result->UpdateFromResult(local_result));
     }
   }
   return true;
@@ -1581,7 +1581,7 @@ absl::StatusOr<bool> Coercer::Context::StructCoercesToProtoMapEntry(
     result->incr_non_matched_arguments();
     return false;
   }
-  result->UpdateFromResult(local_result);
+  GOOGLESQL_RET_CHECK_OK(result->UpdateFromResult(local_result));
   return true;
 }
 

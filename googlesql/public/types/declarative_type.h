@@ -20,7 +20,6 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
-#include <optional>
 #include <string>
 #include <utility>
 #include <variant>
@@ -92,9 +91,6 @@ using DeclarativeTypeId = TypeId;
 //
 // Because built-in types have static, fixed behavior defined within GoogleSQL's
 // codebase, their callbacks do not need to be serialized into TypeProto.
-//
-// Recall that TypeId uniquely identifies the type, so TypeParameter handling
-// must also be consistent and identical for all instances with the same TypeId.
 //
 // Why stateless function pointers (`(*)(...)`) instead of `std::function`:
 // 1. Native Equality: Function pointers can be compared directly (`==`). This
@@ -215,6 +211,13 @@ class DeclarativeTypeDescriptor final {
   struct EqualityDelegated {};
   using EqualityStrategy = std::variant<EqualityDelegated, EqualityDisallowed>;
 
+  struct TypeParamsDisallowed {
+    bool operator==(const TypeParamsDisallowed&) const = default;
+  };
+  using TypeParamsCustom = TypeParameterHandlers;
+  using TypeParamsStrategy =
+      std::variant<TypeParamsDisallowed, TypeParamsCustom>;
+
   const TypeId& type_id() const { return data_->type_id; }
   DeclarativeTypeDescriptor& set_type_id(const TypeId& type_id) {
     data_->type_id = type_id;
@@ -290,26 +293,19 @@ class DeclarativeTypeDescriptor final {
   // callbacks to resolve and validate those type parameters.
   // Those are the implementation of `Type::ValidateAndResolveTypeParameters()`
   // and `Type::ValidateResolvedTypeParameters()`.
-  // When present, `DeclarativeType` delegates to these callbacks from its
-  // overrides of those signatures on Type.
+  // When TypeParameterHandlers is present, `DeclarativeType` delegates to these
+  // callbacks from its overrides of those signatures on Type.
   //
-  // If false, the type does not support type parameters.
+  // If TypeParamsDisallowed, the type does not support type parameters.
   // `DeclarativeType`'s implementations of
   // `Type::ValidateAndResolveTypeParameters()` and
   // `Type::ValidateResolvedTypeParameters()` return an error reporting as such.
-  bool has_type_parameter_handlers() const {
-    return data_->type_parameter_handlers.has_value();
+  const TypeParamsStrategy& type_params_strategy() const {
+    return data_->type_params_strategy;
   }
-
-  // Returns the callbacks to resolve and validate type parameters for this
-  // declarative type.
-  // Those opaque callbacks are not serialized into TypeProto, and therefore
-  // should only be used for built-in types known to the engine.
-  const std::optional<TypeParameterHandlers>& type_parameter_handlers() const;
-
-  DeclarativeTypeDescriptor& set_type_parameter_handlers(
-      std::optional<TypeParameterHandlers> handlers) {
-    data_->type_parameter_handlers = std::move(handlers);
+  DeclarativeTypeDescriptor& set_type_params_strategy(
+      const TypeParamsStrategy& type_params_strategy) {
+    data_->type_params_strategy = type_params_strategy;
     return *this;
   }
 
@@ -321,6 +317,7 @@ class DeclarativeTypeDescriptor final {
 
     // Not used for type identity, but is still user-visible, e.g. in the result
     // of TYPEOF(), displaying function signatures, or in error messages.
+    // In the future, this may become multi-part.
     std::string display_name;
 
     // The backing type for this declarative type.
@@ -344,10 +341,10 @@ class DeclarativeTypeDescriptor final {
     // IsSupportedType() checks both, plus FEATURE_DECLARATIVE_TYPE_FRAMEWORK.
     LanguageOptions::LanguageFeatureSet additional_required_language_features;
 
-    // Optional type parameter handlers registered for built-in types.
+    // The type parameter handling strategy for this declarative type.
     // Those opaque callbacks are not serialized into TypeProto, and therefore
     // should only be used for built-in types known to the engine.
-    std::optional<TypeParameterHandlers> type_parameter_handlers = std::nullopt;
+    TypeParamsStrategy type_params_strategy = TypeParamsDisallowed{};
   };
   // Allocate on the heap.
   std::unique_ptr<Data> data_ = std::make_unique<Data>();
@@ -508,8 +505,8 @@ class DeclarativeType final : public Type {
   // For a backing type stored as (d), this doesn't fit, so the
   // backing type content is converted to be stored as a pointer to an
   // out-of-line 12-byte value.
-  static const ValueContent& GetBackingContent(
-      const ValueContent& value_content, const DeclarativeType* decl_type);
+  const ValueContent& GetBackingContent(
+      const ValueContent& value_content) const;
 
   friend class TypeFactory;
   friend class Value;

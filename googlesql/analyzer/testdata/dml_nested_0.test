@@ -2551,3 +2551,15 @@ UpdateStmt
               +-DMLValue
                 +-value=
                   +-ColumnRef(type=STRING, column=AllPseudoColumnsWithRepeated.Value#2)
+==
+
+# Nested DELETE statement does not support USING clause
+UPDATE TestTable SET
+  (DELETE KitchenSink.repeated_int64_val USING KeyValue
+   WHERE true)
+WHERE true
+--
+ERROR: Nested DELETE statement does not support USING clause [at 2:42]
+  (DELETE KitchenSink.repeated_int64_val USING KeyValue
+                                         ^
+

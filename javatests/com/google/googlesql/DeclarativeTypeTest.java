@@ -114,7 +114,7 @@ public class DeclarativeTypeTest {
             "The number of fields of DeclarativeTypeProto has changed, please also update the "
                 + "serialization code accordingly.")
         .that(DeclarativeTypeProto.getDescriptor().getFields())
-        .hasSize(8);
+        .hasSize(9);
     assertWithMessage(
             "The number of fields of TypeIdProto has changed, please also update the "
                 + "serialization code accordingly.")
@@ -124,7 +124,7 @@ public class DeclarativeTypeTest {
             "The number of fields in DeclarativeTypeDescriptor class has changed, "
                 + "please also update the proto and serialization code accordingly.")
         .that(TestUtil.getNonStaticFieldCount(DeclarativeTypeDescriptor.class))
-        .isEqualTo(8);
+        .isEqualTo(9);
     assertWithMessage(
             "The number of fields in DeclarativeTypeDescriptor.TypeId class has changed, "
                 + "please also update the proto and serialization code accordingly.")

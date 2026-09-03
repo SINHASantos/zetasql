@@ -563,3 +563,12 @@ DeleteStmt
   +-FunctionCall(GoogleSQL:$equal(INT64, INT64) -> BOOL)
     +-ColumnRef(type=INT64, column=KeyValue.Key#1)
     +-Literal(type=INT64, value=1)
+==
+
+# TODO: DELETE with USING clause is not supported yet in parser CL
+DELETE SimpleTypes USING KeyValue WHERE true
+--
+ERROR: DELETE with USING clause is not supported [at 1:20]
+DELETE SimpleTypes USING KeyValue WHERE true
+                   ^
+

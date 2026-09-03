@@ -1349,11 +1349,17 @@ absl::Status TableNameResolver::FindInDeleteStatement(
   googlesql_base::InsertIfNotPresent(table_names_, path);
 
   AliasSet visible_aliases;
-  googlesql_base::InsertIfNotPresent(table_names_, path);
   const absl::string_view alias = statement->alias() == nullptr
                                       ? path.back()
                                       : statement->alias()->GetAsStringView();
   googlesql_base::InsertIfNotPresent(&visible_aliases, absl::AsciiStrToLower(alias));
+
+  if (statement->using_clause() != nullptr) {
+    GOOGLESQL_RET_CHECK(statement->using_clause()->table_expression() != nullptr);
+    GOOGLESQL_RETURN_IF_ERROR(FindInTableExpression(
+        statement->using_clause()->table_expression(),
+        /*external_visible_aliases=*/{}, &visible_aliases));
+  }
 
   GOOGLESQL_RETURN_IF_ERROR(FindInExpressionsUnder(statement->where(), visible_aliases));
   return absl::OkStatus();

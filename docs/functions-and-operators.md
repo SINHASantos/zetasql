@@ -7589,9 +7589,10 @@ already approximate.
 The approximate aggregate functions in this section work directly on the
 input data, rather than an intermediate estimation of the data. These functions
 _don't allow_ users to specify the precision for the estimation with
-sketches. If you would like to specify precision with sketches, see:
+sketches.
 
-+  [HyperLogLog++ functions][hll-functions] to estimate cardinality.
+To specify precision with sketches,
+use [HyperLogLog++ functions][hll-functions] to estimate cardinality.
 
 ### Function list
 
@@ -7659,7 +7660,7 @@ Returns the approximate result for `COUNT(DISTINCT expression)`. The value
 returned is a statistical estimate, not necessarily the actual value.
 
 This function is less accurate than `COUNT(DISTINCT expression)`, but performs
-better on huge input.
+better on very large input.
 
 **Supported Argument Types**
 
@@ -23445,8 +23446,9 @@ a State of The Art Cardinality Estimation Algorithm][hll-link-to-research-whitep
 
 + `precision`: Defines the accuracy of the estimate at the cost of additional
   memory required to process the sketches or store them on disk. The range for
-  this value is `10` to `24`. The default value is `15`. For more information
-  about precision, see [Precision for sketches][precision_hll].
+  this value is `10` to `24`, where larger values indicate higher accuracy, with
+  `24` being the most accurate. The default value is `15`. For more
+  information about precision, see [Precision for sketches][precision_hll].
 + `sparse_precision`: Defines the accuracy of the estimate when the aggregated
   cardinality is relatively small. The range for this value is the `precision`
   value to `25`. You can also set this value to `0` to disable the
@@ -23530,8 +23532,10 @@ over zero rows or only over `NULL` values, the function returns `0`.
 
 **Example**
 
- The following query counts the number of distinct users across all countries
- who have at least one invoice.
+The following query counts the number of distinct users across all countries
+who have at least one invoice. The inner query produces one sketch per country
+by grouping on `country`, and the outer query merges those sketches into a
+single distinct count.
 
 ```googlesql
 SELECT HLL_COUNT.MERGE(hll_sketch) AS distinct_customers_with_open_invoice
@@ -23595,7 +23599,9 @@ This function returns `NULL` if there is no input or all inputs are `NULL`.
 **Example**
 
 The following query returns an HLL++ sketch that counts the number of distinct
-users who have at least one invoice across all countries.
+users who have at least one invoice across all countries. The inner query
+produces one sketch per country by grouping on `country`, and the outer query
+merges those sketches into a new sketch.
 
 ```googlesql
 SELECT HLL_COUNT.MERGE_PARTIAL(HLL_sketch) AS distinct_customers_with_open_invoice

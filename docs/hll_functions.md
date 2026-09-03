@@ -154,8 +154,9 @@ a State of The Art Cardinality Estimation Algorithm][hll-link-to-research-whitep
 
 + `precision`: Defines the accuracy of the estimate at the cost of additional
   memory required to process the sketches or store them on disk. The range for
-  this value is `10` to `24`. The default value is `15`. For more information
-  about precision, see [Precision for sketches][precision_hll].
+  this value is `10` to `24`, where larger values indicate higher accuracy, with
+  `24` being the most accurate. The default value is `15`. For more
+  information about precision, see [Precision for sketches][precision_hll].
 + `sparse_precision`: Defines the accuracy of the estimate when the aggregated
   cardinality is relatively small. The range for this value is the `precision`
   value to `25`. You can also set this value to `0` to disable the
@@ -239,8 +240,10 @@ over zero rows or only over `NULL` values, the function returns `0`.
 
 **Example**
 
- The following query counts the number of distinct users across all countries
- who have at least one invoice.
+The following query counts the number of distinct users across all countries
+who have at least one invoice. The inner query produces one sketch per country
+by grouping on `country`, and the outer query merges those sketches into a
+single distinct count.
 
 ```googlesql
 SELECT HLL_COUNT.MERGE(hll_sketch) AS distinct_customers_with_open_invoice
@@ -304,7 +307,9 @@ This function returns `NULL` if there is no input or all inputs are `NULL`.
 **Example**
 
 The following query returns an HLL++ sketch that counts the number of distinct
-users who have at least one invoice across all countries.
+users who have at least one invoice across all countries. The inner query
+produces one sketch per country by grouping on `country`, and the outer query
+merges those sketches into a new sketch.
 
 ```googlesql
 SELECT HLL_COUNT.MERGE_PARTIAL(HLL_sketch) AS distinct_customers_with_open_invoice

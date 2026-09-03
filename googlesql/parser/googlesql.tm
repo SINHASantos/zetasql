@@ -637,6 +637,7 @@ KW_ALIGN_NONRESERVED {absl::string_view}: /align/
 "DESCRIBE" (KW_DESCRIBE) {absl::string_view}: /describe/
 "DESCRIPTOR" (KW_DESCRIPTOR) {absl::string_view}: /descriptor/
 "DESTINATION" (KW_DESTINATION) {absl::string_view}: /destination/
+"DETACH" (KW_DETACH) {absl::string_view}: /detach/
 "DETERMINISTIC" (KW_DETERMINISTIC) {absl::string_view}: /deterministic/
 "DO" (KW_DO) {absl::string_view}: /do/
 "DROP" (KW_DROP) {absl::string_view}: /drop/
@@ -712,6 +713,7 @@ KW_MATCH_RECOGNIZE_NONRESERVED {absl::string_view}: /match_recognize/
 "NAME" (KW_NAME) {absl::string_view}: /name/
 "NEXT" (KW_NEXT) {absl::string_view}: /next/
 "NODE" (KW_NODE) {absl::string_view}: /node/
+"NODETACH" (KW_NODETACH) {absl::string_view}: /nodetach/
 "NOTHING" (KW_NOTHING) {absl::string_view}: /nothing/
 "NUMERIC" (KW_NUMERIC) {absl::string_view}: /numeric/
 "OFFSET" (KW_OFFSET) {absl::string_view}: /offset/
@@ -1228,9 +1230,7 @@ catch_all: /./ -100 {
 
 // The set of tokens that can start a graph operation block.
 %generate GraphOperationBlockFirst =
-    // TODO: b/474135498 - Remove DELETE once that graph operator is implemented
-    //     in the parser.
-    set(first graph_operation_block | "DELETE");
+    set(first graph_operation_block);
 
 // The set of tokens that can follow "TABLE FUNCTION" as a schema object. In
 // some of the no-eoi rules we need one more token after
@@ -7740,6 +7740,7 @@ graph_dml_operator {ASTNode*}:
     graph_insert_operator
   | graph_set_operator
   | graph_remove_operator
+  | graph_delete_operator
 ;
 
 graph_set_operator {ASTGqlSet*}:
@@ -7804,6 +7805,26 @@ graph_remove_label_item {ASTGqlRemoveLabelItem*}:
     identifier[elem] ("IS" | ":") identifier[label]
     {
       $$ = MakeNode<ASTGqlRemoveLabelItem>(@$, $elem, $label);
+    }
+;
+
+graph_delete_operator {ASTGqlDelete*}:
+    "NODETACH"? "DELETE" (graph_delete_item separator ",")+[items]
+    {
+      $$ = MakeNode<ASTGqlDelete>(@$, $items);
+      $$->set_is_detach_mode(false);
+    }
+  | "DETACH" "DELETE" (graph_delete_item separator ",")+[items]
+    {
+      $$ = MakeNode<ASTGqlDelete>(@$, $items);
+      $$->set_is_detach_mode(true);
+    }
+;
+
+graph_delete_item {ASTGqlDeleteItem*}:
+    identifier[elem]
+    {
+      $$ = MakeNode<ASTGqlDeleteItem>(@$, $elem);
     }
 ;
 
@@ -12089,6 +12110,7 @@ system_variable_expression {ASTExpression*}:
   | "DESCENDING"
   | "DESCRIBE"
   | "DESTINATION"
+  | "DETACH"
   | "DETERMINISTIC"
   | "DO"
   | "DROP"
@@ -12166,6 +12188,7 @@ system_variable_expression {ASTExpression*}:
   | "NAME"
   | "NEXT"
   | "NODE"
+  | "NODETACH"
   | "NOTHING"
   | "NUMERIC"
   | "OFFSET"
@@ -12652,11 +12675,25 @@ delete_statement_prefix {ASTDeleteStatement*}:
     }
 ;
 
+delete_using_clause {ASTNode*}:
+    "USING" from_clause_contents
+    {
+      ErrorInfo error_info;
+      auto node = TransformJoinExpression(
+        $2, node_factory, &error_info);
+      if (node == nullptr) {
+        return MakeSyntaxError(error_info.location, error_info.message);
+      }
+
+      $$ = MakeNode<ASTDeleteUsingClause>(@$, node);
+    }
+;
+
 delete_statement {ASTNode*}:
-    delete_statement_prefix where_expression? assert_rows_modified?
+    delete_statement_prefix delete_using_clause? where_expression? assert_rows_modified?
     returning_clause?
     {
-      $$ = ExtendNodeRight($delete_statement_prefix, @$.end(), $where_expression, $assert_rows_modified, $returning_clause);
+      $$ = ExtendNodeRight($delete_statement_prefix, @$.end(), $delete_using_clause, $where_expression, $assert_rows_modified, $returning_clause);
     }
 ;
 

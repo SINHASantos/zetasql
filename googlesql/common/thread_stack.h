@@ -38,7 +38,7 @@ namespace googlesql {
 
 // Determine whether there is comfortably enough stack left.
 // Useful placed at the top of recursive functions.
-ABSL_MUST_USE_RESULT bool ThreadHasEnoughStack();
+[[nodiscard]] bool ThreadHasEnoughStack();
 
 // Prints the top frames in the stack along with the amount of space
 // each one takes, to help debug stack overflow issues.
@@ -104,7 +104,7 @@ std::ostream& operator<<(std::ostream& os, const ThreadStackStats&);
 
 // Returns the thread local stats. It is mutable so that the estimated usage
 // bounds can be reset.
-ABSL_MUST_USE_RESULT ThreadStackStats& GetCurrentThreadStackStats();
+[[nodiscard]] ThreadStackStats& GetCurrentThreadStackStats();
 
 // Returns a string representing a stack trace of the current
 // thread.

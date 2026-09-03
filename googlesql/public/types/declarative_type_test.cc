@@ -38,7 +38,6 @@
 #include "testing/base/public/malloc_counter.h"
 #include "absl/hash/hash.h"
 #include "absl/status/status.h"
-#include "googlesql/base/status_macros.h"
 #include "absl/types/span.h"
 #include "google/protobuf/descriptor.h"
 
@@ -396,7 +395,7 @@ TEST(DeclarativeTypeTest, DeclarativeTypeProtoFieldCount) {
   TypeFactory type_factory;
 
   const google::protobuf::Descriptor* descriptor = DeclarativeTypeProto::descriptor();
-  EXPECT_EQ(descriptor->field_count(), 8)
+  EXPECT_EQ(descriptor->field_count(), 9)
       << "DeclarativeTypeProto field count has changed. If you added a new "
          "field to DeclarativeTypeProto, please make sure to update the "
          "descriptor structure, the serializer "
@@ -780,7 +779,7 @@ TEST(DeclarativeTypeTest, TypeParameterHandlersNonBuiltinTypeRejected) {
                         .set_type_id({"CUSTOM_NS", "VEC"})
                         .set_display_name("VEC")
                         .set_backing_type(types::BytesType())
-                        .set_type_parameter_handlers(handlers);
+                        .set_type_params_strategy(handlers);
 
   ASSERT_FALSE(descriptor.type_id().IsGoogleSQLBuiltin());
 
@@ -805,12 +804,11 @@ TEST(DeclarativeTypeTest, TypeParameterHandlersNonBuiltinTypeRejected) {
   GOOGLESQL_ASSERT_OK(t1->SerializeToSelfContainedProto(&type_proto));
 
   {
-    // Deserializing without the opaque handlers will lead to a wrong
-    // descriptor, different from the original type.
+    // Deserializing without the custom handlers will fail GOOGLESQL_RET_CHECK during
+    // descriptor deserialization.
     TypeDeserializer incomplete_deserializer(&factory1);
     EXPECT_THAT(incomplete_deserializer.Deserialize(type_proto),
-                StatusIs(absl::StatusCode::kInternal,
-                         HasSubstr("Conflicting declarative types")));
+                StatusIs(absl::StatusCode::kInternal));
   }
 
   {
@@ -880,7 +878,7 @@ TEST(DeclarativeTypeTest, TypeParameterHandlersBuiltinTypeSuccessAndExecution) {
           .set_type_id({std::string(TypeId::kGoogleSqlNamespace), "MY_VEC"})
           .set_display_name("MY_VEC")
           .set_backing_type(types::BytesType())
-          .set_type_parameter_handlers(std::move(handlers));
+          .set_type_params_strategy(std::move(handlers));
 
   GOOGLESQL_ASSERT_OK_AND_ASSIGN(const Type* my_vec,
                        factory.MakeDeclarativeType(builtin_descriptor));
@@ -933,12 +931,11 @@ TEST(DeclarativeTypeTest, TypeParameterHandlersIsIdenticalTo) {
           .set_type_id({std::string(TypeId::kGoogleSqlNamespace), "VEC"})
           .set_display_name("VEC")
           .set_backing_type(types::BytesType())
-          .set_type_parameter_handlers(std::move(handlers1));
+          .set_type_params_strategy(std::move(handlers1));
   auto desc_with_handlers2 = desc_with_handlers1;
-  desc_with_handlers2.set_type_parameter_handlers(std::move(handlers2));
+  desc_with_handlers2.set_type_params_strategy(std::move(handlers2));
   auto desc_with_handlers1_copy = desc_with_handlers1;
-  desc_with_handlers1_copy.set_type_parameter_handlers(
-      std::move(handlers1_copy));
+  desc_with_handlers1_copy.set_type_params_strategy(std::move(handlers1_copy));
   auto desc_without_handlers =
       DeclarativeTypeDescriptor()
           .set_type_id({std::string(TypeId::kGoogleSqlNamespace), "VEC"})
@@ -967,9 +964,9 @@ TEST(DeclarativeTypeTest, TypeFactoryRejectsConflictingTypeParameterHandlers) {
                                  "MY_VEC_COPY"})
                    .set_display_name("MY_VEC_COPY")
                    .set_backing_type(types::BytesType())
-                   .set_type_parameter_handlers(std::move(handlers1));
+                   .set_type_params_strategy(std::move(handlers1));
   auto desc2 = desc1;
-  desc2.set_type_parameter_handlers(std::move(handlers2));
+  desc2.set_type_params_strategy(std::move(handlers2));
 
   GOOGLESQL_ASSERT_OK_AND_ASSIGN(const Type* t1, factory.MakeDeclarativeType(desc1));
   EXPECT_TRUE(t1 != nullptr);

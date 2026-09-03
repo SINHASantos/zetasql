@@ -2407,7 +2407,7 @@ absl::Status Resolver::ResolvePrimaryKey(
                << "Ordered primary key elements are not supported";
       }
       const IdString primary_key_column = element->column()->GetAsIdString();
-      if (googlesql_base::ContainsKey(used_primary_key_columns, primary_key_column)) {
+      if (used_primary_key_columns.contains(primary_key_column)) {
         return MakeSqlErrorAt(element)
                << "Duplicate column " << primary_key_column
                << " specified in PRIMARY KEY of CREATE TABLE";

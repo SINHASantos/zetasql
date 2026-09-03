@@ -441,6 +441,8 @@ class Unparser : public ParseTreeVisitor {
                               void* data) override;
   void visitASTIntoAlias(const ASTIntoAlias* node, void* data) override;
   void visitASTFromClause(const ASTFromClause* node, void* data) override;
+  void visitASTDeleteUsingClause(const ASTDeleteUsingClause* node,
+                                 void* data) override;
   void visitASTTransformClause(const ASTTransformClause* node,
                                void* data) override;
   void visitASTWithOffset(const ASTWithOffset* node, void* data) override;
@@ -502,6 +504,8 @@ class Unparser : public ParseTreeVisitor {
   void visitASTGqlRemoveLabelItem(const ASTGqlRemoveLabelItem* node,
                                   void* data) override;
   void visitASTGqlRemove(const ASTGqlRemove* node, void* data) override;
+  void visitASTGqlDelete(const ASTGqlDelete* node, void* data) override;
+  void visitASTGqlDeleteItem(const ASTGqlDeleteItem* node, void* data) override;
   void visitASTGqlQuery(const ASTGqlQuery* node, void* data) override;
   void visitASTGqlGraphPatternQuery(const ASTGqlGraphPatternQuery* node,
                                     void* data) override;

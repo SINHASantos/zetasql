@@ -21,8 +21,10 @@
 #include <vector>
 
 #include "googlesql/public/type.h"
+#include "absl/status/status.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_join.h"
+#include "googlesql/base/ret_check.h"
 
 namespace googlesql {
 
@@ -40,7 +42,7 @@ bool SignatureMatchResult::IsCloserMatchThan(
   return literals_distance() < other_result.literals_distance();
 }
 
-void SignatureMatchResult::UpdateFromResult(
+absl::Status SignatureMatchResult::UpdateFromResult(
     const SignatureMatchResult& other_result) {
   data_->non_matched_arguments += other_result.non_matched_arguments();
   data_->non_literals_coerced += other_result.non_literals_coerced();
@@ -49,7 +51,15 @@ void SignatureMatchResult::UpdateFromResult(
   data_->literals_distance += other_result.literals_distance();
   data_->mismatch_message = other_result.mismatch_message();
   data_->bad_argument_index = other_result.bad_argument_index();
-  data_->tvf_relation_coercion_map = other_result.tvf_relation_coercion_map();
+  for (const auto& entry : other_result.tvf_relation_coercion_map()) {
+    // Any entries found must be new. We cannot have collisions.
+    GOOGLESQL_RET_CHECK(data_->tvf_relation_coercion_map.insert(entry).second)
+        << "TVF relation coercion map key (arg_index: "
+        << entry.first.argument_index
+        << ", col_index: " << entry.first.column_index
+        << ") already exists in the matching result";
+  }
+  return absl::OkStatus();
 }
 
 std::string SignatureMatchResult::DebugString() const {

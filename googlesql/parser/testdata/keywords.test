@@ -2273,3 +2273,167 @@ SELECT
   table.variant
 FROM
   table
+==
+
+SELECT * FROM `DETACH`
+--
+QueryStatement [0-22] [SELECT * FROM `DETACH`]
+  Query [0-22] [SELECT * FROM `DETACH`]
+    Select [0-22] [SELECT * FROM `DETACH`]
+      SelectList [7-8] [*]
+        SelectColumn [7-8] [*]
+          Star(*) [7-8] [*]
+      FromClause [9-22] [FROM `DETACH`]
+        TablePathExpression [14-22] [`DETACH`]
+          PathExpression [14-22] [`DETACH`]
+            Identifier(DETACH) [14-22] [`DETACH`]
+--
+SELECT
+  *
+FROM
+  DETACH
+==
+
+SELECT * FROM `NODETACH`
+--
+QueryStatement [0-24] [SELECT * FROM `NODETACH`]
+  Query [0-24] [SELECT * FROM `NODETACH`]
+    Select [0-24] [SELECT * FROM `NODETACH`]
+      SelectList [7-8] [*]
+        SelectColumn [7-8] [*]
+          Star(*) [7-8] [*]
+      FromClause [9-24] [FROM `NODETACH`]
+        TablePathExpression [14-24] [`NODETACH`]
+          PathExpression [14-24] [`NODETACH`]
+            Identifier(NODETACH) [14-24] [`NODETACH`]
+--
+SELECT
+  *
+FROM
+  NODETACH
+==
+
+SELECT detach, nodetach FROM table;
+--
+QueryStatement [0-34] [SELECT detach...FROM table]
+  Query [0-34] [SELECT detach...FROM table]
+    Select [0-34] [SELECT detach...FROM table]
+      SelectList [7-23] [detach, nodetach]
+        SelectColumn [7-13] [detach]
+          PathExpression [7-13] [detach]
+            Identifier(detach) [7-13] [detach]
+        SelectColumn [15-23] [nodetach]
+          PathExpression [15-23] [nodetach]
+            Identifier(nodetach) [15-23] [nodetach]
+      FromClause [24-34] [FROM table]
+        TablePathExpression [29-34] [table]
+          PathExpression [29-34] [table]
+            Identifier(table) [29-34] [table]
+--
+SELECT
+  detach,
+  nodetach
+FROM
+  table
+==
+
+SELECT 1 AS detach, 2 AS nodetach;
+--
+QueryStatement [0-33] [SELECT 1 AS...AS nodetach]
+  Query [0-33] [SELECT 1 AS...AS nodetach]
+    Select [0-33] [SELECT 1 AS...AS nodetach]
+      SelectList [7-33] [1 AS detach, 2 AS nodetach]
+        SelectColumn [7-18] [1 AS detach]
+          IntLiteral(1) [7-8] [1]
+          Alias [9-18] [AS detach]
+            Identifier(detach) [12-18] [detach]
+        SelectColumn [20-33] [2 AS nodetach]
+          IntLiteral(2) [20-21] [2]
+          Alias [22-33] [AS nodetach]
+            Identifier(nodetach) [25-33] [nodetach]
+--
+SELECT
+  1 AS detach,
+  2 AS nodetach
+==
+
+SELECT * FROM {{detach|nodetach}};
+--
+ALTERNATION GROUP: detach
+--
+QueryStatement [0-20] [SELECT * FROM detach]
+  Query [0-20] [SELECT * FROM detach]
+    Select [0-20] [SELECT * FROM detach]
+      SelectList [7-8] [*]
+        SelectColumn [7-8] [*]
+          Star(*) [7-8] [*]
+      FromClause [9-20] [FROM detach]
+        TablePathExpression [14-20] [detach]
+          PathExpression [14-20] [detach]
+            Identifier(detach) [14-20] [detach]
+--
+SELECT
+  *
+FROM
+  detach
+--
+ALTERNATION GROUP: nodetach
+--
+QueryStatement [0-22] [SELECT * FROM nodetach]
+  Query [0-22] [SELECT * FROM nodetach]
+    Select [0-22] [SELECT * FROM nodetach]
+      SelectList [7-8] [*]
+        SelectColumn [7-8] [*]
+          Star(*) [7-8] [*]
+      FromClause [9-22] [FROM nodetach]
+        TablePathExpression [14-22] [nodetach]
+          PathExpression [14-22] [nodetach]
+            Identifier(nodetach) [14-22] [nodetach]
+--
+SELECT
+  *
+FROM
+  nodetach
+==
+
+SELECT table.{{detach|nodetach}} FROM table;
+--
+ALTERNATION GROUP: detach
+--
+QueryStatement [0-30] [SELECT table.detach FROM table]
+  Query [0-30] [SELECT table.detach FROM table]
+    Select [0-30] [SELECT table.detach FROM table]
+      SelectList [7-19] [table.detach]
+        SelectColumn [7-19] [table.detach]
+          PathExpression [7-19] [table.detach]
+            Identifier(table) [7-12] [table]
+            Identifier(detach) [13-19] [detach]
+      FromClause [20-30] [FROM table]
+        TablePathExpression [25-30] [table]
+          PathExpression [25-30] [table]
+            Identifier(table) [25-30] [table]
+--
+SELECT
+  table.detach
+FROM
+  table
+--
+ALTERNATION GROUP: nodetach
+--
+QueryStatement [0-32] [SELECT table...FROM table]
+  Query [0-32] [SELECT table...FROM table]
+    Select [0-32] [SELECT table...FROM table]
+      SelectList [7-21] [table.nodetach]
+        SelectColumn [7-21] [table.nodetach]
+          PathExpression [7-21] [table.nodetach]
+            Identifier(table) [7-12] [table]
+            Identifier(nodetach) [13-21] [nodetach]
+      FromClause [22-32] [FROM table]
+        TablePathExpression [27-32] [table]
+          PathExpression [27-32] [table]
+            Identifier(table) [27-32] [table]
+--
+SELECT
+  table.nodetach
+FROM
+  table

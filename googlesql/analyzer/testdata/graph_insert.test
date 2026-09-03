@@ -1771,3 +1771,82 @@ GeneralizedQueryStmt
                   +-GraphRefScan(column_list=$element_table.[a#1, b#2])
 ==
 
+#######################################################
+# DML Terminality across NEXT
+#######################################################
+
+# Chained INSERT statements across NEXT are rejected.
+GRAPH aml
+INSERT (a:Person {name: "A"}), (b:Person {name: "B"})
+NEXT
+INSERT (m:Person {name: "M"}), (n:Person {name: "N"})
+--
+ERROR: INSERT cannot be followed by NEXT and can only have an immediate RETURN as the last statement in a graph query [at 4:1]
+INSERT (m:Person {name: "M"}), (n:Person {name: "N"})
+^
+==
+
+# INSERT followed by MATCH ... RETURN across NEXT is rejected.
+GRAPH aml
+INSERT (n:Person {name: "N"})
+NEXT
+MATCH (p)
+RETURN p.id
+--
+ERROR: INSERT cannot be followed by NEXT and can only have an immediate RETURN as the last statement in a graph query [at 4:1]
+MATCH (p)
+^
+==
+
+# INSERT ... RETURN followed by MATCH ... RETURN across NEXT is rejected.
+GRAPH aml
+INSERT (a:Person {name: "A"})
+RETURN a.name
+NEXT
+MATCH (b:Person)
+RETURN b.id
+--
+ERROR: INSERT cannot be followed by NEXT and can only have an immediate RETURN as the last statement in a graph query [at 5:1]
+MATCH (b:Person)
+^
+==
+
+# MATCH ... INSERT followed by NEXT MATCH ... RETURN is rejected.
+GRAPH aml
+MATCH (a:Person)
+INSERT (b:Person {name: "B"})
+NEXT
+MATCH (c:Person)
+RETURN c.id
+--
+ERROR: INSERT cannot be followed by NEXT and can only have an immediate RETURN as the last statement in a graph query [at 5:1]
+MATCH (c:Person)
+^
+==
+
+# MATCH ... NEXT INSERT ... NEXT MATCH is rejected.
+GRAPH aml
+MATCH (a:Person)
+RETURN a.name
+NEXT
+INSERT (b:Person {name: "B"})
+NEXT
+MATCH (c:Person)
+RETURN c.id
+--
+ERROR: INSERT cannot be followed by NEXT and can only have an immediate RETURN as the last statement in a graph query [at 7:1]
+MATCH (c:Person)
+^
+==
+
+GRAPH aml
+INSERT (a:Person {name: "A"}), (b:Person {name: "B"})
+NEXT
+RETURN 1 AS my_column
+--
+ERROR: INSERT cannot be followed by NEXT and can only have an immediate RETURN as the last statement in a graph query [at 4:1]
+RETURN 1 AS my_column
+^
+
+==
+

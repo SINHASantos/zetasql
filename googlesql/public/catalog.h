@@ -27,6 +27,7 @@
 #include <vector>
 
 #include "googlesql/public/evaluator_table_iterator.h"
+#include "googlesql/public/parse_location.h"
 #include "googlesql/public/property_graph.h"
 #include "googlesql/public/type.h"
 #include "absl/base/attributes.h"
@@ -48,6 +49,12 @@
 
 namespace googlesql {
 
+namespace parser {
+namespace macros {
+class MacroExpander;
+}  // namespace macros
+}  // namespace parser
+
 class Column;
 class Connection;
 class Conversion;
@@ -60,6 +67,7 @@ class ResolvedExpr;
 class Sequence;
 class Table;
 class TableValuedFunction;
+class Macro;
 
 // GoogleSQL uses the Catalog interface to look up names that are visible
 // at global scope inside a query.  Names include
@@ -490,6 +498,29 @@ class Catalog {
     return static_cast<CatalogSubclass*>(this);
   }
 
+  // Gets a Macro with the specified <name> from this Catalog using the given
+  // <options>.
+  //
+  // Sets <*macro> to the found Macro, or nullptr if no macro with <name>
+  // exists in this Catalog. A non-OK status indicates a failure in the lookup
+  // mechanism itself and should cause the caller's request to fail.
+  //
+  // Note on macro resolution and absence of FindMacro():
+  // Unlike other catalog objects (e.g., tables, functions), multi-part macro
+  // path resolution (e.g., $a.b) requires complex disambiguation logic
+  // (whether to resolve 'a' as a local macro or $a.b as a module macro)
+  // that is best handled in MacroExpander. Therefore, Catalog intentionally
+  // does not provide a FindMacro(path) method, and catalogs only need to
+  // provide flat, single-name GetMacro() lookups.
+  virtual absl::Status GetMacro(const std::string& name, const Macro** macro,
+                                const FindOptions& options);
+
+  // Gets a Macro with the specified <name> from this Catalog using default
+  // FindOptions.
+  absl::Status GetMacro(const std::string& name, const Macro** macro) {
+    return GetMacro(name, macro, FindOptions());
+  }
+
  protected:
   // The GetX methods get an object of type X from this Catalog, without
   // looking at any nested Catalogs.
@@ -723,6 +754,10 @@ class Catalog {
   absl::Status FindConstantWithPathPrefixImpl(
       absl::Span<const std::string> path, int* num_names_consumed,
       const Constant** constant, const FindOptions& options);
+
+  // MacroExpander needs to call protected GetCatalog() to resolve macro
+  // references.
+  friend class parser::macros::MacroExpander;
 };
 
 // An extended Catalog interface that adds functions to enumerate schema objects
@@ -778,6 +813,27 @@ class EnumerableCatalog : public Catalog {
         "Procedures are not supported in this EnumerableCatalog");
   }
 };
+
+namespace internal {
+
+// An extended Catalog interface used to identify module-scoped catalogs.
+//
+// This is needed to check whether a Catalog is a ModuleCatalog (e.g., via
+// `catalog->Is<googlesql::internal::ModuleCatalogInterface>()` or `GetAs<>()`).
+//
+// We cannot use ModuleCatalog directly due to a circular dependency:
+// - MacroExpander / Parser depends on Catalog.
+// - ModuleCatalog (in modules.h) depends on Parser.
+// - Therefore, MacroExpander / Parser cannot directly depend on ModuleCatalog.
+class ModuleCatalogInterface : public Catalog {
+ protected:
+  // Returns the internal resolution catalog for this module, which includes
+  // both public and private objects defined within the module.
+  virtual Catalog* GetInternalResolutionCatalog() = 0;
+
+  friend class parser::macros::MacroExpander;
+};
+}  // namespace internal
 
 // Captures userid information related to a table.
 class AnonymizationUserIdInfo {
@@ -1436,6 +1492,69 @@ class Sequence {
   template <class SequenceSubclass>
   const SequenceSubclass* GetAs() const {
     return static_cast<const SequenceSubclass*>(this);
+  }
+};
+
+// Represents a macro definition in the GoogleSQL Catalog, including its name,
+// source text, locations, and body.
+// TODO: Update parser::macros::MacroInfo to inherit from this
+// interface.
+class Macro {
+ public:
+  virtual ~Macro() = default;
+
+  // Get the macro name.
+  virtual absl::string_view Name() const = 0;
+
+  // Get a fully-qualified name of this macro.
+  //
+  // Unlike Name(), which returns the unqualified local identifier (e.g.,
+  // "my_macro"), FullName() includes full module or catalog path qualifiers
+  // (e.g., "my_module.my_macro"). This is suitable for error messages, macro
+  // expansion call stacks, and diagnostics to uniquely identify where the
+  // macro was defined.
+  virtual absl::string_view FullName() const = 0;
+
+  // The contents of the source where this macro was defined.
+  virtual absl::string_view source_text() const = 0;
+
+  // Location of the macro definition, starting from the DEFINE keyword.
+  virtual ParseLocationRange location() const = 0;
+
+  // Location of the macro name.
+  virtual ParseLocationRange name_location() const = 0;
+
+  // Location of the start of the macro body.
+  virtual ParseLocationRange body_location() const = 0;
+
+  // Returns the body of this macro.
+  virtual absl::string_view body() const = 0;
+
+  // The offset of the macro definition in its file.
+  virtual int definition_start_offset() const { return 0; }
+
+  // Line and column where the macro definition starts in the original input
+  // source (1-based), used for accurate diagnostic and error reporting.
+  virtual int definition_start_line() const { return 1; }
+  virtual int definition_start_column() const { return 1; }
+
+  // Returns whether or not this Macro is a specific macro interface or
+  // implementation.
+  template <class MacroSubclass>
+  bool Is() const {
+    return dynamic_cast<const MacroSubclass*>(this) != nullptr;
+  }
+
+  // Returns this Macro as const MacroSubclass*.
+  //
+  // Callers MUST ensure that the object is an instance of MacroSubclass before
+  // calling this method (e.g., by verifying that Is<MacroSubclass>() returns
+  // true). Calling GetAs() when the object is not of the specified subclass
+  // results in undefined behavior (and causes an assertion failure in debug
+  // builds due to static_cast).
+  template <class MacroSubclass>
+  const MacroSubclass* GetAs() const {
+    return static_cast<const MacroSubclass*>(this);
   }
 };
 

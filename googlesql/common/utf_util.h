@@ -49,8 +49,8 @@ std::string PrettyTruncateUTF8(absl::string_view input, int max_bytes);
 
 // Verifies that the string length can be represented in a 32-bit signed int and
 // returns that value. Fitting in an int32 is a requirement for icu methods.
-ABSL_MUST_USE_RESULT bool CheckAndCastStrLength(absl::string_view str,
-                                                int32_t* str_length32);
+[[nodiscard]] bool CheckAndCastStrLength(absl::string_view str,
+                                         int32_t* str_length32);
 
 // Returns the offset needed to forward `str` by `num_code_points` or an empty
 // optional if an invalid UTF-8 codepoint is detected.

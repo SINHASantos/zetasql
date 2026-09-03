@@ -62,6 +62,7 @@ extern std::vector<FunctionTestCall> GetFunctionTestsFormatStrings();
 extern std::vector<FunctionTestCall> GetFunctionTestsFormatNumeric();
 extern std::vector<FunctionTestCall> GetFunctionTestsFormatJson();
 extern std::vector<FunctionTestCall> GetFunctionTestsFormatInterval();
+extern std::vector<FunctionTestCall> GetFunctionTestsFormatRange();
 
 static std::string Zeros(absl::string_view fmt, int zeros) {
   return absl::Substitute(fmt, std::string(zeros, '0'));
@@ -621,6 +622,12 @@ std::vector<FunctionTestCall> GetFunctionTestsFormat() {
   test_cases.insert(test_cases.end(),
                     std::make_move_iterator(interval_test_cases.begin()),
                     std::make_move_iterator(interval_test_cases.end()));
+
+  std::vector<FunctionTestCall> range_test_cases =
+      GetFunctionTestsFormatRange();
+  test_cases.insert(test_cases.end(),
+                    std::make_move_iterator(range_test_cases.begin()),
+                    std::make_move_iterator(range_test_cases.end()));
 
   const std::vector<CivilTimeTestCase> civil_time_test_cases({
       {{{"%t", datetime_micros}}, String("2016-04-26 15:23:27.123456")},

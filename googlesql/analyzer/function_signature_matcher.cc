@@ -2023,7 +2023,8 @@ absl::StatusOr<bool> FunctionSignatureMatcher::SignatureMatches(
                        &local_signature_match_result, arg_overrides));
 
   if (!match) {
-    signature_match_result->UpdateFromResult(local_signature_match_result);
+    GOOGLESQL_RET_CHECK_OK(
+        signature_match_result->UpdateFromResult(local_signature_match_result));
     GOOGLESQL_RET_CHECK(!signature_match_result->allow_mismatch_message() ||
               !signature_match_result->mismatch_message().empty());
     return false;
@@ -2098,7 +2099,8 @@ absl::StatusOr<bool> FunctionSignatureMatcher::SignatureMatches(
         GetConcreteArgument(signature.result_type(), /*num_occurrences=*/1,
                             resolved_templated_arguments, &result_type));
     if (!matches) {
-      signature_match_result->UpdateFromResult(local_signature_match_result);
+      GOOGLESQL_RET_CHECK_OK(signature_match_result->UpdateFromResult(
+          local_signature_match_result));
       SET_MISMATCH_ERROR(absl::StrFormat(
           "Unable to determine type for function return type of kind %s",
           UserFacingName(signature.result_type())));

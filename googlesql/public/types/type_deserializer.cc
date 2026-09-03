@@ -18,7 +18,6 @@
 
 #include <optional>
 #include <string>
-#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -222,6 +221,32 @@ TypeDeserializer::DeserializeDeclarativeTypeDescriptor(
              << "Invalid EqualityStrategy: " << type_proto.equality_strategy();
   }
 
+  // TypeParamsStrategy
+  DeclarativeTypeDescriptor::TypeParamsStrategy type_params_strategy;
+  switch (type_proto.type_params_strategy()) {
+    case DeclarativeTypeProto::TYPE_PARAMS_CUSTOM: {
+      GOOGLESQL_ASSIGN_OR_RETURN(
+          std::optional<TypeParameterHandlers> param_handlers,
+          decl_type_opaque_callback_registry_.GetTypeParameterHandlers(
+              type_id));
+      GOOGLESQL_RET_CHECK(param_handlers.has_value())
+          << "Declarative type with id (name_space: " << type_id.name_space
+          << ", local_id: " << type_id.local_id
+          << ", version_id: " << type_id.version_id
+          << ") specifies a custom type parameter handling callback, but none "
+          << " specifies a custom type parameter handling callback, but none "
+             "were found in the registry";
+      type_params_strategy = std::move(*param_handlers);
+      break;
+    }
+    case DeclarativeTypeProto::TYPE_PARAMS_DISALLOWED:
+      type_params_strategy = DeclarativeTypeDescriptor::TypeParamsDisallowed{};
+      break;
+    case DeclarativeTypeProto::TYPE_PARAMS_UNSPECIFIED:
+      return MakeSqlError() << "Invalid TypeParamsStrategy: "
+                            << type_proto.type_params_strategy();
+  }
+
   return DeclarativeTypeDescriptor()
       .set_type_id(type_id)
       .set_display_name(type_proto.display_name())
@@ -230,6 +255,7 @@ TypeDeserializer::DeserializeDeclarativeTypeDescriptor(
       .set_coercion_to_backing_type(coercion_to_backing_type)
       .set_returning_strategy(std::move(returning_strategy))
       .set_equality_strategy(std::move(equality_strategy))
+      .set_type_params_strategy(std::move(type_params_strategy))
       .set_additional_required_language_features(
           std::move(required_language_features));
 }
@@ -404,13 +430,6 @@ absl::StatusOr<const Type*> TypeDeserializer::Deserialize(
     case TYPE_DECLARATIVE: {
       GOOGLESQL_ASSIGN_OR_RETURN(auto descriptor, DeserializeDeclarativeTypeDescriptor(
                                             type_proto.declarative_type()));
-
-      GOOGLESQL_ASSIGN_OR_RETURN(
-          auto param_handlers,
-          decl_type_opaque_callback_registry_.GetTypeParameterHandlers(
-              descriptor.type_id()));
-      descriptor.set_type_parameter_handlers(std::move(param_handlers));
-
       return type_factory_->MakeDeclarativeType(std::move(descriptor));
     }
     default:

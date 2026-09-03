@@ -5649,8 +5649,8 @@ absl::Status Resolver::CreateSelectNamelists(
       // There's already a SELECT list alias for this, so make the
       // NameTarget ambiguous as well.  Note that the NameTarget may or
       // may not exist yet in <error_name_targets>.
-      googlesql_base::InsertOrUpdate(error_name_targets, select_column_state->alias,
-                          NameTarget());
+      error_name_targets->insert_or_assign(select_column_state->alias,
+                                           NameTarget());
       return absl::OkStatus();
     }
     NameTarget name_target(target_column, /*is_explicit=*/true);

@@ -23,6 +23,7 @@
 #include <type_traits>
 
 #include "googlesql/common/multiprecision_int.h"
+#include "googlesql/common/round_decimal.h"
 #include "googlesql/public/functions/rounding_mode.pb.h"
 #include "googlesql/public/numeric_value.h"
 #include "absl/base/optimization.h"
@@ -34,81 +35,6 @@ namespace googlesql {
 namespace functions {
 namespace {
 
-// Minimum and maximum decimal exponent of numbers representable as double.
-// "numeric_limits<double>::digits10 - 1"  is to take into account subnormal
-// numbers.
-const int kDoubleMinExponent = std::numeric_limits<double>::min_exponent10
-                             - std::numeric_limits<double>::digits10 - 1;
-const int kDoubleMaxExponent = std::numeric_limits<double>::max_exponent10;
-
-// Minimum and maximum decimal exponent of numbers representable as float.
-// "numeric_limits<float>::digits10 - 1"  is to take into account subnormal
-// numbers.
-const int kFloatMinExponent = std::numeric_limits<float>::min_exponent10
-                            - std::numeric_limits<float>::digits10 - 1;
-const int kFloatMaxExponent = std::numeric_limits<float>::max_exponent10;
-
-// Precomputed powers of 10 in the entire ranges
-// [kDoubleMinExponent, kDoubleMaxExponent] and
-// [kFloatMinExponent, kFloatMaxExponent].
-// We use "long double" instead of double and "double" for float exponents
-// to avoid getting into subnormal numbers, and thus keeping relative error
-// better than epsilon.
-// Note that on some platforms "long double" may be the same type as double.
-// On such platforms results of RoundDecimal() and TruncDecimal() will
-// have error greater than 1 ULP if 10^(-digits) is a subnormal double number.
-static long double kDecimalExponentDouble[kDoubleMaxExponent -
-                                          kDoubleMinExponent + 1];
-static double kDecimalExponentFloat[kFloatMaxExponent -
-                                    kFloatMinExponent + 1];
-
-void InitExponents() {
-  // For doubles the results from pow/exp10 cause issues for rounding
-  // whole numbers which is a pretty obvious wart. Instead compute with repeated
-  // multiplying/dividing by 10. For floats below 1 we also use nextafter()
-  // to avoid those issues.
-  //
-  // No solution will be fully correct with floating points here, but this
-  // prevents the obvious whole number warts.
-  long double exponent = 1;
-  kDecimalExponentDouble[-kDoubleMinExponent] = 1;
-  // Compute exponents above 1.
-  for (int i = 0; i < kDoubleMaxExponent; ++i) {
-    exponent *= 10;
-    kDecimalExponentDouble[1 + i - kDoubleMinExponent] = exponent;
-  }
-  exponent = 1;
-  // Compute exponents below 1.
-  for (int i = 0; i < -kDoubleMinExponent; ++i) {
-    exponent /= 10;
-    kDecimalExponentDouble[-kDoubleMinExponent - i - 1] = exponent;
-  }
-
-  // Copy the values to kFloatMinExponent, and fix the values that are too high.
-  for (int i = kFloatMinExponent; i < kFloatMaxExponent + 1; ++i) {
-    double& dest = kDecimalExponentFloat[i - kFloatMinExponent];
-    const long double& src = kDecimalExponentDouble[i - kDoubleMinExponent];
-    dest = static_cast<double>(src);
-    if (dest > src) {
-      // If the exponent is even ULP higher than its exact value, the result
-      // of `x / exp` is lower than exact. This prevents roundtrip of expression
-      // `trunc(x / exp) * x` for values that we expect to roundtrip, because
-      // `x / exp` is just a bit lower than its exact integer value, and `trunc`
-      // rounds down to the next integer value.
-      // To avoid this, we make the exponent the nearest value less than the
-      // exact value, and thus `x / exp` is ULP higher than its exact value, and
-      // this makes sure `trunc(x / exp) * x` roundtrips when we need it to.
-      dest = std::nextafter(dest, 0);
-    }
-  }
-}
-
-namespace {
-static bool module_initialization_complete = []() {
-  InitExponents();
-  return true;
-} ();
-}  // namespace
 
 // This function assumes that the FromType is same or wider than the ToType.
 template <typename FromType, typename ToType>
@@ -136,124 +62,37 @@ static inline bool CastRounded(FromType in, ToType* out) {
 
 template <>
 bool RoundDecimal(double in, int64_t digits, double* out, absl::Status* error) {
-  if (digits > -kDoubleMinExponent || !std::isfinite(in)) {
-    *out = in;
-    return true;
-  }
-  if (digits < -kDoubleMaxExponent) {
-    *out = 0.0;
-    return true;
-  }
-  digits = -digits;
-  const long double exp = kDecimalExponentDouble[digits - kDoubleMinExponent];
-
-  long double x = in / exp;
-  if (std::numeric_limits<long double>::max_exponent <
-          std::numeric_limits<double>::max_exponent * 2 &&
-      ABSL_PREDICT_FALSE(!std::isfinite(x))) {
-    // "in / exp" overflows when "in" is a big number and we are rounding
-    // digits to the right of the decimal point (digits > 0). In that case the
-    // rounded value would be the same as "in" and we just return
-    // the value of "in".
-    *out = in;
-    return true;
-  }
-  long double result = roundl(x) * exp;
-  // 'result' may overflow if the exponent size of long double is insufficient
-  // for the rounded result.
-  if (std::numeric_limits<long double>::max_exponent <
-          std::numeric_limits<double>::max_exponent * 2 &&
-      ABSL_PREDICT_FALSE(!std::isfinite(result) && std::isfinite(in))) {
+  *out = googlesql::util_math::RoundDecimal(in, digits);
+  if (std::isfinite(in) && !std::isfinite(*out)) {
     return internal::SetFloatingPointOverflow(
         absl::StrCat("ROUND(", in, ", ", digits, ")"), error);
   }
-  // Converting the result from long double to double may overflow.
-  if (sizeof(long double) > sizeof(double)) {
-    if (!CastRounded<long double, double>(result, out)) {
-      return internal::SetFloatingPointOverflow(
-          absl::StrCat("ROUND(", in, ", ", digits, ")"), error);
-    } else {
-      return true;
-    }
-  } else {
-    *out = static_cast<double>(result);
-    return true;
-  }
+  return true;
 }
 
 template <>
 bool RoundDecimal(float in, int64_t digits, float* out, absl::Status* error) {
-  static_assert(std::numeric_limits<double>::max_exponent >=
-                std::numeric_limits<float>::max_exponent * 2 ,
-                "double's exponent must be wider than float's");
-  if (digits > -kFloatMinExponent || !std::isfinite(in)) {
-    *out = in;
-    return true;
-  }
-  if (digits < -kFloatMaxExponent) {
-    *out = 0.0;
-    return true;
-  }
-  digits = -digits;
-  double exp = kDecimalExponentFloat[digits - kFloatMinExponent];
-  // round(in / exp) * exp will never overflow due to the static_assert above.
-  // Converting the result from double to float may overflow.
-  if (!CastRounded<double, float>(round(in / exp) * exp, out)) {
+  double rounded = googlesql::util_math::RoundDecimal(in, digits);
+  if (!CastRounded<double, float>(rounded, out)) {
     return internal::SetFloatingPointOverflow(
         absl::StrCat("ROUND(", in, ", ", digits, ")"), error);
-  } else {
-    return true;
   }
+  return true;
 }
+
 template <>
 bool TruncDecimal(double in, int64_t digits, double* out, absl::Status* error) {
-  if (digits > -kDoubleMinExponent || !std::isfinite(in)) {
-    *out = in;
-    return true;
-  }
-  if (digits < -kDoubleMaxExponent) {
-    *out = 0.0;
-    return true;
-  }
-  digits = -digits;
-  const long double exp = kDecimalExponentDouble[digits - kDoubleMinExponent];
-
-  long double x = in / exp;
-  if (std::numeric_limits<long double>::max_exponent <
-          std::numeric_limits<double>::max_exponent * 2 &&
-      ABSL_PREDICT_FALSE(!std::isfinite(x))) {
-    // "in / exp" overflows when "in" is a big number and we are rounding
-    // digits to the right of the decimal point (digits > 0). In that case the
-    // truncated value would be the same as "in" and we just return
-    // the value of "in".
-    *out = in;
-    return true;
-  }
-  *out = truncl(x) * exp;
-  // Because truncl always rounds towards zero, the output value is less than
-  // the input, so we do not expect an overflow to occur here.
+  *out = googlesql::util_math::TruncDecimal(in, digits);
   return true;
 }
 
 template <>
 bool TruncDecimal(float in, int64_t digits, float* out, absl::Status* error) {
-  static_assert(std::numeric_limits<double>::max_exponent >=
-                std::numeric_limits<float>::max_exponent * 2 ,
-                "double's exponent must be wider than float's");
-  if (digits > -kFloatMinExponent || !std::isfinite(in)) {
-    *out = in;
-    return true;
-  }
-  if (digits < -kFloatMaxExponent) {
-    *out = 0.0;
-    return true;
-  }
-  digits = -digits;
-  double exp = kDecimalExponentFloat[digits - kFloatMinExponent];
-  *out = trunc(in / exp) * exp;
-  // trunc(in / exp) * exp will never overflow due to the static_assert above.
-  // Because truncl always rounds towards zero, the output value is less than
-  // the input, so we do not expect an overflow to occur here.
+  // Because TruncDecimal always rounds towards zero, the absolute value of the
+  // output is less than or equal to the absolute value of the input. Thus,
+  // converting the result from double back to float cannot overflow for a
+  // finite input, and we can safely cast without overflow checks.
+  *out = static_cast<float>(googlesql::util_math::TruncDecimal(in, digits));
   return true;
 }
 

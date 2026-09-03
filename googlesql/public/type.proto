@@ -299,6 +299,12 @@ message DeclarativeTypeProto {
     EQUALITY_DISALLOWED = 2;
   }
 
+  enum TypeParamsStrategy {
+    TYPE_PARAMS_UNSPECIFIED = 0;
+    TYPE_PARAMS_DISALLOWED = 1;
+    TYPE_PARAMS_CUSTOM = 2;
+  }
+
   // Uniquely identifies a declarative type. This is the only factor determining
   // the type's identity.
   // Note: unrelated to the type's name.
@@ -330,4 +336,7 @@ message DeclarativeTypeProto {
 
   // The equality strategy for this declarative type.
   optional EqualityStrategy equality_strategy = 8;
+
+  // The type parameter handling strategy for this declarative type.
+  optional TypeParamsStrategy type_params_strategy = 9;
 }

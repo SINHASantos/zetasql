@@ -469,10 +469,14 @@ TEST_P(FormatFunctionTests, Test) {
   EXPECT_EQ("x NULL", TestFormat("x %t", {values::NullString()}));
   EXPECT_EQ("x NULL", TestFormat("x %t", {values::NullBytes()}));
   EXPECT_EQ("x NULL", TestFormat("x %t", {values::NullTimestamp()}));
+  EXPECT_EQ("x NULL",
+            TestFormat("x %t", {values::Null(types::DateRangeType())}));
   EXPECT_EQ("x NULL", TestFormat("x %T", {values::NullInt64()}));
   EXPECT_EQ("x NULL", TestFormat("x %T", {values::NullString()}));
   EXPECT_EQ("x NULL", TestFormat("x %T", {values::NullBytes()}));
   EXPECT_EQ("x NULL", TestFormat("x %T", {values::NullTimestamp()}));
+  EXPECT_EQ("x NULL",
+            TestFormat("x %T", {values::Null(types::DateRangeType())}));
 
   const Value date = values::Date(12345);
   const Value timestamp =
@@ -482,11 +486,48 @@ TEST_P(FormatFunctionTests, Test) {
   const Value time =
       Value::Time(TimeValue::FromHMSAndNanos(15, 12, 47, 987654123));
 
+  // RANGE values
+  const Value date_range =
+      Value::MakeRange(values::Date(1), values::Date(10)).value();
+  const Value datetime_range =
+      Value::MakeRange(Value::Datetime(DatetimeValue::FromYMDHMSAndMicros(
+                           2016, 4, 26, 14, 53, 38, 123456)),
+                       Value::Datetime(DatetimeValue::FromYMDHMSAndMicros(
+                           2016, 4, 27, 14, 53, 38, 123456)))
+          .value();
+  const Value timestamp_range =
+      Value::MakeRange(values::TimestampFromUnixMicros(1429322158123456),
+                       values::TimestampFromUnixMicros(1429322158123457))
+          .value();
+
+  const Value unbounded_start_date_range =
+      Value::MakeRange(Value::UnboundedStartDate(), values::Date(10)).value();
+  const Value unbounded_end_date_range =
+      Value::MakeRange(values::Date(1), Value::UnboundedEndDate()).value();
+  const Value unbounded_date_range =
+      Value::MakeRange(Value::UnboundedStartDate(), Value::UnboundedEndDate())
+          .value();
+
   TypeFactory type_factory;
   const EnumType* enum_type;
   GOOGLESQL_ASSERT_OK(type_factory.MakeEnumType(googlesql_test::TestEnum_descriptor(),
                                       &enum_type));
   const Value enum_value = Value::Enum(enum_type, 2);
+
+  const RangeType* range_date_type;
+  GOOGLESQL_ASSERT_OK(type_factory.MakeRangeType(types::DateType(), &range_date_type));
+  const ArrayType* array_range_date_type;
+  GOOGLESQL_ASSERT_OK(
+      type_factory.MakeArrayType(range_date_type, &array_range_date_type));
+  const Value array_range_date =
+      Value::Array(array_range_date_type, {date_range, date_range});
+
+  const StructType* struct_range_date_type;
+  GOOGLESQL_ASSERT_OK(type_factory.MakeStructType(
+      {{"r1", range_date_type}, {"r2", range_date_type}},
+      &struct_range_date_type));
+  const Value struct_range_date =
+      Value::Struct(struct_range_date_type, {date_range, date_range});
 
   EXPECT_EQ("5", TestFormat("%t", {values::Int64(5)}));
   EXPECT_EQ("5", TestFormat("%t", {values::Int32(5)}));
@@ -498,6 +539,20 @@ TEST_P(FormatFunctionTests, Test) {
   EXPECT_EQ("15:12:47.987654123", TestFormat("%t", {time}));
   EXPECT_EQ("2015-04-18 01:55:58.123456+00", TestFormat("%t", {timestamp}));
   EXPECT_EQ("TESTENUM2", TestFormat("%t", {enum_value}));
+  EXPECT_EQ("[1970-01-02, 1970-01-11)", TestFormat("%t", {date_range}));
+  EXPECT_EQ("[2016-04-26 14:53:38.123456, 2016-04-27 14:53:38.123456)",
+            TestFormat("%t", {datetime_range}));
+  EXPECT_EQ("[2015-04-18 01:55:58.123456+00, 2015-04-18 01:55:58.123457+00)",
+            TestFormat("%t", {timestamp_range}));
+  EXPECT_EQ("[NULL, 1970-01-11)",
+            TestFormat("%t", {unbounded_start_date_range}));
+  EXPECT_EQ("[1970-01-02, NULL)", TestFormat("%t", {unbounded_end_date_range}));
+  EXPECT_EQ("[NULL, NULL)", TestFormat("%t", {unbounded_date_range}));
+  EXPECT_EQ("[[1970-01-02, 1970-01-11), [1970-01-02, 1970-01-11)]",
+            TestFormat("%t", {array_range_date}));
+  EXPECT_EQ("([1970-01-02, 1970-01-11), [1970-01-02, 1970-01-11))",
+            TestFormat("%t", {struct_range_date}));
+  EXPECT_EQ("NULL", TestFormat("%t", {Value::Null(range_date_type)}));
 
   EXPECT_EQ("-5", TestFormat("%T", {values::Int64(-5)}));
   EXPECT_EQ("-5", TestFormat("%T", {values::Int32(-5)}));
@@ -543,6 +598,31 @@ TEST_P(FormatFunctionTests, Test) {
   EXPECT_EQ("TIMESTAMP \"2015-04-18 01:55:58.123456+00\"",
             TestFormat("%T", {timestamp}));
   EXPECT_EQ("\"TESTENUM2\"", TestFormat("%T", {enum_value}));
+  EXPECT_EQ("RANGE<DATE> \"[1970-01-02, 1970-01-11)\"",
+            TestFormat("%T", {date_range}));
+  EXPECT_EQ(
+      "RANGE<DATETIME> \"[2016-04-26 14:53:38.123456, 2016-04-27 "
+      "14:53:38.123456)\"",
+      TestFormat("%T", {datetime_range}));
+  EXPECT_EQ(
+      "RANGE<TIMESTAMP> \"[2015-04-18 01:55:58.123456+00, 2015-04-18 "
+      "01:55:58.123457+00)\"",
+      TestFormat("%T", {timestamp_range}));
+  EXPECT_EQ("RANGE<DATE> \"[UNBOUNDED, 1970-01-11)\"",
+            TestFormat("%T", {unbounded_start_date_range}));
+  EXPECT_EQ("RANGE<DATE> \"[1970-01-02, UNBOUNDED)\"",
+            TestFormat("%T", {unbounded_end_date_range}));
+  EXPECT_EQ("RANGE<DATE> \"[UNBOUNDED, UNBOUNDED)\"",
+            TestFormat("%T", {unbounded_date_range}));
+  EXPECT_EQ(
+      "[RANGE<DATE> \"[1970-01-02, 1970-01-11)\", RANGE<DATE> \"[1970-01-02, "
+      "1970-01-11)\"]",
+      TestFormat("%T", {array_range_date}));
+  EXPECT_EQ(
+      "(RANGE<DATE> \"[1970-01-02, 1970-01-11)\", RANGE<DATE> \"[1970-01-02, "
+      "1970-01-11)\")",
+      TestFormat("%T", {struct_range_date}));
+  EXPECT_EQ("NULL", TestFormat("%T", {Value::Null(range_date_type)}));
 
   // Width and precision and modifiers for %t and %T act like %s.
   EXPECT_EQ("2003-10-20", TestFormat("%4t", {date}));

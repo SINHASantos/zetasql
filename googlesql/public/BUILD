@@ -180,6 +180,7 @@ cc_library(
     ],
     deps = [
         ":evaluator_table_iterator",
+        ":parse_location",
         ":strings",
         ":type",
         "//googlesql/base",
@@ -448,7 +449,6 @@ cc_test(
         "module_factory_test.cc",
         "modules_test.cc",
     ],
-    args = ["--googlesql_omit_tvf_signatures_in_resolved_ast_debug_string=true"],
     data = [
         "//googlesql/testdata:test_files",
         "//googlesql/testdata:test_proto3_proto",
@@ -873,6 +873,8 @@ cc_library(
     deps = [
         ":type",
         "//googlesql/base:logging",
+        "//googlesql/base:ret_check",
+        "@com_google_absl//absl/status",
         "@com_google_absl//absl/strings",
     ],
 )

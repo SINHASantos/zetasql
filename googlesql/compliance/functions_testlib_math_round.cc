@@ -128,6 +128,22 @@ std::vector<FunctionTestCall> GetFunctionTestsRounding() {
       {"round", {double_nan, -1000ll}, double_nan},
       {"round", {double_nan, 1000ll}, double_nan},
 
+      // b/395775549: Rounding 75.736617999999993 to 6 digits previously
+      // returned 75.736617999999993 due to double/long double precision
+      // mismatch.
+      {"round", {75.736617999999993, 6ll}, 75.736618},
+      // b/328562866: Rounding 0.01207 to 5 digits previously returned
+      // 0.012069999999999999.
+      {"round", {0.01207, 5ll}, 0.01207},
+      // Standard stability verification.
+      {"round", {1.2345, 2ll}, 1.23},
+      {"round", {1.2345, 3ll}, 1.234},
+      {"round", {1.2355, 3ll}, 1.236},
+      {"round", {1.2345, 0ll}, 1.0},
+      {"round", {123.45, -2ll}, 100.0},
+      {"round", {-1.2345, 2ll}, -1.23},
+      {"round", {0.0, 0ll}, 0.0},
+
       {"trunc", {NullDouble()}, NullDouble()},
       {"trunc", {0.0f}, 0.0f},
       {"trunc", {2.0f}, 2.0f},
@@ -206,6 +222,19 @@ std::vector<FunctionTestCall> GetFunctionTestsRounding() {
       {"trunc", {double_nan, 0ll}, double_nan},
       {"trunc", {double_nan, -1000ll}, double_nan},
       {"trunc", {double_nan, 10000ll}, double_nan},
+
+      // b/395775549: Truncating 75.736617999999993 to 6 digits.
+      {"trunc", {75.736617999999993, 6ll}, 75.736617},
+      // b/328562866: Truncating 0.01207 to 5 digits.
+      {"trunc", {0.01207, 5ll}, 0.01207},
+      // Standard stability verification.
+      {"trunc", {1.2345, 2ll}, 1.23},
+      {"trunc", {1.2345, 3ll}, 1.234},
+      {"trunc", {1.2355, 3ll}, 1.235},
+      {"trunc", {1.2345, 0ll}, 1.0},
+      {"trunc", {123.45, -2ll}, 100.0},
+      {"trunc", {-1.2345, 2ll}, -1.23},
+      {"trunc", {0.0, 0ll}, 0.0},
 
       // CEIL and CEILING are synonymous.
       {"ceil", {NullDouble()}, NullDouble()},

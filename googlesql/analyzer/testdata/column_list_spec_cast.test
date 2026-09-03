@@ -1,0 +1,146 @@
+[default language_features=MAXIMUM,+COLUMN_LIST_SPEC]
+[default show_sqlbuilder_output]
+[default use_constant_evaluator]
+[default sql_builder_target_syntax_mode=standard]
+
+
+[mode=expression]
+CAST(NULL AS COLUMN_LIST_SPEC)
+
+--
+Literal(type=COLUMN_LIST_SPEC, value=NULL, has_explicit_type=TRUE)
+
+[SQLBUILDER_OUTPUT]
+CAST(NULL AS COLUMN_LIST_SPEC)
+==
+
+[mode=expression]
+CAST(NULL AS ARRAY<COLUMN_LIST_SPEC>)
+
+--
+Literal(type=ARRAY<COLUMN_LIST_SPEC>, value=NULL, has_explicit_type=TRUE)
+
+[SQLBUILDER_OUTPUT]
+CAST(NULL AS ARRAY<COLUMN_LIST_SPEC>)
+==
+
+SELECT CAST(NULL AS ARRAY<COLUMN_LIST_SPEC>) IS NULL;
+
+--
+QueryStmt
++-output_column_list=
+| +-$query.$col1#1 AS `$col1` [BOOL]
++-query=
+  +-ProjectScan
+    +-column_list=[$query.$col1#1]
+    +-expr_list=
+    | +-$col1#1 :=
+    |   +-FunctionCall(GoogleSQL:$is_null(ARRAY<COLUMN_LIST_SPEC>) -> BOOL)
+    |     +-Literal(type=ARRAY<COLUMN_LIST_SPEC>, value=NULL, has_explicit_type=TRUE)
+    +-input_scan=
+      +-SingleRowScan
+
+[SQLBUILDER_OUTPUT]
+SELECT
+  CAST(NULL AS ARRAY< COLUMN_LIST_SPEC >) IS NULL AS a_1;
+==
+
+[allow_undeclared_parameters]
+[parameter_mode=named]
+[mode=expression]
+CAST(@param AS COLUMN_LIST_SPEC)
+--
+Parameter(parse_location=5-11, type=COLUMN_LIST_SPEC, name="param")
+
+[SQLBUILDER_OUTPUT]
+CAST(@param AS COLUMN_LIST_SPEC)
+
+[UNDECLARED_PARAMETERS]
+param: COLUMN_LIST_SPEC
+==
+
+[mode=expression]
+CAST([] AS COLUMN_LIST_SPEC)
+--
+ERROR: Invalid cast from ARRAY<INT64> to COLUMN_LIST_SPEC [at 1:6]
+CAST([] AS COLUMN_LIST_SPEC)
+     ^
+==
+
+[mode=expression]
+CAST([NULL] AS COLUMN_LIST_SPEC)
+--
+ERROR: Invalid cast from ARRAY<INT64> to COLUMN_LIST_SPEC [at 1:6]
+CAST([NULL] AS COLUMN_LIST_SPEC)
+     ^
+==
+
+[mode=expression]
+CAST(['x'] AS COLUMN_LIST_SPEC)
+--
+ERROR: Invalid cast from ARRAY<STRING> to COLUMN_LIST_SPEC [at 1:6]
+CAST(['x'] AS COLUMN_LIST_SPEC)
+     ^
+==
+
+[mode=expression]
+CAST(CAST(NULL AS INT64) AS COLUMN_LIST_SPEC)
+--
+ERROR: Invalid cast from INT64 to COLUMN_LIST_SPEC [at 1:6]
+CAST(CAST(NULL AS INT64) AS COLUMN_LIST_SPEC)
+     ^
+==
+
+[mode=expression]
+CAST(CAST(NULL AS ARRAY<INT64>) AS COLUMN_LIST_SPEC)
+--
+ERROR: Invalid cast from ARRAY<INT64> to COLUMN_LIST_SPEC [at 1:6]
+CAST(CAST(NULL AS ARRAY<INT64>) AS COLUMN_LIST_SPEC)
+     ^
+==
+
+[mode=expression]
+CAST(CAST(NULL AS ARRAY<STRING>) AS COLUMN_LIST_SPEC)
+--
+ERROR: Invalid cast from ARRAY<STRING> to COLUMN_LIST_SPEC [at 1:6]
+CAST(CAST(NULL AS ARRAY<STRING>) AS COLUMN_LIST_SPEC)
+     ^
+==
+
+[mode=expression]
+CAST(CONCAT('a', 'b') AS COLUMN_LIST_SPEC)
+--
+ERROR: Invalid cast from STRING to COLUMN_LIST_SPEC [at 1:6]
+CAST(CONCAT('a', 'b') AS COLUMN_LIST_SPEC)
+     ^
+==
+
+SELECT CAST(Value AS COLUMN_LIST_SPEC) FROM KeyValue
+--
+ERROR: Invalid cast from STRING to COLUMN_LIST_SPEC [at 1:13]
+SELECT CAST(Value AS COLUMN_LIST_SPEC) FROM KeyValue
+            ^
+
+
+==
+
+SELECT CAST(COLUMNS(['a', 'b']) AS STRING)
+--
+ERROR: Function not found: COLUMNS; Did you mean count? [at 1:13]
+SELECT CAST(COLUMNS(['a', 'b']) AS STRING)
+            ^
+==
+
+[language_features=NONE,+COLUMN_LIST_SPEC,+TYPEOF_FUNCTION]
+SELECT TYPEOF(COLUMNS(['a', 'b']))
+--
+ERROR: Function not found: COLUMNS; Did you mean count? [at 1:15]
+SELECT TYPEOF(COLUMNS(['a', 'b']))
+              ^
+==
+
+SELECT CAST(CAST(NULL AS COLUMN_LIST_SPEC) AS STRING)
+--
+ERROR: Invalid cast from COLUMN_LIST_SPEC to STRING [at 1:13]
+SELECT CAST(CAST(NULL AS COLUMN_LIST_SPEC) AS STRING)
+            ^

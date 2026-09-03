@@ -82,25 +82,23 @@ enum TimestampScale {
 absl::Status ValidateTimeScale(TimestampScale scale);
 
 // Checks that a date value falls between 0001-01-01 and 9999-12-31 (inclusive).
-ABSL_MUST_USE_RESULT bool IsValidDate(int32_t date);
+[[nodiscard]] bool IsValidDate(int32_t date);
 
 // Checks that the specified year, month, day, are valid (i.e., month is
 // 1-12, day is valid for the specified month, etc.).
-ABSL_MUST_USE_RESULT bool IsValidDay(absl::civil_year_t year, int month,
-                                     int day);
+[[nodiscard]] bool IsValidDay(absl::civil_year_t year, int month, int day);
 
 // Checks that a timestamp value falls between 0001-01-01 and 9999-12-31 UTC
 // for timestamps with at most microseconds scale.  For nanoseconds, all int64
 // values are considered valid.
-ABSL_MUST_USE_RESULT bool IsValidTimestamp(int64_t timestamp,
-                                           TimestampScale scale);
+[[nodiscard]] bool IsValidTimestamp(int64_t timestamp, TimestampScale scale);
 
 // Valid time zone offsets are -14:00 to +14:00, consistent with the SQL
 // standard.  The input offset must be at minutes granularity.
-ABSL_MUST_USE_RESULT bool IsValidTimeZone(int timezone_minutes_offset);
+[[nodiscard]] bool IsValidTimeZone(int timezone_minutes_offset);
 
 // Checks that a absl::Time value falls between 0001-01-01 and 9999-12-31 UTC.
-ABSL_MUST_USE_RESULT bool IsValidTime(absl::Time time);
+[[nodiscard]] bool IsValidTime(absl::Time time);
 
 // Loads the TimeZone related to the string <timezone_string> into <timezone>,
 // returning success or failure if <timezone_string> is invalid.  Supports
@@ -116,9 +114,8 @@ absl::Status MakeTimeZone(absl::string_view timezone_string,
                           absl::TimeZone* timezone);
 
 // Creates a absl::Time from an int64 based timestamp value.
-ABSL_DEPRECATED("Use MakeTimeFromInt64() instead.")
-ABSL_MUST_USE_RESULT absl::Time MakeTime(int64_t timestamp,
-                                         TimestampScale scale);
+[[nodiscard]] [[deprecated("Use MakeTimeFromInt64() instead.")]]
+absl::Time MakeTime(int64_t timestamp, TimestampScale scale);
 
 // Creates a absl::Time from an int64 based timestamp value.
 absl::StatusOr<absl::Time> MakeTimeFromInt64(int64_t timestamp,
@@ -126,8 +123,8 @@ absl::StatusOr<absl::Time> MakeTimeFromInt64(int64_t timestamp,
 
 // Converts a absl::Time value into an int64 timestamp for the given <scale>.
 // Returns false if the value is outside the representable range.
-ABSL_MUST_USE_RESULT bool FromTime(absl::Time base_time, TimestampScale scale,
-                                   int64_t* output);
+[[nodiscard]] bool FromTime(absl::Time base_time, TimestampScale scale,
+                            int64_t* output);
 
 // Returns the absl::Weekday corresponding to `part`, which must be one of the
 // WEEK values.
@@ -1162,7 +1159,7 @@ absl::Status EncodeFormattedDate(int32_t input_date, FieldFormat::Format format,
                                  int32_t* output_formatted_date);
 
 // Returns current date as of the specified timezone.
-ABSL_MUST_USE_RESULT int32_t CurrentDate(absl::TimeZone timezone);
+[[nodiscard]] int32_t CurrentDate(absl::TimeZone timezone);
 
 // Converts <timezone_string> to absl::TimeZone and invokes previous
 // function.  If <timezone_string> is not a valid TimeZone, returns
@@ -1170,7 +1167,7 @@ ABSL_MUST_USE_RESULT int32_t CurrentDate(absl::TimeZone timezone);
 absl::Status CurrentDate(absl::string_view timezone_string, int32_t* date);
 
 // Returns the current timestamp as the number of microseconds from epoch.
-ABSL_MUST_USE_RESULT int64_t CurrentTimestamp();
+[[nodiscard]] int64_t CurrentTimestamp();
 
 // Given a timestamp as a absl::Time and an initial scale, returns the narrowest
 // scale that can still accurately represent the timestamp.

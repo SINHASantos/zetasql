@@ -24,7 +24,6 @@
 #include <string>
 #include <vector>
 
-#include "googlesql/common/box_glyphs.h"
 #include "googlesql/common/thread_stack.h"
 #include "googlesql/public/constant.h"
 #include "googlesql/public/function.h"
@@ -37,6 +36,7 @@
 #include "googlesql/public/types/type_parameters.h"
 #include "googlesql/resolved_ast/resolved_ast.h"
 #include "googlesql/resolved_ast/resolved_ast_enums.pb.h"
+#include "googlesql/resolved_ast/resolved_ast_formatter.h"
 #include "googlesql/resolved_ast/resolved_collation.h"
 #include "googlesql/resolved_ast/resolved_column.h"
 #include "googlesql/resolved_ast/resolved_node_kind.pb.h"
@@ -48,21 +48,12 @@
 #include "absl/status/status.h"
 #include "googlesql/base/status_macros.h"
 #include "absl/status/statusor.h"
-#include "absl/strings/ascii.h"
-#include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_join.h"
-#include "absl/strings/str_split.h"
 #include "absl/strings/string_view.h"
 #include "absl/types/span.h"
 #include "googlesql/base/map_util.h"
 #include "googlesql/base/ret_check.h"
-
-// TODO: Remove the flag once it is rolled out in external tests.
-ABSL_FLAG(bool, googlesql_omit_tvf_signatures_in_resolved_ast_debug_string,
-          true,
-          "If true, TVF signatures are omittied from the debug string "
-          "representation of TableValueFunction fields in ResolvedAST nodes.");
 
 namespace googlesql {
 
@@ -99,259 +90,9 @@ void ResolvedNode::ClearOperatorKeywordLocationRange() {
 }
 
 std::string ResolvedNode::DebugString(const DebugStringConfig& config) const {
-  std::string output;
-  DebugStringImpl(this, config, /*stem=*/"", /*node_connector=*/"",
-                  /*field_value_indent=*/"", &output,
-                  /*pipe_input_to_elide=*/nullptr);
-  return output;
+  return RenderResolvedAST(this, config);
 }
 
-void ResolvedNode::AppendAnnotations(
-    const ResolvedNode* node, absl::Span<const NodeAnnotation> annotations,
-    std::string* output) {
-  if (node == nullptr) {
-    return;
-  }
-  for (const NodeAnnotation& annotation : annotations) {
-    if (annotation.node == node) {
-      absl::StrAppend(output, " ", annotation.annotation);
-      return;
-    }
-  }
-}
-
-void ResolvedNode::DebugStringImpl(const ResolvedNode* node,
-                                   const DebugStringConfig& config,
-                                   absl::string_view stem,
-                                   absl::string_view node_connector,
-                                   absl::string_view field_value_indent,
-                                   std::string* output,
-                                   const ResolvedScan* pipe_input_to_elide) {
-  if (config.linear_mode && node != nullptr && node->IsScan() &&
-      node->GetAs<ResolvedScan>()->GetPipeInputScan() != nullptr) {
-    DebugStringLinearScanChain(node->GetAs<ResolvedScan>(), config, stem,
-                               node_connector, output);
-  } else {
-    DebugStringNodeBody(node, config,
-                        /*name_prefix=*/absl::StrCat(stem, node_connector),
-                        /*field_prefix=*/absl::StrCat(stem, field_value_indent),
-                        output, pipe_input_to_elide);
-  }
-}
-
-void ResolvedNode::DebugStringLinearScanChain(const ResolvedScan* top_scan,
-                                              const DebugStringConfig& config,
-                                              absl::string_view stem,
-                                              absl::string_view connector,
-                                              std::string* output) {
-
-  const BoxGlyphs& glyphs =
-      config.use_box_glyphs ? kUnicodeBoxGlyphs : kAsciiBoxGlyphs;
-
-  // Collect the pipe input chain: pipe_chain[0] is this scan (the top of the
-  // chain) and pipe_chain.back() is the first scan (with pipe input null).
-  std::vector<const ResolvedScan*> pipe_chain;
-  for (const ResolvedScan* scan = top_scan; scan != nullptr;
-       scan = scan->GetPipeInputScan()) {
-    pipe_chain.push_back(scan);
-  }
-
-  // If pipe_chain.size() > 1, this scan is followed by pipe operators below
-  // it, so any bottom-left corner ("└─") should be turned into a tee branch
-  // ("├─"), because pipe operators that follow are formatted like additional
-  // children in the tree (connected by a `tree_vertical_light` line).
-  //
-  // Without this adjustment, we get trees that look like this:
-  //     └──TableScan(...)
-  //     ·  └─field_value=...
-  //     |> FilterScan(...)
-  //
-  // The adjustment makes trees look like this, with a better connection to the
-  // dotted line and pipe operator below.
-  //     ├──TableScan(...)
-  //     ·  └─field_value=...
-  //     |> FilterScan(...)
-  absl::string_view source_connector = connector;
-  if (pipe_chain.size() > 1 && source_connector == glyphs.tree_last) {
-    source_connector = glyphs.tree_branch;
-  }
-
-  // Emit the first leaf ResolvedScan that starts the chain.
-  // The StrCat adjusts its connector to be 3 characters wide instead of 2
-  // (e.g. "+-" -> "+--") so its name lines up with the pipe operator names
-  // below, which use "|> " as a prefix.
-  DebugStringNodeBody(
-      pipe_chain.back(), config,
-      /*name_prefix=*/absl::StrCat(stem, source_connector, glyphs.horizontal),
-      /*field_prefix=*/
-      absl::StrCat(stem, glyphs.tree_vertical_light, "  "), output,
-      /*pipe_input_to_elide=*/nullptr);
-
-  // Emit the rest of the ResolvedScan chain as pipe operators.
-  // The outer scan (pipe_chain[0]) is printed last.
-  // Each operator has a "|> " prefix.
-  // The input scans were printed as the pipe input, and get passed as
-  // `pipe_input_to_elide` to avoid printing them twice.
-  for (int i = static_cast<int>(pipe_chain.size()) - 2; i >= 0; --i) {
-    const bool is_last = (i == 0);
-    DebugStringNodeBody(
-        pipe_chain[i], config, /*name_prefix=*/absl::StrCat(stem, "|> "),
-        /*field_prefix=*/
-        is_last ? absl::StrCat(stem, "   ")
-                : absl::StrCat(stem, glyphs.tree_vertical_light, "  "),
-        output, /*pipe_input_to_elide=*/pipe_chain[i]->GetPipeInputScan());
-  }
-}
-
-void ResolvedNode::DebugStringNodeBody(
-    const ResolvedNode* node, const DebugStringConfig& config,
-    absl::string_view name_prefix, absl::string_view field_prefix,
-    std::string* output, const ResolvedScan* pipe_input_to_elide) {
-
-  const BoxGlyphs& glyphs =
-      config.use_box_glyphs ? kUnicodeBoxGlyphs : kAsciiBoxGlyphs;
-
-  std::vector<DebugStringField> fields;
-
-  // Trees containing nullptr AST nodes are not valid; however we still want
-  // them to display a debug string indicating where the null node is in the
-  // tree, as this makes debugging easier.
-  if (node != nullptr) {
-    node->CollectDebugStringFields(&fields);
-  }
-
-  // In linear_mode, the scan field consumed as the pipe input (which may be
-  // nested, e.g. the `scan` of a ResolvedSetOperationItem) is either omitted
-  // entirely (default) or shown inline as an "<pipe_input>" placeholder,
-  // wherever it appears among the descendants.
-  if (pipe_input_to_elide != nullptr) {
-    auto is_pipe_input = [pipe_input_to_elide](const DebugStringField& field) {
-      return field.nodes.size() == 1 && field.nodes[0] == pipe_input_to_elide;
-    };
-    // `node->IsScan()` is used to detect cases when the pipe input isn't
-    // directly an input_scan field of ResolvedScan node (e.g. a TVF argument).
-    // In those cases, for clarity, we always show the placeholder rather than
-    // omitting the field.
-    if (config.omit_pipe_input_scan_field && node->IsScan()) {
-      fields.erase(std::remove_if(fields.begin(), fields.end(), is_pipe_input),
-                   fields.end());
-    } else {
-      for (DebugStringField& field : fields) {
-        if (is_pipe_input(field)) {
-          field.value = "<pipe_input>";
-          field.nodes.clear();
-        }
-      }
-    }
-  }
-
-  // Use multi-line mode if the node has any node-typed children, and always
-  // for STATIC_DESCRIBE (which contains a multi-line string, without any
-  // node-typed child field in linear mode).
-  bool multiline = false;
-  if (node != nullptr && node->node_kind() == RESOLVED_STATIC_DESCRIBE_SCAN) {
-    multiline = true;
-  } else {
-    for (const DebugStringField& field : fields) {
-      if (!field.nodes.empty()) {
-        multiline = true;
-        break;
-      }
-    }
-  }
-
-  if (node != nullptr) {
-    absl::StrAppend(output, name_prefix, node->GetNameForDebugString(config));
-  } else {
-    absl::StrAppend(output, name_prefix, "<nullptr AST node>");
-  }
-
-  if (fields.empty()) {
-    AppendAnnotations(node, config.annotations, output);
-    *output += '\n';
-  } else if (multiline) {
-    AppendAnnotations(node, config.annotations, output);
-    *output += '\n';
-
-    for (const DebugStringField& field : fields) {
-      const bool is_last_field = (&field == &fields.back());
-      absl::string_view field_connector =
-          is_last_field ? glyphs.tree_last : glyphs.tree_branch;
-      absl::string_view field_indent =
-          is_last_field ? glyphs.tree_space : glyphs.tree_vertical;
-
-      const bool print_field_name = !field.name.empty();
-      const bool value_has_newlines = absl::StrContains(field.value, "\n");
-      const bool print_one_line = field.nodes.empty() && !value_has_newlines;
-
-      absl::string_view column_created_string =
-          config.print_created_columns && field.column_created ? "{c}" : "";
-      absl::string_view accessed_string =
-          config.print_accessed ? field.accessed ? "{*}" : "{ }" : "";
-
-      if (print_field_name) {
-        absl::StrAppend(output, field_prefix, field_connector, field.name,
-                        column_created_string, accessed_string, "=");
-        if (print_one_line) {
-          absl::StrAppend(output, field.value);
-        }
-        absl::StrAppend(output, "\n");
-      } else if (print_one_line) {
-        absl::StrAppend(output, field_prefix, field_connector, field.value,
-                        column_created_string, accessed_string, "\n");
-      }
-
-      if (!print_one_line) {
-        if (value_has_newlines) {
-          absl::StrAppend(output, field_prefix, field_indent, "  \"\"\"\n");
-          for (auto line : absl::StrSplit(field.value, '\n')) {
-            std::string line_content = absl::StrCat(field_indent, "  ", line);
-            absl::StrAppend(output, field_prefix,
-                            absl::StripTrailingAsciiWhitespace(line_content),
-                            "\n");
-          }
-          absl::StrAppend(output, field_prefix, field_indent, "  \"\"\"\n");
-        }
-
-        for (const ResolvedNode* child : field.nodes) {
-          const absl::string_view field_name_indent =
-              print_field_name ? field_indent : "";
-          const bool is_last_child = (child == field.nodes.back()) &&
-                                     (print_field_name || is_last_field);
-          const absl::string_view field_value_indent =
-              is_last_child ? glyphs.tree_space : glyphs.tree_vertical;
-          const absl::string_view node_connector =
-              is_last_child ? glyphs.tree_last : glyphs.tree_branch;
-
-          DebugStringImpl(
-              child, config,
-              /*stem=*/absl::StrCat(field_prefix, field_name_indent),
-              node_connector, field_value_indent, output, pipe_input_to_elide);
-        }
-      }
-    }
-  } else {
-    *output += '(';
-    for (const DebugStringField& field : fields) {
-      absl::string_view column_created_string =
-          config.print_created_columns && field.column_created ? "{c}" : "";
-      absl::string_view accessed_string =
-          config.print_accessed ? field.accessed ? "{*}" : "{ }" : "";
-
-      if (&field != &fields[0]) *output += ", ";
-      if (field.name.empty()) {
-        absl::StrAppend(output, field.value, column_created_string,
-                        accessed_string);
-      } else {
-        absl::StrAppend(output, field.name, column_created_string,
-                        accessed_string, "=", field.value);
-      }
-    }
-    *output += ')';
-    AppendAnnotations(node, config.annotations, output);
-    *output += '\n';
-  }
-}
 
 void ResolvedNode::CollectDebugStringFields(
     std::vector<DebugStringField>* fields) const {

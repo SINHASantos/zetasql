@@ -122,6 +122,7 @@ cc_library(
     srcs = [
         "resolved_ast.cc",
         "resolved_ast_deep_copy_visitor.cc",
+        "resolved_ast_formatter.cc",
         "resolved_ast_helper.cc",
         "resolved_collation.cc",
         "resolved_column.cc",
@@ -130,6 +131,7 @@ cc_library(
     hdrs = [
         "resolved_ast.h",
         "resolved_ast_deep_copy_visitor.h",
+        "resolved_ast_formatter.h",
         "resolved_ast_helper.h",
         "resolved_ast_visitor.h",
         "resolved_collation.h",
@@ -173,6 +175,7 @@ cc_library(
         "@com_google_absl//absl/container:flat_hash_map",
         "@com_google_absl//absl/container:flat_hash_set",
         "@com_google_absl//absl/flags:flag",
+        "@com_google_absl//absl/functional:function_ref",
         "@com_google_absl//absl/hash",
         "@com_google_absl//absl/log",
         "@com_google_absl//absl/memory",
@@ -503,6 +506,22 @@ cc_test(
         "//googlesql/public:value",
         "//googlesql/public/types",
         "@com_google_absl//absl/status:statusor",
+    ],
+)
+
+cc_test(
+    name = "resolved_ast_formatter_test",
+    size = "small",
+    srcs = ["resolved_ast_formatter_test.cc"],
+    deps = [
+        ":resolved_ast",
+        ":resolved_node_kind_cc_proto",
+        "//googlesql/base/testing:googlesql_gtest_main",
+        "//googlesql/base/testing:status_matchers",
+        "//googlesql/public:id_string",
+        "//googlesql/public:value",
+        "//googlesql/public/types",
+        "@com_google_absl//absl/strings",
     ],
 )
 

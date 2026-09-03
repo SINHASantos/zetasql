@@ -32,7 +32,6 @@ def gen_analyzer_test(filename):
         ],
         args = [
             "--test_file=$(location " + datafile + ")",
-            "--googlesql_omit_tvf_signatures_in_resolved_ast_debug_string=true",
         ],
     )
 

@@ -28,7 +28,7 @@ namespace googlesql::parser {
 TextMapperLexerAdapter::TextMapperLexerAdapter(TokenStream* input)
     : input_(input) {}
 
-ABSL_MUST_USE_RESULT Token TextMapperLexerAdapter::Next() {
+[[nodiscard]] Token TextMapperLexerAdapter::Next() {
   auto status_or_token = input_->GetNextToken();
   if (!status_or_token.ok()) {
     // The TextMapper lexer interface requires returning a Token enum. Returning

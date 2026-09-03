@@ -389,8 +389,7 @@ RETURN p.name AS person_name, friend.name AS friend_name;
 **Example: Call an inline subquery**
 
 The following example calls an inline subquery to find accounts owned by each
-matched person `p`. Multiple accounts for the same person are ordered by account
-ID.
+matched person `p`:
 
 ```googlesql
 GRAPH FinGraph
@@ -398,8 +397,6 @@ MATCH (p:Person)
 CALL (p) {
   MATCH (p)-[:Owns]->(a:Account)
   RETURN a.Id AS account_Id
-  ORDER BY account_Id
-  LIMIT 2
 }
 RETURN p.name AS person_name, account_Id
 ORDER BY person_name, account_Id;
@@ -407,10 +404,9 @@ ORDER BY person_name, account_Id;
 /*--------------------------+
  | person_name | account_Id |
  +--------------------------+
- | Alex        | 16         |
- | Dana        | 17         |
+ | Alex        | 7          |
  | Dana        | 20         |
- | Lee         | 7          |
+ | Lee         | 16         |
  +--------------------------*/
 ```
 
@@ -427,8 +423,6 @@ MATCH (p:Person)  -- Outer-scoped variable `p`
 CALL () {  -- `p` not declared
   MATCH (p)-[:Owns]->(a:Account)  -- Inner-scoped variable `p`, independent of outer-scoped `p`
   RETURN a.Id AS account_Id
-  ORDER BY account_Id
-  LIMIT 2
 }
 RETURN p.name AS person_name, account_Id
 ORDER BY person_name, account_Id;
@@ -437,12 +431,15 @@ ORDER BY person_name, account_Id;
 /*--------------------------+
  | person_name | account_Id |
  +--------------------------+
- | Alex        |          7 |
- | Alex        |         16 |
- | Dana        |          7 |
- | Dana        |         16 |
- | Lee         |          7 |
- | Lee         |         16 |
+ | Alex        | 7          |
+ | Alex        | 16         |
+ | Alex        | 20         |
+ | Dana        | 7          |
+ | Dana        | 16         |
+ | Dana        | 20         |
+ | Lee         | 7          |
+ | Lee         | 16         |
+ | Lee         | 20         |
  +--------------------------*/
 ```
 
@@ -457,13 +454,11 @@ LET Id = p.Id
 CALL (Id) {  -- Non-node, non-edge variable `Id` declared
   MATCH (p)-[:Owns]->(a:Account)
   RETURN a.Id  -- Not allowed, outer-scoped `Id` isn't a node or edge variable, so you can't redeclare it.
-  ORDER BY a.Id
-  LIMIT 2
 }
 RETURN p.name AS person_name, Id;
 
 /*
-ERROR: generic::invalid_argument: Variable name: Id already exists [at 7:3]
+ERROR: generic::invalid_argument: Variable name: Id already exists [at 6:3]
   RETURN a.Id
 */
 ```
@@ -486,7 +481,7 @@ ORDER BY num_accounts DESC, p.name;
 /*-----------------------+
  | name   | num_accounts |
  +-----------------------+
- | Dana   | 2            |
+ | Dana   | 1            |
  | Alex   | 1            |
  | Lee    | 1            |
  +-----------------------*/
@@ -494,10 +489,10 @@ ORDER BY num_accounts DESC, p.name;
 
 **Example: Use `OPTIONAL` to include `NULL` row values**
 
-The following query finds the two most recent account transfers `t` for each
-person `p`. The `OPTIONAL` clause includes rows for which the TVF or subquery
-produces no output. Rows with no output return `NULL` values. Without the
-`OPTIONAL` clause, rows with no output are excluded from the results.
+The following query finds account transfers `t` for each person `p`. The
+`OPTIONAL` clause includes rows for which the TVF or subquery produces no
+output. Rows with no output return `NULL` values. Without the `OPTIONAL` clause,
+rows with no output are excluded from the results.
 
 ```googlesql
 GRAPH FinGraph
@@ -505,8 +500,6 @@ MATCH (p:Person)
 OPTIONAL CALL (p) {
   MATCH (p)-[:Owns]->(a:Account)-[t:Transfers]->()
   RETURN a.Id AS account_id, t.amount AS transfer_amount, DATE(t.create_time) AS transfer_date
-  ORDER BY transfer_date DESC
-  LIMIT 2
 }
 RETURN p.name, account_id, transfer_amount, transfer_date
 ORDER BY p.name, transfer_date DESC;
@@ -514,7 +507,7 @@ ORDER BY p.name, transfer_date DESC;
 /*-------------------------------------------------------+
  | name   | account_id | transfer_amount | transfer_date |
  +-------------------------------------------------------+
- | Alex   | NULL       | NULL            | NULL          |
+ | Alex   | 7          | 100             | 2020-10-04    |
  | Alex   | 7          | 300             | 2020-08-29    |
  | Dana   | 20         | 200             | 2020-10-17    |
  | Dana   | 20         | 500             | 2020-10-04    |
@@ -553,14 +546,13 @@ RETURN p.Id AS person_Id, account_Id;
 /*------------------------+
  | person_Id | account_Id |
  +------------------------+
- | 1         | 16         |
+ | 1         | 7          |
  +------------------------*/
 ```
 
-**Example: Filter, order, and limit subquery results**
+**Example: Filter subquery results**
 
-The following query finds the top three largest transfers over 50 dollar amounts
-for each person.
+The following query finds transfers over 50 dollar amounts for each person:
 
 ```googlesql
 GRAPH FinGraph
@@ -569,8 +561,6 @@ CALL (p) {
   MATCH (p)-[:Owns]->(a:Account)-[t:Transfers]->()
   WHERE t.amount > 50
   RETURN a.Id AS account_id, t.amount
-  ORDER BY t.amount DESC
-  LIMIT 3
 }
 RETURN p.name, account_id, amount
 ORDER BY p.name, amount DESC;
@@ -578,12 +568,11 @@ ORDER BY p.name, amount DESC;
 /*------------------------------+
  | name   | account_id | amount |
  +------------------------------+
- | Alex   | NULL       | NULL   |
- | Dana   | 17         | 80     |
- | Dana   | 20         | 100    |
- | Dana   | 17         | 60     |
- | Lee    | 7          | 200    |
- | Lee    | 7          | 150    |
+ | Alex   | 7          | 300    |
+ | Alex   | 7          | 100    |
+ | Dana   | 20         | 500    |
+ | Dana   | 20         | 200    |
+ | Lee    | 16         | 300    |
  +------------------------------*/
 ```
 

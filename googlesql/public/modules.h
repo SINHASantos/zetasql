@@ -107,7 +107,7 @@ typedef absl::btree_map<std::string, const Type*,
 // This likely includes things like fetching all the public and/or private
 // functions.  These will be added as we find specific requirements for
 // them.
-class ModuleCatalog : public Catalog {
+class ModuleCatalog : public internal::ModuleCatalogInterface {
  public:
   static const char kUninitializedModuleName[];
   ~ModuleCatalog() override;
@@ -466,6 +466,11 @@ class ModuleCatalog : public Catalog {
   // returns nullptr.
   // Retains ownership of the ResolvedModuleStmt.
   const ResolvedModuleStmt* resolved_module_stmt() const;
+
+ protected:
+  Catalog* GetInternalResolutionCatalog() override {
+    return resolution_catalog_global_.get();
+  }
 
  private:
   // The ModuleCatalog must be initialized (via Init()) before it is used.

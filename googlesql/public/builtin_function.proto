@@ -61,7 +61,7 @@ enum FunctionSignatureId {
   // 3100-3199 Measure functions              (NextId: 3101)
   // 3200-3299 MATCH_RECOGNIZE functions      (NextId: 3207)
   // 3300-3399 Aggregate functions III        (NextId: 3303)
-  // 3400-3499 Misc functions II              (NextId: 3430)
+  // 3400-3499 Misc functions II              (NextId: 3431)
   // 3500-3599 Vector functions               (NextId: 3502)
   // 4000-4099 Table valued functions         (NextId: 4006)
   // 5000-5023 AI functions                   (Fully used)
@@ -929,12 +929,8 @@ enum FunctionSignatureId {
   FN_JSON_SUBSCRIPT_STRING = 1690;  // $subscript(json,string)-> json
   FN_TO_JSON_STRING = 1622;         // to_json_string(any[, bool]) -> string
   FN_TO_JSON = 1697;                // to_json(any[, bool]) -> json
-  FN_TO_JSON_UNSUPPORTED_FIELDS =
-      1948;  // to_json(any[, bool][, unsupported_fields]) -> json
   FN_TO_JSON_PATH_AS_OBJECT =
-      3405;  // to_json(any[, bool][, path_as_object]) -> json
-  FN_TO_JSON_UNSUPPORTED_FIELDS_PATH_AS_OBJECT = 3406;
-  // to_json(any[, bool][, unsupported_fields][, path_as_object]) -> json
+      3405;                   // to_json(any[, bool][, path_as_object]) -> json
   FN_SAFE_TO_JSON = 1949;     // safe_to_json(any) -> json
   FN_JSON_QUERY = 1623;       // json_query(string, string) -> string
   FN_JSON_QUERY_JSON = 1686;  // json_query(json, string) -> json
@@ -968,6 +964,13 @@ enum FunctionSignatureId {
       3427;  // bit_cast_to_int64(bytes [, endianness]) -> int64
   FN_BIT_CAST_BYTES_TO_UINT64 =
       3428;  // bit_cast_to_uint64(bytes [, endianness]) -> uint64
+
+  // These TO_JSON signatures are no longer supported
+  reserved "FN_TO_JSON_UNSUPPORTED_FIELDS";
+  reserved 1948;  // FN_TO_JSON_UNSUPPORTED_FIELDS
+  reserved "FN_TO_JSON_UNSUPPORTED_FIELDS_PATH_AS_OBJECT";
+  reserved 3406;  // FN_TO_JSON_UNSUPPORTED_FIELDS_PATH_AS_OBJECT
+
   FN_FROM_PROTO_TIMESTAMP =
       1626;  // from_proto(google.protobuf.Timestamp) -> timestamp
   FN_FROM_PROTO_DATE = 1627;  // from_proto(google.type.Date) -> date

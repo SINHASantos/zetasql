@@ -97,6 +97,7 @@ public final class DeclarativeTypeDescriptor implements Serializable {
   private final DeclarativeTypeProto.AllowCoercionMode coercionToBackingType;
   private final DeclarativeTypeProto.ReturningStrategy returningStrategy;
   private final DeclarativeTypeProto.EqualityStrategy equalityStrategy;
+  private final DeclarativeTypeProto.TypeParamsStrategy typeParamsStrategy;
   private final ImmutableSet<Integer> additionalRequiredLanguageFeatures;
 
   private DeclarativeTypeDescriptor(Builder builder) {
@@ -107,6 +108,7 @@ public final class DeclarativeTypeDescriptor implements Serializable {
     this.coercionToBackingType = builder.coercionToBackingType;
     this.returningStrategy = builder.returningStrategy;
     this.equalityStrategy = builder.equalityStrategy;
+    this.typeParamsStrategy = builder.typeParamsStrategy;
     this.additionalRequiredLanguageFeatures = builder.additionalRequiredLanguageFeatures;
   }
 
@@ -146,6 +148,10 @@ public final class DeclarativeTypeDescriptor implements Serializable {
     return equalityStrategy;
   }
 
+  public DeclarativeTypeProto.TypeParamsStrategy getTypeParamsStrategy() {
+    return typeParamsStrategy;
+  }
+
   public ImmutableSet<Integer> getAdditionalRequiredLanguageFeatures() {
     return additionalRequiredLanguageFeatures;
   }
@@ -161,6 +167,7 @@ public final class DeclarativeTypeDescriptor implements Serializable {
         && this.coercionToBackingType == other.coercionToBackingType
         && this.returningStrategy == other.returningStrategy
         && this.equalityStrategy == other.equalityStrategy
+        && this.typeParamsStrategy == other.typeParamsStrategy
         && Objects.equals(
             this.additionalRequiredLanguageFeatures, other.additionalRequiredLanguageFeatures);
   }
@@ -178,6 +185,8 @@ public final class DeclarativeTypeDescriptor implements Serializable {
         DeclarativeTypeProto.ReturningStrategy.RETURNING_DISALLOWED;
     private DeclarativeTypeProto.EqualityStrategy equalityStrategy =
         DeclarativeTypeProto.EqualityStrategy.EQUALITY_DISALLOWED;
+    private DeclarativeTypeProto.TypeParamsStrategy typeParamsStrategy =
+        DeclarativeTypeProto.TypeParamsStrategy.TYPE_PARAMS_DISALLOWED;
     private ImmutableSet<Integer> additionalRequiredLanguageFeatures = ImmutableSet.of();
 
     private Builder() {}
@@ -190,6 +199,7 @@ public final class DeclarativeTypeDescriptor implements Serializable {
       this.coercionToBackingType = descriptor.coercionToBackingType;
       this.returningStrategy = descriptor.returningStrategy;
       this.equalityStrategy = descriptor.equalityStrategy;
+      this.typeParamsStrategy = descriptor.typeParamsStrategy;
       this.additionalRequiredLanguageFeatures = descriptor.additionalRequiredLanguageFeatures;
     }
 
@@ -238,6 +248,13 @@ public final class DeclarativeTypeDescriptor implements Serializable {
     }
 
     @CanIgnoreReturnValue
+    public Builder setTypeParamsStrategy(
+        DeclarativeTypeProto.TypeParamsStrategy typeParamsStrategy) {
+      this.typeParamsStrategy = typeParamsStrategy;
+      return this;
+    }
+
+    @CanIgnoreReturnValue
     public Builder setAdditionalRequiredLanguageFeatures(
         Set<Integer> additionalRequiredLanguageFeatures) {
       this.additionalRequiredLanguageFeatures =
@@ -263,6 +280,7 @@ public final class DeclarativeTypeDescriptor implements Serializable {
         .setCoercionToBackingType(coercionToBackingType)
         .setReturningStrategy(returningStrategy)
         .setEqualityStrategy(equalityStrategy)
+        .setTypeParamsStrategy(typeParamsStrategy)
         .addAllAdditionalRequiredLanguageFeatures(additionalRequiredLanguageFeatures);
 
     backingType.serialize(builder.getBackingTypeBuilder(), fileDescriptorSetsBuilder);

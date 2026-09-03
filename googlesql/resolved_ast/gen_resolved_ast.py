@@ -13936,6 +13936,8 @@ ResolvedArgumentRef(y)
 
       When executed, `ResolvedGraphInsertScan` applies the side effects of
       inserting these new nodes or edges into the current property graph.
+
+      See (broken link):dml-insert for the design.
       """,
       fields=[
           Field('input_scan', 'ResolvedScan', tag_id=2),

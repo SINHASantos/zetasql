@@ -619,6 +619,38 @@ cc_test(
 )
 
 cc_library(
+    name = "double_double",
+    hdrs = ["double_double.h"],
+    features = ["header_modules"],
+    deps = [
+        "@com_google_absl//absl/base:core_headers",
+        "@com_google_absl//absl/types:compare",
+    ],
+)
+
+cc_library(
+    name = "round_decimal",
+    srcs = ["round_decimal.cc"],
+    hdrs = ["round_decimal.h"],
+    features = ["header_modules"],
+    deps = [
+        ":double_double",
+        "@com_google_absl//absl/base",
+        "@com_google_absl//absl/base:core_headers",
+    ],
+)
+
+cc_test(
+    name = "round_decimal_test",
+    srcs = ["round_decimal_test.cc"],
+    deps = [
+        ":round_decimal",
+        "//googlesql/base:source_location",
+        "//googlesql/base/testing:googlesql_gtest_main",
+    ],
+)
+
+cc_library(
     name = "internal_value",
     srcs = [
         "internal_value.cc",

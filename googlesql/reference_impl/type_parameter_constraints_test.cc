@@ -21,15 +21,20 @@
 #include "googlesql/base/testing/status_matchers.h"
 #include "googlesql/public/numeric_value.h"
 #include "googlesql/public/options.pb.h"
+#include "googlesql/public/proto/vector_encoding_id.pb.h"
 #include "googlesql/public/type_parameters.pb.h"
+#include "googlesql/public/types/declarative_type.h"
 #include "googlesql/public/types/type.h"
 #include "googlesql/public/types/type_factory.h"
 #include "googlesql/public/types/type_parameters.h"
+#include "googlesql/public/types/vector_type_util.h"
 #include "googlesql/public/value.h"
+#include "googlesql/public/value.pb.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "absl/status/status.h"
 #include "absl/strings/string_view.h"
+#include "absl/types/span.h"
 
 using ::googlesql::BigNumericValue;
 using ::googlesql::NumericValue;
@@ -462,6 +467,157 @@ TEST(TypeParametersTest, StructWithTypeParametersFails) {
           absl::StatusCode::kOutOfRange,
           HasSubstr(
               "precision 2 and scale 2 but got a value that is not in range")));
+}
+
+absl::StatusOr<Value> MakeVectorValue(TypeFactory* type_factory,
+                                      absl::Span<const float> elements) {
+  GOOGLESQL_ASSIGN_OR_RETURN(const Type* vector_type, MakeVectorType(type_factory));
+  std::vector<Value> float_values;
+  float_values.reserve(elements.size());
+  for (float elem : elements) {
+    float_values.push_back(Value::Float(elem));
+  }
+  Value array_val = Value::Array(types::FloatArrayType(), float_values);
+  ValueProto proto;
+  if (absl::Status s = array_val.Serialize(&proto); !s.ok()) {
+    return s;
+  }
+  return Value::Declarative(vector_type->AsDeclarativeType(),
+                            Value::Bytes(proto.SerializeAsString()));
+}
+
+TEST(TypeParametersTest, VectorWithLengthOk) {
+  TypeFactory type_factory;
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(Value vector_val,
+                       MakeVectorValue(&type_factory, {1.0f, 2.0f, 3.0f}));
+  VectorTypeParametersProto proto;
+  proto.set_length(3);
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(TypeParameters type_params,
+                       TypeParameters::MakeVectorTypeParameters(proto));
+  EXPECT_THAT(ApplyConstraints(type_params, PRODUCT_INTERNAL, vector_val),
+              IsOk());
+}
+
+TEST(TypeParametersTest, VectorWithLengthFails) {
+  TypeFactory type_factory;
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(Value vector_val,
+                       MakeVectorValue(&type_factory, {1.0f, 2.0f}));
+  VectorTypeParametersProto proto;
+  proto.set_length(3);
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(TypeParameters type_params,
+                       TypeParameters::MakeVectorTypeParameters(proto));
+  EXPECT_THAT(
+      ApplyConstraints(type_params, PRODUCT_INTERNAL, vector_val),
+      StatusIs(
+          absl::StatusCode::kOutOfRange,
+          HasSubstr("VECTOR(3) has length 3 but got a vector with length 2")));
+}
+
+TEST(TypeParametersTest, VectorNullWithLengthOk) {
+  TypeFactory type_factory;
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(const Type* vector_type, MakeVectorType(&type_factory));
+  Value vector_null = Value::Null(vector_type);
+  VectorTypeParametersProto proto;
+  proto.set_length(3);
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(TypeParameters type_params,
+                       TypeParameters::MakeVectorTypeParameters(proto));
+  EXPECT_THAT(ApplyConstraints(type_params, PRODUCT_INTERNAL, vector_null),
+              IsOk());
+}
+
+TEST(TypeParametersTest, VectorWithoutTypeParametersOk) {
+  TypeFactory type_factory;
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(Value vector_val,
+                       MakeVectorValue(&type_factory, {1.0f, 2.0f}));
+  TypeParameters type_params;
+  EXPECT_THAT(ApplyConstraints(type_params, PRODUCT_INTERNAL, vector_val),
+              IsOk());
+}
+
+TEST(TypeParametersTest, ArrayOfVectorWithTypeParametersOk) {
+  TypeFactory type_factory;
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(const Type* vector_type, MakeVectorType(&type_factory));
+  const ArrayType* array_type = nullptr;
+  GOOGLESQL_ASSERT_OK(type_factory.MakeArrayType(vector_type, &array_type));
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(Value v1, MakeVectorValue(&type_factory, {1.0f, 2.0f}));
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(Value v2, MakeVectorValue(&type_factory, {3.0f, 4.0f}));
+  Value array_val = Value::Array(array_type, {v1, v2});
+
+  VectorTypeParametersProto proto;
+  proto.set_length(2);
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(TypeParameters vector_params,
+                       TypeParameters::MakeVectorTypeParameters(proto));
+  TypeParameters array_params =
+      TypeParameters::MakeTypeParametersWithChildList({vector_params});
+  EXPECT_THAT(ApplyConstraints(array_params, PRODUCT_INTERNAL, array_val),
+              IsOk());
+}
+
+TEST(TypeParametersTest, ArrayOfVectorWithTypeParametersFails) {
+  TypeFactory type_factory;
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(const Type* vector_type, MakeVectorType(&type_factory));
+  const ArrayType* array_type = nullptr;
+  GOOGLESQL_ASSERT_OK(type_factory.MakeArrayType(vector_type, &array_type));
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(Value v1, MakeVectorValue(&type_factory, {1.0f, 2.0f}));
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(Value v2,
+                       MakeVectorValue(&type_factory, {3.0f, 4.0f, 5.0f}));
+  Value array_val = Value::Array(array_type, {v1, v2});
+
+  VectorTypeParametersProto proto;
+  proto.set_length(2);
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(TypeParameters vector_params,
+                       TypeParameters::MakeVectorTypeParameters(proto));
+  TypeParameters array_params =
+      TypeParameters::MakeTypeParametersWithChildList({vector_params});
+  EXPECT_THAT(
+      ApplyConstraints(array_params, PRODUCT_INTERNAL, array_val),
+      StatusIs(
+          absl::StatusCode::kOutOfRange,
+          HasSubstr("VECTOR(2) has length 2 but got a vector with length 3")));
+}
+
+TEST(TypeParametersTest, VectorWithFloat32EncodingOk) {
+  TypeFactory type_factory;
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(Value vector_val,
+                       MakeVectorValue(&type_factory, {1.0f, 2.0f}));
+  VectorTypeParametersProto proto;
+  proto.set_length(2);
+  proto.set_encoding(googlesql::VectorEncodingId::FLOAT32);
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(TypeParameters type_params,
+                       TypeParameters::MakeVectorTypeParameters(proto));
+  EXPECT_THAT(ApplyConstraints(type_params, PRODUCT_INTERNAL, vector_val),
+              IsOk());
+}
+
+TEST(TypeParametersTest, NonVectorDeclarativeTypeWithParametersFails) {
+  TypeFactory type_factory;
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(
+      TypeParameterHandlers handlers,
+      TypeParameterHandlers::Create(
+          [](const std::vector<TypeParameterValue>&, ProductMode)
+              -> absl::StatusOr<TypeParameters> { return TypeParameters(); },
+          [](const TypeParameters&, ProductMode) -> absl::Status {
+            return absl::OkStatus();
+          }));
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(const Type* custom_type,
+                       type_factory.MakeDeclarativeType(
+                           DeclarativeTypeDescriptor()
+                               .set_type_id(TypeId{"test_ns", "MyCustomType"})
+                               .set_display_name("MyCustomType")
+                               .set_backing_type(type_factory.get_string())
+                               .set_type_params_strategy(handlers)));
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(Value custom_val,
+                       Value::Declarative(custom_type->AsDeclarativeType(),
+                                          Value::String("foo")));
+  StringTypeParametersProto proto;
+  proto.set_max_length(10);
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(TypeParameters type_params,
+                       TypeParameters::MakeStringTypeParameters(proto));
+  EXPECT_THAT(
+      ApplyConstraints(type_params, PRODUCT_INTERNAL, custom_val),
+      StatusIs(
+          absl::StatusCode::kInternal,
+          HasSubstr("Type parameters are not handled for type MyCustomType")));
 }
 
 }  // namespace

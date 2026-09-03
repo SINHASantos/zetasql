@@ -23,6 +23,7 @@
 #include <tuple>
 
 #include "googlesql/base/logging.h"
+#include "absl/status/status.h"
 #include "absl/strings/string_view.h"
 
 namespace googlesql {
@@ -124,7 +125,7 @@ class SignatureMatchResult {
   bool IsCloserMatchThan(const SignatureMatchResult& other_result) const;
 
   // Adds the individual results from <other_result> to this.
-  void UpdateFromResult(const SignatureMatchResult& other_result);
+  absl::Status UpdateFromResult(const SignatureMatchResult& other_result);
 
   std::string DebugString() const;
 

@@ -7940,6 +7940,27 @@ absl::Status Algebrizer::AlgebrizeDMLReturningClause(
   return absl::OkStatus();
 }
 
+static absl::Status VerifyUpdateItemElementMode(
+    const Type* target_type,
+    const ResolvedUpdateItemElement* update_item_element) {
+  if (target_type->IsJson()) {
+    GOOGLESQL_RET_CHECK(update_item_element->update_item_mode() ==
+              ResolvedUpdateItemElementEnums::ELEMENT_PRESENCE_OPTIONAL);
+  } else if (target_type->IsArray()) {
+    GOOGLESQL_RET_CHECK(update_item_element->update_item_mode() ==
+              ResolvedUpdateItemElementEnums::ELEMENT_PRESENCE_REQUIRED);
+  } else if (target_type->IsMap()) {
+    GOOGLESQL_RET_CHECK(update_item_element->update_item_mode() ==
+                  ResolvedUpdateItemElementEnums::ELEMENT_PRESENCE_REQUIRED ||
+              update_item_element->update_item_mode() ==
+                  ResolvedUpdateItemElementEnums::ELEMENT_PRESENCE_OPTIONAL);
+  } else {
+    GOOGLESQL_RET_CHECK_FAIL() << "Unsupported subscripted type: "
+                     << target_type->DebugString();
+  }
+  return absl::OkStatus();
+}
+
 absl::Status Algebrizer::AlgebrizeDescendantsOfUpdateItem(
     const ResolvedUpdateItem* update_item, ResolvedScanMap* resolved_scan_map,
     ResolvedExprMap* resolved_expr_map, ColumnExprMap* column_expr_map) {
@@ -7958,6 +7979,8 @@ absl::Status Algebrizer::AlgebrizeDescendantsOfUpdateItem(
 
   for (const std::unique_ptr<const ResolvedUpdateItemElement>&
            update_item_element : update_item->update_item_element_list()) {
+    GOOGLESQL_RETURN_IF_ERROR(VerifyUpdateItemElementMode(update_item->target()->type(),
+                                                update_item_element.get()));
     GOOGLESQL_RETURN_IF_ERROR(PopulateResolvedExprMap(update_item_element->subscript(),
                                             resolved_expr_map));
     GOOGLESQL_RETURN_IF_ERROR(AlgebrizeDescendantsOfUpdateItem(

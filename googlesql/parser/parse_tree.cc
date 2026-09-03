@@ -1923,4 +1923,12 @@ const ASTAliasedGroupRows* ASTWithClauseEntry::aliased_group_rows() const {
   return aliased_group_rows_;
 }
 
+std::string ASTGqlDelete::SingleNodeDebugString() const {
+  std::string node_name = ASTNode::SingleNodeDebugString();
+  if (is_detach_mode()) {
+    return absl::StrCat(node_name, "(DETACH)");
+  }
+  return absl::StrCat(node_name, "(NODETACH)");
+}
+
 }  // namespace googlesql

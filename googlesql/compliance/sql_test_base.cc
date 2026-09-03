@@ -1695,6 +1695,11 @@ static std::unique_ptr<ReferenceDriver> CreateTestSetupDriver() {
   // when type-linked language features are enabled by default.
   options.EnableLanguageFeature(FEATURE_COLLATION_SUPPORT);
   options.EnableLanguageFeature(FEATURE_MAP_TYPE);
+  // TODO: Required for vector CREATE TABLE and parameter
+  // expressions in file based tests, remove when vector features are enabled by
+  // default.
+  options.EnableLanguageFeature(FEATURE_VECTOR_TYPE);
+  options.EnableLanguageFeature(FEATURE_DECLARATIVE_TYPE_FRAMEWORK);
   // Allow CREATE TABLE AS SELECT in [prepare_database] statements.
   options.AddSupportedStatementKind(RESOLVED_CREATE_TABLE_AS_SELECT_STMT);
   options.AddSupportedStatementKind(RESOLVED_CREATE_CONSTANT_STMT);
@@ -2249,11 +2254,13 @@ void SQLTestBase::StepPrepareDatabase() {
   // early.
   ABSL_CHECK(test_case_options_ != nullptr);
 
-  // When running [prepare_database] statements with the reference driver, we
-  // may need to enable extra features that the reference driver does not
-  // enable by default, for instance features which are still marked as
+  // When running [prepare_database] statements with the reference driver and
+  // test setup driver, we may need to enable extra features that the drivers
+  // do not enable by default, for instance features which are still marked as
   // in development.
   AutoLanguageOptions reference_driver_options_cleanup(reference_driver_);
+  AutoLanguageOptions test_setup_driver_options_cleanup(
+      test_setup_driver_.get());
   std::unique_ptr<AutoLanguageOptions> driver_options_cleanup;
   if (!IsVerifyingGoldens() && driver()->IsReferenceImplementation()) {
     driver_options_cleanup = std::make_unique<AutoLanguageOptions>(
@@ -2265,6 +2272,9 @@ void SQLTestBase::StepPrepareDatabase() {
         test_case_options_->prepare_database_additional_features().end());
     InsertLanguageFeatures(
         reference_driver_,
+        test_case_options_->prepare_database_additional_features());
+    InsertLanguageFeatures(
+        test_setup_driver_.get(),
         test_case_options_->prepare_database_additional_features());
 
     if (!IsVerifyingGoldens() && driver()->IsReferenceImplementation()) {

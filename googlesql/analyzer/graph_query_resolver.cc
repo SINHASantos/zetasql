@@ -2873,6 +2873,39 @@ GraphTableQueryResolver::BuildGraphRefScan(const NameListPtr& input_name_list) {
   return std::move(builder).Build();
 }
 
+absl::Status GraphTableQueryResolver::ValidateGqlDmlOperator(
+    const ASTGqlOperator* gql_op, const GqlQueryContext& context) const {
+  switch (gql_op->node_kind()) {
+    case AST_GQL_INSERT: {
+      if (!resolver_->language().LanguageFeatureEnabled(
+              FEATURE_SQL_GRAPH_TERMINAL_INSERT)) {
+        return MakeSqlErrorAt(gql_op) << "Graph INSERT is not supported";
+      }
+      // `is_nested` is true if any of the conditions are met:
+      // - The query is nested inside a GRAPH_TABLE subquery.
+      // - The query is nested inside a GQL subquery, for example, CALL {...}
+      //   or EXISTS {...}.
+      if (context.is_nested) {
+        return MakeSqlErrorAt(gql_op)
+               << "INSERT is not allowed in non-top-level graph statement";
+      }
+      if (context.is_set_op) {
+        return MakeSqlErrorAt(gql_op)
+               << "INSERT is not allowed in GQL set operations";
+      }
+      return absl::OkStatus();
+    }
+    case AST_GQL_SET:
+      return MakeSqlErrorAt(gql_op) << "Graph SET is not supported";
+    case AST_GQL_REMOVE:
+      return MakeSqlErrorAt(gql_op) << "Graph REMOVE is not supported";
+    case AST_GQL_DELETE:
+      return MakeSqlErrorAt(gql_op) << "Graph DELETE is not supported";
+    default:
+      return absl::OkStatus();
+  }
+}
+
 absl::StatusOr<ResolvedGraphWithNameList<const ResolvedScan>>
 GraphTableQueryResolver::ResolveGqlOperator(
     const ASTGqlOperator* gql_op, const NameScope* external_scope,
@@ -2901,19 +2934,8 @@ GraphTableQueryResolver::ResolveGqlOperator(
                              std::move(inputs));
     }
     case AST_GQL_INSERT: {
-      if (!resolver_->language().LanguageFeatureEnabled(
-              FEATURE_SQL_GRAPH_TERMINAL_INSERT)) {
-        return MakeSqlErrorAt(gql_op) << "Graph INSERT is not supported";
-      }
+      GOOGLESQL_RETURN_IF_ERROR(ValidateGqlDmlOperator(gql_op, context));
       resolver_->needs_generalized_query_stmt_ = true;
-      if (context.is_nested) {
-        return MakeSqlErrorAt(gql_op)
-               << "INSERT is not allowed in non-top-level graph statement";
-      }
-      if (context.is_set_op) {
-        return MakeSqlErrorAt(gql_op)
-               << "INSERT is not allowed in GQL set operations";
-      }
 
       GraphDmlResolver dml_resolver(resolver_, graph_);
       // `local_scope` contains variables from the preceding linear operators
@@ -2925,11 +2947,12 @@ GraphTableQueryResolver::ResolveGqlOperator(
                                            local_scope.get(),
                                            std::move(inputs));
     }
-    case AST_GQL_SET: {
-      return MakeSqlErrorAt(gql_op) << "Graph SET is not supported";
-    }
+    case AST_GQL_SET:
     case AST_GQL_REMOVE: {
-      return MakeSqlErrorAt(gql_op) << "Graph REMOVE is not supported";
+      return ValidateGqlDmlOperator(gql_op, context);
+    }
+    case AST_GQL_DELETE: {
+      return ValidateGqlDmlOperator(gql_op, context);
     }
     case AST_GQL_LET: {
       return ResolveGqlLet(*gql_op->GetAsOrDie<ASTGqlLet>(), local_scope.get(),
@@ -3515,6 +3538,41 @@ static bool IsCompositeQuery(const ASTGqlOperator* node) {
   return IsLinearQuery(node) || node->Is<ASTGqlSetOperation>();
 }
 
+// Recursively searches the parsed GQL operator `op` for an ASTGqlInsert node.
+// Returns true if an ASTGqlInsert is found, or false otherwise.
+static bool ContainsInsertOp(const ASTGqlOperator* op) {
+  if (op->Is<ASTGqlInsert>()) {
+    return true;
+  }
+  if (op->Is<ASTGqlOperatorList>()) {
+    for (const auto* child_op :
+         op->GetAsOrDie<ASTGqlOperatorList>()->operators()) {
+      if (ContainsInsertOp(child_op)) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+absl::Status GraphTableQueryResolver::ValidateGqlLinearQueryListDml(
+    const ASTGqlOperatorList& gql_ops_list,
+    const GqlQueryContext& context) const {
+  if (context.is_nested || !resolver_->language().LanguageFeatureEnabled(
+                               FEATURE_SQL_GRAPH_TERMINAL_INSERT)) {
+    return absl::OkStatus();
+  }
+  const int64_t num_ops = gql_ops_list.operators().size();
+  for (int i = 0; i < num_ops - 1; ++i) {
+    if (ContainsInsertOp(gql_ops_list.operators(i))) {
+      return MakeSqlErrorAt(gql_ops_list.operators(i + 1))
+             << "INSERT cannot be followed by NEXT and can only have an "
+                "immediate RETURN as the last statement in a graph query";
+    }
+  }
+  return absl::OkStatus();
+}
+
 absl::StatusOr<ResolvedGraphWithNameList<const ResolvedGraphLinearScan>>
 GraphTableQueryResolver::ResolveGqlLinearQueryList(
     const ASTGqlOperatorList& gql_ops_list, const NameScope* external_scope,
@@ -3526,6 +3584,8 @@ GraphTableQueryResolver::ResolveGqlLinearQueryList(
         << "GQL top level linear scan must contain ASTGqlOperatorList or "
            "ASTGqlSetOperation as children";
   }
+  GOOGLESQL_RETURN_IF_ERROR(ValidateGqlLinearQueryListDml(gql_ops_list, context));
+
   GOOGLESQL_ASSIGN_OR_RETURN(auto input_scan,
                    googlesql::ResolvedSingleRowScanBuilder().Build());
 
@@ -3581,21 +3641,33 @@ absl::Status GraphTableQueryResolver::CheckGqlLinearQuery(
         primitive_ops[i]->Is<ASTGqlInlineSubqueryCall>()) {
       continue;
     }
-    // Terminal INSERT prevents all ops other than RETURN from following it.
+    // In a single linear query, INSERT can only appear before the last
+    // operator if it is followed by RETURN (enforced by the parser grammar).
     if (primitive_ops[i]->Is<ASTGqlInsert>()) {
-      if (!primitive_ops[i + 1]->Is<ASTGqlReturn>()) {
-        return MakeSqlErrorAt(primitive_ops[i + 1])
-               << "INSERT can only be followed by RETURN in a linear query";
-      }
+      GOOGLESQL_RET_CHECK(primitive_ops[i + 1]->Is<ASTGqlReturn>());
       continue;
     }
-    // Terminal SET and REMOVE prevent all ops (including RETURN) from following
-    // them. This provides a user-facing error message instead of returning an
-    // Internal error.
+    // Terminal SET, REMOVE, and DELETE prevent all ops (including RETURN) from
+    // following them. This provides a user-facing error message instead of
+    // returning an Internal error.
     if (primitive_ops[i]->Is<ASTGqlSet>() ||
-        primitive_ops[i]->Is<ASTGqlRemove>()) {
-      absl::string_view op_name =
-          primitive_ops[i]->Is<ASTGqlSet>() ? "SET" : "REMOVE";
+        primitive_ops[i]->Is<ASTGqlRemove>() ||
+        primitive_ops[i]->Is<ASTGqlDelete>()) {
+      absl::string_view op_name;
+      switch (primitive_ops[i]->node_kind()) {
+        case AST_GQL_SET:
+          op_name = "SET";
+          break;
+        case AST_GQL_REMOVE:
+          op_name = "REMOVE";
+          break;
+        case AST_GQL_DELETE:
+          op_name = "DELETE";
+          break;
+        default:
+          GOOGLESQL_RET_CHECK_FAIL() << "Unexpected op: "
+                           << primitive_ops[i]->DebugString();
+      }
       if (primitive_ops[i + 1]->Is<ASTGqlReturn>()) {
         return MakeSqlErrorAt(primitive_ops[i + 1])
                << "RETURN after " << op_name
@@ -3611,7 +3683,8 @@ absl::Status GraphTableQueryResolver::CheckGqlLinearQuery(
   GOOGLESQL_RET_CHECK(primitive_ops[size - 1]->Is<ASTGqlReturn>() ||
             primitive_ops[size - 1]->Is<ASTGqlInsert>() ||
             primitive_ops[size - 1]->Is<ASTGqlSet>() ||
-            primitive_ops[size - 1]->Is<ASTGqlRemove>());
+            primitive_ops[size - 1]->Is<ASTGqlRemove>() ||
+            primitive_ops[size - 1]->Is<ASTGqlDelete>());
 
   auto is_only_order_by = [](const ASTGqlOrderByAndPage* op) {
     return op != nullptr && op->order_by() != nullptr && op->page() == nullptr;

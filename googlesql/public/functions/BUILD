@@ -597,6 +597,7 @@ cc_library(
         ":util",
         "//googlesql/base:status",
         "//googlesql/common:multiprecision_int",
+        "//googlesql/common:round_decimal",
         "//googlesql/public:numeric_value",
         "@com_google_absl//absl/base:core_headers",
         "@com_google_absl//absl/status",

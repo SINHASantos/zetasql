@@ -325,15 +325,7 @@ static std::string ToStringImpl(const Connection* connection) {
   return connection->FullName();
 }
 static std::string ToStringImpl(const TableValuedFunction* tvf) {
-  if (tvf == nullptr) return "<null>";
-  if (absl::GetFlag(FLAGS_googlesql_omit_tvf_signatures_in_resolved_ast_debug_string)) {
-    return tvf->FullName(/*include_group=*/true);
-  }
-  return absl::StrCat(tvf->FullName(/*include_group=*/true), "(",
-                   FunctionSignature::SignaturesToString(
-                       tvf->signatures(), /*verbose=*/true, /*prefix=*/"",
-                       /*separator=*/"; "),
-                   ")");
+  return tvf == nullptr ? "<null>" : tvf->FullName(/*include_group=*/true);
 }
 static std::string ToStringImpl(const Procedure* procedure) {
   return procedure->FullName();

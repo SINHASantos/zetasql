@@ -770,6 +770,31 @@ STRUCT<
 }
 ==
 
+[name=update_array_element_non_matching_row]
+[required_features=ARRAY_ELEMENTS_WITH_SET]
+UPDATE TableArrayValue SET array_value[OFFSET(0)] = 100 WHERE false
+--
+STRUCT<
+  num_rows_modified INT64,
+  all_rows ARRAY<>
+>{
+  0,
+  ARRAY<STRUCT<primary_key INT64, array_value ARRAY<>, array_value2 ARRAY<>>>[unknown order:
+    {
+      1,
+      ARRAY<INT64>[known order:11, 12, 13],
+      ARRAY<INT64>[known order:111, 112, 112]
+    },
+    {
+      2,
+      ARRAY<INT64>[known order:21, 22, 23],
+      ARRAY<INT64>[known order:221, 222, 223]
+    },
+    {3, ARRAY<INT64>(NULL), ARRAY<INT64>(NULL)}
+  ]
+}
+==
+
 [name=update_first_array_element_with_set]
 [required_features=ARRAY_ELEMENTS_WITH_SET]
 UPDATE TableArrayValue SET array_value[OFFSET(0)] = 100 WHERE array_value IS NOT NULL

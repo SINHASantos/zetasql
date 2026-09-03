@@ -328,21 +328,9 @@ bool IsOrContainsMeasure(const Type* type) {
   if (type->IsMeasureType()) {
     return true;
   }
-  if (type->IsArray() && IsOrContainsMeasure(type->AsArray()->element_type())) {
-    return true;
-  }
-  if (type->IsStruct()) {
-    for (const StructType::StructField& field : type->AsStruct()->fields()) {
-      if (IsOrContainsMeasure(field.type)) {
-        return true;
-      }
-    }
-  }
-  if (type->IsMap()) {
-    if (IsOrContainsMeasure(type->AsMap()->key_type())) {
-      return true;
-    }
-    if (IsOrContainsMeasure(type->AsMap()->value_type())) {
+
+  for (const Type* component_type : type->ComponentTypes()) {
+    if (IsOrContainsMeasure(component_type)) {
       return true;
     }
   }

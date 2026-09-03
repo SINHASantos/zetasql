@@ -927,8 +927,7 @@ absl::StatusOr<Value> Value::backing_value() const {
   const Type* backing_type = decl_type->backing_type();
   if (backing_type->UsesExtendedInlineValueContent()) {
     GOOGLESQL_RET_CHECK(backing_type->IsSimpleType());
-    copied_content =
-        DeclarativeType::GetBackingContent(GetContent(), decl_type);
+    copied_content = decl_type->GetBackingContent(GetContent());
   } else {
     decl_type->CopyValueContent(GetContent(), &copied_content);
   }

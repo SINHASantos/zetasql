@@ -19,12 +19,13 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
-#include <optional>
 #include <string>
 #include <utility>
 #include <variant>
 #include <vector>
 
+#include "googlesql/common/errors.h"
+#include "googlesql/common/string_util.h"
 #include "googlesql/public/language_options.h"
 #include "googlesql/public/options.pb.h"
 #include "googlesql/public/type.pb.h"
@@ -59,11 +60,6 @@ size_t DeclarativeTypeDescriptor::GetEstimatedOwnedMemoryBytesSize() const {
          // Heap memory for the feature set.
          internal::GetExternallyAllocatedMemoryEstimate(
              data_->additional_required_language_features);
-}
-
-const std::optional<TypeParameterHandlers>&
-DeclarativeTypeDescriptor::type_parameter_handlers() const {
-  return data_->type_parameter_handlers;
 }
 
 DeclarativeType::DeclarativeType(const TypeFactoryBase& factory,
@@ -102,12 +98,17 @@ absl::StatusOr<TypeParameters>
 DeclarativeType::ValidateAndResolveTypeParameters(
     const std::vector<TypeParameterValue>& type_parameter_values,
     ProductMode mode) const {
-  const auto& handlers = descriptor().type_parameter_handlers();
-  if (handlers.has_value()) {
-    return handlers->resolve_callback()(type_parameter_values, mode);
-  }
-  // Delegate to the base implementation, which returns a "Not Supported" error.
-  return Type::ValidateAndResolveTypeParameters(type_parameter_values, mode);
+  return std::visit(
+      absl::Overload(
+          [&](const DeclarativeTypeDescriptor::TypeParamsCustom& custom) {
+            return custom.resolve_callback()(type_parameter_values, mode);
+          },
+          [&](DeclarativeTypeDescriptor::TypeParamsDisallowed)
+              -> absl::StatusOr<TypeParameters> {
+            return MakeSqlError() << "Type " << ShortTypeName(mode)
+                                  << " does not support type parameters";
+          }),
+      descriptor().type_params_strategy());
 }
 
 absl::Status DeclarativeType::ValidateResolvedTypeParameters(
@@ -115,12 +116,18 @@ absl::Status DeclarativeType::ValidateResolvedTypeParameters(
   if (type_parameters.IsEmpty()) {
     return absl::OkStatus();
   }
-  const auto& handlers = descriptor().type_parameter_handlers();
-  if (handlers.has_value()) {
-    return handlers->validate_callback()(type_parameters, mode);
-  }
-  // Delegate to the base implementation, which returns a "Not Supported" error.
-  return Type::ValidateResolvedTypeParameters(type_parameters, mode);
+  return std::visit(
+      absl::Overload(
+          [&](const DeclarativeTypeDescriptor::TypeParamsCustom& custom) {
+            return custom.validate_callback()(type_parameters, mode);
+          },
+          [&](DeclarativeTypeDescriptor::TypeParamsDisallowed) -> absl::Status {
+            GOOGLESQL_RET_CHECK(type_parameters.IsEmpty())
+                << "Type " << ShortTypeName(mode)
+                << " does not support type parameters";
+            return absl::OkStatus();
+          }),
+      descriptor().type_params_strategy());
 }
 
 std::vector<const Type*> DeclarativeType::ComponentTypes() const { return {}; }
@@ -347,6 +354,18 @@ absl::Status DeclarativeType::SerializeToProtoAndDistinctFileDescriptorsImpl(
              data_.equality_strategy());
   declarative_type_proto->set_equality_strategy(equality_strategy);
 
+  DeclarativeTypeProto::TypeParamsStrategy type_params_strategy;
+  std::visit(
+      absl::Overload(
+          [&](DeclarativeTypeDescriptor::TypeParamsDisallowed) {
+            type_params_strategy = DeclarativeTypeProto::TYPE_PARAMS_DISALLOWED;
+          },
+          [&](const TypeParameterHandlers&) {
+            type_params_strategy = DeclarativeTypeProto::TYPE_PARAMS_CUSTOM;
+          }),
+      data_.type_params_strategy());
+  declarative_type_proto->set_type_params_strategy(type_params_strategy);
+
   // Serialize the backing type
   GOOGLESQL_RETURN_IF_ERROR(
       backing_type()->SerializeToProtoAndDistinctFileDescriptorsImpl(
@@ -377,6 +396,13 @@ static bool AreSame(
   return equality_strategy1.index() == equality_strategy2.index();
 }
 
+static bool AreSame(
+    const DeclarativeTypeDescriptor::TypeParamsStrategy& type_params_strategy1,
+    const DeclarativeTypeDescriptor::TypeParamsStrategy&
+        type_params_strategy2) {
+  return type_params_strategy1 == type_params_strategy2;
+}
+
 bool DeclarativeType::IsIdenticalTo(const DeclarativeType* other) const {
   if (other == nullptr) {
     return false;
@@ -395,7 +421,7 @@ bool DeclarativeTypeDescriptor::IsIdenticalTo(
          AreSame(equality_strategy(), other.equality_strategy()) &&
          additional_required_language_features() ==
              other.additional_required_language_features() &&
-         data_->type_parameter_handlers == other.data_->type_parameter_handlers;
+         AreSame(type_params_strategy(), other.type_params_strategy());
 }
 
 bool DeclarativeType::EqualsForSameKind(const Type* that,
@@ -415,8 +441,8 @@ void DeclarativeType::DebugStringImpl(bool details, TypeOrStringVector* stack,
 }
 
 const ValueContent& DeclarativeType::GetBackingContent(
-    const ValueContent& value_content, const DeclarativeType* decl_type) {
-  if (!decl_type->backing_type()->UsesExtendedInlineValueContent()) {
+    const ValueContent& value_content) const {
+  if (!backing_type()->UsesExtendedInlineValueContent()) {
     return value_content;
   }
   // The ValueContent is just a pointer to the wider content which is stored
@@ -436,8 +462,8 @@ bool DeclarativeType::ValueContentEquals(
   // This is the low-level C++ comparison, so we blindly delegate to the
   // backing type. This is needed for compliance testing, for example, where we
   // have to compare the engine result vs the golden result.
-  return backing_type()->ValueContentEquals(
-      GetBackingContent(x, this), GetBackingContent(y, this), options);
+  return backing_type()->ValueContentEquals(GetBackingContent(x),
+                                            GetBackingContent(y), options);
 }
 
 bool DeclarativeType::ValueContentLess(const ValueContent& x,
@@ -446,20 +472,20 @@ bool DeclarativeType::ValueContentLess(const ValueContent& x,
   // When we define `ordering_strategy`, we should ABSL_DCHECK() that it's delegated
   // to the backing type. Any custom ordering will be handled before we hit
   // this point, and we should never execute this code path in that case.
-  return backing_type()->ValueContentLess(
-      GetBackingContent(x, this), GetBackingContent(y, this), backing_type());
+  return backing_type()->ValueContentLess(GetBackingContent(x),
+                                          GetBackingContent(y), backing_type());
 }
 
 absl::HashState DeclarativeType::HashValueContent(const ValueContent& value,
                                                   absl::HashState state) const {
-  return backing_type()->HashValueContent(GetBackingContent(value, this),
+  return backing_type()->HashValueContent(GetBackingContent(value),
                                           std::move(state));
 }
 
 absl::HashState DeclarativeType::HashValueContentIgnoringFloat(
     const ValueContent& value, absl::HashState state) const {
-  return backing_type()->HashValueContentIgnoringFloat(
-      GetBackingContent(value, this), std::move(state));
+  return backing_type()->HashValueContentIgnoringFloat(GetBackingContent(value),
+                                                       std::move(state));
 }
 
 absl::HashState DeclarativeType::HashTypeParameter(
@@ -473,12 +499,36 @@ absl::HashState DeclarativeType::HashTypeParameter(
 
 std::string DeclarativeType::FormatValueContent(
     const ValueContent& value, const FormatValueContentOptions& options) const {
+  // TODO: Support FormatValueContent for declarative types with
+  // the callback approach.
+  if (IsGoogleSQLBuiltin("VECTOR")) {
+    ValueProto value_proto;
+    if (SerializeValueContent(value, &value_proto).ok()) {
+      ValueProto inner_proto;
+      if (inner_proto.ParseFromString(value_proto.bytes_value()) &&
+          inner_proto.has_array_value()) {
+        std::string result = "VECTOR([";
+        for (int i = 0; i < inner_proto.array_value().element_size(); ++i) {
+          if (i > 0) {
+            absl::StrAppend(&result, ", ");
+          }
+          const ValueProto& elem = inner_proto.array_value().element(i);
+          if (elem.has_float_value()) {
+            absl::StrAppend(&result,
+                            RoundTripFloatToString(elem.float_value()));
+          }
+        }
+        absl::StrAppend(&result, "])");
+        return result;
+      }
+    }
+  }
   return "ERROR('Unimplemented')";
 }
 
 absl::Status DeclarativeType::SerializeValueContent(
     const ValueContent& value, ValueProto* value_proto) const {
-  return backing_type()->SerializeValueContent(GetBackingContent(value, this),
+  return backing_type()->SerializeValueContent(GetBackingContent(value),
                                                value_proto);
 }
 

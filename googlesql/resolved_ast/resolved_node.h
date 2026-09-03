@@ -20,7 +20,6 @@
 #include <memory>
 #include <set>
 #include <string>
-#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -37,10 +36,6 @@
 #include "absl/strings/string_view.h"
 #include "absl/types/span.h"
 #include "google/protobuf/descriptor.h"
-#include "googlesql/base/status.h"
-
-ABSL_DECLARE_FLAG(bool,
-                  googlesql_omit_tvf_signatures_in_resolved_ast_debug_string);
 
 namespace googlesql {
 
@@ -451,46 +446,9 @@ class ResolvedNode {
   enum class ConstructorOverload { NEW_CONSTRUCTOR };
 
  private:
-  // Dispatches DebugString rendering for `node`.
-  // If `config.linear_mode` is enabled and `node` is a linear scan chain, this
-  // delegates to `DebugStringLinearScanChain` using `stem` and
-  // `node_connector`. Otherwise, it delegates to `DebugStringNodeBody` with
-  // `name_prefix` constructed as `absl::StrCat(stem, node_connector)` and
-  // `field_prefix` constructed as `absl::StrCat(stem, field_value_indent)`.
-  //
-  // `stem`: Indentation prefix prior to the tree connector.
-  // `node_connector`: Tree connector for this node's header line (e.g. "├─" or
-  //   "└─").
-  // `field_value_indent`: Indentation added to `stem` for this node's fields
-  //   (e.g. "│ " or "  ").
-  // `pipe_input_to_elide`: When non-null (in linear mode), the scan field
-  //   consumed as pipe input to either omit or display as "<pipe_input>".
-  static void DebugStringImpl(const ResolvedNode* node,
-                              const DebugStringConfig& config,
-                              absl::string_view stem,
-                              absl::string_view node_connector,
-                              absl::string_view field_value_indent,
-                              std::string* output,
-                              const ResolvedScan* pipe_input_to_elide);
-
-  // Renders a ResolvedScan and its pipe input chain in linear mode.
-  static void DebugStringLinearScanChain(const ResolvedScan* top_scan,
-                                         const DebugStringConfig& config,
-                                         absl::string_view stem,
-                                         absl::string_view connector,
-                                         std::string* output);
-
-  // Renders a single node's name line and its fields.
-  static void DebugStringNodeBody(const ResolvedNode* node,
-                                  const DebugStringConfig& config,
-                                  absl::string_view name_prefix,
-                                  absl::string_view field_prefix,
-                                  std::string* output,
-                                  const ResolvedScan* pipe_input_to_elide);
-
-  static void AppendAnnotations(const ResolvedNode* node,
-                                absl::Span<const NodeAnnotation> annotations,
-                                std::string* output);
+  // Formatter view classes access protected DebugString fields and methods.
+  friend class ResolvedASTNodeView;
+  friend class ResolvedASTFieldView;
 
   // DebugString on these call protected methods.
   friend class ResolvedComputedColumn;

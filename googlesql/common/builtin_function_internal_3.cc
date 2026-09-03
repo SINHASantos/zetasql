@@ -1691,9 +1691,6 @@ absl::Status GetJsonParseFunctions(
       types::UnsupportedFieldsEnumType();
 
   bool path_as_object_enabled = false;
-  const bool unsupported_fields_enabled =
-      options.language_options.LanguageFeatureEnabled(
-          FEATURE_TO_JSON_UNSUPPORTED_FIELDS);
 
   const FunctionArgumentTypeOptions stringify_wide_numbers_option =
       FunctionArgumentTypeOptions()
@@ -1729,27 +1726,6 @@ absl::Status GetJsonParseFunctions(
                                    {bool_type, stringify_wide_numbers_option},
                                    {bool_type, path_as_object_option}},
                                   FN_TO_JSON_PATH_AS_OBJECT});
-  }
-  if (unsupported_fields_enabled) {
-    to_json_signatures.push_back(
-        {json_type,
-         {ARG_KIND_EXPR_ANY_1,
-          {bool_type, stringify_wide_numbers_option},
-          {unsupported_fields_type, unsupported_fields_option}},
-         FN_TO_JSON_UNSUPPORTED_FIELDS});
-    extra_to_json_types.push_back(unsupported_fields_type);
-  }
-  if (path_as_object_enabled && unsupported_fields_enabled) {
-    // If both are enabled, there is an additional signature that takes both
-    // options.
-    to_json_signatures.push_back(
-        {json_type,
-         {ARG_KIND_EXPR_ANY_1,
-          {bool_type, stringify_wide_numbers_option},
-          {unsupported_fields_type, unsupported_fields_option},
-          {bool_type, path_as_object_option}},
-         FN_TO_JSON_UNSUPPORTED_FIELDS_PATH_AS_OBJECT});
-    extra_to_json_types.push_back(unsupported_fields_type);
   }
 
   GOOGLESQL_RETURN_IF_ERROR(InsertFunctionAndTypes(

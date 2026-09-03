@@ -2169,10 +2169,8 @@ enum LanguageFeature {
 
   // Enables syntax for updating MAP values via key subscript in an
   // UPDATE ... SET.
-  FEATURE_MAP_SUBSCRIPT_WITH_SET = 14126 [
-    (language_feature_options).language_version = VERSION_1_5,
-    (language_feature_options).in_development = true
-  ];
+  FEATURE_MAP_SUBSCRIPT_WITH_SET = 14126
+      [(language_feature_options).language_version = VERSION_1_5];
 
   // Enables MAP braced constructor literal syntax.
   // See (broken link):map_literal for more details.

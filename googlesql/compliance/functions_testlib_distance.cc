@@ -2441,22 +2441,24 @@ std::vector<FunctionTestCall> GetFunctionTestsJaroWinklerSimilarity() {
        {"MARHTA", "MARTHA", -0.01},
        0.0,
        absl::OutOfRangeError(
-           "prefix_scaling_factor must be in [0, 0.25] range")},
+           "The prefix_scaling_factor must be in [0, 0.25] range")},
       {"jarowinkler_similarity",
        {"MARHTA", "MARTHA", 0.26},
        0.0,
        absl::OutOfRangeError(
-           "prefix_scaling_factor must be in [0, 0.25] range")},
+           "The prefix_scaling_factor must be in [0, 0.25] range")},
 
       // Invalid parameter errors: prefix_boost_threshold
       {"jarowinkler_similarity",
        {"MARHTA", "MARTHA", 0.1, -0.01},
        0.0,
-       absl::OutOfRangeError("prefix_boost_threshold must be in [0, 1] range")},
+       absl::OutOfRangeError(
+           "The prefix_boost_threshold must be in [0, 1] range")},
       {"jarowinkler_similarity",
        {"MARHTA", "MARTHA", 0.1, 1.01},
        0.0,
-       absl::OutOfRangeError("prefix_boost_threshold must be in [0, 1] range")},
+       absl::OutOfRangeError(
+           "The prefix_boost_threshold must be in [0, 1] range")},
 
       // NULL semantics with invalid parameters
       {"jarowinkler_similarity",
@@ -2570,22 +2572,24 @@ std::vector<FunctionTestCall> GetFunctionTestsJaroWinklerSimilarityBytes() {
        {values::Bytes("MARHTA"), values::Bytes("MARTHA"), -0.01},
        0.0,
        absl::OutOfRangeError(
-           "prefix_scaling_factor must be in [0, 0.25] range")},
+           "The prefix_scaling_factor must be in [0, 0.25] range")},
       {"jarowinkler_similarity",
        {values::Bytes("MARHTA"), values::Bytes("MARTHA"), 0.26},
        0.0,
        absl::OutOfRangeError(
-           "prefix_scaling_factor must be in [0, 0.25] range")},
+           "The prefix_scaling_factor must be in [0, 0.25] range")},
 
       // Invalid parameter errors: prefix_boost_threshold
       {"jarowinkler_similarity",
        {values::Bytes("MARHTA"), values::Bytes("MARTHA"), 0.1, -0.01},
        0.0,
-       absl::OutOfRangeError("prefix_boost_threshold must be in [0, 1] range")},
+       absl::OutOfRangeError(
+           "The prefix_boost_threshold must be in [0, 1] range")},
       {"jarowinkler_similarity",
        {values::Bytes("MARHTA"), values::Bytes("MARTHA"), 0.1, 1.01},
        0.0,
-       absl::OutOfRangeError("prefix_boost_threshold must be in [0, 1] range")},
+       absl::OutOfRangeError(
+           "The prefix_boost_threshold must be in [0, 1] range")},
 
       // NULL semantics with invalid parameters
       {"jarowinkler_similarity",

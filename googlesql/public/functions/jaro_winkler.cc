@@ -218,14 +218,14 @@ absl::Status ValidateJaroWinklerParams(
     double factor = *prefix_scaling_factor;
     if (std::isnan(factor) || factor < 0.0 || factor > 0.25) {
       return absl::OutOfRangeError(
-          "prefix_scaling_factor must be in [0, 0.25] range");
+          "The prefix_scaling_factor must be in [0, 0.25] range");
     }
   }
   if (prefix_boost_threshold.has_value()) {
     double threshold = *prefix_boost_threshold;
     if (std::isnan(threshold) || threshold < 0.0 || threshold > 1.0) {
       return absl::OutOfRangeError(
-          "prefix_boost_threshold must be in [0, 1] range");
+          "The prefix_boost_threshold must be in [0, 1] range");
     }
   }
   return absl::OkStatus();

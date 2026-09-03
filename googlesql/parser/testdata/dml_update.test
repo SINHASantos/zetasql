@@ -695,6 +695,41 @@ SET
   z = DEFAULT
 ==
 
+# Nested DELETE with USING
+UPDATE TestTable SET
+  (DELETE KitchenSink.repeated_int64_val USING KeyValue
+   WHERE true)
+WHERE true
+--
+UpdateStatement [0-102] [UPDATE TestTable...WHERE true]
+  PathExpression [7-16] [TestTable]
+    Identifier(TestTable) [7-16] [TestTable]
+  UpdateItemList [23-91] [(DELETE KitchenSi...HERE true)]
+    UpdateItem [23-91] [(DELETE KitchenSi...HERE true)]
+      DeleteStatement [24-90] [DELETE KitchenSin...WHERE true]
+        PathExpression [31-61] [KitchenSink.repeated_int64_val]
+          Identifier(KitchenSink) [31-42] [KitchenSink]
+          Identifier(repeated_int64_val) [43-61] [repeated_int64_val]
+        DeleteUsingClause [62-76] [USING KeyValue]
+          TablePathExpression [68-76] [KeyValue]
+            PathExpression [68-76] [KeyValue]
+              Identifier(KeyValue) [68-76] [KeyValue]
+        BooleanLiteral(true) [86-90] [true]
+  BooleanLiteral(true) [98-102] [true]
+--
+UPDATE TestTable
+SET
+  (
+    DELETE KitchenSink.repeated_int64_val
+    USING
+      KeyValue
+    WHERE
+      true
+  )
+WHERE
+  true
+==
+
 # Nested DML statements with generalized path targets.
 update T
 set (delete a.(b.c)),

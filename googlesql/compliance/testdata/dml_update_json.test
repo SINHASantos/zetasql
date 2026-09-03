@@ -211,6 +211,28 @@ STRUCT<
   ]}
 ==
 
+[name=update_json_subscript_non_matching_row]
+UPDATE JsonValue
+SET json_value[0] = JSON '10'
+WHERE false
+--
+STRUCT<
+  num_rows_modified INT64,
+  all_rows ARRAY<>
+>{0,
+  ARRAY<STRUCT<primary_key INT64, json_value JSON>>[unknown order:
+    {1, {"a":1}},
+    {2, {}},
+    {3, []},
+    {4, null},
+    {5, 1},
+    {6, NULL},
+    {7, {"a":{"b":null}}},
+    {8, {"a":{"b":true}}},
+    {9, {"a":[1,2,3]}}
+  ]}
+==
+
 [name=invalid_update_scalar_value]
 UPDATE JsonValue
 SET json_value.a = JSON '1'

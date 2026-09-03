@@ -69,19 +69,19 @@ select * from
 --
 ALTERNATION GROUP: t
 --
-ERROR: Syntax error: Expected keyword INSERT or keyword REMOVE or keyword RETURN or keyword SET but got identifier "t" [at 4:26]
+ERROR: Syntax error: Unexpected identifier "t" [at 4:26]
     CALL PER() tvf(x, a) t
                          ^
 --
 ALTERNATION GROUP: AS t
 --
-ERROR: Syntax error: Expected keyword INSERT or keyword REMOVE or keyword RETURN or keyword SET but got keyword AS [at 4:26]
+ERROR: Syntax error: Unexpected keyword AS [at 4:26]
     CALL PER() tvf(x, a) AS t
                          ^
 --
 ALTERNATION GROUP: PIVOT SUM (a) AS m FOR b IN (1, 2) 
 --
-ERROR: Syntax error: Expected keyword INSERT or keyword REMOVE or keyword RETURN or keyword SET but got keyword PIVOT [at 4:26]
+ERROR: Syntax error: Unexpected keyword PIVOT [at 4:26]
     CALL PER() tvf(x, a) PIVOT SUM (a) AS m FOR b IN (1, 2) 
                          ^
 ==

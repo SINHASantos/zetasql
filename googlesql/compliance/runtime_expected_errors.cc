@@ -351,6 +351,12 @@ std::unique_ptr<MatcherCollection<absl::Status>> RuntimeExpectedErrorMatcher(
       absl::StatusCode::kOutOfRange, "EDIT_DISTANCE .* invalid UTF8 string"));
   error_matchers.emplace_back(std::make_unique<StatusRegexMatcher>(
       absl::StatusCode::kOutOfRange, "Invalid UTF8 string"));
+  error_matchers.emplace_back(std::make_unique<StatusSubstringMatcher>(
+      absl::StatusCode::kOutOfRange,
+      "The prefix_scaling_factor must be in [0, 0.25] range"));
+  error_matchers.emplace_back(std::make_unique<StatusSubstringMatcher>(
+      absl::StatusCode::kOutOfRange,
+      "The prefix_boost_threshold must be in [0, 1] range"));
 
   // TODO: known issue
   error_matchers.emplace_back(std::make_unique<StatusRegexMatcher>(

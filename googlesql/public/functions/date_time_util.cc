@@ -831,8 +831,8 @@ static absl::Status CheckValidAddTimestampPart(DateTimestampPart part,
                          << " for TIMESTAMP_ADD";
 }
 
-ABSL_MUST_USE_RESULT static bool MakeDate(int year, int month, int day,
-                                          absl::CivilDay* civil_day);
+[[nodiscard]] static bool MakeDate(int year, int month, int day,
+                                   absl::CivilDay* civil_day);
 
 // Returns false if date is out of bounds.
 static bool MakeDate(int year, int month, int day, absl::CivilDay* civil_day) {

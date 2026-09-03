@@ -2085,6 +2085,16 @@ void Unparser::visitASTFromClause(const ASTFromClause* node, void* data) {
   }
 }
 
+void Unparser::visitASTDeleteUsingClause(const ASTDeleteUsingClause* node,
+                                         void* data) {
+  println();
+  println("USING");
+  {
+    Formatter::Indenter indenter(&formatter_);
+    visitASTChildren(node, data);
+  }
+}
+
 void Unparser::visitASTTransformClause(const ASTTransformClause* node,
                                        void* data) {
   println("(");
@@ -3718,6 +3728,9 @@ void Unparser::visitASTDeleteStatement(const ASTDeleteStatement* node,
   }
   if (node->offset() != nullptr) {
     node->offset()->Accept(this, data);
+  }
+  if (node->using_clause() != nullptr) {
+    node->using_clause()->Accept(this, data);
   }
   if (node->where() != nullptr) {
     println();
@@ -6088,6 +6101,23 @@ void Unparser::visitASTGqlRemove(const ASTGqlRemove* node, void* data) {
     Formatter::Indenter indenter(&formatter_);
     UnparseVectorWithSeparator(node->items(), data, ",\n");
   }
+}
+
+void Unparser::visitASTGqlDelete(const ASTGqlDelete* node, void* data) {
+  if (node->is_detach_mode()) {
+    print("DETACH DELETE");
+  } else {
+    print("DELETE");
+  }
+  println();
+  {
+    Formatter::Indenter indenter(&formatter_);
+    UnparseVectorWithSeparator(node->delete_item_list(), data, ",\n");
+  }
+}
+
+void Unparser::visitASTGqlDeleteItem(const ASTGqlDeleteItem* node, void* data) {
+  node->element_variable()->Accept(this, data);
 }
 
 void Unparser::visitASTGqlReturn(const ASTGqlReturn* node, void* data) {

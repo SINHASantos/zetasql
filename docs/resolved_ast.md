@@ -11506,7 +11506,9 @@ class ResolvedGraphInsertElement : public <a href="#ResolvedExpr">ResolvedExpr</
 //   both.
 //
 // When executed, `<a href="#ResolvedGraphInsertScan">ResolvedGraphInsertScan</a>` applies the side effects of
-// inserting these new nodes or edges into the current property graph.</font>
+// inserting these new nodes or edges into the current property graph.
+//
+// See (broken link):dml-insert for the design.</font>
 class ResolvedGraphInsertScan : public <a href="#ResolvedScan">ResolvedScan</a> {
   static const ResolvedNodeKind TYPE = RESOLVED_GRAPH_INSERT_SCAN;
 

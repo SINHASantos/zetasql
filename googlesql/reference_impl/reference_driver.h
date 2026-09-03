@@ -286,9 +286,9 @@ class ReferenceDriver : public TestDriver {
   // The LanguageOptions used by the zero-arg constructor.
   static LanguageOptions DefaultLanguageOptions();
 
-  ABSL_DEPRECATED(
+  [[deprecated(
       "DO NOT USE THIS. USED ONLY FOR AN EXTERNAL LEGACY TEST"
-      "WHICH IS USING FAKE IN-MEMORY DESCRIPTORS")
+      "WHICH IS USING FAKE IN-MEMORY DESCRIPTORS")]]
   absl::Status CreateDatabaseWithLeakyDescriptors(const TestDatabase& test_db);
 
  private:

@@ -1,9 +1,74 @@
-# TODO: Add tests for CREATE TABLE, CAST assertion on VECTOR type
-# parameters.
 [prepare_database]
 [default required_features=VECTOR_TYPE,DECLARATIVE_TYPE_FRAMEWORK]
+[prepare_database_additional_features=VECTOR_TYPE,DECLARATIVE_TYPE_FRAMEWORK]
 CREATE TEMP CONSTANT CVectorLength = 2;
 ==
+
+#######
+# DDL #
+#######
+[prepare_database]
+[prepare_database_additional_features=VECTOR_TYPE,DECLARATIVE_TYPE_FRAMEWORK]
+# TODO: Add standalone failing tests for CREATE TABLE with VECTOR types.
+CREATE TABLE VectorTable(
+  id INT64,
+  v_unannotated VECTOR,
+  v_len2 VECTOR(2),
+  v_arr ARRAY<VECTOR(2)>,
+  v_arr_unannotated ARRAY<VECTOR>,
+  v_struct STRUCT<a VECTOR(2)>) AS
+SELECT
+  1 AS id,
+  ENCODE_VECTOR(ARRAY<FLOAT>[1.0, 2.0, 3.0]) AS v_unannotated,
+  ENCODE_VECTOR(ARRAY<FLOAT>[1.0, 2.0]) AS v_len2,
+  ARRAY<VECTOR>[ENCODE_VECTOR(ARRAY<FLOAT>[1.0, 2.0]), ENCODE_VECTOR(ARRAY<FLOAT>[3.0, 4.0])] AS v_arr,
+  ARRAY<VECTOR>[ENCODE_VECTOR(ARRAY<FLOAT>[1.0, 2.0]), ENCODE_VECTOR(ARRAY<FLOAT>[3.0, 4.0, 5.0])] AS v_arr_unannotated,
+  STRUCT(ENCODE_VECTOR(ARRAY<FLOAT>[1.0, 2.0]) AS a) AS v_struct
+UNION ALL
+SELECT
+  2 AS id,
+  ENCODE_VECTOR(ARRAY<FLOAT>[4.0, 5.0]) AS v_unannotated,
+  ENCODE_VECTOR(ARRAY<FLOAT>[0.0, 1.0]) AS v_len2,
+  ARRAY<VECTOR>[ENCODE_VECTOR(ARRAY<FLOAT>[5.0, 6.0])] AS v_arr,
+  ARRAY<VECTOR>[ENCODE_VECTOR(ARRAY<FLOAT>[5.0, 6.0])] AS v_arr_unannotated,
+  STRUCT(ENCODE_VECTOR(ARRAY<FLOAT>[0.0, 1.0]) AS a) AS v_struct
+--
+ARRAY<STRUCT<
+        id INT64,
+        v_unannotated VECTOR,
+        v_len2 VECTOR,
+        v_arr ARRAY<>,
+        v_arr_unannotated ARRAY<>,
+        v_struct STRUCT<a VECTOR>
+      >>
+[{
+   1,
+   VECTOR([1, 2, 3]),
+   VECTOR([1, 2]),
+   ARRAY<VECTOR>[VECTOR([1, 2]), VECTOR([3, 4])],
+   ARRAY<VECTOR>[VECTOR([1, 2]), VECTOR([3, 4, 5])],
+   {VECTOR([1, 2])}
+ },
+ {
+   2,
+   VECTOR([4, 5]),
+   VECTOR([0, 1]),
+   ARRAY<VECTOR>[VECTOR([5, 6])],
+   ARRAY<VECTOR>[VECTOR([5, 6])],
+   {VECTOR([0, 1])}
+ }]
+==
+
+[prepare_database]
+[prepare_database_additional_features=VECTOR_TYPE,DECLARATIVE_TYPE_FRAMEWORK]
+CREATE TABLE VectorDmlTable(
+  id INT64,
+  v VECTOR(2)) AS
+SELECT 1 AS id, ENCODE_VECTOR(ARRAY<FLOAT>[1.0, 2.0]) AS v
+--
+ARRAY<STRUCT<id INT64, v VECTOR>>[{1, VECTOR([1, 2])}]
+==
+
 
 #################
 # ENCODE_VECTOR #
@@ -381,3 +446,339 @@ ARRAY<STRUCT<INT64>>[{NULL}]
 SELECT VECTOR_LENGTH(ARRAY<VECTOR>[CAST(NULL AS VECTOR), ENCODE_VECTOR(ARRAY<FLOAT>[1.0])][OFFSET(1)]);
 --
 ARRAY<STRUCT<INT64>>[{1}]
+==
+
+#################
+# CAST & PARAMS #
+#################
+
+[name=cast_vector_with_matching_length]
+[required_features=VECTOR_TYPE,DECLARATIVE_TYPE_FRAMEWORK,PARAMETERIZED_TYPES]
+SELECT VECTOR_LENGTH(CAST(ENCODE_VECTOR(ARRAY<FLOAT>[1.0, 2.0]) AS VECTOR(2)));
+--
+ARRAY<STRUCT<INT64>>[{2}]
+==
+
+[name=cast_vector_with_mismatched_length_error]
+[required_features=VECTOR_TYPE,DECLARATIVE_TYPE_FRAMEWORK,PARAMETERIZED_TYPES]
+SELECT CAST(ENCODE_VECTOR(ARRAY<FLOAT>[1.0, 2.0]) AS VECTOR(3));
+--
+ERROR: generic::out_of_range: VECTOR(3) has length 3 but got a vector with length 2
+==
+
+[name=safe_cast_vector_with_mismatched_length]
+[required_features=VECTOR_TYPE,DECLARATIVE_TYPE_FRAMEWORK,PARAMETERIZED_TYPES]
+SELECT SAFE_CAST(ENCODE_VECTOR(ARRAY<FLOAT>[1.0, 2.0]) AS VECTOR(3));
+--
+ARRAY<STRUCT<VECTOR>>[{NULL}]
+==
+
+[name=cast_null_vector_with_length]
+[required_features=VECTOR_TYPE,DECLARATIVE_TYPE_FRAMEWORK,PARAMETERIZED_TYPES]
+SELECT CAST(CAST(NULL AS VECTOR) AS VECTOR(2));
+--
+ARRAY<STRUCT<VECTOR>>[{NULL}]
+==
+
+[name=cast_array_of_vector_with_matching_length]
+[required_features=VECTOR_TYPE,DECLARATIVE_TYPE_FRAMEWORK,PARAMETERIZED_TYPES]
+SELECT CAST(ARRAY<VECTOR>[ENCODE_VECTOR(ARRAY<FLOAT>[1.0, 2.0])] AS ARRAY<VECTOR(2)>);
+--
+ARRAY<STRUCT<ARRAY<>>>[{ARRAY<VECTOR>[VECTOR([1, 2])]}]
+==
+
+[name=cast_array_of_mixed_vectors_to_array_of_vector_with_length]
+[required_features=VECTOR_TYPE,DECLARATIVE_TYPE_FRAMEWORK,PARAMETERIZED_TYPES]
+SELECT CAST(ARRAY<VECTOR>[ENCODE_VECTOR(ARRAY<FLOAT>[1.0, 2.0, 3.0]), ENCODE_VECTOR(ARRAY<FLOAT>[3.0, 4.0])] AS ARRAY<VECTOR(2)>);
+--
+ERROR: generic::out_of_range: VECTOR(2) has length 2 but got a vector with length 3
+==
+
+[name=cast_array_of_vector_with_mismatched_length_error]
+[required_features=VECTOR_TYPE,DECLARATIVE_TYPE_FRAMEWORK,PARAMETERIZED_TYPES]
+SELECT CAST(ARRAY<VECTOR>[ENCODE_VECTOR(ARRAY<FLOAT>[1.0, 2.0])] AS ARRAY<VECTOR(3)>);
+--
+ERROR: generic::out_of_range: VECTOR(3) has length 3 but got a vector with length 2
+==
+
+[name=safe_cast_array_of_vector_with_mismatched_length]
+[required_features=VECTOR_TYPE,DECLARATIVE_TYPE_FRAMEWORK,PARAMETERIZED_TYPES]
+SELECT SAFE_CAST(ARRAY<VECTOR>[ENCODE_VECTOR(ARRAY<FLOAT>[1.0, 2.0])] AS ARRAY<VECTOR(3)>);
+--
+ARRAY<STRUCT<ARRAY<>>>[{ARRAY<VECTOR>(NULL)}]
+==
+
+[name=cast_struct_of_vector_with_matching_length]
+[required_features=VECTOR_TYPE,DECLARATIVE_TYPE_FRAMEWORK,PARAMETERIZED_TYPES]
+SELECT VECTOR_LENGTH(CAST(STRUCT(ENCODE_VECTOR(ARRAY<FLOAT>[1.0, 2.0]) AS v) AS STRUCT<v VECTOR(2)>).v);
+--
+ARRAY<STRUCT<INT64>>[{2}]
+==
+
+[name=cast_struct_of_vector_with_mismatched_length_error]
+[required_features=VECTOR_TYPE,DECLARATIVE_TYPE_FRAMEWORK,PARAMETERIZED_TYPES]
+SELECT CAST(STRUCT(ENCODE_VECTOR(ARRAY<FLOAT>[1.0, 2.0]) AS v) AS STRUCT<v VECTOR(3)>);
+--
+ERROR: generic::out_of_range: VECTOR(3) has length 3 but got a vector with length 2
+==
+
+[name=safe_cast_struct_of_vector_with_mismatched_length]
+[required_features=VECTOR_TYPE,DECLARATIVE_TYPE_FRAMEWORK,PARAMETERIZED_TYPES]
+SELECT SAFE_CAST(STRUCT(ENCODE_VECTOR(ARRAY<FLOAT>[1.0, 2.0]) AS v) AS STRUCT<v VECTOR(3)>);
+--
+ARRAY<STRUCT<STRUCT<v VECTOR>>>[{{NULL}}]
+==
+
+[name=cast_vector_with_float32_encoding]
+[required_features=VECTOR_TYPE,DECLARATIVE_TYPE_FRAMEWORK,PARAMETERIZED_TYPES]
+SELECT VECTOR_LENGTH(CAST(ENCODE_VECTOR(ARRAY<FLOAT>[1.0, 2.0]) AS VECTOR(2, 'FLOAT32')));
+--
+ARRAY<STRUCT<INT64>>[{2}]
+==
+
+##############################
+# QUERIES ON PREPARED TABLES #
+##############################
+
+[name=query_vector_table_unannotated_column]
+SELECT id, VECTOR_LENGTH(v_unannotated), DECODE_VECTOR(v_unannotated)
+FROM VectorTable
+ORDER BY id;
+--
+ARRAY<STRUCT<id INT64, INT64, ARRAY<>>>[known order:
+  {
+    1,
+    3,
+    ARRAY<FLOAT>[known order:1, 2, 3]
+  },
+  {
+    2,
+    2,
+    ARRAY<FLOAT>[known order:4, 5]
+  }
+]
+==
+
+[name=query_vector_table_param_column]
+SELECT id, VECTOR_LENGTH(v_len2), DECODE_VECTOR(v_len2)
+FROM VectorTable
+ORDER BY id;
+--
+ARRAY<STRUCT<id INT64, INT64, ARRAY<>>>[known order:
+  {
+    1,
+    2,
+    ARRAY<FLOAT>[known order:1, 2]
+  },
+  {
+    2,
+    2,
+    ARRAY<FLOAT>[known order:0, 1]
+  }
+]
+==
+
+[name=query_vector_table_array_column]
+SELECT id, ARRAY_LENGTH(v_arr), VECTOR_LENGTH(v_arr[OFFSET(0)])
+FROM VectorTable
+ORDER BY id;
+--
+ARRAY<STRUCT<id INT64, INT64, INT64>>[known order:{1, 2, 2}, {2, 1, 2}]
+==
+
+[name=query_vector_table_unannotated_array_column]
+SELECT id, ARRAY_LENGTH(v_arr_unannotated), VECTOR_LENGTH(v_arr_unannotated[OFFSET(0)]), VECTOR_LENGTH(v_arr_unannotated[OFFSET(1)])
+FROM VectorTable
+WHERE id = 1;
+--
+ARRAY<STRUCT<id INT64, INT64, INT64, INT64>>[{1, 2, 2, 3}]
+==
+
+[name=query_vector_table_struct_column]
+SELECT id, VECTOR_LENGTH(v_struct.a), DECODE_VECTOR(v_struct.a)
+FROM VectorTable
+ORDER BY id;
+--
+ARRAY<STRUCT<id INT64, INT64, ARRAY<>>>[known order:
+  {
+    1,
+    2,
+    ARRAY<FLOAT>[known order:1, 2]
+  },
+  {
+    2,
+    2,
+    ARRAY<FLOAT>[known order:0, 1]
+  }
+]
+==
+
+[name=query_vector_table_distance_functions]
+SELECT id, COSINE_DISTANCE(v_len2, ENCODE_VECTOR(ARRAY<FLOAT>[1.0, 0.0])) AS dist
+FROM VectorTable
+ORDER BY id;
+--
+ARRAY<STRUCT<id INT64, dist DOUBLE>>[known order:
+  {1, 0.55278640450004213},
+  {2, 1}
+]
+==
+
+[name=cast_unannotated_column_with_mismatched_length_error]
+[required_features=VECTOR_TYPE,DECLARATIVE_TYPE_FRAMEWORK,PARAMETERIZED_TYPES]
+SELECT CAST(v_unannotated AS VECTOR(2))
+FROM VectorTable
+WHERE id = 1;
+--
+ERROR: generic::out_of_range: VECTOR(2) has length 2 but got a vector with length 3
+==
+
+[name=safe_cast_unannotated_column_with_mismatched_length]
+[required_features=VECTOR_TYPE,DECLARATIVE_TYPE_FRAMEWORK,PARAMETERIZED_TYPES]
+SELECT SAFE_CAST(v_unannotated AS VECTOR(2))
+FROM VectorTable
+WHERE id = 1;
+--
+ARRAY<STRUCT<VECTOR>>[{NULL}]
+==
+
+[name=cast_unannotated_column_with_matching_length]
+[required_features=VECTOR_TYPE,DECLARATIVE_TYPE_FRAMEWORK,PARAMETERIZED_TYPES]
+SELECT CAST(v_unannotated AS VECTOR(2))
+FROM VectorTable
+WHERE id = 2;
+--
+ARRAY<STRUCT<VECTOR>>[{VECTOR([4, 5])}]
+==
+
+
+##################
+# DML STATEMENTS #
+##################
+
+[name=insert_into_vector_dml_table_valid]
+INSERT VectorDmlTable (id, v) VALUES (2, ENCODE_VECTOR(ARRAY<FLOAT>[3.0, 4.0]));
+--
+STRUCT<
+  num_rows_modified INT64,
+  all_rows ARRAY<>
+>{1,
+  ARRAY<STRUCT<id INT64, v VECTOR>>[unknown order:
+    {1, VECTOR([1, 2])},
+    {2, VECTOR([3, 4])}
+  ]}
+==
+
+[name=insert_into_vector_dml_table_null]
+INSERT VectorDmlTable (id, v) VALUES (2, CAST(NULL AS VECTOR));
+--
+STRUCT<
+  num_rows_modified INT64,
+  all_rows ARRAY<>
+>{1,
+  ARRAY<STRUCT<id INT64, v VECTOR>>[unknown order:
+    {1, VECTOR([1, 2])},
+    {2, NULL}
+  ]}
+==
+
+[name=insert_into_vector_dml_table_mismatched_length_error]
+INSERT VectorDmlTable (id, v) VALUES (2, ENCODE_VECTOR(ARRAY<FLOAT>[1.0, 2.0, 3.0], 2));
+--
+ERROR: generic::out_of_range: Input ARRAY does not have a matching array_length (3) with the length (2)
+==
+
+[name=insert_into_vector_dml_table_select_query]
+INSERT VectorDmlTable (id, v) SELECT 2, ENCODE_VECTOR(ARRAY<FLOAT>[5.0, 6.0]);
+--
+STRUCT<
+  num_rows_modified INT64,
+  all_rows ARRAY<>
+>{1,
+  ARRAY<STRUCT<id INT64, v VECTOR>>[unknown order:
+    {1, VECTOR([1, 2])},
+    {2, VECTOR([5, 6])}
+  ]}
+==
+
+[name=insert_into_vector_dml_table_with_vector_param]
+[parameters=ENCODE_VECTOR(ARRAY<FLOAT>[3.0, 4.0]) as vec_param]
+INSERT VectorDmlTable (id, v) VALUES (2, @vec_param);
+--
+STRUCT<
+  num_rows_modified INT64,
+  all_rows ARRAY<>
+>{1,
+  ARRAY<STRUCT<id INT64, v VECTOR>>[unknown order:
+    {1, VECTOR([1, 2])},
+    {2, VECTOR([3, 4])}
+  ]}
+==
+
+[name=insert_into_vector_dml_table_with_null_vector_param]
+[parameters=CAST(NULL AS VECTOR) as vec_param]
+INSERT VectorDmlTable (id, v) VALUES (2, @vec_param);
+--
+STRUCT<
+  num_rows_modified INT64,
+  all_rows ARRAY<>
+>{1,
+  ARRAY<STRUCT<id INT64, v VECTOR>>[unknown order:
+    {1, VECTOR([1, 2])},
+    {2, NULL}
+  ]}
+==
+
+[name=insert_into_vector_dml_table_with_mismatched_vector_param_error]
+[required_features=VECTOR_TYPE,DECLARATIVE_TYPE_FRAMEWORK,PARAMETERIZED_TYPES]
+[parameters=CAST(ENCODE_VECTOR(ARRAY<FLOAT>[3.0, 4.0, 5.0]) AS VECTOR(3)) as vec_param]
+INSERT VectorDmlTable (id, v) VALUES (2, CAST(@vec_param AS VECTOR(2)));
+--
+ERROR: generic::out_of_range: VECTOR(2) has length 2 but got a vector with length 3
+==
+
+[name=insert_into_vector_dml_table_with_array_param]
+[parameters=ARRAY<FLOAT>[7.0, 8.0] as arr_param]
+INSERT VectorDmlTable (id, v) VALUES (2, ENCODE_VECTOR(@arr_param));
+--
+STRUCT<
+  num_rows_modified INT64,
+  all_rows ARRAY<>
+>{1,
+  ARRAY<STRUCT<id INT64, v VECTOR>>[unknown order:
+    {1, VECTOR([1, 2])},
+    {2, VECTOR([7, 8])}
+  ]}
+==
+
+[name=update_vector_dml_table_valid]
+UPDATE VectorDmlTable SET v = ENCODE_VECTOR(ARRAY<FLOAT>[5.0, 6.0]) WHERE id = 1;
+--
+STRUCT<
+  num_rows_modified INT64,
+  all_rows ARRAY<>
+>{
+  1,
+  ARRAY<STRUCT<id INT64, v VECTOR>>[{1, VECTOR([5, 6])}]
+}
+==
+
+[name=update_vector_dml_table_mismatched_length_error]
+UPDATE VectorDmlTable SET v = ENCODE_VECTOR(ARRAY<FLOAT>[5.0, 6.0, 7.0], 2) WHERE id = 1;
+--
+ERROR: generic::out_of_range: Input ARRAY does not have a matching array_length (3) with the length (2)
+==
+
+[name=delete_from_vector_dml_table]
+DELETE FROM VectorDmlTable WHERE id = 1;
+--
+STRUCT<
+  num_rows_modified INT64,
+  all_rows ARRAY<>
+>{
+  1,
+  ARRAY<STRUCT<id INT64, v VECTOR>>[]
+}
+==
+
+

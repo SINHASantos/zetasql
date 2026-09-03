@@ -982,7 +982,7 @@ from graph_table(aml
 --
 ALTERNATION GROUP: column_bool OR column_bool
 --
-ERROR: Syntax error: Expected keyword INSERT or keyword REMOVE or keyword RETURN or keyword SET but got keyword OR [at 4:73]
+ERROR: Syntax error: Unexpected keyword OR [at 4:73]
 ...g_with_fixed_output() YIELD column_bool OR column_bool AS y
                                            ^
 --

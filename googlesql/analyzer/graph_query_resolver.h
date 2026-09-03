@@ -269,6 +269,17 @@ class GraphTableQueryResolver {
   absl::Status CheckGqlLinearQuery(
       absl::Span<const ASTGqlOperator* const> primitive_ops) const;
 
+  // Validates operator-level constraints on GQL DML operators (e.g. INSERT,
+  // SET, REMOVE).
+  absl::Status ValidateGqlDmlOperator(const ASTGqlOperator* gql_op,
+                                      const GqlQueryContext& context) const;
+
+  // Validates that GQL DML statements in a linear query list satisfy
+  // terminality constraints across NEXT.
+  absl::Status ValidateGqlLinearQueryListDml(
+      const ASTGqlOperatorList& gql_ops_list,
+      const GqlQueryContext& context) const;
+
   // Resolves a composite GraphLinearScan having linear scans as children.
   // `out_name_list` should start as an empty namelist, and would be updated by
   // this function.

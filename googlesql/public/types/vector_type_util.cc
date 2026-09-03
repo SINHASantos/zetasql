@@ -47,7 +47,7 @@ absl::StatusOr<const Type*> MakeVectorType(TypeFactory* type_factory) {
           .set_backing_type(type_factory->get_bytes())
           .set_returning_strategy(
               DeclarativeTypeDescriptor::ReturningDelegated{})
-          .set_type_parameter_handlers(std::move(type_parameter_handlers))
+          .set_type_params_strategy(std::move(*type_parameter_handlers))
           .set_additional_required_language_features({FEATURE_VECTOR_TYPE}));
 }
 

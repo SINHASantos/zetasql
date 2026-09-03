@@ -99,6 +99,8 @@ struct MacroCatalogOptions {
 // Represents the catalog of existing macros and their definitions.
 // This will likely develop into an interface for more sophisticated catalog in
 // the future, like catalog.h, with multi-part paths.
+// TODO: Converge MacroCatalog with googlesql::Catalog and update
+// MacroInfo to inherit from googlesql::Macro.
 class MacroCatalog {
  public:
   // Returns a statically allocated empty macro catalog.

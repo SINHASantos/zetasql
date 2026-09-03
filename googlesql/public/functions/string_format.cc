@@ -127,6 +127,7 @@ bool StringFormatEvaluator::ValueAsString(const Value& value,
     case TYPE_TIME:
     case TYPE_DATETIME:
     case TYPE_INTERVAL:
+    case TYPE_RANGE:
       cord_buffer_.Append(value.DebugString());
       break;
     case TYPE_ARRAY: {
@@ -836,6 +837,7 @@ FormatPart::SetterFn StringFormatEvaluator::MakeValueAsStringSetter(
     case TYPE_BIGNUMERIC:
     case TYPE_NUMERIC:
     case TYPE_JSON:
+    case TYPE_RANGE:
       return &StringFormatEvaluator::ValueAsStringSetter;
     default:
       break;
@@ -873,6 +875,7 @@ FormatPart::SetterFn StringFormatEvaluator::MakeValueLiteralSetter(
     case TYPE_BIGNUMERIC:
     case TYPE_NUMERIC:
     case TYPE_JSON:
+    case TYPE_RANGE:
       return &StringFormatEvaluator::ValueLiteralSetter;
 
     default:

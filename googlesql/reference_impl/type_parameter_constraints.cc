@@ -26,10 +26,15 @@
 #include "googlesql/public/functions/string.h"
 #include "googlesql/public/numeric_value.h"
 #include "googlesql/public/options.pb.h"
+#include "googlesql/public/proto/vector_encoding_id.pb.h"
 #include "googlesql/public/timestamp_picos_value.h"
 #include "googlesql/public/type.pb.h"
+#include "googlesql/public/type_parameters.pb.h"
+#include "googlesql/public/types/type_factory.h"
 #include "googlesql/public/types/type_parameters.h"
+#include "googlesql/public/types/vector_type_util.h"
 #include "googlesql/public/value.h"
+#include "googlesql/public/value.pb.h"
 #include "absl/numeric/int128.h"
 #include "absl/status/status.h"
 #include "googlesql/base/status_macros.h"
@@ -135,6 +140,39 @@ static absl::StatusOr<TimestampPicosValue> ApplyPrecision(
 
   absl::int128 remainder = unix_picos % picos_per_target_unit;
   return TimestampPicosValue::FromUnixPicos(unix_picos - remainder);
+}
+
+static absl::Status ApplyVectorConstraints(const TypeParameters& type_params,
+                                           const Value& value) {
+  GOOGLESQL_RET_CHECK(type_params.IsVectorTypeParameters());
+  const VectorTypeParametersProto* vector_params =
+      type_params.vector_type_parameters();
+  GOOGLESQL_RET_CHECK(vector_params != nullptr);
+
+  if (vector_params->has_encoding() &&
+      vector_params->encoding() != googlesql::VectorEncodingId::FLOAT32) {
+    return absl::OutOfRangeError(absl::Substitute(
+        "VECTOR has encoding $0 but got a vector with encoding FLOAT32",
+        googlesql::VectorEncodingId_Id_Name(vector_params->encoding())));
+  }
+
+  GOOGLESQL_ASSIGN_OR_RETURN(Value backing_val, value.backing_value());
+  ValueProto value_proto;
+
+  GOOGLESQL_RET_CHECK(value_proto.ParseFromString(backing_val.bytes_value()))
+      << "Failed to parse VECTOR backing value";
+  GOOGLESQL_ASSIGN_OR_RETURN(Value decoded_array,
+                   Value::Deserialize(value_proto, types::FloatArrayType()));
+  int64_t actual_length = decoded_array.num_elements();
+  if (vector_params->has_length()) {
+    int64_t expected_length = vector_params->length();
+    if (actual_length != expected_length) {
+      return absl::OutOfRangeError(absl::Substitute(
+          "VECTOR($0) has length $0 but got a vector with length $1",
+          expected_length, actual_length));
+    }
+  }
+  return absl::OkStatus();
 }
 
 }  // namespace
@@ -256,6 +294,15 @@ absl::Status ApplyConstraints(const TypeParameters& type_params,
       GOOGLESQL_ASSIGN_OR_RETURN(value, Value::MakeMap(value.type()->AsMap(),
                                              std::move(new_map_entries)));
       return absl::OkStatus();
+    }
+    case TYPE_DECLARATIVE: {
+      if (IsVectorType(value.type())) {
+        return ApplyVectorConstraints(type_params, value);
+      }
+      GOOGLESQL_RET_CHECK_FAIL() << absl::Substitute(
+          "Type parameters are not handled for type $0. (Got type "
+          "parameters: $1)",
+          value.type()->DebugString(), type_params.DebugString());
     }
     default:
       // If type parameters is non-empty, then the type should have been
