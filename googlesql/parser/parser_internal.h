@@ -28,6 +28,7 @@
 #include "googlesql/parser/parser_runtime_info.h"
 #include "googlesql/parser/statement_properties.h"
 #include "googlesql/parser/token_stream.h"
+#include "googlesql/public/catalog.h"
 #include "googlesql/public/id_string.h"
 #include "googlesql/public/language_options.h"
 #include "absl/status/status.h"
@@ -63,9 +64,9 @@ absl::Status ParseInternal(
     ParserMode mode, absl::string_view filename, absl::string_view input,
     int start_byte_offset, IdStringPool* id_string_pool, googlesql_base::UnsafeArena* arena,
     const LanguageOptions& language_options,
-    MacroExpansionMode macro_expansion_mode,
-    const macros::MacroCatalog* macro_catalog, std::unique_ptr<ASTNode>* output,
-    ParserRuntimeInfo& runtime_info, WarningSink& warning_sink,
+    MacroExpansionMode macro_expansion_mode, Catalog* catalog,
+    std::unique_ptr<ASTNode>* output, ParserRuntimeInfo& runtime_info,
+    WarningSink& warning_sink,
     std::vector<std::unique_ptr<ASTNode>>* other_allocated_ast_nodes,
     ASTStatementProperties* ast_statement_properties,
     int* statement_end_byte_offset);

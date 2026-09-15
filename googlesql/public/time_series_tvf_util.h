@@ -27,7 +27,6 @@
 namespace googlesql {
 
 class Type;
-class TypeFactory;
 class TVFRelation;
 
 // Represents a single step (either index-based for STRUCT or descriptor-based
@@ -39,7 +38,9 @@ struct TypeFieldPathStep {
   int struct_field_index = -1;
   // Descriptor of the field if it is a PROTO_FIELD.
   const google::protobuf::FieldDescriptor* proto_field_descriptor = nullptr;
-  // The type of the field.
+  // The type of the field if kind == STRUCT_FIELD, or nullptr for PROTO_FIELD.
+  // Callers requiring a Type* for proto fields should resolve
+  // proto_field_descriptor using their own TypeFactory.
   const Type* type = nullptr;
 };
 
@@ -50,9 +51,6 @@ struct ResolvedTimestampColumnPath {
   int column_index = -1;
   // Steps to traverse from the top-level column to the leaf timestamp field.
   std::vector<TypeFieldPathStep> steps;
-  // The type of the leaf field (TIMESTAMP or google.protobuf.Timestamp,
-  // including fields with GoogleSQL format annotations resolving to TIMESTAMP).
-  const Type* leaf_type = nullptr;
 };
 
 // Convert a dotted identifier path string to a vector of path components,
@@ -120,8 +118,7 @@ absl::StatusOr<std::vector<std::string>> ParseSimpleIdentifierPath(
 // Returned errors are InvalidArgument Status. The caller should associate the
 // error with the timestamp column AST location.
 absl::StatusOr<ResolvedTimestampColumnPath> ResolveTimestampColumnPath(
-    const TVFRelation& input_relation, absl::string_view path_string,
-    TypeFactory* type_factory);
+    const TVFRelation& input_relation, absl::string_view path_string);
 
 }  // namespace googlesql
 

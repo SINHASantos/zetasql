@@ -18,7 +18,6 @@
 #define GOOGLESQL_ANALYZER_REWRITERS_MEASURE_COLLECTOR_H_
 #include <optional>
 #include <string>
-#include <vector>
 
 #include "googlesql/public/types/annotation.h"
 #include "googlesql/public/types/measure_type.h"

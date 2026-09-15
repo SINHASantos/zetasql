@@ -17,6 +17,7 @@
 #include "googlesql/public/types/declarative_type.h"
 
 #include <cstddef>
+#include <cstdint>
 #include <memory>
 #include <optional>
 #include <string>
@@ -26,18 +27,23 @@
 #include "googlesql/public/options.pb.h"
 #include "googlesql/public/type.pb.h"
 #include "googlesql/public/type_parameters.pb.h"
+#include "googlesql/public/types/builtin_declarative_types.h"
 #include "googlesql/public/types/collation.h"
 #include "googlesql/public/types/simple_value.h"
 #include "googlesql/public/types/type.h"
 #include "googlesql/public/types/type_deserializer.h"
 #include "googlesql/public/types/type_factory.h"
 #include "googlesql/public/types/type_parameters.h"
+#include "googlesql/public/value.h"
 #include "googlesql/testdata/test_schema.pb.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "testing/base/public/malloc_counter.h"
 #include "absl/hash/hash.h"
 #include "absl/status/status.h"
+#include "absl/status/statusor.h"
+#include "absl/strings/str_cat.h"
+#include "absl/strings/string_view.h"
 #include "absl/types/span.h"
 #include "google/protobuf/descriptor.h"
 
@@ -370,7 +376,7 @@ TEST(DeclarativeTypeTest, DeclarativeTypeCounterEquality) {
   GOOGLESQL_ASSERT_OK_AND_ASSIGN(
       t1, type_factory.MakeDeclarativeType(
               DeclarativeTypeDescriptor()
-                  .set_type_id(TypeId{
+                  .set_type_id(DeclarativeTypeId{
                       .name_space = "NS", .local_id = "T1", .version_id = "v1"})
                   .set_display_name("t1")
                   .set_backing_type(type_factory.get_int64())));
@@ -379,14 +385,14 @@ TEST(DeclarativeTypeTest, DeclarativeTypeCounterEquality) {
   GOOGLESQL_ASSERT_OK_AND_ASSIGN(
       t2, type_factory.MakeDeclarativeType(
               DeclarativeTypeDescriptor()
-                  .set_type_id(TypeId{
+                  .set_type_id(DeclarativeTypeId{
                       .name_space = "NS", .local_id = "T1", .version_id = "v2"})
                   .set_display_name("t1")
                   .set_backing_type(type_factory.get_int64())));
 
   EXPECT_FALSE(t1->Equals(t2));
 
-  absl::Hash<TypeId> type_id_hasher;
+  absl::Hash<DeclarativeTypeId> type_id_hasher;
   EXPECT_NE(type_id_hasher(t1->AsDeclarativeType()->id()),
             type_id_hasher(t2->AsDeclarativeType()->id()));
 }
@@ -395,7 +401,7 @@ TEST(DeclarativeTypeTest, DeclarativeTypeProtoFieldCount) {
   TypeFactory type_factory;
 
   const google::protobuf::Descriptor* descriptor = DeclarativeTypeProto::descriptor();
-  EXPECT_EQ(descriptor->field_count(), 9)
+  EXPECT_EQ(descriptor->field_count(), 10)
       << "DeclarativeTypeProto field count has changed. If you added a new "
          "field to DeclarativeTypeProto, please make sure to update the "
          "descriptor structure, the serializer "
@@ -454,11 +460,12 @@ TEST(DeclarativeTypeTest, DeclarativeTypeIsSupportedType) {
 TEST(DeclarativeTypeTest,
      DeclarativeBuiltinTypeIsDeterminedBasedOnNamespaceInTypeId) {
   TypeFactory type_factory;
-  auto descriptor = DeclarativeTypeDescriptor()
-                        .set_type_id({std::string(TypeId::kGoogleSqlNamespace),
-                                      "MY_BUILTIN_TYPE"})
-                        .set_display_name("my_builtin")
-                        .set_backing_type(types::Int32Type());
+  auto descriptor =
+      DeclarativeTypeDescriptor()
+          .set_type_id({std::string(DeclarativeTypeId::kGoogleSqlNamespace),
+                        "MY_BUILTIN_TYPE"})
+          .set_display_name("my_builtin")
+          .set_backing_type(types::Int32Type());
 
   ASSERT_TRUE(descriptor.type_id().IsGoogleSQLBuiltin());
 
@@ -482,23 +489,25 @@ TEST(DeclarativeTypeTest, DescriptorValidation) {
   // Valid descriptor
   GOOGLESQL_EXPECT_OK(type_factory.MakeDeclarativeType(
       DeclarativeTypeDescriptor()
-          .set_type_id(TypeId{.name_space = "NS", .local_id = "local_id"})
+          .set_type_id(
+              DeclarativeTypeId{.name_space = "NS", .local_id = "local_id"})
           .set_display_name("t1")
           .set_backing_type(type_factory.get_int64())));
 
   // Empty Namespace
-  EXPECT_THAT(
-      type_factory.MakeDeclarativeType(
-          DeclarativeTypeDescriptor()
-              .set_type_id(TypeId{.name_space = "", .local_id = "local_id"})
-              .set_display_name("t1")
-              .set_backing_type(type_factory.get_int64())),
-      StatusIs(absl::StatusCode::kInternal, HasSubstr("name_space")));
+  EXPECT_THAT(type_factory.MakeDeclarativeType(
+                  DeclarativeTypeDescriptor()
+                      .set_type_id(DeclarativeTypeId{.name_space = "",
+                                                     .local_id = "local_id"})
+                      .set_display_name("t1")
+                      .set_backing_type(type_factory.get_int64())),
+              StatusIs(absl::StatusCode::kInternal, HasSubstr("name_space")));
 
   // Empty Local ID
   EXPECT_THAT(type_factory.MakeDeclarativeType(
                   DeclarativeTypeDescriptor()
-                      .set_type_id(TypeId{.name_space = "NS", .local_id = ""})
+                      .set_type_id(
+                          DeclarativeTypeId{.name_space = "NS", .local_id = ""})
                       .set_display_name("t1")
                       .set_backing_type(type_factory.get_int64())),
               StatusIs(absl::StatusCode::kInternal, HasSubstr("local_id")));
@@ -506,28 +515,29 @@ TEST(DeclarativeTypeTest, DescriptorValidation) {
   // Non-empty version_id for GoogleSQL built-in type
   EXPECT_THAT(type_factory.MakeDeclarativeType(
                   DeclarativeTypeDescriptor()
-                      .set_type_id(TypeId{.name_space = std::string(
-                                              TypeId::kGoogleSqlNamespace),
-                                          .local_id = "local_id",
-                                          .version_id = "v1"})
+                      .set_type_id(DeclarativeTypeId{
+                          .name_space = std::string(
+                              DeclarativeTypeId::kGoogleSqlNamespace),
+                          .local_id = "local_id",
+                          .version_id = "v1"})
                       .set_display_name("t1")
                       .set_backing_type(type_factory.get_int64())),
               StatusIs(absl::StatusCode::kInternal, HasSubstr("version_id")));
 
   // Empty display_name
-  EXPECT_THAT(
-      type_factory.MakeDeclarativeType(
-          DeclarativeTypeDescriptor()
-              .set_type_id(TypeId{.name_space = "NS", .local_id = "local_id"})
-              .set_display_name("")
-              .set_backing_type(type_factory.get_int64())),
-      StatusIs(absl::StatusCode::kInternal, HasSubstr("display_name")));
+  EXPECT_THAT(type_factory.MakeDeclarativeType(
+                  DeclarativeTypeDescriptor()
+                      .set_type_id(DeclarativeTypeId{.name_space = "NS",
+                                                     .local_id = "local_id"})
+                      .set_display_name("")
+                      .set_backing_type(type_factory.get_int64())),
+              StatusIs(absl::StatusCode::kInternal, HasSubstr("display_name")));
 
   // Nullptr backing_type
   EXPECT_THAT(
       type_factory.MakeDeclarativeType(
           DeclarativeTypeDescriptor()
-              .set_type_id(TypeId{
+              .set_type_id(DeclarativeTypeId{
                   .name_space = "NS", .local_id = "local_id", .version_id = ""})
               .set_display_name("t1")
               .set_backing_type(nullptr)),
@@ -614,7 +624,8 @@ TEST(DeclarativeTypeTest, DeclarativeTypeVersionIdCannotBeSetForBuiltinTypes) {
 
   auto descriptor =
       DeclarativeTypeDescriptor()
-          .set_type_id({std::string(TypeId::kGoogleSqlNamespace), "BT", "v1"})
+          .set_type_id(
+              {std::string(DeclarativeTypeId::kGoogleSqlNamespace), "BT", "v1"})
           .set_display_name("builtin_type")
           .set_backing_type(types::Int32Type());
 
@@ -622,7 +633,8 @@ TEST(DeclarativeTypeTest, DeclarativeTypeVersionIdCannotBeSetForBuiltinTypes) {
               StatusIs(absl::StatusCode::kInternal, HasSubstr("version_id")));
 
   // Use a proper descriptor with an empty version_id to generate a valid proto.
-  descriptor.set_type_id({std::string(TypeId::kGoogleSqlNamespace), "BT", ""});
+  descriptor.set_type_id(
+      {std::string(DeclarativeTypeId::kGoogleSqlNamespace), "BT", ""});
   GOOGLESQL_ASSERT_OK_AND_ASSIGN(const Type* declarative_type,
                        type_factory.MakeDeclarativeType(descriptor));
   TypeProto type_proto;
@@ -642,7 +654,8 @@ TEST(DeclarativeTypeTest,
      UsesStaticFactoryForGoogleSQLBuiltinTypesBackedByTypesInStaticFactory) {
   auto descriptor =
       DeclarativeTypeDescriptor()
-          .set_type_id({std::string(TypeId::kGoogleSqlNamespace), "T1"})
+          .set_type_id(
+              {std::string(DeclarativeTypeId::kGoogleSqlNamespace), "T1"})
           .set_display_name("t1")
           .set_backing_type(types::Int64Type());
 
@@ -660,7 +673,8 @@ TEST(DeclarativeTypeTest,
   EXPECT_EQ(t1, t2);
 
   // Same for a transitive builtin DeclarativeType
-  descriptor.set_type_id({std::string(TypeId::kGoogleSqlNamespace), "T2"})
+  descriptor
+      .set_type_id({std::string(DeclarativeTypeId::kGoogleSqlNamespace), "T2"})
       .set_display_name("t2")
       .set_backing_type(t1);
   GOOGLESQL_ASSERT_OK_AND_ASSIGN(const Type* t3,
@@ -673,7 +687,8 @@ TEST(DeclarativeTypeTest,
 TEST(DeclarativeTypeTest, BuiltinTypesBackedByTypesNotInStaticFactory) {
   auto descriptor =
       DeclarativeTypeDescriptor()
-          .set_type_id({std::string(TypeId::kGoogleSqlNamespace), "T1"})
+          .set_type_id(
+              {std::string(DeclarativeTypeId::kGoogleSqlNamespace), "T1"})
           .set_display_name("t1");
 
   ASSERT_TRUE(descriptor.type_id().IsGoogleSQLBuiltin());
@@ -783,7 +798,7 @@ TEST(DeclarativeTypeTest, TypeParameterHandlersNonBuiltinTypeRejected) {
 
   ASSERT_FALSE(descriptor.type_id().IsGoogleSQLBuiltin());
 
-  TypeId type_id = descriptor.type_id();
+  DeclarativeTypeId type_id = descriptor.type_id();
 
   // Create t1 from factory1.
   TypeFactory factory1;
@@ -875,7 +890,8 @@ TEST(DeclarativeTypeTest, TypeParameterHandlersBuiltinTypeSuccessAndExecution) {
 
   auto builtin_descriptor =
       DeclarativeTypeDescriptor()
-          .set_type_id({std::string(TypeId::kGoogleSqlNamespace), "MY_VEC"})
+          .set_type_id(
+              {std::string(DeclarativeTypeId::kGoogleSqlNamespace), "MY_VEC"})
           .set_display_name("MY_VEC")
           .set_backing_type(types::BytesType())
           .set_type_params_strategy(std::move(handlers));
@@ -928,7 +944,8 @@ TEST(DeclarativeTypeTest, TypeParameterHandlersIsIdenticalTo) {
 
   auto desc_with_handlers1 =
       DeclarativeTypeDescriptor()
-          .set_type_id({std::string(TypeId::kGoogleSqlNamespace), "VEC"})
+          .set_type_id(
+              {std::string(DeclarativeTypeId::kGoogleSqlNamespace), "VEC"})
           .set_display_name("VEC")
           .set_backing_type(types::BytesType())
           .set_type_params_strategy(std::move(handlers1));
@@ -938,7 +955,8 @@ TEST(DeclarativeTypeTest, TypeParameterHandlersIsIdenticalTo) {
   desc_with_handlers1_copy.set_type_params_strategy(std::move(handlers1_copy));
   auto desc_without_handlers =
       DeclarativeTypeDescriptor()
-          .set_type_id({std::string(TypeId::kGoogleSqlNamespace), "VEC"})
+          .set_type_id(
+              {std::string(DeclarativeTypeId::kGoogleSqlNamespace), "VEC"})
           .set_display_name("VEC")
           .set_backing_type(types::BytesType());
 
@@ -959,12 +977,13 @@ TEST(DeclarativeTypeTest, TypeFactoryRejectsConflictingTypeParameterHandlers) {
       TypeParameterHandlers::Create(&ResolveEmptyTypeParameters2,
                                     &ValidateOkTypeParameters));
 
-  auto desc1 = DeclarativeTypeDescriptor()
-                   .set_type_id({std::string(TypeId::kGoogleSqlNamespace),
-                                 "MY_VEC_COPY"})
-                   .set_display_name("MY_VEC_COPY")
-                   .set_backing_type(types::BytesType())
-                   .set_type_params_strategy(std::move(handlers1));
+  auto desc1 =
+      DeclarativeTypeDescriptor()
+          .set_type_id({std::string(DeclarativeTypeId::kGoogleSqlNamespace),
+                        "MY_VEC_COPY"})
+          .set_display_name("MY_VEC_COPY")
+          .set_backing_type(types::BytesType())
+          .set_type_params_strategy(std::move(handlers1));
   auto desc2 = desc1;
   desc2.set_type_params_strategy(std::move(handlers2));
 
@@ -973,6 +992,256 @@ TEST(DeclarativeTypeTest, TypeFactoryRejectsConflictingTypeParameterHandlers) {
   EXPECT_THAT(factory.MakeDeclarativeType(desc2),
               StatusIs(absl::StatusCode::kInternal,
                        HasSubstr("Conflicting declarative types")));
+}
+
+using FormatOptions =
+    DeclarativeTypeDescriptor::FormattingCustom::FormatOptions;
+
+static std::string MyFormatCallback(const ValueContent& value,
+                                    const FormatOptions& options) {
+  int64_t v = value.GetAs<int64_t>();
+  switch (options.mode) {
+    case FormatOptions::Mode::kDebug:
+      return absl::StrCat("DEBUG(", v, ")");
+    case FormatOptions::Mode::kSQLLiteral:
+      return absl::StrCat("LITERAL(", v, ")");
+    case FormatOptions::Mode::kSQLExpression:
+      return absl::StrCat("CAST(", v, " AS foo_type)");
+  }
+}
+
+static std::string Formatter1(const ValueContent&, const FormatOptions&) {
+  return "fmt1";
+}
+
+static std::string Formatter2(const ValueContent&, const FormatOptions&) {
+  return "fmt2";
+}
+
+TEST(DeclarativeTypeTest, FormattingCustomExecution) {
+  TypeFactory factory;
+  auto descriptor =
+      DeclarativeTypeDescriptor()
+          .set_type_id({"CUSTOM_NS", "FOO_TYPE"})
+          .set_display_name("foo_type")
+          .set_backing_type(types::Int64Type())
+          .set_formatting_strategy(
+              DeclarativeTypeDescriptor::FormattingCustom(&MyFormatCallback));
+
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(const Type* foo_type,
+                       factory.MakeDeclarativeType(descriptor));
+  const DeclarativeType* decl_type = foo_type->AsDeclarativeType();
+  ASSERT_NE(decl_type, nullptr);
+  EXPECT_TRUE(decl_type->SupportsFormatting());
+
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(Value value,
+                       Value::Declarative(decl_type, Value::Int64(42)));
+
+  // DebugString / Format (Mode::kDebug)
+  EXPECT_EQ(value.DebugString(), "DEBUG(42)");
+  EXPECT_EQ(value.Format(/*print_top_level_type=*/false), "DEBUG(42)");
+
+  // GetSQLLiteral (Mode::kSQLLiteral)
+  EXPECT_EQ(value.GetSQLLiteral(), "LITERAL(42)");
+
+  // GetSQL (Mode::kSQLExpression)
+  EXPECT_EQ(value.GetSQL(), "CAST(42 AS foo_type)");
+}
+
+TEST(DeclarativeTypeTest, FormattingDisallowedExecution) {
+  TypeFactory factory;
+  auto descriptor = DeclarativeTypeDescriptor()
+                        .set_type_id({"CUSTOM_NS", "DISALLOWED_TYPE"})
+                        .set_display_name("disallowed_type")
+                        .set_backing_type(types::Int64Type())
+                        .set_formatting_strategy(
+                            DeclarativeTypeDescriptor::FormattingDisallowed{});
+
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(const Type* type,
+                       factory.MakeDeclarativeType(descriptor));
+  const DeclarativeType* decl_type = type->AsDeclarativeType();
+  ASSERT_NE(decl_type, nullptr);
+  EXPECT_FALSE(decl_type->SupportsFormatting());
+
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(Value value,
+                       Value::Declarative(decl_type, Value::Int64(42)));
+
+  EXPECT_EQ(value.DebugString(), "ERROR('Unimplemented')");
+  EXPECT_EQ(value.Format(/*print_top_level_type=*/false),
+            "ERROR('Unimplemented')");
+  EXPECT_EQ(value.GetSQLLiteral(), "ERROR('Unimplemented')");
+  EXPECT_EQ(value.GetSQL(), "ERROR('Unimplemented')");
+}
+
+TEST(DeclarativeTypeTest, FormattingStrategyIsIdenticalTo) {
+  auto base_desc = DeclarativeTypeDescriptor()
+                       .set_type_id({"NS", "T_FMT"})
+                       .set_display_name("t_fmt")
+                       .set_backing_type(types::Int64Type());
+
+  auto desc_disallowed1 = base_desc;
+  desc_disallowed1.set_formatting_strategy(
+      DeclarativeTypeDescriptor::FormattingDisallowed{});
+  auto desc_disallowed2 = base_desc;
+  desc_disallowed2.set_formatting_strategy(
+      DeclarativeTypeDescriptor::FormattingDisallowed{});
+
+  auto desc_cb1 = base_desc;
+  desc_cb1.set_formatting_strategy(
+      DeclarativeTypeDescriptor::FormattingCustom(&Formatter1));
+  auto desc_cb1_copy = base_desc;
+  desc_cb1_copy.set_formatting_strategy(
+      DeclarativeTypeDescriptor::FormattingCustom(&Formatter1));
+  auto desc_cb2 = base_desc;
+  desc_cb2.set_formatting_strategy(
+      DeclarativeTypeDescriptor::FormattingCustom(&Formatter2));
+
+  EXPECT_TRUE(desc_disallowed1.IsIdenticalTo(desc_disallowed2));
+  EXPECT_TRUE(desc_cb1.IsIdenticalTo(desc_cb1_copy));
+  EXPECT_FALSE(desc_cb1.IsIdenticalTo(desc_cb2));
+  EXPECT_FALSE(desc_cb1.IsIdenticalTo(desc_disallowed1));
+}
+
+TEST(DeclarativeTypeTest, TypeFactoryRejectsConflictingFormattingCallbacks) {
+  TypeFactory factory;
+  auto desc1 =
+      DeclarativeTypeDescriptor()
+          .set_type_id({"NS", "T_CONFLICT"})
+          .set_display_name("t_conflict")
+          .set_backing_type(types::Int64Type())
+          .set_formatting_strategy(
+              DeclarativeTypeDescriptor::FormattingCustom(&Formatter1));
+  auto desc2 = desc1;
+  desc2.set_formatting_strategy(
+      DeclarativeTypeDescriptor::FormattingCustom(&Formatter2));
+
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(const Type* t1, factory.MakeDeclarativeType(desc1));
+  EXPECT_TRUE(t1 != nullptr);
+  EXPECT_THAT(factory.MakeDeclarativeType(desc2),
+              StatusIs(absl::StatusCode::kInternal,
+                       HasSubstr("Conflicting declarative types")));
+}
+
+TEST(DeclarativeTypeTest, FormattingCustomDeserialization) {
+  auto descriptor =
+      DeclarativeTypeDescriptor()
+          .set_type_id({"ENGINE_NS", "ENGINE_TYPE"})
+          .set_display_name("engine_type")
+          .set_backing_type(types::Int64Type())
+          .set_formatting_strategy(
+              DeclarativeTypeDescriptor::FormattingCustom(&MyFormatCallback));
+
+  TypeFactory factory1;
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(const Type* t1,
+                       factory1.MakeDeclarativeType(descriptor));
+
+  TypeProto type_proto;
+  GOOGLESQL_ASSERT_OK(t1->SerializeToSelfContainedProto(&type_proto));
+  EXPECT_EQ(type_proto.declarative_type().formatting_strategy(),
+            DeclarativeTypeProto::FORMATTING_CUSTOM);
+
+  // Deserializing without custom callback hook fails GOOGLESQL_RET_CHECK during
+  // descriptor deserialization.
+  {
+    TypeDeserializer incomplete_deserializer(&factory1);
+    EXPECT_THAT(incomplete_deserializer.Deserialize(type_proto),
+                StatusIs(absl::StatusCode::kInternal));
+  }
+
+  // Deserializing with the wrong callback hook also leads to conflict.
+  {
+    const auto get_wrong_fmt_cb = [](const DeclarativeTypeId& id)
+        -> absl::StatusOr<std::optional<
+            DeclarativeTypeDescriptor::FormattingCustom::Callback>> {
+      return &Formatter2;
+    };
+    DeclarativeTypeCallbacksRegistry registry(nullptr, get_wrong_fmt_cb);
+    TypeDeserializer incorrect_deserializer(
+        &factory1, /*descriptor_pools=*/{},
+        /*extended_type_deserializer=*/nullptr, registry);
+    EXPECT_THAT(incorrect_deserializer.Deserialize(type_proto),
+                StatusIs(absl::StatusCode::kInternal,
+                         HasSubstr("Conflicting declarative types")));
+  }
+
+  // Deserializing with the correct callback hook rehydrates the callback and
+  // succeeds.
+  {
+    const auto get_fmt_cb = [](const DeclarativeTypeId& id)
+        -> absl::StatusOr<std::optional<
+            DeclarativeTypeDescriptor::FormattingCustom::Callback>> {
+      return &MyFormatCallback;
+    };
+    DeclarativeTypeCallbacksRegistry registry(nullptr, get_fmt_cb);
+    TypeDeserializer deserializer(&factory1, /*descriptor_pools=*/{},
+                                  /*extended_type_deserializer=*/nullptr,
+                                  registry);
+    GOOGLESQL_ASSERT_OK_AND_ASSIGN(const Type* deserialized_type,
+                         deserializer.Deserialize(type_proto));
+    EXPECT_EQ(deserialized_type, t1);
+  }
+}
+
+TEST(DeclarativeTypeTest, FormattingDisallowedSerialization) {
+  TypeFactory factory;
+  auto desc_disallowed =
+      DeclarativeTypeDescriptor()
+          .set_type_id({"NS", "T_DISALLOWED"})
+          .set_display_name("t_disallowed")
+          .set_backing_type(types::Int64Type())
+          .set_formatting_strategy(
+              DeclarativeTypeDescriptor::FormattingDisallowed{});
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(const Type* t_dis,
+                       factory.MakeDeclarativeType(desc_disallowed));
+
+  TypeProto proto_dis;
+  GOOGLESQL_ASSERT_OK(t_dis->SerializeToSelfContainedProto(&proto_dis));
+  EXPECT_EQ(proto_dis.declarative_type().formatting_strategy(),
+            DeclarativeTypeProto::FORMATTING_DISALLOWED);
+
+  TypeDeserializer deserializer(&factory);
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(const Type* deserialized_dis,
+                       deserializer.Deserialize(proto_dis));
+  EXPECT_EQ(deserialized_dis, t_dis);
+}
+
+TEST(DeclarativeTypeTest, BuiltinDeclarativeTypesOpaqueCallbacksLookup) {
+  EXPECT_FALSE(GetBuiltinTypeParameterHandlers("NONEXISTENT_TYPE").has_value());
+  EXPECT_FALSE(
+      GetBuiltinCustomFormattingCallback("NONEXISTENT_TYPE").has_value());
+
+  EXPECT_TRUE(GetBuiltinTypeParameterHandlers("VECTOR").has_value());
+  EXPECT_TRUE(GetBuiltinCustomFormattingCallback("VECTOR").has_value());
+}
+
+TEST(DeclarativeTypeTest,
+     BuiltinDeclarativeTypeDeserializationWithCustomFormat) {
+  // Simulate a GoogleSQL built-in declarative type serialized with
+  // FORMATTING_CUSTOM.
+  TypeFactory factory;
+  auto builtin_desc =
+      DeclarativeTypeDescriptor()
+          .set_type_id({std::string(DeclarativeTypeId::kGoogleSqlNamespace),
+                        "BUILTIN_FORMAT_TEST"})
+          .set_display_name("builtin_format_test")
+          .set_backing_type(types::Int64Type())
+          .set_formatting_strategy(
+              DeclarativeTypeDescriptor::FormattingCustom(&MyFormatCallback));
+
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(const Type* t1,
+                       factory.MakeDeclarativeType(builtin_desc));
+
+  TypeProto proto;
+  GOOGLESQL_ASSERT_OK(t1->SerializeToSelfContainedProto(&proto));
+  EXPECT_EQ(proto.declarative_type().formatting_strategy(),
+            DeclarativeTypeProto::FORMATTING_CUSTOM);
+
+  // Deserializing without a registered built-in callback in
+  // builtin_declarative_types will fail GOOGLESQL_RET_CHECK during descriptor
+  // deserialization.
+  TypeDeserializer deserializer(&factory);
+  EXPECT_THAT(deserializer.Deserialize(proto),
+              StatusIs(absl::StatusCode::kInternal));
 }
 
 }  // namespace googlesql

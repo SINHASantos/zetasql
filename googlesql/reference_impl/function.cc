@@ -14184,14 +14184,21 @@ TumbleTVF::CreateEvaluator(
 
   auto type_factory = std::make_unique<googlesql::TypeFactory>();
   absl::StatusOr<ResolvedTimestampColumnPath> timestamp_column_path =
-      ResolveTimestampColumnPath(input_relation, timestamp_column_name,
-                                 type_factory.get());
+      ResolveTimestampColumnPath(input_relation, timestamp_column_name);
   if (!timestamp_column_path.ok()) {
     if (timestamp_column_path.status().code() ==
         absl::StatusCode::kInvalidArgument) {
       return absl::OutOfRangeError(timestamp_column_path.status().message());
     }
     return timestamp_column_path.status();
+  }
+
+  for (TypeFieldPathStep& step : timestamp_column_path->steps) {
+    if (step.kind == TypeFieldPathStep::PROTO_FIELD) {
+      GOOGLESQL_RETURN_IF_ERROR(type_factory->GetProtoFieldType(
+          step.proto_field_descriptor,
+          /*catalog_name_path=*/absl::Span<const std::string>(), &step.type));
+    }
   }
 
   GOOGLESQL_RET_CHECK(args[2].value);
@@ -14378,14 +14385,21 @@ absl::StatusOr<std::unique_ptr<EvaluatorTableIterator>> HopTVF::CreateEvaluator(
 
   auto type_factory = std::make_unique<googlesql::TypeFactory>();
   absl::StatusOr<ResolvedTimestampColumnPath> timestamp_column_path =
-      ResolveTimestampColumnPath(input_relation, timestamp_column_name,
-                                 type_factory.get());
+      ResolveTimestampColumnPath(input_relation, timestamp_column_name);
   if (!timestamp_column_path.ok()) {
     if (timestamp_column_path.status().code() ==
         absl::StatusCode::kInvalidArgument) {
       return absl::OutOfRangeError(timestamp_column_path.status().message());
     }
     return timestamp_column_path.status();
+  }
+
+  for (TypeFieldPathStep& step : timestamp_column_path->steps) {
+    if (step.kind == TypeFieldPathStep::PROTO_FIELD) {
+      GOOGLESQL_RETURN_IF_ERROR(type_factory->GetProtoFieldType(
+          step.proto_field_descriptor,
+          /*catalog_name_path=*/absl::Span<const std::string>(), &step.type));
+    }
   }
 
   GOOGLESQL_RET_CHECK(args[3].value);

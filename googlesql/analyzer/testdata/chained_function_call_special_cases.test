@@ -212,22 +212,23 @@ from TestTable
 --
 QueryStmt
 +-output_column_list=
-| +-$query.$col1#4 AS `$col1` [PROTO<googlesql_test.KitchenSinkPB>]
+| +-$query.$col1#5 AS `$col1` [PROTO<googlesql_test.KitchenSinkPB>]
 +-query=
   +-ProjectScan
-    +-column_list=[$query.$col1#4]
+    +-column_list=[$query.$col1#5]
     +-expr_list=
-    | +-$col1#4 :=
+    | +-$col1#5 :=
     |   +-UpdateConstructor
     |     +-type=PROTO<googlesql_test.KitchenSinkPB>
     |     +-expr=
     |     | +-ColumnRef(type=PROTO<googlesql_test.KitchenSinkPB>, column=TestTable.KitchenSink#3)
     |     +-update_field_item_list=
-    |       +-UpdateFieldItem
-    |         +-expr=
-    |         | +-Literal(type=DOUBLE, value=123.4)
-    |         +-proto_field_path=double_val
-    |         +-operation=UPDATE_SINGLE
+    |     | +-UpdateFieldItem
+    |     |   +-expr=
+    |     |   | +-Literal(type=DOUBLE, value=123.4)
+    |     |   +-proto_field_path=double_val
+    |     |   +-operation=UPDATE_SINGLE
+    |     +-update_element_column=$update_constructor.update_element_column#4
     +-input_scan=
       +-TableScan(column_list=[TestTable.KitchenSink#3], table=TestTable, column_index_list=[2])
 ==

@@ -253,7 +253,6 @@ absl::Status GetParseTokens(const ParseTokenOptions& options,
   }
 
   auto arena = std::make_unique<googlesql_base::UnsafeArena>(/*block_size=*/4096);
-  parser::StackFrame::StackFrameFactory stack_frame_factory;
   auto input = std::make_unique<parser::GoogleSqlTokenizer>(
       resume_location->filename(), resume_location->input(),
       resume_location->byte_position());

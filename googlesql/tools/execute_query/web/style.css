@@ -15,6 +15,22 @@
  *
  */
 
+:root {
+  /* Layout Panel and Splitter Dimensions */
+  --min-left-panel-width: 580px;
+  --min-right-panel-width: 460px;
+  --splitter-width: 6px;
+  --default-left-width: 40%;
+
+  /* Theme and Component Colors */
+  --header-bg: #1597ec;
+  --header-btn-bg: #0f73b5;
+  --header-btn-hover-bg: rgba(255, 255, 255, 0.2);
+  --header-btn-active-bg: rgba(255, 255, 255, 0.4);
+  --splitter-bg: #d0d0d0;
+  --splitter-hover-bg: #1597ec;
+}
+
 html, body {
   background-color: #f0f8ff;
   margin: 0;
@@ -65,13 +81,33 @@ textarea#query:focus {
 main {
   display: grid;
   grid-template-rows: auto 1fr;
-  grid-template-columns: 40% 60%;
+  grid-template-columns:
+    minmax(var(--min-left-panel-width), var(--left-width, var(--default-left-width)))
+    var(--splitter-width)
+    minmax(var(--min-right-panel-width), 1fr);
   height: 100vh;
+}
+
+.splitter {
+  cursor: col-resize;
+  background-color: var(--splitter-bg);
+  transition: background-color 0.2s ease;
+  user-select: none;
+}
+
+.splitter:hover,
+main.is-splitter-resizing .splitter {
+  background-color: var(--splitter-hover-bg);
+}
+
+main.is-splitter-resizing {
+  cursor: col-resize;
+  user-select: none;
 }
 
 #header {
   grid-column: 1 / -1;
-  background-color: #1597ec;
+  background-color: var(--header-bg);
   font-size: 2.25em;
   font-family: Roboto, Arial, sans-serif;
   font-weight: 700;
@@ -92,7 +128,7 @@ main {
 
 .avatar {
   border-radius: 50%;
-  border: 1px solid #0f73b5;
+  border: 1px solid var(--header-btn-bg);
   width: 32px;
   height: 32px;
   object-fit: cover;
@@ -103,26 +139,57 @@ main {
   filter: invert(90%) hue-rotate(180deg) contrast(105%);
 }
 
-#header #share-link,
-#header #dark-mode-toggle {
+.header-button-group {
+  display: inline-flex;
+  align-items: center;
+  background-color: var(--header-btn-bg);
+  border-radius: 0.5em;
+  border: 1px solid var(--header-btn-bg);
+  overflow: hidden;
+}
+
+.header-button-group button {
+  font-size: 0.5em;
+  padding: 0.4em 0.6em;
+  background: transparent;
+  border: none;
+  color: #fff;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.15s ease-in-out;
+}
+
+.header-button-group button:not(:last-child) {
+  border-right: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.header-button-group button:hover {
+  background-color: var(--header-btn-hover-bg);
+}
+
+.header-button-group button:active {
+  background-color: var(--header-btn-active-bg);
+}
+
+#header #share-link {
   float: right;
   font-size: 0.5em;
   padding: 0.4em 0.6em;
-  background-color: #0f73b5;
+  background-color: var(--header-btn-bg);
   border-radius: 0.5em;
-  border: 1px solid #0f73b5;
+  border: 1px solid var(--header-btn-bg);
   color: #fff;
   cursor: pointer;
 }
 
-#header #share-link:hover,
-#header #dark-mode-toggle:hover {
-  background-color: #c74dd1;
-  border-color: #1597ec;
+#header #share-link:hover {
+  background-color: var(--header-btn-hover-bg);
+  border-color: var(--header-bg);
 }
 
-#header #share-link:active,
-#header #dark-mode-toggle:active {
+#header #share-link:active {
   border-color: #fff;
   border-style: dashed;
 }
@@ -133,36 +200,81 @@ main {
 .dark-mode #dark-mode-toggle .sun-icon { display: block; }
 .dark-mode #dark-mode-toggle .moon-icon { display: none; }
 
-#dark-mode-toggle svg {
+/* Display/hide the layout-toggle icons based on the layout mode */
+#layout-toggle .icon-vertical { display: none; }
+#layout-toggle .icon-horizontal { display: block; }
+main.layout-vertical #layout-toggle .icon-vertical { display: block; }
+main.layout-vertical #layout-toggle .icon-horizontal { display: none; }
+
+#dark-mode-toggle svg,
+#layout-toggle svg {
   vertical-align: middle;
 }
 
 .left-section {
   box-sizing: border-box;
   padding: 1rem;
+  min-width: var(--min-left-panel-width);
+  overflow-x: auto;
 }
 
 .right-section {
   overflow-y: auto;
   box-sizing: border-box;
   padding: 1rem;
-  height: 100%
+  height: 100%;
+  min-width: var(--min-right-panel-width);
 }
 
-@media (max-width: 1600px) {
+/* Stack panels vertically and reset dimensions to avoid unnecessary scrollbars. */
+main.layout-vertical {
+  display: block;
+  height: auto;
+  min-height: 100vh;
+}
+main.layout-vertical .splitter {
+  display: none;
+}
+main.layout-vertical .left-section {
+  min-width: auto;
+}
+main.layout-vertical .right-section {
+  height: auto;
+  min-width: auto;
+  overflow-y: initial;
+}
+main.layout-vertical textarea#query,
+main.layout-vertical #editor {
+  height: auto;
+}
+
+/* Responsive stacked layout for narrow screens. */
+@media (max-width: 1280px) {
   main {
     display: block;
+    height: auto;
+    min-height: 100vh;
+  }
+  .splitter {
+    display: none;
+  }
+  .left-section {
+    min-width: auto;
   }
   .right-section {
+    height: auto;
+    min-width: auto;
     overflow-y: initial;
   }
-  textarea#query, #editor {
+  textarea#query,
+  #editor {
     height: auto;
   }
 }
 
 textarea#query,
 #editor {
+  box-sizing: border-box;
   width: 100%;
   min-height: 20em;
   height: 40vh;
@@ -182,7 +294,8 @@ textarea#query,
 fieldset {
   display: inline-block;
   margin-bottom: 0.5em;
-  width: fit-content;
+  max-width: 100%;
+  box-sizing: border-box;
   border-radius: 0.5rem;
 }
 

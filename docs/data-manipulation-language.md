@@ -206,6 +206,28 @@ message Album {
 </tbody>
 </table>
 
+### Venues table 
+<a id="venues_table"></a>
+
+<table>
+<thead>
+<tr>
+<th>Column Name</th>
+<th>Data Type</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>VenueId</td>
+<td><code>INT64 NOT NULL</code></td>
+</tr>
+<tr>
+<td>VenueInfo</td>
+<td><code>JSON</code></td>
+</tr>
+</tbody>
+</table>
+
 ## `INSERT` statement 
 <a id="insert_statement"></a>
 
@@ -1132,6 +1154,82 @@ SET s.SingerInfo = NULL
 WHERE SingerId = 6;
 ```
 
+### JSON updates 
+<a id="json-updates"></a>
+
+GoogleSQL allows you to update specific fields and array elements in a
+`JSON` column using the [dot operator][field-access-operator], the [JSON
+subscript operator][json-subscript-operator], or a combination of both in the
+`SET` clause.
+
+The right-hand side of the assignment can be any of the following:
+
++   A `JSON` expression (such as a `JSON` literal, parameter, or function).
++   Any SQL value coercible to `JSON` using [`CAST(value AS
+    JSON)`][cast-function].
++   SQL `NULL`, which removes the target field or array element with the same
+    semantics as [`JSON_REMOVE`][json-remove]. To set a field or array element
+    to a JSON `null` value instead, assign `JSON 'null'`.
+
+JSON updates follow these rules:
+
++   **Missing keys and array elements**: If a target object key doesn't exist,
+    it's created (similar to [`JSON_SET`][json-set] with `create_if_missing`).
+    If an array index is a non-negative integer beyond the current length of the
+    array, the array is extended and padded with JSON `null` values up to that
+    index. Negative array indexes return an out-of-bounds error.
++   **Null column handling**: If the top-level `JSON` column is SQL `NULL` and a
+    nested path is updated, it's treated as if the column contained `JSON
+    'null'` and replaced with the newly constructed JSON structure.
++   **Non-container traversal**: If a path traverses through an existing value
+    that isn't a matching container (for example, setting an object field on a
+    scalar or array, or indexing an array element on a scalar or object), an
+    error is returned rather than overwriting the existing value.
++   **Multiple and overlapping updates**: You can update multiple disjoint paths
+    within the same `JSON` column in a single `UPDATE` statement (for example,
+    `SET v.VenueInfo.a.b = 1, v.VenueInfo.a.c = 2`). Overlapping paths where one
+    path is a prefix of another (for example, `SET v.VenueInfo.a = JSON '{"b":
+    1}', v.VenueInfo.a.b = 2`) aren't allowed and return an error.
+
+To illustrate, consider the [Venues table][venues-table], which has a `JSON`
+column `VenueInfo` containing the object field `name` (a JSON string) and
+`performers` (a JSON array).
+
+The following statement updates the field `name` using the dot operator and
+implicit `STRING` to `JSON` coercion:
+
+```googlesql
+UPDATE Venues v
+SET v.VenueInfo.name = "Garden"
+WHERE v.VenueId = 1;
+```
+
+The following statement updates the field `name` using the subscript operator:
+
+```googlesql
+UPDATE Venues v
+SET v.VenueInfo['name'] = "Garden"
+WHERE v.VenueId = 1;
+```
+
+The following statement updates the first index in `performers`:
+
+```googlesql
+UPDATE Venues v
+SET v.VenueInfo.performers[0] = "singer"
+WHERE v.VenueId = 1;
+```
+
+The following statement updates multiple disjoint fields and removes the `temp`
+field by assigning SQL `NULL`:
+
+```googlesql
+UPDATE Venues v
+SET v.VenueInfo.capacity = 5000,
+    v.VenueInfo.temp = NULL
+WHERE v.VenueId = 1;
+```
+
 ### Updating fields
 
 GoogleSQL allows you to update non-repeating or repeating fields within
@@ -1478,6 +1576,18 @@ This is the `Inventory` table after you run the query:
 [join-operator]: https://github.com/google/googlesql/blob/master/docs/query-syntax.md#join_types
 
 [dml-then-return-clause]: #dml_then_return_clause
+
+[field-access-operator]: https://github.com/google/googlesql/blob/master/docs/operators.md#field_access_operator
+
+[json-subscript-operator]: https://github.com/google/googlesql/blob/master/docs/operators.md#json_subscript_operator
+
+[json-remove]: https://github.com/google/googlesql/blob/master/docs/json_functions.md#json_remove
+
+[json-set]: https://github.com/google/googlesql/blob/master/docs/json_functions.md#json_set
+
+[cast-function]: https://github.com/google/googlesql/blob/master/docs/conversion_functions.md#cast
+
+[venues-table]: #venues_table
 
 [coercion]: https://github.com/google/googlesql/blob/master/docs/conversion_rules.md#coercion
 

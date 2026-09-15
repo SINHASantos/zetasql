@@ -198,10 +198,7 @@ TestIsSameExpressionForGroupBy(const ResolvedExpr* expr1,
       const ResolvedGetRowField* row1 = expr1->GetAs<ResolvedGetRowField>();
       const ResolvedGetRowField* row2 = expr2->GetAs<ResolvedGetRowField>();
       RETURN_IF_EXPR_NOT_EQUAL(row1->expr(), row2->expr(), language_options);
-      // Column names in ResolvedGetRowField are normalized by the lookup, so OK
-      // to do a case-sensitive comparison.
-      RETURN_IF_PRIMITIVE_NOT_EQUAL(row1->column()->Name(),
-                                    row2->column()->Name());
+      RETURN_IF_PRIMITIVE_NOT_EQUAL(row1->column(), row2->column());
       break;
     }
     case RESOLVED_CAST: {

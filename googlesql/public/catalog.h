@@ -1497,8 +1497,6 @@ class Sequence {
 
 // Represents a macro definition in the GoogleSQL Catalog, including its name,
 // source text, locations, and body.
-// TODO: Update parser::macros::MacroInfo to inherit from this
-// interface.
 class Macro {
  public:
   virtual ~Macro() = default;

@@ -114,6 +114,9 @@ class FilebasedSQLTestCaseOptions {
   // Whether to reserve the keyword GRAPH_TABLE
   bool reserve_graph_table() const { return reserve_graph_table_; }
 
+  // Whether to reserve the keyword ALIGN
+  bool reserve_align() const { return reserve_align_; }
+
   // If true, the golden file will contain the computed labels in the printed
   // result.
   bool extract_labels() const { return extract_labels_; }
@@ -153,6 +156,7 @@ class FilebasedSQLTestCaseOptions {
   bool prepare_database_ = false;
   bool reserve_match_recognize_ = false;
   bool reserve_graph_table_ = false;
+  bool reserve_align_ = false;
   bool skip_required_feature_integrity_check_ = false;
   bool use_test_database_copy_ = false;
   bool exclude_in_sql_builder_pipe_sql_equivalence_tests_ = false;

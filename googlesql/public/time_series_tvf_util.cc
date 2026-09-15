@@ -25,7 +25,6 @@
 #include "googlesql/public/type.h"
 #include "googlesql/public/types/proto_type.h"
 #include "googlesql/public/types/struct_type.h"
-#include "googlesql/public/types/type_factory.h"
 #include "absl/status/status.h"
 #include "googlesql/base/status_macros.h"
 #include "absl/status/statusor.h"
@@ -78,7 +77,6 @@ absl::StatusOr<std::string> ValidateAndUnquoteSegment(absl::string_view segment,
 
 struct ResolvedFieldPath {
   std::vector<TypeFieldPathStep> steps;
-  const Type* leaf_type = nullptr;
 };
 
 absl::Status FieldPathError(absl::string_view message,
@@ -88,71 +86,115 @@ absl::Status FieldPathError(absl::string_view message,
                    i + 1, "): ", message));
 }
 
+bool IsValidProtoTimestampField(const google::protobuf::FieldDescriptor* field_desc) {
+  if (field_desc == nullptr) {
+    return false;
+  }
+  if (field_desc->type() == google::protobuf::FieldDescriptor::TYPE_MESSAGE) {
+    return field_desc->message_type()->full_name() ==
+           "google.protobuf.Timestamp";
+  }
+  TypeKind kind;
+  return ProtoType::FieldDescriptorToTypeKind(field_desc, &kind).ok() &&
+         kind == TYPE_TIMESTAMP;
+}
+
+// Helper to traverse remaining path components within protobuf descriptors.
+absl::Status ResolveProtoFieldPath(
+    const google::protobuf::Descriptor* descriptor,
+    absl::Span<const std::string> full_path_components, size_t start_index,
+    std::vector<TypeFieldPathStep>& steps) {
+  const google::protobuf::Descriptor* current_descriptor = descriptor;
+  const google::protobuf::FieldDescriptor* last_field_desc = nullptr;
+  for (size_t i = start_index; i < full_path_components.size(); ++i) {
+    const std::string& component = full_path_components[i];
+    const google::protobuf::FieldDescriptor* field_desc =
+        current_descriptor->FindFieldByName(component);
+    if (field_desc == nullptr) {
+      return FieldPathError(absl::StrCat("Field not found in proto ",
+                                         current_descriptor->full_name()),
+                            component, i);
+    }
+    if (field_desc->is_map()) {
+      return FieldPathError("Proto map field is not supported", component, i);
+    }
+    if (field_desc->is_repeated()) {
+      return FieldPathError("Proto repeated field is not supported", component,
+                            i);
+    }
+    steps.push_back({TypeFieldPathStep::PROTO_FIELD, -1, field_desc, nullptr});
+    last_field_desc = field_desc;
+
+    if (i + 1 < full_path_components.size()) {
+      if (field_desc->type() != google::protobuf::FieldDescriptor::TYPE_MESSAGE) {
+        return FieldPathError("Cannot traverse non-struct/proto field",
+                              full_path_components[i + 1], i + 1);
+      }
+      current_descriptor = field_desc->message_type();
+    }
+  }
+
+  if (!IsValidProtoTimestampField(last_field_desc)) {
+    return FieldPathError(
+        "Leaf field type must be TIMESTAMP or google.protobuf.Timestamp",
+        full_path_components.back(), full_path_components.size() - 1);
+  }
+
+  return absl::OkStatus();
+}
+
 // Helper to traverse a type along a path of components and validate
 // correctness.
 absl::StatusOr<ResolvedFieldPath> ResolveAndValidateFieldPath(
     const Type* start_type, absl::Span<const std::string> full_path_components,
-    size_t start_index, TypeFactory* type_factory) {
+    size_t start_index) {
   ResolvedFieldPath result;
   const Type* current_type = start_type;
-  for (size_t i = start_index; i < full_path_components.size(); ++i) {
-    const std::string& component = full_path_components[i];
-    if (current_type->IsStruct()) {
-      const StructType* struct_type = current_type->AsStruct();
-      bool is_ambiguous = false;
-      int found_idx = -1;
-      const StructField* field =
-          struct_type->FindField(component, &is_ambiguous, &found_idx);
-      if (is_ambiguous) {
-        return FieldPathError("Struct field name is ambiguous", component, i);
-      }
-      if (field == nullptr) {
-        return FieldPathError("Field not found in struct", component, i);
-      }
-      result.steps.push_back(
-          {TypeFieldPathStep::STRUCT_FIELD, found_idx, nullptr, field->type});
-      current_type = field->type;
-    } else if (current_type->IsProto()) {
-      const google::protobuf::Descriptor* descriptor =
-          current_type->AsProto()->descriptor();
-      const google::protobuf::FieldDescriptor* field_desc =
-          descriptor->FindFieldByName(component);
-      if (field_desc == nullptr) {
-        return FieldPathError(
-            absl::StrCat("Field not found in proto ", descriptor->full_name()),
-            component, i);
-      }
-      if (field_desc->is_map()) {
-        return FieldPathError("Proto map field is not supported", component, i);
-      }
-      if (field_desc->is_repeated()) {
-        return FieldPathError("Proto repeated field is not supported",
-                              component, i);
-      }
-      const Type* field_type = nullptr;
-      GOOGLESQL_RETURN_IF_ERROR(type_factory->GetProtoFieldType(
-          field_desc, absl::Span<const std::string>(), &field_type));
-      result.steps.push_back(
-          {TypeFieldPathStep::PROTO_FIELD, -1, field_desc, field_type});
-      current_type = field_type;
-    } else {
-      return FieldPathError("Cannot traverse non-struct/proto field", component,
-                            i);
-    }
-  }
-  result.leaf_type = current_type;
-  return result;
-}
 
-bool IsValidTimestampType(const Type* type) {
-  if (type->IsTimestamp()) {
-    return true;
+  size_t i = start_index;
+  for (; i < full_path_components.size(); ++i) {
+    if (!current_type->IsStruct()) {
+      break;
+    }
+    const std::string& component = full_path_components[i];
+    const StructType* struct_type = current_type->AsStruct();
+    bool is_ambiguous = false;
+    int found_idx = -1;
+    const StructField* field =
+        struct_type->FindField(component, &is_ambiguous, &found_idx);
+    if (is_ambiguous) {
+      return FieldPathError("Struct field name is ambiguous", component, i);
+    }
+    if (field == nullptr) {
+      return FieldPathError("Field not found in struct", component, i);
+    }
+    result.steps.push_back(
+        {TypeFieldPathStep::STRUCT_FIELD, found_idx, nullptr, field->type});
+    current_type = field->type;
   }
-  if (type->IsProto()) {
-    return type->AsProto()->descriptor()->full_name() ==
-           "google.protobuf.Timestamp";
+
+  if (i == full_path_components.size()) {
+    if (current_type->IsTimestamp()) {
+      return result;
+    }
+    if (current_type->IsProto() &&
+        current_type->AsProto()->descriptor()->full_name() ==
+            "google.protobuf.Timestamp") {
+      return result;
+    }
+    return FieldPathError(
+        "Leaf field type must be TIMESTAMP or google.protobuf.Timestamp",
+        full_path_components.back(), full_path_components.size() - 1);
   }
-  return false;
+
+  if (!current_type->IsProto()) {
+    return FieldPathError("Cannot traverse non-struct/proto field",
+                          full_path_components[i], i);
+  }
+
+  GOOGLESQL_RETURN_IF_ERROR(ResolveProtoFieldPath(current_type->AsProto()->descriptor(),
+                                        full_path_components, i, result.steps));
+  return result;
 }
 
 }  // namespace
@@ -245,8 +287,7 @@ absl::StatusOr<std::vector<std::string>> ParseSimpleIdentifierPath(
 }
 
 absl::StatusOr<ResolvedTimestampColumnPath> ResolveTimestampColumnPath(
-    const TVFRelation& input_relation, absl::string_view path_string,
-    TypeFactory* type_factory) {
+    const TVFRelation& input_relation, absl::string_view path_string) {
   GOOGLESQL_ASSIGN_OR_RETURN(std::vector<std::string> components,
                    ParseSimpleIdentifierPath(path_string));
 
@@ -293,17 +334,10 @@ absl::StatusOr<ResolvedTimestampColumnPath> ResolveTimestampColumnPath(
   // Resolve the path, with full path components. The first component refers
   // to a field in the value table (for value tables) or the field in the column
   // (for SQL tables).
-  GOOGLESQL_ASSIGN_OR_RETURN(ResolvedFieldPath field_path_result,
-                   ResolveAndValidateFieldPath(start_type, components,
-                                               start_index, type_factory));
+  GOOGLESQL_ASSIGN_OR_RETURN(
+      ResolvedFieldPath field_path_result,
+      ResolveAndValidateFieldPath(start_type, components, start_index));
   result.steps = std::move(field_path_result.steps);
-  result.leaf_type = field_path_result.leaf_type;
-
-  if (!IsValidTimestampType(result.leaf_type)) {
-    return FieldPathError(
-        "Leaf field type must be TIMESTAMP or google.protobuf.Timestamp",
-        components.back(), components.size() - 1);
-  }
 
   return result;
 }

@@ -746,7 +746,7 @@ absl::Status SampleCatalogImpl::LoadCatalogImpl(
       std::make_unique<SimpleCatalog>("ambiguous_has_descriptor_pool");
   ambiguous_has_descriptor_pool_catalog->SetDescriptorPool(
       ambiguous_has_descriptor_pool_.get());
-  catalog_->AddOwnedCatalog(ambiguous_has_descriptor_pool_catalog.release());
+  catalog_->AddOwnedCatalog(std::move(ambiguous_has_descriptor_pool_catalog));
 
   // Add various kinds of objects to the catalog(s).
   // In debug builds, these skip over errors caused by out-of-stack failures.
@@ -931,6 +931,10 @@ absl::Status SampleCatalogImpl::LoadTypes() {
   catalog_->AddType("INT64AliasType", types_->get_int64());
 
   // Add mock declarative types for testing.
+
+  // DeclarativeType backed by INT64, with explicit-only coercion from and
+  // allowed-all coercion to backing type.
+  // Returning & Equality are delegated (to INT64) and thus supported.
   const Type* decl_int_type = nullptr;
   GOOGLESQL_ASSIGN_OR_RETURN(
       decl_int_type,
@@ -950,6 +954,8 @@ absl::Status SampleCatalogImpl::LoadTypes() {
                   DeclarativeTypeDescriptor::ReturningDelegated{})));
   catalog_->AddType("DeclInt", decl_int_type);
 
+  // DeclarativeType with explicit-only coercion from and to the backing INT64.
+  // Returning & Equality are delegated (to INT64) and thus supported.
   const Type* decl_explicit_coercion_type = nullptr;
   GOOGLESQL_ASSIGN_OR_RETURN(
       decl_explicit_coercion_type,
@@ -968,6 +974,7 @@ absl::Status SampleCatalogImpl::LoadTypes() {
                   DeclarativeTypeDescriptor::ReturningDelegated{})));
   catalog_->AddType("DeclExplicitCoercion", decl_explicit_coercion_type);
 
+  // DeclarativeType delegates Equality to GEOGRAPHY and thus unsupported.
   const Type* decl_geog_type = nullptr;
   GOOGLESQL_ASSIGN_OR_RETURN(
       decl_geog_type,
@@ -984,6 +991,7 @@ absl::Status SampleCatalogImpl::LoadTypes() {
                   DeclarativeTypeDescriptor::ReturningDelegated{})));
   catalog_->AddType("DeclDelegatedButUnsupportedEquality", decl_geog_type);
 
+  // DeclarativeType with an array backing type.
   const Type* decl_array_type = nullptr;
   GOOGLESQL_ASSIGN_OR_RETURN(
       decl_array_type,
@@ -1000,6 +1008,7 @@ absl::Status SampleCatalogImpl::LoadTypes() {
                   DeclarativeTypeDescriptor::ReturningDelegated{})));
   catalog_->AddType("DeclArray", decl_array_type);
 
+  // DeclarativeType with a struct backing type.
   const Type* decl_struct_type = nullptr;
   GOOGLESQL_ASSIGN_OR_RETURN(
       decl_struct_type,
@@ -1016,6 +1025,7 @@ absl::Status SampleCatalogImpl::LoadTypes() {
                   DeclarativeTypeDescriptor::ReturningDelegated{})));
   catalog_->AddType("DeclStruct", decl_struct_type);
 
+  // DeclarativeType with all properties disallowed.
   const Type* decl_type_all_properties_disallowed = nullptr;
   GOOGLESQL_ASSIGN_OR_RETURN(
       decl_type_all_properties_disallowed,
@@ -1569,7 +1579,7 @@ absl::Status SampleCatalogImpl::LoadTables() {
 
   GOOGLESQL_RET_CHECK_OK(versionedTable->AddColumn(std::move(key_col)));
   GOOGLESQL_RET_CHECK_OK(versionedTable->AddColumn(std::move(val_col)));
-  AddOwnedTable(versionedTable.release());
+  AddOwnedTable(std::move(versionedTable));
 
   // Create NestedVersionedTable for nested DML testing.
   auto nestedVersionedTable =
@@ -1604,7 +1614,7 @@ absl::Status SampleCatalogImpl::LoadTables() {
 
   GOOGLESQL_RET_CHECK_OK(nestedVersionedTable->AddColumn(std::move(key_col_nested)));
   GOOGLESQL_RET_CHECK_OK(nestedVersionedTable->AddColumn(std::move(array_col_nested)));
-  AddOwnedTable(nestedVersionedTable.release());
+  AddOwnedTable(std::move(nestedVersionedTable));
 
   // Create DoublyNestedVersionedTable for doubly-nested DML versioning tests.
   auto doublyNestedVersionedTable =
@@ -1656,7 +1666,7 @@ absl::Status SampleCatalogImpl::LoadTables() {
       doublyNestedVersionedTable->AddColumn(std::move(key_col_doubly_nested)));
   GOOGLESQL_RET_CHECK_OK(doublyNestedVersionedTable->AddColumn(
       std::move(array_col_doubly_nested)));
-  AddOwnedTable(doublyNestedVersionedTable.release());
+  AddOwnedTable(std::move(doublyNestedVersionedTable));
 
   // Create MixedVersionedTable containing both a top-level versioned column
   // and a nested versioned array column.
@@ -1678,7 +1688,7 @@ absl::Status SampleCatalogImpl::LoadTables() {
   GOOGLESQL_RET_CHECK_OK(
       mixedVersionedTable->AddColumn(std::move(val_unversioned_col_mixed)));
   GOOGLESQL_RET_CHECK_OK(mixedVersionedTable->AddColumn(std::move(array_col_mixed)));
-  AddOwnedTable(mixedVersionedTable.release());
+  AddOwnedTable(std::move(mixedVersionedTable));
 
   // Create AmbiguousVersionedTable to test name resolution ambiguity between
   // the implicit 'timestamp' pseudo-column and a physical column of the same
@@ -1697,7 +1707,7 @@ absl::Status SampleCatalogImpl::LoadTables() {
   GOOGLESQL_RET_CHECK_OK(ambiguousVersionedTable->AddColumn(std::move(val_col_amb)));
   GOOGLESQL_RET_CHECK_OK(
       ambiguousVersionedTable->AddColumn(std::move(timestamp_col_amb)));
-  AddOwnedTable(ambiguousVersionedTable.release());
+  AddOwnedTable(std::move(ambiguousVersionedTable));
 
   auto complex_collated_table = new SimpleTable("ComplexCollatedTable");
 
@@ -2008,7 +2018,7 @@ absl::Status SampleCatalogImpl::LoadTables() {
     auto table_with_single_int64_array_col = std::make_unique<SimpleTable>(
         "TableWithSingleInt64ArrayCol",
         std::vector<SimpleTable::NameAndType>{{"array_col", int64array_type_}});
-    AddOwnedTable(table_with_single_int64_array_col.release());
+    AddOwnedTable(std::move(table_with_single_int64_array_col));
   }
 
   {
@@ -2028,7 +2038,7 @@ absl::Status SampleCatalogImpl::LoadTables() {
                                           {"uid", types_->get_int64()},
                                           {"numeric", types_->get_numeric()}});
     GOOGLESQL_RET_CHECK_OK(simple_table_with_uid->SetAnonymizationInfo("uid"));
-    AddOwnedTable(simple_table_with_uid.release());
+    AddOwnedTable(std::move(simple_table_with_uid));
   }
 
   {
@@ -2038,7 +2048,7 @@ absl::Status SampleCatalogImpl::LoadTables() {
                                          {"double_array", double_array_type_},
                                          {"uid", types_->get_int64()}});
     GOOGLESQL_RET_CHECK_OK(array_table_with_uid->SetAnonymizationInfo("uid"));
-    AddOwnedTable(array_table_with_uid.release());
+    AddOwnedTable(std::move(array_table_with_uid));
   }
 
   {
@@ -2047,7 +2057,7 @@ absl::Status SampleCatalogImpl::LoadTables() {
         std::vector<SimpleTable::NameAndType>{{"uid", types_->get_string()},
                                               {"c2", types_->get_string()}});
     GOOGLESQL_RET_CHECK_OK(table_with_string_uid->SetAnonymizationInfo("uid"));
-    AddOwnedTable(table_with_string_uid.release());
+    AddOwnedTable(std::move(table_with_string_uid));
   }
 
   {
@@ -2056,7 +2066,7 @@ absl::Status SampleCatalogImpl::LoadTables() {
         std::vector<SimpleTable::NameAndType>{{"c1", types_->get_string()},
                                               {"uid", types_->get_string()}});
     GOOGLESQL_RET_CHECK_OK(table_with_string_uid->SetAnonymizationInfo("uid"));
-    AddOwnedTable(table_with_string_uid.release());
+    AddOwnedTable(std::move(table_with_string_uid));
   }
 
   {
@@ -2064,21 +2074,21 @@ absl::Status SampleCatalogImpl::LoadTables() {
         "ProtoAnonymizationUid",
         std::vector<SimpleTable::NameAndType>{{"uid", proto_KitchenSinkPB_}});
     GOOGLESQL_RET_CHECK_OK(table_with_proto_uid->SetAnonymizationInfo("uid"));
-    AddOwnedTable(table_with_proto_uid.release());
+    AddOwnedTable(std::move(table_with_proto_uid));
   }
 
   {
     auto value_table_with_uid = std::make_unique<SimpleTable>(
         "KitchenSinkWithUidValueTable", proto_KitchenSinkPB_);
     GOOGLESQL_RET_CHECK_OK(value_table_with_uid->SetAnonymizationInfo("string_val"));
-    AddOwnedTable(value_table_with_uid.release());
+    AddOwnedTable(std::move(value_table_with_uid));
   }
 
   {
     auto value_table_with_uid = std::make_unique<SimpleTable>(
         "TestStructWithUidValueTable", struct_type_);
     GOOGLESQL_RET_CHECK_OK(value_table_with_uid->SetAnonymizationInfo("a"));
-    AddOwnedTable(value_table_with_uid.release());
+    AddOwnedTable(std::move(value_table_with_uid));
   }
 
   {
@@ -2086,20 +2096,20 @@ absl::Status SampleCatalogImpl::LoadTables() {
         "TestWithDoublyNestedStructUidValueTable", doubly_nested_struct_type_);
     GOOGLESQL_RET_CHECK_OK(value_table_with_doubly_nested_uid->SetAnonymizationInfo(
         {"f", "d", "a"}));
-    AddOwnedTable(value_table_with_doubly_nested_uid.release());
+    AddOwnedTable(std::move(value_table_with_doubly_nested_uid));
   }
 
   {
     auto value_table_with_no_uid = std::make_unique<SimpleTable>(
         "TestStructWithNoUidValueTable", struct_type_);
-    AddOwnedTable(value_table_with_no_uid.release());
+    AddOwnedTable(std::move(value_table_with_no_uid));
   }
 
   {
     auto value_table_with_doubly_nested_no_uid = std::make_unique<SimpleTable>(
         "TestWithDoublyNestedStructNoUidValueTable",
         doubly_nested_struct_type_);
-    AddOwnedTable(value_table_with_doubly_nested_no_uid.release());
+    AddOwnedTable(std::move(value_table_with_doubly_nested_no_uid));
   }
 
   {
@@ -2107,7 +2117,7 @@ absl::Status SampleCatalogImpl::LoadTables() {
         "TestWithProtoUidValueTable", proto_MessageWithKitchenSinkPB_);
     GOOGLESQL_RET_CHECK_OK(value_table_with_proto_uid->SetAnonymizationInfo(
         {"kitchen_sink", "nested_value", "nested_int64"}));
-    AddOwnedTable(value_table_with_proto_uid.release());
+    AddOwnedTable(std::move(value_table_with_proto_uid));
   }
 
   {
@@ -2116,7 +2126,7 @@ absl::Status SampleCatalogImpl::LoadTables() {
                                       proto_MessageWithKitchenSinkPB_);
     GOOGLESQL_RET_CHECK_OK(value_table_with_proto_uid_of_wrong_type->SetAnonymizationInfo(
         std::vector<std::string>({"kitchen_sink", "nested_value"})));
-    AddOwnedTable(value_table_with_proto_uid_of_wrong_type.release());
+    AddOwnedTable(std::move(value_table_with_proto_uid_of_wrong_type));
   }
 
   AddOwnedTable(
@@ -2392,7 +2402,7 @@ absl::Status SampleCatalogImpl::AddTableWithMeasures(
     }
     table->SetContents(padded_rows);
   }
-  AddOwnedTable(table.release());
+  AddOwnedTable(std::move(table));
   return absl::OkStatus();
 }
 
@@ -3880,7 +3890,7 @@ absl::Status SampleCatalogImpl::LoadNestedCatalogs() {
                                                   {Value::Int32(223),
                                                    Value::String("foo")})})}),
       &constant_struct));
-  nested_nested_catalog->AddOwnedConstant(constant_struct.release());
+  nested_nested_catalog->AddOwnedConstant(std::move(constant_struct));
 
   // Add an enum and a proto to the nested catalog.
   nested_catalog->AddType(enum_TestEnum_->enum_descriptor()->full_name(),
@@ -3930,7 +3940,7 @@ absl::Status SampleCatalogImpl::LoadNestedCatalogs() {
   GOOGLESQL_RETURN_IF_ERROR(
       SimpleConstant::Create({"name_conflict_table", "name_conflict_field"},
                              Value::Bool(false), &constant));
-  name_conflict_catalog->AddOwnedConstant(constant.release());
+  name_conflict_catalog->AddOwnedConstant(std::move(constant));
 
   // Add <nested_catalog_with_constant> for testing named constants in catalogs.
   SimpleCatalog* nested_catalog_with_constant =
@@ -3938,7 +3948,7 @@ absl::Status SampleCatalogImpl::LoadNestedCatalogs() {
   GOOGLESQL_RETURN_IF_ERROR(
       SimpleConstant::Create({"nested_catalog_with_constant", "KnownConstant"},
                              Value::Bool(false), &constant));
-  nested_catalog_with_constant->AddOwnedConstant(constant.release());
+  nested_catalog_with_constant->AddOwnedConstant(std::move(constant));
 
   // Add <nested_catalog_with_catalog> for testing conflicts with named
   // constants.
@@ -3947,31 +3957,31 @@ absl::Status SampleCatalogImpl::LoadNestedCatalogs() {
   GOOGLESQL_RETURN_IF_ERROR(SimpleConstant::Create(
       {"nested_catalog_with_catalog", "TestConstantBool"}, Value::Bool(false),
       &constant));
-  nested_catalog_with_catalog->AddOwnedConstant(constant.release());
+  nested_catalog_with_catalog->AddOwnedConstant(std::move(constant));
   GOOGLESQL_RETURN_IF_ERROR(SimpleConstant::Create({"nested_catalog_with_catalog", "c"},
                                          Value::Double(-9999.999), &constant));
-  nested_catalog_with_catalog->AddOwnedConstant(constant.release());
+  nested_catalog_with_catalog->AddOwnedConstant(std::move(constant));
   SimpleCatalog* nested_catalog_catalog =
       nested_catalog_with_catalog->MakeOwnedSimpleCatalog(
           "nested_catalog_catalog");
   GOOGLESQL_RETURN_IF_ERROR(SimpleConstant::Create(
       {"nested_catalog_with_catalog", "nested_catalog_catalog", "a"},
       Value::Float(-1.4987f), &constant));
-  nested_catalog_catalog->AddOwnedConstant(constant.release());
+  nested_catalog_catalog->AddOwnedConstant(std::move(constant));
   GOOGLESQL_RETURN_IF_ERROR(SimpleConstant::Create(
       {"nested_catalog_with_catalog", "nested_catalog_catalog", "c"},
       Value::String("foo"), &constant));
-  nested_catalog_catalog->AddOwnedConstant(constant.release());
+  nested_catalog_catalog->AddOwnedConstant(std::move(constant));
 
   // Add a constant to <nested_catalog>.
   GOOGLESQL_RETURN_IF_ERROR(SimpleConstant::Create({"nested_catalog", "TestConstantBool"},
                                          Value::Bool(false), &constant));
-  nested_catalog->AddOwnedConstant(constant.release());
+  nested_catalog->AddOwnedConstant(std::move(constant));
 
   // Add another constant to <nested_catalog> that conflicts with a procedure.
   GOOGLESQL_RETURN_IF_ERROR(SimpleConstant::Create({"nested_catalog", "nested_procedure"},
                                          Value::Int64(2345), &constant));
-  nested_catalog->AddOwnedConstant(constant.release());
+  nested_catalog->AddOwnedConstant(std::move(constant));
 
   // Add a constant to <nested_catalog> which requires backticks.
   std::unique_ptr<SimpleConstant> string_constant_nonstandard_name;
@@ -3980,7 +3990,7 @@ absl::Status SampleCatalogImpl::LoadNestedCatalogs() {
       std::vector<std::string>{"nested_catalog", "Test Constant-String"},
       Value::String("Test constant in nested catalog"),
       &string_constant_nonstandard_name));
-  nested_catalog->AddOwnedConstant(string_constant_nonstandard_name.release());
+  nested_catalog->AddOwnedConstant(std::move(string_constant_nonstandard_name));
 
   // Add struct constant with the same name as a nested catalog
   const StructType* nested_nested_catalog_type;
@@ -3994,14 +4004,14 @@ absl::Status SampleCatalogImpl::LoadNestedCatalogs() {
       std::vector<std::string>{"nested_catalog", "wwww"},
       Value::Struct(nested_nested_catalog_type, {Value::Int64(8)}),
       &wwww_constant));
-  nested_catalog->AddOwnedConstant(wwww_constant.release());
+  nested_catalog->AddOwnedConstant(std::move(wwww_constant));
 
   std::unique_ptr<SimpleConstant> xxxx_constant;
   GOOGLESQL_RETURN_IF_ERROR(SimpleConstant::Create(
       std::vector<std::string>{"nested_catalog", "wwww", "xxxx"},
       Value::Struct(nested_nested_catalog_type, {Value::Int64(8)}),
       &xxxx_constant));
-  wwww_catalog->AddOwnedConstant(xxxx_constant.release());
+  wwww_catalog->AddOwnedConstant(std::move(xxxx_constant));
 
   // Load a nested catalog with a name that resembles a system variable.
   SimpleCatalog* at_at_nested_catalog =
@@ -4011,7 +4021,7 @@ absl::Status SampleCatalogImpl::LoadNestedCatalogs() {
       std::vector<std::string>{"@@nested_catalog", "sysvar2"}, Value::Int64(8),
       &at_at_nested_catalog_constant));
   at_at_nested_catalog->AddOwnedConstant(
-      at_at_nested_catalog_constant.release());
+      std::move(at_at_nested_catalog_constant));
 
   {
     std::unique_ptr<SimpleConstant> rounding_mode_constant;
@@ -4986,6 +4996,75 @@ RegisterForSampleCatalog
                       {arg_type}, /*context_id=*/-1)},
                   output_schema));
         });
+
+// This registers a TVF with the signature:
+//   tvf_rejects_collation_in_callback(ANY TYPE) -> TABLE<result BOOL>
+// It has a customized behavior in check_argument_annotations_callback where it
+// explicitly rejects any scalar arguments that have an annotation
+// (e.g. collation).
+RegisterForSampleCatalog fn_tvf_rejects_collation_in_callback =
+    RegisterForSampleCatalog([](googlesql::SimpleCatalog* catalog_) {
+      googlesql::TypeFactory* types = catalog_->type_factory();
+      googlesql::TableValuedFunctionOptions options;
+      options.check_argument_annotations_callback =
+          [](const googlesql::FunctionSignature& sig,
+             const std::vector<googlesql::TVFInputArgumentType>& args,
+             const googlesql::LanguageOptions& language_options) {
+            for (const auto& arg : args) {
+              if (arg.is_scalar()) {
+                auto annotated_type = arg.GetScalarArgAnnotatedType();
+                if (annotated_type.ok() &&
+                    annotated_type.value().annotation_map != nullptr) {
+                  return absl::InvalidArgumentError(
+                      "Custom mock TVF rejects scalar argument with "
+                      "annotation");
+                }
+              }
+            }
+            return absl::OkStatus();
+          };
+
+      googlesql::TVFRelation output_schema({{"result", types->get_bool()}});
+
+      catalog_->AddOwnedTableValuedFunction(new googlesql::FixedOutputSchemaTVF(
+          {"tvf_rejects_collation_in_callback"},
+          {googlesql::FunctionSignature(
+              googlesql::FunctionArgumentType::RelationWithSchema(
+                  output_schema,
+                  /*extra_relation_input_columns_allowed=*/false),
+              {googlesql::FunctionArgumentType(googlesql::ARG_KIND_EXPR_ANY_1)},
+              /*context_id=*/-1)},
+          output_schema, options));
+    });
+
+// This registers a TVF with the signature:
+//   tvf_allows_collation_in_callback(ANY TYPE) -> TABLE<result BOOL>
+// It has a customized behavior in check_argument_annotations_callback where it
+// accepts arguments with annotations, doing nothing and returning OkStatus().
+RegisterForSampleCatalog fn_tvf_allows_collation_in_callback =
+    RegisterForSampleCatalog([](googlesql::SimpleCatalog* catalog_) {
+      googlesql::TypeFactory* types = catalog_->type_factory();
+      googlesql::TableValuedFunctionOptions options;
+      // This callback explicitly returns OkStatus() allowing collation.
+      options.check_argument_annotations_callback =
+          [](const googlesql::FunctionSignature& sig,
+             const std::vector<googlesql::TVFInputArgumentType>& args,
+             const googlesql::LanguageOptions& language_options) {
+            return absl::OkStatus();
+          };
+
+      googlesql::TVFRelation output_schema({{"result", types->get_bool()}});
+
+      catalog_->AddOwnedTableValuedFunction(new googlesql::FixedOutputSchemaTVF(
+          {"tvf_allows_collation_in_callback"},
+          {googlesql::FunctionSignature(
+              googlesql::FunctionArgumentType::RelationWithSchema(
+                  output_schema,
+                  /*extra_relation_input_columns_allowed=*/false),
+              {googlesql::FunctionArgumentType(googlesql::ARG_KIND_EXPR_ANY_1)},
+              /*context_id=*/-1)},
+          output_schema, options));
+    });
 
 RegisterForSampleCatalog fn_complex_concrete_and_templated_arg =
     RegisterForSampleCatalog([](googlesql::SimpleCatalog* catalog_) {
@@ -13422,12 +13501,17 @@ absl::Status SampleCatalogImpl::LoadConstants() {
   GOOGLESQL_RETURN_IF_ERROR(
       SimpleConstant::Create(std::vector<std::string>{"TestConstantInt64"},
                              Value::Int64(1L), &int64_constant));
-  catalog_->AddOwnedConstant(int64_constant.release());
+  catalog_->AddOwnedConstant(std::move(int64_constant));
   std::unique_ptr<SimpleConstant> string_constant;
   GOOGLESQL_RETURN_IF_ERROR(
       SimpleConstant::Create(std::vector<std::string>{"TestConstantString"},
                              Value::String("foo"), &string_constant));
-  catalog_->AddOwnedConstant(string_constant.release());
+  catalog_->AddOwnedConstant(std::move(string_constant));
+
+  GOOGLESQL_RETURN_IF_ERROR(SimpleConstant::Create(
+      std::vector<std::string>{"TestConstantStringNamedKey"},
+      Value::String("key"), &string_constant));
+  catalog_->AddOwnedConstant(std::move(string_constant));
 
   std::unique_ptr<SimpleConstant> bool_constant;
   GOOGLESQL_RETURN_IF_ERROR(
@@ -13447,7 +13531,50 @@ absl::Status SampleCatalogImpl::LoadConstants() {
   GOOGLESQL_RETURN_IF_ERROR(SimpleConstant::Create(
       std::vector<std::string>{"Test Constant-String"},
       Value::String("foo bar"), &string_constant_nonstandard_name));
-  catalog_->AddOwnedConstant(string_constant_nonstandard_name.release());
+  catalog_->AddOwnedConstant(std::move(string_constant_nonstandard_name));
+
+  // Load ARRAY<INT64> constant.
+  std::unique_ptr<SimpleConstant> int64_array_constant;
+  GOOGLESQL_ASSIGN_OR_RETURN(
+      Value array_value,
+      Value::MakeArray(int64array_type_, {Value::Int64(1), Value::Int64(2)}));
+  GOOGLESQL_RETURN_IF_ERROR(
+      SimpleConstant::Create(std::vector<std::string>{"TestConstantInt64Array"},
+                             array_value, &int64_array_constant));
+  catalog_->AddOwnedConstant(std::move(int64_array_constant));
+
+  // Load ARRAY<STRING> constant.
+  std::unique_ptr<SimpleConstant> string_array_constant;
+  GOOGLESQL_ASSIGN_OR_RETURN(array_value, Value::MakeArray(string_array_type_,
+                                                 {Value::String("Key"),
+                                                  Value::String("Value")}));
+  GOOGLESQL_RETURN_IF_ERROR(SimpleConstant::Create(
+      std::vector<std::string>{"TestConstantStringArray"}, array_value,
+      &string_array_constant));
+  catalog_->AddOwnedConstant(std::move(string_array_constant));
+
+  GOOGLESQL_ASSIGN_OR_RETURN(array_value, Value::MakeArray(string_array_type_,
+                                                 {Value::String("Key")}));
+  GOOGLESQL_RETURN_IF_ERROR(SimpleConstant::Create(
+      std::vector<std::string>{"TestConstantStringOneElementArray"},
+      array_value, &string_array_constant));
+  catalog_->AddOwnedConstant(std::move(string_array_constant));
+
+  GOOGLESQL_ASSIGN_OR_RETURN(array_value,
+                   Value::MakeArray(string_array_type_, {Value::String("Key"),
+                                                         Value::NullString()}));
+  GOOGLESQL_RETURN_IF_ERROR(SimpleConstant::Create(
+      std::vector<std::string>{"TestConstantStringArrayWithNull"}, array_value,
+      &string_array_constant));
+  catalog_->AddOwnedConstant(std::move(string_array_constant));
+
+  GOOGLESQL_ASSIGN_OR_RETURN(array_value,
+                   Value::MakeArray(string_array_type_,
+                                    {Value::String("Key"), Value::String("")}));
+  GOOGLESQL_RETURN_IF_ERROR(SimpleConstant::Create(
+      std::vector<std::string>{"TestConstantStringArrayWithEmpty"}, array_value,
+      &string_array_constant));
+  catalog_->AddOwnedConstant(std::move(string_array_constant));
 
   // Load a constant that is not owned by 'catalog_'.
   GOOGLESQL_ASSIGN_OR_RETURN(const ProtoType* proto_type,
@@ -13470,28 +13597,28 @@ absl::Status SampleCatalogImpl::LoadConstants() {
       std::vector<std::string>{"NameConflictTable"},
       Value::Struct(table_struct_type, {Value::Int32(-3456)}),
       &table_constant));
-  catalog_->AddOwnedConstant(table_constant.release());
+  catalog_->AddOwnedConstant(std::move(table_constant));
 
   // Load a constant that conflicts with a value table.
   std::unique_ptr<SimpleConstant> value_table_constant;
   GOOGLESQL_RETURN_IF_ERROR(
       SimpleConstant::Create(std::vector<std::string>{"Int32ValueTable"},
                              Value::Int32(3), &value_table_constant));
-  catalog_->AddOwnedConstant(value_table_constant.release());
+  catalog_->AddOwnedConstant(std::move(value_table_constant));
 
   // Load a constant that conflicts with a type.
   std::unique_ptr<SimpleConstant> type_constant;
   GOOGLESQL_RETURN_IF_ERROR(
       SimpleConstant::Create(std::vector<std::string>{"NameConflictType"},
                              Value::Bool(false), &type_constant));
-  catalog_->AddOwnedConstant(type_constant.release());
+  catalog_->AddOwnedConstant(std::move(type_constant));
 
   // Load a constant that conflicts with zero-argument functions.
   std::unique_ptr<SimpleConstant> zero_argument_function_constant;
   GOOGLESQL_RETURN_IF_ERROR(SimpleConstant::Create(std::vector<std::string>{"sort_count"},
                                          Value::Int64(4),
                                          &zero_argument_function_constant));
-  catalog_->AddOwnedConstant(zero_argument_function_constant.release());
+  catalog_->AddOwnedConstant(std::move(zero_argument_function_constant));
 
   std::unique_ptr<SimpleConstant>
       zero_argument_function_constant_with_optional_parentheses;
@@ -13499,35 +13626,35 @@ absl::Status SampleCatalogImpl::LoadConstants() {
       std::vector<std::string>{"CURRENT_DATE"}, Value::Int64(4),
       &zero_argument_function_constant_with_optional_parentheses));
   catalog_->AddOwnedConstant(
-      zero_argument_function_constant_with_optional_parentheses.release());
+      std::move(zero_argument_function_constant_with_optional_parentheses));
 
   // Load a constant that conflicts with a multi-argument function.
   std::unique_ptr<SimpleConstant> multi_argument_function_constant;
   GOOGLESQL_RETURN_IF_ERROR(SimpleConstant::Create(std::vector<std::string>{"concat"},
                                          Value::Int64(5),
                                          &multi_argument_function_constant));
-  catalog_->AddOwnedConstant(multi_argument_function_constant.release());
+  catalog_->AddOwnedConstant(std::move(multi_argument_function_constant));
 
   // Load a constant that conflicts with a zero-argument TVF.
   std::unique_ptr<SimpleConstant> zero_argument_tvf_constant;
   GOOGLESQL_RETURN_IF_ERROR(
       SimpleConstant::Create(std::vector<std::string>{"tvf_no_args"},
                              Value::Int64(6), &zero_argument_tvf_constant));
-  catalog_->AddOwnedConstant(zero_argument_tvf_constant.release());
+  catalog_->AddOwnedConstant(std::move(zero_argument_tvf_constant));
 
   // Load a constant that conflicts with a multi-argument TVF.
   std::unique_ptr<SimpleConstant> multi_argument_tvf_constant;
   GOOGLESQL_RETURN_IF_ERROR(SimpleConstant::Create(
       std::vector<std::string>{"tvf_exactly_1_int64_arg"}, Value::Int64(7),
       &multi_argument_tvf_constant));
-  catalog_->AddOwnedConstant(multi_argument_tvf_constant.release());
+  catalog_->AddOwnedConstant(std::move(multi_argument_tvf_constant));
 
   // Load a constant that conflicts with a zero-argument procedure.
   // The multi-argument case is handled in the nested catalog.
   std::unique_ptr<SimpleConstant> constant;
   GOOGLESQL_RETURN_IF_ERROR(
       SimpleConstant::Create({"proc_no_args"}, Value::Bool(true), &constant));
-  catalog_->AddOwnedConstant(constant.release());
+  catalog_->AddOwnedConstant(std::move(constant));
 
   // Load a constant that conflicts with a catalog.
   const StructType* nested_struct_type;
@@ -13549,7 +13676,7 @@ absl::Status SampleCatalogImpl::LoadConstants() {
                                    {Value::Int32(-3434), Value::Int64(4333)}),
                      Value::Bool(false)}),
       &catalog_constant));
-  catalog_->AddOwnedConstant(catalog_constant.release());
+  catalog_->AddOwnedConstant(std::move(catalog_constant));
 
   // Load a constant that conflicts with an expression column in standalone
   // expression resolution.
@@ -13557,18 +13684,18 @@ absl::Status SampleCatalogImpl::LoadConstants() {
   GOOGLESQL_RETURN_IF_ERROR(
       SimpleConstant::Create(std::vector<std::string>{"column_KitchenSink"},
                              Value::Int64(8), &standalone_expression_constant));
-  catalog_->AddOwnedConstant(standalone_expression_constant.release());
+  catalog_->AddOwnedConstant(std::move(standalone_expression_constant));
 
   // Load a constant with a name that resembles a system variable.
   std::unique_ptr<SimpleConstant> sysvar1_constant;
   GOOGLESQL_RETURN_IF_ERROR(SimpleConstant::Create(std::vector<std::string>{"@@sysvar1"},
                                          Value::Int64(8), &sysvar1_constant));
-  catalog_->AddOwnedConstant(sysvar1_constant.release());
+  catalog_->AddOwnedConstant(std::move(sysvar1_constant));
 
   std::unique_ptr<SimpleConstant> sysvar2_constant;
   GOOGLESQL_RETURN_IF_ERROR(SimpleConstant::Create(std::vector<std::string>{"@@sysvar2"},
                                          Value::Int64(8), &sysvar2_constant));
-  catalog_->AddOwnedConstant(sysvar2_constant.release());
+  catalog_->AddOwnedConstant(std::move(sysvar2_constant));
 
   // Script variables are managed by the ScriptExecutor. Eventually, they get
   // put into the catalog as constants. For testing, we'll add some "variables"
@@ -13598,14 +13725,14 @@ absl::Status SampleCatalogImpl::LoadConstants() {
       Value::Enum(types::DifferentialPrivacyReportFormatEnumType(),
                   functions::DifferentialPrivacyEnums::PROTO),
       &PROTO_ENUM));
-  catalog_->AddOwnedConstant(PROTO_ENUM.release());
+  catalog_->AddOwnedConstant(std::move(PROTO_ENUM));
   std::unique_ptr<SimpleConstant> JSON_ENUM;
   GOOGLESQL_RETURN_IF_ERROR(SimpleConstant::Create(
       std::vector<std::string>{"JSON_ENUM"},
       Value::Enum(types::DifferentialPrivacyReportFormatEnumType(),
                   functions::DifferentialPrivacyEnums::JSON),
       &JSON_ENUM));
-  catalog_->AddOwnedConstant(JSON_ENUM.release());
+  catalog_->AddOwnedConstant(std::move(JSON_ENUM));
   return absl::OkStatus();
 }
 
@@ -13643,9 +13770,14 @@ void SampleCatalogImpl::LoadSequences() {
   }
 }
 
+void SampleCatalogImpl::AddOwnedTable(std::unique_ptr<SimpleTable> table) {
+  SimpleTable* table_ptr = table.get();
+  catalog_->AddOwnedTable(std::move(table));
+  googlesql_base::InsertOrDie(&tables_, table_ptr->Name(), table_ptr);
+}
+
 void SampleCatalogImpl::AddOwnedTable(SimpleTable* table) {
-  catalog_->AddOwnedTable(absl::WrapUnique(table));
-  googlesql_base::InsertOrDie(&tables_, table->Name(), table);
+  AddOwnedTable(absl::WrapUnique(table));
 }
 
 absl::Status SampleCatalogImpl::LoadWellKnownLambdaArgFunctions() {
@@ -13669,7 +13801,7 @@ absl::Status SampleCatalogImpl::LoadWellKnownLambdaArgFunctions() {
                           /*context_id=*/-1});
   GOOGLESQL_RET_CHECK("(<array<T1>>, FUNCTION<(<T1>, INT64)->BOOL>) -> <array<T1>>" ==
             function->GetSignature(1)->DebugString());
-  catalog_->AddOwnedFunction(function.release());
+  catalog_->AddOwnedFunction(std::move(function));
 
   // Models ARRAY_TRANSFORM
   function = std::make_unique<Function>("fn_array_transform",
@@ -13689,7 +13821,7 @@ absl::Status SampleCatalogImpl::LoadWellKnownLambdaArgFunctions() {
        /*context_id=*/-1});
   GOOGLESQL_RET_CHECK("(<array<T1>>, FUNCTION<(<T1>, INT64)-><T2>>) -> <array<T2>>" ==
             function->GetSignature(1)->DebugString());
-  catalog_->AddOwnedFunction(function.release());
+  catalog_->AddOwnedFunction(std::move(function));
 
   function = std::make_unique<Function>("fn_fp_array_sort", "sample_functions",
                                         Function::SCALAR);
@@ -13701,7 +13833,7 @@ absl::Status SampleCatalogImpl::LoadWellKnownLambdaArgFunctions() {
        /*context_id=*/-1});
   GOOGLESQL_RET_CHECK("(<array<T1>>, FUNCTION<(<T1>, <T1>)->INT64>) -> <T1>" ==
             function->GetSignature(0)->DebugString());
-  catalog_->AddOwnedFunction(function.release());
+  catalog_->AddOwnedFunction(std::move(function));
 
   // Models REDUCE function, which takes an input array, an initial state and a
   // function to run over each element with the current state to produce the
@@ -13716,7 +13848,7 @@ absl::Status SampleCatalogImpl::LoadWellKnownLambdaArgFunctions() {
        /*context_id=*/-1});
   GOOGLESQL_RET_CHECK("(<array<T1>>, <T2>, FUNCTION<(<T2>, <T1>)-><T2>>) -> <T2>" ==
             function->GetSignature(0)->DebugString());
-  catalog_->AddOwnedFunction(function.release());
+  catalog_->AddOwnedFunction(std::move(function));
 
   return absl::OkStatus();
 }
@@ -13737,7 +13869,7 @@ absl::Status SampleCatalogImpl::LoadContrivedLambdaArgFunctions() {
        /*context_id=*/-1});
   GOOGLESQL_RET_CHECK("(<T1>, <T1>, FUNCTION<<T1>->BOOL>) -> <T1>" ==
             function->GetSignature(0)->DebugString());
-  catalog_->AddOwnedFunction(function.release());
+  catalog_->AddOwnedFunction(std::move(function));
 
   // fn_fp_ArrayT_T is provided here to show current behavior to make it easier
   // for reader to understand fn_fp_ArrayT_T_LAMBDA.
@@ -13748,7 +13880,7 @@ absl::Status SampleCatalogImpl::LoadContrivedLambdaArgFunctions() {
                           /*context_id=*/-1});
   GOOGLESQL_RET_CHECK("(<array<T1>>, <T1>) -> <T1>" ==
             function->GetSignature(0)->DebugString());
-  catalog_->AddOwnedFunction(function.release());
+  catalog_->AddOwnedFunction(std::move(function));
 
   // Demostrate case where we don't have common super type for T1, due to
   // ARRAY<T1>.
@@ -13761,7 +13893,7 @@ absl::Status SampleCatalogImpl::LoadContrivedLambdaArgFunctions() {
        /*context_id=*/-1});
   GOOGLESQL_RET_CHECK("(<array<T1>>, <T1>, FUNCTION<<T1>->BOOL>) -> <T1>" ==
             function->GetSignature(0)->DebugString());
-  catalog_->AddOwnedFunction(function.release());
+  catalog_->AddOwnedFunction(std::move(function));
 
   // Demonstrate that lambda argument type inference conflict with final
   // concrete type of templated type influenced by lambda body type.
@@ -13774,7 +13906,7 @@ absl::Status SampleCatalogImpl::LoadContrivedLambdaArgFunctions() {
        /*context_id=*/-1});
   GOOGLESQL_RET_CHECK("(<T1>, FUNCTION<<T1>-><T1>>) -> <T1>" ==
             function->GetSignature(0)->DebugString());
-  catalog_->AddOwnedFunction(function.release());
+  catalog_->AddOwnedFunction(std::move(function));
 
   const auto named_required_format_arg = FunctionArgumentType(
       types_->get_string(), FunctionArgumentTypeOptions().set_argument_name(
@@ -13791,7 +13923,7 @@ absl::Status SampleCatalogImpl::LoadContrivedLambdaArgFunctions() {
                           /*context_id=*/-1});
   GOOGLESQL_RET_CHECK("(STRING format_string, FUNCTION<INT64-><T1>> lambda) -> <T1>" ==
             function->GetSignature(0)->DebugString());
-  catalog_->AddOwnedFunction(function.release());
+  catalog_->AddOwnedFunction(std::move(function));
 
   // Signature with lambda and named argument after lambda.
   function = std::make_unique<Function>("fn_fp_lambda_then_named",
@@ -13803,7 +13935,7 @@ absl::Status SampleCatalogImpl::LoadContrivedLambdaArgFunctions() {
        /*context_id=*/-1});
   GOOGLESQL_RET_CHECK("(FUNCTION<INT64-><T1>>, STRING format_string) -> <T1>" ==
             function->GetSignature(0)->DebugString());
-  catalog_->AddOwnedFunction(function.release());
+  catalog_->AddOwnedFunction(std::move(function));
 
   // Signature with lambda and repeated arguments after lambda.
   const auto repeated_arg =
@@ -13817,7 +13949,7 @@ absl::Status SampleCatalogImpl::LoadContrivedLambdaArgFunctions() {
        /*context_id=*/-1});
   GOOGLESQL_RET_CHECK("(FUNCTION<INT64-><T1>>, repeated INT64) -> <T1>" ==
             function->GetSignature(0)->DebugString());
-  catalog_->AddOwnedFunction(function.release());
+  catalog_->AddOwnedFunction(std::move(function));
 
   // Signature with lambda and repeated arguments before lambda.
   function = std::make_unique<Function>("fn_fp_repeated_arg_then_lambda",
@@ -13829,7 +13961,7 @@ absl::Status SampleCatalogImpl::LoadContrivedLambdaArgFunctions() {
        /*context_id=*/-1});
   GOOGLESQL_RET_CHECK("(repeated INT64, FUNCTION<INT64-><T1>>) -> <T1>" ==
             function->GetSignature(0)->DebugString());
-  catalog_->AddOwnedFunction(function.release());
+  catalog_->AddOwnedFunction(std::move(function));
 
   GOOGLESQL_RETURN_IF_ERROR(AddFunction("fn_fp_repeated_arg_then_lambda_string",
                               Function::SCALAR,
@@ -13859,7 +13991,7 @@ absl::Status SampleCatalogImpl::LoadContrivedLambdaArgFunctions() {
       {ARG_KIND_EXPR_ANY_1,
        {repeated_string_arg,
         FunctionArgumentType::Lambda({string_type},
-  ARG_KIND_EXPR_ANY_1)}}); catalog_->AddOwnedFunction(function.release());
+  ARG_KIND_EXPR_ANY_1)}}); catalog_->AddOwnedFunction(std::move(function));
   */
 
   return absl::OkStatus();
@@ -13889,7 +14021,7 @@ absl::Status SampleCatalogImpl::AddSqlDefinedFunction(
       /*function_options=*/{}, analyzer_output->resolved_expr(), argument_names,
       /*aggregate_expression_list=*/{},
       /*parse_resume_location=*/{}, &function));
-  catalog_->AddOwnedFunction(function.release());
+  catalog_->AddOwnedFunction(std::move(function));
   sql_object_artifacts_.emplace_back(std::move(analyzer_output));
 
   return absl::OkStatus();

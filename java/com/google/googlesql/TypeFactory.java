@@ -633,6 +633,7 @@ public abstract class TypeFactory implements Serializable {
               .setReturningStrategy(declarativeType.getReturningStrategy())
               .setEqualityStrategy(declarativeType.getEqualityStrategy())
               .setTypeParamsStrategy(declarativeType.getTypeParamsStrategy())
+              .setFormattingStrategy(declarativeType.getFormattingStrategy())
               .setAdditionalRequiredLanguageFeatures(
                   ImmutableSet.copyOf(declarativeType.getAdditionalRequiredLanguageFeaturesList()))
               .build();

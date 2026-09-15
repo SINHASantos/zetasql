@@ -5899,6 +5899,17 @@ class ResolvedInsertStmt : public <a href="#ResolvedStatement">ResolvedStatement
 //
 // &lt;where_expr&gt; is required.
 //
+// If `using_scan` is present, `table_scan` is joined with `using_scan`
+// using join conditions in `where_expr`. Rows selected after joining
+// and filtering are targeted for deletion. When the same target table row
+// gets matched more than once, it only gets deleted once.
+// `using_scan` is only allowed for a top-level DELETE statement, meaning
+// `table_scan` must be present and `array_offset_column` must not be
+// present.
+//
+// `using_scan` is enabled by FEATURE_DML_DELETE_WITH_JOIN.
+// See (broken link) for more details.
+//
 // If &lt;returning&gt; is present, the DELETE statement will return deleted rows
 // back. It can only occur on top-level statements.
 //
@@ -5938,6 +5949,10 @@ class ResolvedDeleteStmt : public <a href="#ResolvedStatement">ResolvedStatement
   const <a href="#ResolvedExpr">ResolvedExpr</a>* where_expr() const;
 
   const <a href="#ResolvedColumnHolder">ResolvedColumnHolder</a>* timestamp_version_column() const;
+
+<font color="brown">  // The scan representing the data source from the USING clause in
+  // a DELETE statement.</font>
+  const <a href="#ResolvedScan">ResolvedScan</a>* using_scan() const;
 };
 </code></pre></p>
 
@@ -11370,6 +11385,21 @@ class ResolvedUpdateConstructor : public <a href="#ResolvedExpr">ResolvedExpr</a
   const std::vector&lt;std::unique_ptr&lt;const <a href="#ResolvedUpdateFieldItem">ResolvedUpdateFieldItem</a>&gt;&gt;&amp; update_field_item_list() const;
   int update_field_item_list_size() const;
   const <a href="#ResolvedUpdateFieldItem">ResolvedUpdateFieldItem</a>* update_field_item_list(int i) const;
+
+<font color="brown">  // This <a href="#ResolvedColumn">ResolvedColumn</a> is created to store the original value being
+  // updated. It holds a copy of the value returned by `expr`.
+  //
+  // This column is visible to the `expr` in
+  // `update_field_item_list`, allowing those expressions to
+  // reference the original UPDATE input value.
+  //
+  // In nested UPDATE constructors, this allows <a href="#ResolvedColumnRef">ResolvedColumnRefs</a>
+  // that reference the input value from a specific UPDATE.
+  //
+  // (If the LHS path traverses repeated fields in nested update
+  // constructor, then this column represents an individual element
+  // of the repeated field.)</font>
+  const <a href="#ResolvedColumn">ResolvedColumn</a>&amp; update_element_column() const;
 };
 </code></pre></p>
 

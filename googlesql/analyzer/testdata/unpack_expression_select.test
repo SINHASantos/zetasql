@@ -1,0 +1,1280 @@
+[default language_features=MAXIMUM,+COLUMN_LIST_SPEC]
+[default show_sqlbuilder_output]
+[default use_constant_evaluator]
+[default sql_builder_target_syntax_mode=standard]
+
+################################################################################
+#
+# Positive test cases for UNPACK (**)
+#
+################################################################################
+#
+
+SELECT **COLUMNS(['Key', 'Value']) FROM KeyValue
+--
+QueryStmt
++-output_column_list=
+| +-KeyValue.Key#1 AS Key [INT64]
+| +-KeyValue.Value#2 AS Value [STRING]
++-query=
+  +-ProjectScan
+    +-column_list=KeyValue.[Key#1, Value#2]
+    +-input_scan=
+      +-TableScan(column_list=KeyValue.[Key#1, Value#2], table=KeyValue, column_index_list=[0, 1])
+
+[SQLBUILDER_OUTPUT]
+SELECT
+  KeyValue.Key AS Key,
+  KeyValue.Value AS Value
+FROM
+  KeyValue;
+==
+
+[sql_builder_target_syntax_mode=pipe]
+FROM KeyValue |> SELECT **COLUMNS(['Key', 'Value'])
+
+--
+QueryStmt
++-output_column_list=
+| +-KeyValue.Key#1 AS Key [INT64]
+| +-KeyValue.Value#2 AS Value [STRING]
++-query=
+  +-ProjectScan
+    +-column_list=KeyValue.[Key#1, Value#2]
+    +-input_scan=
+      +-TableScan(column_list=KeyValue.[Key#1, Value#2], table=KeyValue, column_index_list=[0, 1])
+
+[SQLBUILDER_OUTPUT]
+FROM
+  KeyValue
+|> SELECT
+     KeyValue.Key AS Key,
+     KeyValue.Value AS Value;
+==
+
+SELECT **COLUMNS(ARRAY['Key', 'Value']) FROM KeyValue
+--
+QueryStmt
++-output_column_list=
+| +-KeyValue.Key#1 AS Key [INT64]
+| +-KeyValue.Value#2 AS Value [STRING]
++-query=
+  +-ProjectScan
+    +-column_list=KeyValue.[Key#1, Value#2]
+    +-input_scan=
+      +-TableScan(column_list=KeyValue.[Key#1, Value#2], table=KeyValue, column_index_list=[0, 1])
+
+[SQLBUILDER_OUTPUT]
+SELECT
+  KeyValue.Key AS Key,
+  KeyValue.Value AS Value
+FROM
+  KeyValue;
+==
+
+[sql_builder_target_syntax_mode=pipe]
+FROM KeyValue |> SELECT **COLUMNS(ARRAY['Key', 'Value'])
+--
+QueryStmt
++-output_column_list=
+| +-KeyValue.Key#1 AS Key [INT64]
+| +-KeyValue.Value#2 AS Value [STRING]
++-query=
+  +-ProjectScan
+    +-column_list=KeyValue.[Key#1, Value#2]
+    +-input_scan=
+      +-TableScan(column_list=KeyValue.[Key#1, Value#2], table=KeyValue, column_index_list=[0, 1])
+
+[SQLBUILDER_OUTPUT]
+FROM
+  KeyValue
+|> SELECT
+     KeyValue.Key AS Key,
+     KeyValue.Value AS Value;
+
+==
+
+SELECT Key, **COLUMNS(['Value']) FROM KeyValue
+--
+QueryStmt
++-output_column_list=
+| +-KeyValue.Key#1 AS Key [INT64]
+| +-KeyValue.Value#2 AS Value [STRING]
++-query=
+  +-ProjectScan
+    +-column_list=KeyValue.[Key#1, Value#2]
+    +-input_scan=
+      +-TableScan(column_list=KeyValue.[Key#1, Value#2], table=KeyValue, column_index_list=[0, 1])
+
+[SQLBUILDER_OUTPUT]
+SELECT
+  KeyValue.Key AS Key,
+  KeyValue.Value AS Value
+FROM
+  KeyValue;
+==
+
+[sql_builder_target_syntax_mode=pipe]
+FROM KeyValue |> SELECT Key, **COLUMNS(['Value'])
+--
+QueryStmt
++-output_column_list=
+| +-KeyValue.Key#1 AS Key [INT64]
+| +-KeyValue.Value#2 AS Value [STRING]
++-query=
+  +-ProjectScan
+    +-column_list=KeyValue.[Key#1, Value#2]
+    +-input_scan=
+      +-TableScan(column_list=KeyValue.[Key#1, Value#2], table=KeyValue, column_index_list=[0, 1])
+
+[SQLBUILDER_OUTPUT]
+FROM
+  KeyValue
+|> SELECT
+     KeyValue.Key AS Key,
+     KeyValue.Value AS Value;
+
+==
+
+SELECT **COLUMNS(['Key']), Value FROM KeyValue
+--
+QueryStmt
++-output_column_list=
+| +-KeyValue.Key#1 AS Key [INT64]
+| +-KeyValue.Value#2 AS Value [STRING]
++-query=
+  +-ProjectScan
+    +-column_list=KeyValue.[Key#1, Value#2]
+    +-input_scan=
+      +-TableScan(column_list=KeyValue.[Key#1, Value#2], table=KeyValue, column_index_list=[0, 1])
+
+[SQLBUILDER_OUTPUT]
+SELECT
+  KeyValue.Key AS Key,
+  KeyValue.Value AS Value
+FROM
+  KeyValue;
+==
+
+[sql_builder_target_syntax_mode=pipe]
+FROM KeyValue |> SELECT **COLUMNS(['Key']), Value
+
+--
+QueryStmt
++-output_column_list=
+| +-KeyValue.Key#1 AS Key [INT64]
+| +-KeyValue.Value#2 AS Value [STRING]
++-query=
+  +-ProjectScan
+    +-column_list=KeyValue.[Key#1, Value#2]
+    +-input_scan=
+      +-TableScan(column_list=KeyValue.[Key#1, Value#2], table=KeyValue, column_index_list=[0, 1])
+
+[SQLBUILDER_OUTPUT]
+FROM
+  KeyValue
+|> SELECT
+     KeyValue.Key AS Key,
+     KeyValue.Value AS Value;
+==
+
+SELECT Key, **COLUMNS(['Value']), CAST(Key AS STRING) AS key_str FROM KeyValue
+--
+QueryStmt
++-output_column_list=
+| +-KeyValue.Key#1 AS Key [INT64]
+| +-KeyValue.Value#2 AS Value [STRING]
+| +-$query.key_str#3 AS key_str [STRING]
++-query=
+  +-ProjectScan
+    +-column_list=[KeyValue.Key#1, KeyValue.Value#2, $query.key_str#3]
+    +-expr_list=
+    | +-key_str#3 :=
+    |   +-Cast(INT64 -> STRING)
+    |     +-ColumnRef(type=INT64, column=KeyValue.Key#1)
+    +-input_scan=
+      +-TableScan(column_list=KeyValue.[Key#1, Value#2], table=KeyValue, column_index_list=[0, 1])
+
+[SQLBUILDER_OUTPUT]
+SELECT
+  keyvalue_3.a_1 AS Key,
+  keyvalue_3.a_2 AS Value,
+  CAST(keyvalue_3.a_1 AS STRING) AS key_str
+FROM
+  (
+    SELECT
+      KeyValue.Key AS a_1,
+      KeyValue.Value AS a_2
+    FROM
+      KeyValue
+  ) AS keyvalue_3;
+
+==
+
+[sql_builder_target_syntax_mode=pipe]
+FROM KeyValue |> SELECT Key, **COLUMNS(['Value']), CAST(Key AS STRING) AS key_str
+
+--
+QueryStmt
++-output_column_list=
+| +-KeyValue.Key#1 AS Key [INT64]
+| +-KeyValue.Value#2 AS Value [STRING]
+| +-$pipe_select.key_str#3 AS key_str [STRING]
++-query=
+  +-ProjectScan
+    +-column_list=[KeyValue.Key#1, KeyValue.Value#2, $pipe_select.key_str#3]
+    +-expr_list=
+    | +-key_str#3 :=
+    |   +-Cast(INT64 -> STRING)
+    |     +-ColumnRef(type=INT64, column=KeyValue.Key#1)
+    +-input_scan=
+      +-TableScan(column_list=KeyValue.[Key#1, Value#2], table=KeyValue, column_index_list=[0, 1])
+
+[SQLBUILDER_OUTPUT]
+FROM
+  KeyValue
+|> SELECT
+     KeyValue.Key AS a_1,
+     KeyValue.Value AS a_2
+|> AS keyvalue_3
+|> SELECT
+     keyvalue_3.a_1 AS Key,
+     keyvalue_3.a_2 AS Value,
+     CAST(keyvalue_3.a_1 AS STRING) AS key_str;
+==
+
+SELECT **COLUMNS([]) FROM KeyValue
+--
+ERROR: Output column list is empty [at 1:1]
+SELECT **COLUMNS([]) FROM KeyValue
+^
+==
+
+[sql_builder_target_syntax_mode=pipe]
+FROM KeyValue |> SELECT **COLUMNS([])
+--
+ERROR: Output column list is empty [at 1:1]
+FROM KeyValue |> SELECT **COLUMNS([])
+^
+==
+
+SELECT Key, **COLUMNS([]) FROM KeyValue
+--
+QueryStmt
++-output_column_list=
+| +-KeyValue.Key#1 AS Key [INT64]
++-query=
+  +-ProjectScan
+    +-column_list=[KeyValue.Key#1]
+    +-input_scan=
+      +-TableScan(column_list=[KeyValue.Key#1], table=KeyValue, column_index_list=[0])
+
+[SQLBUILDER_OUTPUT]
+SELECT
+  KeyValue.Key AS Key
+FROM
+  KeyValue;
+==
+
+[sql_builder_target_syntax_mode=pipe]
+FROM KeyValue |> SELECT Key, **COLUMNS([])
+--
+QueryStmt
++-output_column_list=
+| +-KeyValue.Key#1 AS Key [INT64]
++-query=
+  +-ProjectScan
+    +-column_list=[KeyValue.Key#1]
+    +-input_scan=
+      +-TableScan(column_list=[KeyValue.Key#1], table=KeyValue, column_index_list=[0])
+
+[SQLBUILDER_OUTPUT]
+FROM
+  KeyValue
+|> SELECT
+     KeyValue.Key AS Key;
+==
+
+SELECT **COLUMNS(['a']) FROM (select Key as a, Value as b from KeyValue)
+--
+QueryStmt
++-output_column_list=
+| +-KeyValue.Key#1 AS a [INT64]
++-query=
+  +-ProjectScan
+    +-column_list=[KeyValue.Key#1]
+    +-input_scan=
+      +-ProjectScan
+        +-column_list=KeyValue.[Key#1, Value#2]
+        +-input_scan=
+          +-TableScan(column_list=KeyValue.[Key#1, Value#2], table=KeyValue, column_index_list=[0, 1])
+
+[SQLBUILDER_OUTPUT]
+SELECT
+  projectscan_3.a_1 AS a
+FROM
+  (
+    SELECT
+      KeyValue.Key AS a_1,
+      KeyValue.Value AS a_2
+    FROM
+      KeyValue
+  ) AS projectscan_3;
+==
+
+[sql_builder_target_syntax_mode=pipe]
+select Key as a, Value as b from KeyValue |> SELECT **COLUMNS(['a'])
+--
+QueryStmt
++-output_column_list=
+| +-KeyValue.Key#1 AS a [INT64]
++-query=
+  +-ProjectScan
+    +-column_list=[KeyValue.Key#1]
+    +-input_scan=
+      +-ProjectScan
+        +-column_list=KeyValue.[Key#1, Value#2]
+        +-input_scan=
+          +-TableScan(column_list=KeyValue.[Key#1, Value#2], table=KeyValue, column_index_list=[0, 1])
+
+[SQLBUILDER_OUTPUT]
+FROM
+  KeyValue
+|> SELECT
+     KeyValue.Key AS a_1,
+     KeyValue.Value AS a_2
+|> AS projectscan_3
+|> SELECT
+     projectscan_3.a_1 AS a;
+==
+
+# Interaction with SELECT *
+SELECT *, **COLUMNS(['Value']) FROM KeyValue
+--
+QueryStmt
++-output_column_list=
+| +-KeyValue.Key#1 AS Key [INT64]
+| +-KeyValue.Value#2 AS Value [STRING]
+| +-KeyValue.Value#2 AS Value [STRING]
++-query=
+  +-ProjectScan
+    +-column_list=KeyValue.[Key#1, Value#2, Value#2]
+    +-input_scan=
+      +-TableScan(column_list=KeyValue.[Key#1, Value#2], table=KeyValue, column_index_list=[0, 1])
+
+[SQLBUILDER_OUTPUT]
+SELECT
+  keyvalue_3.a_1 AS Key,
+  keyvalue_3.a_2 AS Value,
+  keyvalue_3.a_2 AS Value
+FROM
+  (
+    SELECT
+      KeyValue.Key AS a_1,
+      KeyValue.Value AS a_2
+    FROM
+      KeyValue
+  ) AS keyvalue_3;
+==
+
+[sql_builder_target_syntax_mode=pipe]
+FROM KeyValue |> SELECT *, **COLUMNS(['Value'])
+--
+QueryStmt
++-output_column_list=
+| +-KeyValue.Key#1 AS Key [INT64]
+| +-KeyValue.Value#2 AS Value [STRING]
+| +-KeyValue.Value#2 AS Value [STRING]
++-query=
+  +-ProjectScan
+    +-column_list=KeyValue.[Key#1, Value#2, Value#2]
+    +-input_scan=
+      +-TableScan(column_list=KeyValue.[Key#1, Value#2], table=KeyValue, column_index_list=[0, 1])
+
+[SQLBUILDER_OUTPUT]
+FROM
+  KeyValue
+|> SELECT
+     KeyValue.Key AS a_1,
+     KeyValue.Value AS a_2
+|> AS keyvalue_3
+|> SELECT
+     keyvalue_3.a_1 AS Key,
+     keyvalue_3.a_2 AS Value,
+     keyvalue_3.a_2 AS Value;
+==
+
+SELECT * EXCEPT (Value), **COLUMNS(['Value']) FROM KeyValue
+
+--
+QueryStmt
++-output_column_list=
+| +-KeyValue.Key#1 AS Key [INT64]
+| +-KeyValue.Value#2 AS Value [STRING]
++-query=
+  +-ProjectScan
+    +-column_list=KeyValue.[Key#1, Value#2]
+    +-input_scan=
+      +-TableScan(column_list=KeyValue.[Key#1, Value#2], table=KeyValue, column_index_list=[0, 1])
+
+[SQLBUILDER_OUTPUT]
+SELECT
+  KeyValue.Key AS Key,
+  KeyValue.Value AS Value
+FROM
+  KeyValue;
+==
+
+[sql_builder_target_syntax_mode=pipe]
+FROM KeyValue |> SELECT * EXCEPT (Value), **COLUMNS(['Value'])
+
+--
+QueryStmt
++-output_column_list=
+| +-KeyValue.Key#1 AS Key [INT64]
+| +-KeyValue.Value#2 AS Value [STRING]
++-query=
+  +-ProjectScan
+    +-column_list=KeyValue.[Key#1, Value#2]
+    +-input_scan=
+      +-TableScan(column_list=KeyValue.[Key#1, Value#2], table=KeyValue, column_index_list=[0, 1])
+
+[SQLBUILDER_OUTPUT]
+FROM
+  KeyValue
+|> SELECT
+     KeyValue.Key AS Key,
+     KeyValue.Value AS Value;
+==
+
+# Interaction with AS STRUCT
+SELECT AS STRUCT **COLUMNS(['Key', 'Value']) FROM KeyValue
+--
+QueryStmt
++-output_column_list=
+| +-$make_struct.$struct#3 AS `$struct` [STRUCT<Key INT64, Value STRING>]
++-is_value_table=TRUE
++-query=
+  +-ProjectScan
+    +-column_list=[$make_struct.$struct#3]
+    +-expr_list=
+    | +-$struct#3 :=
+    |   +-MakeStruct
+    |     +-type=STRUCT<Key INT64, Value STRING>
+    |     +-field_list=
+    |       +-ColumnRef(type=INT64, column=KeyValue.Key#1)
+    |       +-ColumnRef(type=STRING, column=KeyValue.Value#2)
+    +-input_scan=
+      +-ProjectScan
+        +-column_list=KeyValue.[Key#1, Value#2]
+        +-input_scan=
+          +-TableScan(column_list=KeyValue.[Key#1, Value#2], table=KeyValue, column_index_list=[0, 1])
+
+[SQLBUILDER_OUTPUT]
+SELECT AS VALUE
+  STRUCT< Key INT64, Value STRING > (projectscan_3.a_1, projectscan_3.a_2) AS a_4
+FROM
+  (
+    SELECT
+      KeyValue.Key AS a_1,
+      KeyValue.Value AS a_2
+    FROM
+      KeyValue
+  ) AS projectscan_3;
+==
+
+[sql_builder_target_syntax_mode=pipe]
+FROM KeyValue |> SELECT AS STRUCT **COLUMNS(['Key', 'Value'])
+--
+QueryStmt
++-output_column_list=
+| +-$make_struct.$struct#3 AS `$struct` [STRUCT<Key INT64, Value STRING>]
++-is_value_table=TRUE
++-query=
+  +-ProjectScan
+    +-column_list=[$make_struct.$struct#3]
+    +-expr_list=
+    | +-$struct#3 :=
+    |   +-MakeStruct
+    |     +-type=STRUCT<Key INT64, Value STRING>
+    |     +-field_list=
+    |       +-ColumnRef(type=INT64, column=KeyValue.Key#1)
+    |       +-ColumnRef(type=STRING, column=KeyValue.Value#2)
+    +-input_scan=
+      +-ProjectScan
+        +-column_list=KeyValue.[Key#1, Value#2]
+        +-input_scan=
+          +-TableScan(column_list=KeyValue.[Key#1, Value#2], table=KeyValue, column_index_list=[0, 1])
+
+[SQLBUILDER_OUTPUT]
+FROM
+  KeyValue
+|> SELECT
+     KeyValue.Key AS a_1,
+     KeyValue.Value AS a_2
+|> AS projectscan_3
+|> SELECT AS VALUE
+     STRUCT< Key INT64, Value STRING > (projectscan_3.a_1, projectscan_3.a_2) AS a_4;
+==
+
+# Duplicate column names
+SELECT **COLUMNS(['Key', 'Key']) FROM KeyValue
+--
+QueryStmt
++-output_column_list=
+| +-KeyValue.Key#1 AS Key [INT64]
+| +-KeyValue.Key#1 AS Key [INT64]
++-query=
+  +-ProjectScan
+    +-column_list=KeyValue.[Key#1, Key#1]
+    +-input_scan=
+      +-TableScan(column_list=[KeyValue.Key#1], table=KeyValue, column_index_list=[0])
+
+[SQLBUILDER_OUTPUT]
+SELECT
+  keyvalue_2.a_1 AS Key,
+  keyvalue_2.a_1 AS Key
+FROM
+  (
+    SELECT
+      KeyValue.Key AS a_1
+    FROM
+      KeyValue
+  ) AS keyvalue_2;
+==
+
+[sql_builder_target_syntax_mode=pipe]
+FROM KeyValue |> SELECT **COLUMNS(['Key', 'Key'])
+--
+QueryStmt
++-output_column_list=
+| +-KeyValue.Key#1 AS Key [INT64]
+| +-KeyValue.Key#1 AS Key [INT64]
++-query=
+  +-ProjectScan
+    +-column_list=KeyValue.[Key#1, Key#1]
+    +-input_scan=
+      +-TableScan(column_list=[KeyValue.Key#1], table=KeyValue, column_index_list=[0])
+
+[SQLBUILDER_OUTPUT]
+FROM
+  KeyValue
+|> SELECT
+     KeyValue.Key AS a_1
+|> AS keyvalue_2
+|> SELECT
+     keyvalue_2.a_1 AS Key,
+     keyvalue_2.a_1 AS Key;
+==
+
+# Unpack in Subquery
+SELECT * FROM (SELECT **COLUMNS(['Key', 'Value']) FROM KeyValue)
+--
+QueryStmt
++-output_column_list=
+| +-KeyValue.Key#1 AS Key [INT64]
+| +-KeyValue.Value#2 AS Value [STRING]
++-query=
+  +-ProjectScan
+    +-column_list=KeyValue.[Key#1, Value#2]
+    +-input_scan=
+      +-ProjectScan
+        +-column_list=KeyValue.[Key#1, Value#2]
+        +-input_scan=
+          +-TableScan(column_list=KeyValue.[Key#1, Value#2], table=KeyValue, column_index_list=[0, 1])
+
+[SQLBUILDER_OUTPUT]
+SELECT
+  KeyValue.Key AS Key,
+  KeyValue.Value AS Value
+FROM
+  KeyValue;
+==
+
+[sql_builder_target_syntax_mode=pipe]
+SELECT **COLUMNS(['Key', 'Value']) FROM KeyValue |> SELECT *
+--
+QueryStmt
++-output_column_list=
+| +-KeyValue.Key#1 AS Key [INT64]
+| +-KeyValue.Value#2 AS Value [STRING]
++-query=
+  +-ProjectScan
+    +-column_list=KeyValue.[Key#1, Value#2]
+    +-input_scan=
+      +-ProjectScan
+        +-column_list=KeyValue.[Key#1, Value#2]
+        +-input_scan=
+          +-TableScan(column_list=KeyValue.[Key#1, Value#2], table=KeyValue, column_index_list=[0, 1])
+
+[SQLBUILDER_OUTPUT]
+FROM
+  KeyValue
+|> SELECT
+     KeyValue.Key AS Key,
+     KeyValue.Value AS Value;
+==
+
+# Unpack with ORDER BY
+SELECT **COLUMNS(['Value', 'Key']) FROM KeyValue ORDER BY Key
+--
+QueryStmt
++-output_column_list=
+| +-KeyValue.Value#2 AS Value [STRING]
+| +-KeyValue.Key#1 AS Key [INT64]
++-query=
+  +-OrderByScan
+    +-column_list=KeyValue.[Value#2, Key#1]
+    +-is_ordered=TRUE
+    +-input_scan=
+    | +-TableScan(column_list=KeyValue.[Key#1, Value#2], table=KeyValue, column_index_list=[0, 1])
+    +-order_by_item_list=
+      +-OrderByItem
+        +-column_ref=
+          +-ColumnRef(type=INT64, column=KeyValue.Key#1)
+
+[SQLBUILDER_OUTPUT]
+SELECT
+  keyvalue_3.a_2 AS Value,
+  keyvalue_3.a_1 AS Key
+FROM
+  (
+    SELECT
+      KeyValue.Key AS a_1,
+      KeyValue.Value AS a_2
+    FROM
+      KeyValue
+  ) AS keyvalue_3
+ORDER BY keyvalue_3.a_1;
+==
+
+[sql_builder_target_syntax_mode=pipe]
+FROM KeyValue |> SELECT **COLUMNS(['Value', 'Key']) |> ORDER BY Key
+--
+QueryStmt
++-output_column_list=
+| +-KeyValue.Value#2 AS Value [STRING]
+| +-KeyValue.Key#1 AS Key [INT64]
++-query=
+  +-OrderByScan
+    +-column_list=KeyValue.[Value#2, Key#1]
+    +-is_ordered=TRUE
+    +-input_scan=
+    | +-ProjectScan
+    |   +-column_list=KeyValue.[Value#2, Key#1]
+    |   +-input_scan=
+    |     +-TableScan(column_list=KeyValue.[Key#1, Value#2], table=KeyValue, column_index_list=[0, 1])
+    +-order_by_item_list=
+      +-OrderByItem
+        +-column_ref=
+          +-ColumnRef(type=INT64, column=KeyValue.Key#1)
+
+[SQLBUILDER_OUTPUT]
+FROM
+  KeyValue
+|> SELECT
+     KeyValue.Key AS a_1,
+     KeyValue.Value AS a_2
+|> AS keyvalue_3
+|> SELECT
+     keyvalue_3.a_2 AS a_2,
+     keyvalue_3.a_1 AS a_1
+|> AS projectscan_4
+|> ORDER BY projectscan_4.a_1
+|> SELECT
+     projectscan_4.a_2 AS Value,
+     projectscan_4.a_1 AS Key;
+==
+
+# Unpack with GROUP BY
+SELECT **COLUMNS(['Key']), COUNT(*) FROM KeyValue GROUP BY Key
+--
+QueryStmt
++-output_column_list=
+| +-$groupby.Key#4 AS Key [INT64]
+| +-$aggregate.$agg1#3 AS `$col2` [INT64]
++-query=
+  +-ProjectScan
+    +-column_list=[$groupby.Key#4, $aggregate.$agg1#3]
+    +-input_scan=
+      +-AggregateScan
+        +-column_list=[$groupby.Key#4, $aggregate.$agg1#3]
+        +-input_scan=
+        | +-TableScan(column_list=[KeyValue.Key#1], table=KeyValue, column_index_list=[0])
+        +-group_by_list=
+        | +-Key#4 := ColumnRef(type=INT64, column=KeyValue.Key#1)
+        +-aggregate_list=
+          +-$agg1#3 := AggregateFunctionCall(GoogleSQL:$count_star() -> INT64)
+
+[SQLBUILDER_OUTPUT]
+SELECT
+  keyvalue_2.a_1 AS Key,
+  COUNT(*) AS a_4
+FROM
+  (
+    SELECT
+      KeyValue.Key AS a_1
+    FROM
+      KeyValue
+  ) AS keyvalue_2
+GROUP BY 1;
+==
+
+# Case Sensitivity
+SELECT **COLUMNS(['key']) FROM KeyValue
+--
+QueryStmt
++-output_column_list=
+| +-KeyValue.Key#1 AS key [INT64]
++-query=
+  +-ProjectScan
+    +-column_list=[KeyValue.Key#1]
+    +-input_scan=
+      +-TableScan(column_list=[KeyValue.Key#1], table=KeyValue, column_index_list=[0])
+
+[SQLBUILDER_OUTPUT]
+SELECT
+  KeyValue.Key AS key
+FROM
+  KeyValue;
+==
+
+[sql_builder_target_syntax_mode=pipe]
+FROM KeyValue |> SELECT **COLUMNS(['key'])
+--
+QueryStmt
++-output_column_list=
+| +-KeyValue.Key#1 AS key [INT64]
++-query=
+  +-ProjectScan
+    +-column_list=[KeyValue.Key#1]
+    +-input_scan=
+      +-TableScan(column_list=[KeyValue.Key#1], table=KeyValue, column_index_list=[0])
+
+[SQLBUILDER_OUTPUT]
+FROM
+  KeyValue
+|> SELECT
+     KeyValue.Key AS key;
+==
+
+# Null in column list
+SELECT **COLUMNS(['Key', NULL]) FROM KeyValue
+--
+ERROR: Column name in Column list spec cannot be NULL [at 1:18]
+SELECT **COLUMNS(['Key', NULL]) FROM KeyValue
+                 ^
+==
+
+[sql_builder_target_syntax_mode=pipe]
+FROM KeyValue |> SELECT **COLUMNS(['Key', NULL])
+--
+ERROR: Column name in Column list spec cannot be NULL [at 1:35]
+FROM KeyValue |> SELECT **COLUMNS(['Key', NULL])
+                                  ^
+==
+
+# Value Table Tests
+
+# Unpack fields
+SELECT **COLUMNS(['a', 'b']) FROM TestStructValueTable
+--
+QueryStmt
++-output_column_list=
+| +-TestStructValueTable.value#1 AS a [STRUCT<a INT32, b STRING>]
+| +-TestStructValueTable.value#1 AS b [STRUCT<a INT32, b STRING>]
++-query=
+  +-ProjectScan
+    +-column_list=TestStructValueTable.[value#1, value#1]
+    +-input_scan=
+      +-TableScan(column_list=[TestStructValueTable.value#1], table=TestStructValueTable, column_index_list=[0])
+
+[SQLBUILDER_OUTPUT]
+SELECT
+  teststructvaluetable_2.a_1 AS a,
+  teststructvaluetable_2.a_1 AS b
+FROM
+  (
+    SELECT
+      TestStructValueTable AS a_1
+    FROM
+      TestStructValueTable
+  ) AS teststructvaluetable_2;
+==
+
+[sql_builder_target_syntax_mode=pipe]
+FROM TestStructValueTable |> SELECT **COLUMNS(['a', 'b'])
+--
+QueryStmt
++-output_column_list=
+| +-TestStructValueTable.value#1 AS a [STRUCT<a INT32, b STRING>]
+| +-TestStructValueTable.value#1 AS b [STRUCT<a INT32, b STRING>]
++-query=
+  +-ProjectScan
+    +-column_list=TestStructValueTable.[value#1, value#1]
+    +-input_scan=
+      +-TableScan(column_list=[TestStructValueTable.value#1], table=TestStructValueTable, column_index_list=[0])
+
+[SQLBUILDER_OUTPUT]
+FROM
+  TestStructValueTable
+|> SELECT
+     TestStructValueTable AS a_1
+|> AS teststructvaluetable_2
+|> SELECT
+     teststructvaluetable_2.a_1 AS a,
+     teststructvaluetable_2.a_1 AS b;
+==
+
+# Unpack fields - alias needed
+SELECT **COLUMNS(['a', 'b']) FROM TestStructValueTable v
+--
+QueryStmt
++-output_column_list=
+| +-TestStructValueTable.value#1 AS a [STRUCT<a INT32, b STRING>]
+| +-TestStructValueTable.value#1 AS b [STRUCT<a INT32, b STRING>]
++-query=
+  +-ProjectScan
+    +-column_list=TestStructValueTable.[value#1, value#1]
+    +-input_scan=
+      +-TableScan(column_list=[TestStructValueTable.value#1], table=TestStructValueTable, column_index_list=[0], alias="v")
+
+[SQLBUILDER_OUTPUT]
+SELECT
+  teststructvaluetable_2.a_1 AS a,
+  teststructvaluetable_2.a_1 AS b
+FROM
+  (
+    SELECT
+      TestStructValueTable AS a_1
+    FROM
+      TestStructValueTable
+  ) AS teststructvaluetable_2;
+==
+
+[sql_builder_target_syntax_mode=pipe]
+FROM TestStructValueTable AS v |> SELECT **COLUMNS(['a', 'b'])
+--
+QueryStmt
++-output_column_list=
+| +-TestStructValueTable.value#1 AS a [STRUCT<a INT32, b STRING>]
+| +-TestStructValueTable.value#1 AS b [STRUCT<a INT32, b STRING>]
++-query=
+  +-ProjectScan
+    +-column_list=TestStructValueTable.[value#1, value#1]
+    +-input_scan=
+      +-TableScan(column_list=[TestStructValueTable.value#1], table=TestStructValueTable, column_index_list=[0], alias="v")
+
+[SQLBUILDER_OUTPUT]
+FROM
+  TestStructValueTable
+|> SELECT
+     TestStructValueTable AS a_1
+|> AS teststructvaluetable_2
+|> SELECT
+     teststructvaluetable_2.a_1 AS a,
+     teststructvaluetable_2.a_1 AS b;
+==
+
+# Unpack the value column itself
+SELECT **COLUMNS(['v']) FROM TestStructValueTable v
+--
+ERROR: Name v provided to ** does not refer to a column or field [at 1:10]
+SELECT **COLUMNS(['v']) FROM TestStructValueTable v
+         ^
+==
+
+[sql_builder_target_syntax_mode=pipe]
+FROM TestStructValueTable AS v |> SELECT **COLUMNS(['v'])
+--
+ERROR: Name v provided to ** does not refer to a column or field [at 1:44]
+FROM TestStructValueTable AS v |> SELECT **COLUMNS(['v'])
+                                           ^
+==
+
+# Unpack a field from the proto value column
+SELECT **COLUMNS(['value']) FROM TestBcPBValueProtoTable v
+--
+QueryStmt
++-output_column_list=
+| +-TestBcPBValueProtoTable.value#1 AS value [PROTO<googlesql_test.TestBcPB>]
++-query=
+  +-ProjectScan
+    +-column_list=[TestBcPBValueProtoTable.value#1]
+    +-input_scan=
+      +-TableScan(column_list=[TestBcPBValueProtoTable.value#1], table=TestBcPBValueProtoTable, column_index_list=[0], alias="v")
+
+[SQLBUILDER_OUTPUT]
+SELECT
+  TestBcPBValueProtoTable.value AS value
+FROM
+  TestBcPBValueProtoTable;
+
+==
+
+[sql_builder_target_syntax_mode=pipe]
+FROM TestBcPBValueProtoTable AS v |> SELECT **COLUMNS(['value'])
+--
+QueryStmt
++-output_column_list=
+| +-TestBcPBValueProtoTable.value#1 AS value [PROTO<googlesql_test.TestBcPB>]
++-query=
+  +-ProjectScan
+    +-column_list=[TestBcPBValueProtoTable.value#1]
+    +-input_scan=
+      +-TableScan(column_list=[TestBcPBValueProtoTable.value#1], table=TestBcPBValueProtoTable, column_index_list=[0], alias="v")
+
+[SQLBUILDER_OUTPUT]
+FROM
+  TestBcPBValueProtoTable
+|> SELECT
+     TestBcPBValueProtoTable.value AS value;
+==
+
+# Unpack a nested field from the proto value column
+SELECT **COLUMNS(['value.b']) FROM TestBcPBValueProtoTable v
+--
+ERROR: Name value.b not found in the current scope [at 1:10]
+SELECT **COLUMNS(['value.b']) FROM TestBcPBValueProtoTable v
+         ^
+
+==
+
+[sql_builder_target_syntax_mode=pipe]
+FROM TestBcPBValueProtoTable AS v |> SELECT **COLUMNS(['value.b'])
+--
+ERROR: Name value.b not found in the current scope [at 1:47]
+FROM TestBcPBValueProtoTable AS v |> SELECT **COLUMNS(['value.b'])
+                                              ^
+==
+
+SELECT **COLUMNS([TestConstantStringNamedKey, "Value"]) FROM KeyValue
+--
+QueryStmt
++-output_column_list=
+| +-KeyValue.Key#1 AS key [INT64]
+| +-KeyValue.Value#2 AS Value [STRING]
++-query=
+  +-ProjectScan
+    +-column_list=KeyValue.[Key#1, Value#2]
+    +-input_scan=
+      +-TableScan(column_list=KeyValue.[Key#1, Value#2], table=KeyValue, column_index_list=[0, 1])
+
+[SQLBUILDER_OUTPUT]
+SELECT
+  KeyValue.Key AS key,
+  KeyValue.Value AS Value
+FROM
+  KeyValue;
+
+==
+
+[sql_builder_target_syntax_mode=pipe]
+FROM KeyValue |> SELECT **COLUMNS([TestConstantStringNamedKey, "Value"])
+--
+QueryStmt
++-output_column_list=
+| +-KeyValue.Key#1 AS key [INT64]
+| +-KeyValue.Value#2 AS Value [STRING]
++-query=
+  +-ProjectScan
+    +-column_list=KeyValue.[Key#1, Value#2]
+    +-input_scan=
+      +-TableScan(column_list=KeyValue.[Key#1, Value#2], table=KeyValue, column_index_list=[0, 1])
+
+[SQLBUILDER_OUTPUT]
+FROM
+  KeyValue
+|> SELECT
+     KeyValue.Key AS key,
+     KeyValue.Value AS Value;
+==
+
+SELECT **COLUMNS(TestConstantStringArray) FROM KeyValue
+--
+QueryStmt
++-output_column_list=
+| +-KeyValue.Key#1 AS Key [INT64]
+| +-KeyValue.Value#2 AS Value [STRING]
++-query=
+  +-ProjectScan
+    +-column_list=KeyValue.[Key#1, Value#2]
+    +-input_scan=
+      +-TableScan(column_list=KeyValue.[Key#1, Value#2], table=KeyValue, column_index_list=[0, 1])
+
+[SQLBUILDER_OUTPUT]
+SELECT
+  KeyValue.Key AS Key,
+  KeyValue.Value AS Value
+FROM
+  KeyValue;
+==
+
+[sql_builder_target_syntax_mode=pipe]
+FROM KeyValue |> SELECT **COLUMNS(TestConstantStringArray)
+--
+QueryStmt
++-output_column_list=
+| +-KeyValue.Key#1 AS Key [INT64]
+| +-KeyValue.Value#2 AS Value [STRING]
++-query=
+  +-ProjectScan
+    +-column_list=KeyValue.[Key#1, Value#2]
+    +-input_scan=
+      +-TableScan(column_list=KeyValue.[Key#1, Value#2], table=KeyValue, column_index_list=[0, 1])
+
+[SQLBUILDER_OUTPUT]
+FROM
+  KeyValue
+|> SELECT
+     KeyValue.Key AS Key,
+     KeyValue.Value AS Value;
+==
+
+################################################################################
+#
+# Negative test cases for UNPACK (**)
+#
+################################################################################
+#
+
+
+# Error condition: Not a COLUMN_LIST_SPEC
+SELECT **['Key'] FROM KeyValue
+--
+ERROR: Operator ** requires an argument of type COLUMN_LIST_SPEC, but found ArrayConstructor [at 1:10]
+SELECT **['Key'] FROM KeyValue
+         ^
+==
+
+[sql_builder_target_syntax_mode=pipe]
+FROM KeyValue |> SELECT **['Key']
+--
+ERROR: Operator ** requires an argument of type COLUMN_LIST_SPEC, but found ArrayConstructor [at 1:27]
+FROM KeyValue |> SELECT **['Key']
+                          ^
+==
+
+SELECT 1 AS b, **Columns(['b']);
+
+--
+ERROR: No columns found in the FROM clause to resolve ** [at 1:16]
+SELECT 1 AS b, **Columns(['b']);
+               ^
+==
+
+# Argument is not a constant array of strings - non-array type
+SELECT **COLUMNS(TestConstantString) FROM KeyValue
+--
+ERROR: Column list spec must be an array [at 1:18]
+SELECT **COLUMNS(TestConstantString) FROM KeyValue
+                 ^
+==
+
+[sql_builder_target_syntax_mode=pipe]
+FROM KeyValue |> SELECT **COLUMNS(TestConstantString)
+--
+ERROR: Column list spec must be an array [at 1:35]
+FROM KeyValue |> SELECT **COLUMNS(TestConstantString)
+                                  ^
+==
+
+# Argument is not a constant array of strings - array of wrong type
+SELECT **COLUMNS(TestConstantInt64Array) FROM KeyValue
+--
+ERROR: Column list spec array element must be string [at 1:18]
+SELECT **COLUMNS(TestConstantInt64Array) FROM KeyValue
+                 ^
+==
+
+[sql_builder_target_syntax_mode=pipe]
+FROM KeyValue |> SELECT **COLUMNS(TestConstantInt64Array)
+--
+ERROR: Column list spec array element must be string [at 1:35]
+FROM KeyValue |> SELECT **COLUMNS(TestConstantInt64Array)
+                                  ^
+==
+
+# Argument is not a constant array of strings - array with non-constant
+SELECT **COLUMNS(['Key', a]) FROM KeyValue
+--
+ERROR: Unrecognized name: a [at 1:26]
+SELECT **COLUMNS(['Key', a]) FROM KeyValue
+                         ^
+==
+
+[sql_builder_target_syntax_mode=pipe]
+FROM KeyValue |> SELECT **COLUMNS(['Key', a])
+--
+ERROR: Unrecognized name: a [at 1:43]
+FROM KeyValue |> SELECT **COLUMNS(['Key', a])
+                                          ^
+==
+
+# Argument is not a constant array of strings
+SELECT **(IF(TRUE, COLUMNS(['Key']), COLUMNS(['Value']))) FROM KeyValue
+--
+ERROR: Operator ** requires an argument of type COLUMN_LIST_SPEC, but found FunctionCall [at 1:11]
+SELECT **(IF(TRUE, COLUMNS(['Key']), COLUMNS(['Value']))) FROM KeyValue
+          ^
+==
+
+[sql_builder_target_syntax_mode=pipe]
+FROM KeyValue |> SELECT **(IF(TRUE, COLUMNS(['Key']), COLUMNS(['Value'])))
+--
+ERROR: Operator ** requires an argument of type COLUMN_LIST_SPEC, but found FunctionCall [at 1:28]
+FROM KeyValue |> SELECT **(IF(TRUE, COLUMNS(['Key']), COLUMNS(['Value'])))
+                           ^
+==
+
+# Argument is not a constant array of strings - complex expression
+SELECT **COLUMNS(ARRAY_CONCAT(['Key'], ['Value'])) FROM KeyValue
+--
+ERROR: Column list spec must be an analysis constant [at 1:18]
+SELECT **COLUMNS(ARRAY_CONCAT(['Key'], ['Value'])) FROM KeyValue
+                 ^
+==
+
+[sql_builder_target_syntax_mode=pipe]
+FROM KeyValue |> SELECT **COLUMNS(ARRAY_CONCAT(['Key'], ['Value']))
+--
+ERROR: Column list spec must be an analysis constant [at 1:35]
+FROM KeyValue |> SELECT **COLUMNS(ARRAY_CONCAT(['Key'], ['Value']))
+                                  ^
+==
+
+# NULL array
+SELECT **COLUMNS(CAST(NULL AS ARRAY<STRING>)) FROM KeyValue
+--
+ERROR: Column list spec must not be null [at 1:18]
+SELECT **COLUMNS(CAST(NULL AS ARRAY<STRING>)) FROM KeyValue
+                 ^
+==
+
+[sql_builder_target_syntax_mode=pipe]
+FROM KeyValue |> SELECT **COLUMNS(CAST(NULL AS ARRAY<STRING>))
+--
+ERROR: Column list spec must not be null [at 1:35]
+FROM KeyValue |> SELECT **COLUMNS(CAST(NULL AS ARRAY<STRING>))
+                                  ^
+==
+
+# NULL element in constant array
+SELECT **COLUMNS(TestConstantStringArrayWithNull) FROM KeyValue
+--
+ERROR: Column name in Column list spec cannot be NULL [at 1:18]
+SELECT **COLUMNS(TestConstantStringArrayWithNull) FROM KeyValue
+                 ^
+==
+
+[sql_builder_target_syntax_mode=pipe]
+FROM KeyValue |> SELECT **COLUMNS(TestConstantStringArrayWithNull)
+--
+ERROR: Column name in Column list spec cannot be NULL [at 1:35]
+FROM KeyValue |> SELECT **COLUMNS(TestConstantStringArrayWithNull)
+                                  ^
+==
+
+# Empty string element in literal array
+SELECT **COLUMNS(['']) FROM KeyValue
+--
+ERROR: Column name in Column list spec cannot be empty string [at 1:18]
+SELECT **COLUMNS(['']) FROM KeyValue
+                 ^
+==
+
+[sql_builder_target_syntax_mode=pipe]
+FROM KeyValue |> SELECT **COLUMNS([''])
+--
+ERROR: Column name in Column list spec cannot be empty string [at 1:35]
+FROM KeyValue |> SELECT **COLUMNS([''])
+                                  ^
+==
+
+# Empty string element in constant array
+SELECT **COLUMNS(TestConstantStringArrayWithEmpty) FROM KeyValue
+--
+ERROR: Column name in Column list spec cannot be empty string [at 1:18]
+SELECT **COLUMNS(TestConstantStringArrayWithEmpty) FROM KeyValue
+                 ^
+==
+
+[sql_builder_target_syntax_mode=pipe]
+FROM KeyValue |> SELECT **COLUMNS(TestConstantStringArrayWithEmpty)
+--
+ERROR: Column name in Column list spec cannot be empty string [at 1:35]
+FROM KeyValue |> SELECT **COLUMNS(TestConstantStringArrayWithEmpty)
+                                  ^
+==
+
+# Element not a string in literal array
+SELECT **COLUMNS([1]) FROM KeyValue
+--
+ERROR: Column list spec array element must be string [at 1:18]
+SELECT **COLUMNS([1]) FROM KeyValue
+                 ^
+==
+
+[sql_builder_target_syntax_mode=pipe]
+FROM KeyValue |> SELECT **COLUMNS([1])
+--
+ERROR: Column list spec array element must be string [at 1:35]
+FROM KeyValue |> SELECT **COLUMNS([1])
+                                  ^
+==
+
+# Element not a string in constant array element
+SELECT **COLUMNS([TestConstantInt64]) FROM KeyValue
+--
+ERROR: Column list spec array element must be string [at 1:18]
+SELECT **COLUMNS([TestConstantInt64]) FROM KeyValue
+                 ^
+==
+
+[sql_builder_target_syntax_mode=pipe]
+FROM KeyValue |> SELECT **COLUMNS([TestConstantInt64])
+--
+ERROR: Column list spec array element must be string [at 1:35]
+FROM KeyValue |> SELECT **COLUMNS([TestConstantInt64])
+                                  ^
+==
+
+# Column not found
+SELECT **COLUMNS(['NonExistent']) FROM KeyValue
+--
+ERROR: Name NonExistent not found in the current scope [at 1:10]
+SELECT **COLUMNS(['NonExistent']) FROM KeyValue
+         ^
+==
+
+[sql_builder_target_syntax_mode=pipe]
+FROM KeyValue |> SELECT **COLUMNS(['NonExistent'])
+--
+ERROR: Name NonExistent not found in the current scope [at 1:27]
+FROM KeyValue |> SELECT **COLUMNS(['NonExistent'])
+                          ^
+==
+
+# Name is not a column or field (using table alias)
+SELECT **COLUMNS(['KeyValue']) FROM KeyValue
+--
+ERROR: Name KeyValue provided to ** does not refer to a column or field [at 1:10]
+SELECT **COLUMNS(['KeyValue']) FROM KeyValue
+         ^
+==
+
+[sql_builder_target_syntax_mode=pipe]
+FROM KeyValue |> SELECT **COLUMNS(['KeyValue'])
+--
+ERROR: Name KeyValue provided to ** does not refer to a column or field [at 1:27]
+FROM KeyValue |> SELECT **COLUMNS(['KeyValue'])
+                          ^
+
+==
+
+SELECT **COLUMNS(['Key']) as a
+FROM KeyValue;
+--
+ERROR: ** expression cannot be aliased [at 1:27]
+SELECT **COLUMNS(['Key']) as a
+                          ^

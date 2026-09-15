@@ -18,22 +18,18 @@
 #define GOOGLESQL_ANALYZER_REWRITERS_MEASURE_CLOSURE_BUILDER_H_
 
 #include <memory>
-#include <string>
 #include <vector>
 
-#include "googlesql/analyzer/rewriters/measure_collector.h"
 #include "googlesql/analyzer/rewriters/measure_dependency_graph.h"
 #include "googlesql/public/catalog.h"
+#include "googlesql/public/types/annotation.h"
 #include "googlesql/public/types/struct_type.h"
 #include "googlesql/public/types/type_factory.h"
 #include "googlesql/resolved_ast/column_factory.h"
 #include "googlesql/resolved_ast/resolved_ast.h"
 #include "googlesql/resolved_ast/resolved_column.h"
-#include "absl/container/flat_hash_map.h"
 #include "absl/container/flat_hash_set.h"
-#include "absl/functional/function_ref.h"
 #include "absl/status/statusor.h"
-#include "absl/types/span.h"
 
 namespace googlesql {
 

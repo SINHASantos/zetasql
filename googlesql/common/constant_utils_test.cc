@@ -23,9 +23,11 @@
 #include "googlesql/public/analyzer.h"
 #include "googlesql/public/analyzer_options.h"
 #include "googlesql/public/analyzer_output.h"
+#include "googlesql/public/evaluator.h"
 #include "googlesql/public/function.h"
 #include "googlesql/public/function_signature.h"
 #include "googlesql/public/language_options.h"
+#include "googlesql/public/prepared_expression_constant_evaluator.h"
 #include "googlesql/public/types/type.h"
 #include "googlesql/public/types/type_factory.h"
 #include "googlesql/resolved_ast/resolved_ast.h"
@@ -42,7 +44,9 @@ namespace googlesql {
 
 class IsConstantTest : public ::testing::Test {
  protected:
-  IsConstantTest() {
+  IsConstantTest()
+      : constant_evaluator_(PreparedExpressionConstantEvaluator(
+            EvaluatorOptions{}, options_.language())) {
     options_.mutable_language()->EnableMaximumLanguageFeaturesForDevelopment();
     options_.mutable_language()->SetSupportedStatementKinds(
         {googlesql::RESOLVED_CREATE_FUNCTION_STMT,
@@ -63,6 +67,8 @@ class IsConstantTest : public ::testing::Test {
     GOOGLESQL_CHECK_OK(options_.AddQueryParameter("param_proto_ks", proto_type_ks_));
     json_type_ = type_factory_.get_json();
     GOOGLESQL_CHECK_OK(options_.AddQueryParameter("param_json", json_type_));
+
+    options_.set_constant_evaluator(&constant_evaluator_);
 
     catalog_.catalog()->AddOwnedFunction(
         new Function("StableFunc", "Test", Function::SCALAR,
@@ -98,6 +104,7 @@ class IsConstantTest : public ::testing::Test {
   TypeFactory type_factory_;
   SampleCatalog catalog_;
   AnalyzerOptions options_;
+  PreparedExpressionConstantEvaluator constant_evaluator_;
   const Type* struct_type_int64_ = nullptr;
   const Type* struct_type_a_ = nullptr;
   const Type* proto_type_ks_ = nullptr;

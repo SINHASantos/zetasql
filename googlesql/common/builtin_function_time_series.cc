@@ -35,11 +35,9 @@
 #include "googlesql/public/types/type_factory.h"
 #include "googlesql/public/value.h"
 #include "googlesql/resolved_ast/resolved_ast.h"
-#include "absl/functional/bind_front.h"
 #include "absl/status/status.h"
 #include "googlesql/base/status_macros.h"
 #include "absl/status/statusor.h"
-#include "absl/strings/match.h"
 #include "absl/time/time.h"
 #include "absl/types/span.h"
 #include "googlesql/base/ret_check.h"
@@ -83,7 +81,7 @@ absl::StatusOr<std::shared_ptr<TVFSignature>> TimeSeriesComputeResultType(
 
 // Perform post-resolution constraints on the TUMBLE and HOP TVFs.
 absl::Status ValidateTimeSeriesTVFArguments(
-    TypeFactory* type_factory, const FunctionSignature& signature,
+    const FunctionSignature& signature,
     absl::Span<const TVFInputArgumentType> actual_arguments,
     const LanguageOptions& /*language_options*/) {
   GOOGLESQL_RET_CHECK(!actual_arguments.empty());
@@ -123,8 +121,7 @@ absl::Status ValidateTimeSeriesTVFArguments(
   }
 
   absl::StatusOr<ResolvedTimestampColumnPath> resolved_path =
-      ResolveTimestampColumnPath(input_relation, timestamp_column_name,
-                                 type_factory);
+      ResolveTimestampColumnPath(input_relation, timestamp_column_name);
   if (!resolved_path.ok()) {
     return MakeSqlError() << resolved_path.status().message();
   }
@@ -134,7 +131,8 @@ absl::Status ValidateTimeSeriesTVFArguments(
 }  // namespace
 
 absl::Status GetTimeSeriesTableValuedFunctions(
-    TypeFactory* type_factory, const GoogleSQLBuiltinFunctionOptions& options,
+    TypeFactory* /*type_factory*/,
+    const GoogleSQLBuiltinFunctionOptions& options,
     NameToTableValuedFunctionMap* table_valued_functions) {
   const FunctionArgumentType::ArgumentCardinality OPTIONAL =
       FunctionArgumentType::OPTIONAL;
@@ -145,7 +143,7 @@ absl::Status GetTimeSeriesTableValuedFunctions(
           .set_compute_result_type_callback(&TimeSeriesComputeResultType)
           .set_is_passthrough(true)
           .set_post_resolution_argument_constraint(
-              absl::bind_front(&ValidateTimeSeriesTVFArguments, type_factory));
+              &ValidateTimeSeriesTVFArguments);
 
   FunctionSignatureOptions options_time_series_tvf_no_timestamp_col;
   options_time_series_tvf_no_timestamp_col.AddRequiredLanguageFeature(

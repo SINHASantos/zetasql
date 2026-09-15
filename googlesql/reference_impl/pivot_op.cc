@@ -127,6 +127,7 @@ class PivotTupleIterator : public TupleIterator {
     std::vector<const TupleData*> extended_params_vec = params_ptrs;
     extended_params_vec.push_back(nullptr);
     absl::Span<const TupleData* const> extended_params(extended_params_vec);
+    UnorderedArrayCollisionTracker unordered_array_collision_tracker;
 
     while (true) {
       const TupleData* input_row = input_iter->Next();
@@ -144,6 +145,20 @@ class PivotTupleIterator : public TupleIterator {
         if (!keys_[i]->value_expr()->EvalSimple(extended_params, context_,
                                                 &slot, &status)) {
           return status;
+        }
+
+        if (  // Once we know the query is known to be non-deterministic, we
+              // short-circuit to avoid any overhead from non-determinism
+              // detection.
+            context_->IsDeterministicOutput()) {
+          GOOGLESQL_ASSIGN_OR_RETURN(
+              bool could_indicate_nondeterministic_grouping,
+              unordered_array_collision_tracker
+                  .CouldIndicateNondetermisticGrouping(i, slot.value()));
+          // On the first row we know it is not real non-determinism yet.
+          if (could_indicate_nondeterministic_grouping && !group_map.empty()) {
+            context_->SetNonDeterministicOutput();
+          }
         }
 
         key_tuple->mutable_slot(i)->SetValue(slot.value());

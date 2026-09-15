@@ -7809,4 +7809,228 @@ TEST(ValidatorTest, InvalidVectorTypeParameters) {
               "Unrecognized VECTOR encoding: \"UNKNOWN_VECTOR_ENCODING\"")));
 }
 
+TEST(ValidatorTest, ValidDeleteStmtWithUsingScan) {
+  Validator validator;
+  IdStringPool pool;
+  TypeFactory type_factory;
+  const SimpleTable table("KeyValue", {{"Key", type_factory.get_int64()}});
+  const SimpleTable table2("KeyValue2", {{"Key", type_factory.get_int64()}});
+  const ResolvedColumn target_col(1, pool.Make("KeyValue"), pool.Make("Key"),
+                                  type_factory.get_int64());
+  const ResolvedColumn from_col(2, pool.Make("KeyValue2"), pool.Make("Key"),
+                                type_factory.get_int64());
+
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(auto table_scan, ResolvedTableScanBuilder()
+                                            .set_table(&table)
+                                            .add_column_list(target_col)
+                                            .add_column_index_list(0)
+                                            .Build());
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(auto from_scan, ResolvedTableScanBuilder()
+                                           .set_table(&table2)
+                                           .add_column_list(from_col)
+                                           .add_column_index_list(0)
+                                           .Build());
+
+  FunctionSignature sig(FunctionArgumentType(types::BoolType(), 1),
+                        {FunctionArgumentType(types::Int64Type(), 1),
+                         FunctionArgumentType(types::Int64Type(), 1)},
+                        /*context_id=*/static_cast<int64_t>(1));
+  Function equal_fn("equal", Function::kGoogleSQLFunctionGroupName,
+                    Function::SCALAR, {sig});
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(
+      auto where_expr,
+      ResolvedFunctionCallBuilder()
+          .set_type(types::BoolType())
+          .set_function(&equal_fn)
+          .set_signature(sig)
+          .add_argument_list(MakeResolvedColumnRef(types::Int64Type(),
+                                                   target_col,
+                                                   /*is_correlated=*/false))
+          .add_argument_list(MakeResolvedColumnRef(types::Int64Type(), from_col,
+                                                   /*is_correlated=*/false))
+          .Build());
+
+  auto returning_output_col = MakeResolvedOutputColumn("Key", target_col);
+  std::vector<std::unique_ptr<const ResolvedOutputColumn>>
+      returning_output_cols;
+  returning_output_cols.push_back(std::move(returning_output_col));
+  auto returning_clause = MakeResolvedReturningClause(
+      std::move(returning_output_cols), nullptr, {});
+
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(auto delete_stmt,
+                       ResolvedDeleteStmtBuilder()
+                           .set_table_scan(std::move(table_scan))
+                           .set_using_scan(std::move(from_scan))
+                           .set_where_expr(std::move(where_expr))
+                           .set_returning(std::move(returning_clause))
+                           .add_column_access_list(ResolvedStatementEnums::READ)
+                           .Build());
+
+  GOOGLESQL_EXPECT_OK(validator.ValidateResolvedStatement(delete_stmt.get()));
+}
+
+TEST(ValidatorTest, InvalidDeleteStmtWhereExprRefersToUnknownColumn) {
+  Validator validator;
+  IdStringPool pool;
+  TypeFactory type_factory;
+  const SimpleTable table("KeyValue", {{"Key", type_factory.get_int64()}});
+  const SimpleTable table2("KeyValue2", {{"Key", type_factory.get_int64()}});
+  const ResolvedColumn target_col(1, pool.Make("KeyValue"), pool.Make("Key"),
+                                  type_factory.get_int64());
+  const ResolvedColumn from_col(2, pool.Make("KeyValue2"), pool.Make("Key"),
+                                type_factory.get_int64());
+  const ResolvedColumn unknown_col(999, pool.Make("Unknown"), pool.Make("Col"),
+                                   type_factory.get_int64());
+
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(auto table_scan, ResolvedTableScanBuilder()
+                                            .set_table(&table)
+                                            .add_column_list(target_col)
+                                            .add_column_index_list(0)
+                                            .Build());
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(auto from_scan, ResolvedTableScanBuilder()
+                                           .set_table(&table2)
+                                           .add_column_list(from_col)
+                                           .add_column_index_list(0)
+                                           .Build());
+
+  FunctionSignature sig(FunctionArgumentType(types::BoolType(), 1),
+                        {FunctionArgumentType(types::Int64Type(), 1),
+                         FunctionArgumentType(types::Int64Type(), 1)},
+                        /*context_id=*/static_cast<int64_t>(1));
+  Function equal_fn("equal", Function::kGoogleSQLFunctionGroupName,
+                    Function::SCALAR, {sig});
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(auto where_expr,
+                       ResolvedFunctionCallBuilder()
+                           .set_type(types::BoolType())
+                           .set_function(&equal_fn)
+                           .set_signature(sig)
+                           .add_argument_list(MakeResolvedColumnRef(
+                               types::Int64Type(), target_col,
+                               /*is_correlated=*/false))
+                           .add_argument_list(MakeResolvedColumnRef(
+                               types::Int64Type(), unknown_col,
+                               /*is_correlated=*/false))
+                           .Build());
+
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(auto delete_stmt,
+                       ResolvedDeleteStmtBuilder()
+                           .set_table_scan(std::move(table_scan))
+                           .set_using_scan(std::move(from_scan))
+                           .set_where_expr(std::move(where_expr))
+                           .add_column_access_list(ResolvedStatementEnums::READ)
+                           .Build());
+
+  EXPECT_THAT(validator.ValidateResolvedStatement(delete_stmt.get()),
+              ::absl_testing::StatusIs(
+                  absl::StatusCode::kInternal,
+                  ::testing::HasSubstr(
+                      "Incorrect reference to column Unknown.Col#999")));
+}
+
+TEST(ValidatorTest, InvalidDeleteStmtReturningAccessingUsingScanColumn) {
+  Validator validator;
+  IdStringPool pool;
+  TypeFactory type_factory;
+  const SimpleTable table("KeyValue", {{"Key", type_factory.get_int64()}});
+  const SimpleTable table2("KeyValue2", {{"Key", type_factory.get_int64()}});
+  const ResolvedColumn target_col(1, pool.Make("KeyValue"), pool.Make("Key"),
+                                  type_factory.get_int64());
+  const ResolvedColumn from_col(2, pool.Make("KeyValue2"), pool.Make("Key"),
+                                type_factory.get_int64());
+
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(auto table_scan, ResolvedTableScanBuilder()
+                                            .set_table(&table)
+                                            .add_column_list(target_col)
+                                            .add_column_index_list(0)
+                                            .Build());
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(auto from_scan, ResolvedTableScanBuilder()
+                                           .set_table(&table2)
+                                           .add_column_list(from_col)
+                                           .add_column_index_list(0)
+                                           .Build());
+
+  auto returning_output_col = MakeResolvedOutputColumn("Key", from_col);
+  std::vector<std::unique_ptr<const ResolvedOutputColumn>>
+      returning_output_cols;
+  returning_output_cols.push_back(std::move(returning_output_col));
+  auto returning_clause = MakeResolvedReturningClause(
+      std::move(returning_output_cols), nullptr, {});
+
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(
+      auto delete_stmt,
+      ResolvedDeleteStmtBuilder()
+          .set_table_scan(std::move(table_scan))
+          .set_using_scan(std::move(from_scan))
+          .set_where_expr(MakeResolvedLiteral(Value::Bool(true)))
+          .set_returning(std::move(returning_clause))
+          .add_column_access_list(ResolvedStatementEnums::READ)
+          .Build());
+
+  EXPECT_THAT(validator.ValidateResolvedStatement(delete_stmt.get()),
+              ::absl_testing::StatusIs(
+                  absl::StatusCode::kInternal,
+                  ::testing::HasSubstr(
+                      "Incorrect reference to column KeyValue2.Key#2")));
+}
+
+TEST(ValidatorTest, InvalidNestedDeleteStmtWithUsingScan) {
+  Validator validator;
+  IdStringPool pool;
+  TypeFactory type_factory;
+  const Type* array_type;
+  GOOGLESQL_ASSERT_OK(type_factory.MakeArrayType(type_factory.get_int64(), &array_type));
+  const SimpleTable table("KeyValue", {{"Arr", array_type}});
+  const SimpleTable table2("KeyValue2", {{"Key", type_factory.get_int64()}});
+  const ResolvedColumn target_col(1, pool.Make("KeyValue"), pool.Make("Arr"),
+                                  array_type);
+  const ResolvedColumn element_col(
+      2, pool.Make("$element"), pool.Make("Element"), type_factory.get_int64());
+  const ResolvedColumn from_col(3, pool.Make("KeyValue2"), pool.Make("Key"),
+                                type_factory.get_int64());
+
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(auto table_scan, ResolvedTableScanBuilder()
+                                            .set_table(&table)
+                                            .add_column_list(target_col)
+                                            .add_column_index_list(0)
+                                            .Build());
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(auto from_scan, ResolvedTableScanBuilder()
+                                           .set_table(&table2)
+                                           .add_column_list(from_col)
+                                           .add_column_index_list(0)
+                                           .Build());
+
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(
+      auto nested_delete_stmt,
+      ResolvedDeleteStmtBuilder()
+          .set_where_expr(MakeResolvedLiteral(Value::Bool(true)))
+          .set_using_scan(std::move(from_scan))
+          .Build());
+
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(
+      auto update_item,
+      ResolvedUpdateItemBuilder()
+          .set_target(MakeResolvedColumnRef(target_col.type(), target_col,
+                                            /*is_correlated=*/false))
+          .set_element_column(MakeResolvedColumnHolder(element_col))
+          .add_delete_list(std::move(nested_delete_stmt))
+          .Build());
+
+  std::vector<std::unique_ptr<const ResolvedUpdateItem>> update_item_list;
+  update_item_list.push_back(std::move(update_item));
+
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(
+      auto update_stmt,
+      ResolvedUpdateStmtBuilder()
+          .set_table_scan(std::move(table_scan))
+          .set_where_expr(MakeResolvedLiteral(Value::Bool(true)))
+          .set_update_item_list(std::move(update_item_list))
+          .add_column_access_list(ResolvedStatementEnums::WRITE)
+          .Build());
+
+  EXPECT_THAT(validator.ValidateResolvedStatement(update_stmt.get()),
+              ::absl_testing::StatusIs(
+                  absl::StatusCode::kInternal,
+                  ::testing::HasSubstr("stmt->using_scan() == nullptr")));
+}
+
 }  // namespace googlesql

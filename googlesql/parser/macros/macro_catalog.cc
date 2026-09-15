@@ -21,6 +21,8 @@
 #include <string>
 #include <utility>
 
+#include "googlesql/public/catalog.h"
+#include "absl/base/nullability.h"
 #include "absl/container/node_hash_map.h"
 #include "absl/status/status.h"
 #include "absl/strings/str_cat.h"
@@ -49,20 +51,36 @@ absl::Status MacroCatalog::RegisterMacro(MacroInfo macro_info) {
   return absl::OkStatus();
 }
 
-std::optional<MacroInfo> MacroCatalog::Find(
+const MacroInfo* /*absl_nullable*/ MacroCatalog::FindPtr(
     absl::string_view macro_name) const {
   auto it = macros_->find(macro_name);
   if (it == macros_->end()) {
-    return std::nullopt;
+    return nullptr;
   }
   auto jt = it->second.upper_bound(version_id_);
   // If the upper bound iterator lands at begin, then the macro was not defined
   // before the current version.
   if (jt == it->second.begin()) {
-    return std::nullopt;
+    return nullptr;
   }
   --jt;
-  return jt->second;
+  return &jt->second;
+}
+
+std::optional<MacroInfo> MacroCatalog::Find(
+    absl::string_view macro_name) const {
+  const MacroInfo* info = FindPtr(macro_name);
+  if (info == nullptr) {
+    return std::nullopt;
+  }
+  return *info;
+}
+
+absl::Status MacroCatalog::GetMacro(const std::string& name,
+                                    const Macro** macro,
+                                    const Catalog::FindOptions& options) {
+  *macro = FindPtr(name);
+  return absl::OkStatus();
 }
 
 std::unique_ptr<MacroCatalog> MacroCatalog::NewVersion() {

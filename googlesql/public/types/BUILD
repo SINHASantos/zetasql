@@ -169,8 +169,11 @@ cc_library(
     hdrs = ["builtin_declarative_types.h"],
     deps = [
         ":type",
+        ":value_representations",
         "//googlesql/base:ret_check",
         "//googlesql/common:errors",
+        "//googlesql/common:string_util",
+        "//googlesql/public:value_cc_proto",
         "//googlesql/public/proto:vector_encoding_id_cc_proto",
         "@com_google_absl//absl/base:no_destructor",
         "@com_google_absl//absl/container:flat_hash_map",

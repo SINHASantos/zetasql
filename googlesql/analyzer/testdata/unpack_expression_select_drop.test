@@ -1,0 +1,240 @@
+[default language_features=MAXIMUM,+COLUMN_LIST_SPEC]
+[default show_sqlbuilder_output]
+[default sql_builder_target_syntax_mode=pipe]
+
+FROM KeyValue |> DROP **COLUMNS(['Key'])
+--
+QueryStmt
++-output_column_list=
+| +-KeyValue.Value#2 AS Value [STRING]
++-query=
+  +-TableScan(column_list=[KeyValue.Value#2], table=KeyValue, column_index_list=[1])
+
+[SQLBUILDER_OUTPUT]
+FROM
+  KeyValue
+|> SELECT
+     KeyValue.Value AS Value;
+==
+
+FROM KeyValue |> DROP **COLUMNS(ARRAY['Key'])
+--
+QueryStmt
++-output_column_list=
+| +-KeyValue.Value#2 AS Value [STRING]
++-query=
+  +-TableScan(column_list=[KeyValue.Value#2], table=KeyValue, column_index_list=[1])
+
+[SQLBUILDER_OUTPUT]
+FROM
+  KeyValue
+|> SELECT
+     KeyValue.Value AS Value;
+==
+
+FROM KeyValue |> DROP **COLUMNS(['Key', 'Value'])
+
+--
+ERROR: Pipe DROP dropped all columns in the input table [at 1:15]
+FROM KeyValue |> DROP **COLUMNS(['Key', 'Value'])
+              ^
+==
+
+FROM Account |> DROP id, **COLUMNS(['balance'])
+--
+QueryStmt
++-output_column_list=
+| +-Account.name#2 AS name [STRING]
++-query=
+  +-TableScan(column_list=[Account.name#2], table=Account, column_index_list=[1])
+
+[SQLBUILDER_OUTPUT]
+FROM
+  Account
+|> SELECT
+     Account.name AS name;
+==
+
+FROM Account |> DROP **COLUMNS(['balance']), name
+--
+QueryStmt
++-output_column_list=
+| +-Account.id#1 AS id [INT64]
++-query=
+  +-TableScan(column_list=[Account.id#1], table=Account, column_index_list=[0])
+
+[SQLBUILDER_OUTPUT]
+FROM
+  Account
+|> SELECT
+     Account.id AS id;
+==
+
+FROM KeyValue |> DROP **COLUMNS([])
+--
+ERROR: No columns specified in pipe DROP [at 1:15]
+FROM KeyValue |> DROP **COLUMNS([])
+              ^
+==
+
+FROM KeyValue |> DROP Key, **COLUMNS([])
+--
+QueryStmt
++-output_column_list=
+| +-KeyValue.Value#2 AS Value [STRING]
++-query=
+  +-TableScan(column_list=[KeyValue.Value#2], table=KeyValue, column_index_list=[1])
+
+[SQLBUILDER_OUTPUT]
+FROM
+  KeyValue
+|> SELECT
+     KeyValue.Value AS Value;
+==
+
+FROM (select Key as a, Value as b, Key as c from KeyValue) |> DROP **COLUMNS(['a', 'b'])
+--
+QueryStmt
++-output_column_list=
+| +-KeyValue.Key#1 AS c [INT64]
++-query=
+  +-ProjectScan
+    +-column_list=KeyValue.[Key#1, Value#2, Key#1]
+    +-input_scan=
+      +-TableScan(column_list=KeyValue.[Key#1, Value#2], table=KeyValue, column_index_list=[0, 1])
+
+[SQLBUILDER_OUTPUT]
+FROM
+  KeyValue
+|> SELECT
+     KeyValue.Key AS a_1,
+     KeyValue.Value AS a_2
+|> AS keyvalue_3
+|> SELECT
+     keyvalue_3.a_1 AS a_1,
+     keyvalue_3.a_2 AS a_2,
+     keyvalue_3.a_1 AS a_4
+|> AS projectscan_5
+|> SELECT
+     projectscan_5.a_1 AS c;
+==
+
+# Duplicate column names
+FROM KeyValue |> DROP **COLUMNS(['Key', 'Key'])
+--
+ERROR: Duplicate column name in pipe DROP: Key [at 1:23]
+FROM KeyValue |> DROP **COLUMNS(['Key', 'Key'])
+                      ^
+==
+
+# Unpack in Subquery
+SELECT * FROM (FROM KeyValue |> DROP **COLUMNS(['Key']))
+--
+QueryStmt
++-output_column_list=
+| +-KeyValue.Value#2 AS Value [STRING]
++-query=
+  +-ProjectScan
+    +-column_list=[KeyValue.Value#2]
+    +-input_scan=
+      +-TableScan(column_list=[KeyValue.Value#2], table=KeyValue, column_index_list=[1])
+
+[SQLBUILDER_OUTPUT]
+FROM
+  KeyValue
+|> SELECT
+     KeyValue.Value AS Value;
+==
+
+# Case Sensitivity
+FROM KeyValue |> DROP **COLUMNS(['key'])
+--
+QueryStmt
++-output_column_list=
+| +-KeyValue.Value#2 AS Value [STRING]
++-query=
+  +-TableScan(column_list=[KeyValue.Value#2], table=KeyValue, column_index_list=[1])
+
+[SQLBUILDER_OUTPUT]
+FROM
+  KeyValue
+|> SELECT
+     KeyValue.Value AS Value;
+==
+
+# Column not found
+FROM KeyValue |> DROP **COLUMNS(['NonExistent'])
+--
+ERROR: Column name in pipe DROP not found in input table: NonExistent [at 1:23]
+FROM KeyValue |> DROP **COLUMNS(['NonExistent'])
+                      ^
+==
+
+# Name is not a column or field (using table alias)
+FROM KeyValue |> DROP **COLUMNS(['KeyValue'])
+--
+ERROR: Name in pipe DROP is a table alias; DROP can only drop columns: KeyValue [at 1:23]
+FROM KeyValue |> DROP **COLUMNS(['KeyValue'])
+                      ^
+==
+
+# Value Table Tests
+
+# Unpack fields
+FROM TestStructValueTable |> DROP **COLUMNS(['a'])
+--
+ERROR: Name in pipe DROP is a field inside a value table; DROP can only drop columns: a [at 1:35]
+FROM TestStructValueTable |> DROP **COLUMNS(['a'])
+                                  ^
+==
+
+# Unpack fields - with alias
+FROM TestStructValueTable v |> DROP **COLUMNS(['a'])
+--
+ERROR: Name in pipe DROP is a field inside a value table; DROP can only drop columns: a [at 1:37]
+FROM TestStructValueTable v |> DROP **COLUMNS(['a'])
+                                    ^
+==
+
+FROM TestStructValueTable |> DROP **COLUMNS(['c'])
+
+--
+ERROR: Column name in pipe DROP not found in input table: c [at 1:35]
+FROM TestStructValueTable |> DROP **COLUMNS(['c'])
+                                  ^
+==
+
+# Unpack the value column itself
+FROM TestStructValueTable v |> DROP **COLUMNS(['v'])
+--
+ERROR: Pipe DROP dropped all columns in the input table [at 1:29]
+FROM TestStructValueTable v |> DROP **COLUMNS(['v'])
+                            ^
+==
+
+# Unpack a field from the proto value column
+FROM TestBcPBValueProtoTable v |> DROP **COLUMNS(['value'])
+--
+QueryStmt
++-output_column_list=
+| +-TestBcPBValueProtoTable.Filename#2 AS Filename [STRING]
+| +-TestBcPBValueProtoTable.RowId#3 AS RowId [INT64]
++-query=
+  +-TableScan(column_list=TestBcPBValueProtoTable.[Filename#2, RowId#3], table=TestBcPBValueProtoTable, column_index_list=[1, 2], alias="v")
+
+[SQLBUILDER_OUTPUT]
+FROM
+  TestBcPBValueProtoTable
+|> SELECT
+     TestBcPBValueProtoTable.Filename AS Filename,
+     TestBcPBValueProtoTable.RowId AS RowId;
+
+==
+
+# Unpack a nested field from the proto value column
+FROM TestBcPBValueProtoTable v |> DROP **COLUMNS(['value.b'])
+--
+ERROR: Column name in pipe DROP not found in input table: `value.b` [at 1:40]
+FROM TestBcPBValueProtoTable v |> DROP **COLUMNS(['value.b'])
+                                       ^
+

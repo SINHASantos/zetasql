@@ -50,7 +50,9 @@
 #include "googlesql/resolved_ast/resolved_node.h"
 #include "googlesql/resolved_ast/resolved_node_kind.pb.h"
 #include "googlesql/resolved_ast/rewrite_utils.h"
+#include "absl/algorithm/container.h"
 #include "absl/base/nullability.h"
+#include "absl/cleanup/cleanup.h"
 #include "absl/container/btree_set.h"
 #include "absl/container/flat_hash_map.h"
 #include "absl/container/flat_hash_set.h"
@@ -68,15 +70,12 @@ namespace googlesql {
 namespace {
 
 using ArgNameToExprMap =
-    absl::flat_hash_map</*argument_name=*/absl::string_view,
-                        const ResolvedExpr*>;
+    absl::flat_hash_map</*argument_name=*/std::string, const ResolvedExpr*>;
 using ArgScanBuilder =
     std::function<absl::StatusOr<std::unique_ptr<const ResolvedScan>>(
         const ResolvedScan* arg_scan)>;
 using ArgNameToScanBuilderMap =
     absl::flat_hash_map</*argument_name=*/absl::string_view, ArgScanBuilder>;
-using WithExprColumnDepthMap =
-    absl::flat_hash_map<ResolvedColumn, /*depth=*/int>;
 
 // Helps rewriting a SQL function body during inlining.
 //
@@ -99,12 +98,11 @@ class ResolvedArgumentRefReplacer : public ResolvedASTRewriteVisitor {
   template <typename T>
   static absl::StatusOr<std::unique_ptr<T>> Replace(
       std::unique_ptr<T> body, const ArgNameToExprMap& argument_map,
-      ArgNameToScanBuilderMap& table_arg_map,
-      const WithExprColumnDepthMap& active_with_expr_columns_depth,
+      const ArgNameToScanBuilderMap& table_arg_map = {},
+      const absl::flat_hash_set<ResolvedColumn>& outer_columns = {},
       ColumnFactory* /*absl_nullable*/ column_factory = nullptr) {
     ResolvedArgumentRefReplacer replacer(argument_map, table_arg_map,
-                                         active_with_expr_columns_depth,
-                                         column_factory);
+                                         outer_columns, column_factory);
     GOOGLESQL_ASSIGN_OR_RETURN(std::unique_ptr<const T> result,
                      replacer.VisitAll<T>(std::move(body)));
     return absl::WrapUnique(const_cast<T*>(result.release()));
@@ -113,53 +111,25 @@ class ResolvedArgumentRefReplacer : public ResolvedASTRewriteVisitor {
  private:
   ResolvedArgumentRefReplacer(
       const ArgNameToExprMap& argument_map,
-      ArgNameToScanBuilderMap& table_arg_map,
-      const WithExprColumnDepthMap& active_with_expr_columns_depth,
+      const ArgNameToScanBuilderMap& table_arg_map,
+      const absl::flat_hash_set<ResolvedColumn>& outer_columns,
       ColumnFactory* /*absl_nullable*/ column_factory)
       : argument_map_(argument_map),
         table_arg_map_(table_arg_map),
-        active_with_expr_columns_depth_(active_with_expr_columns_depth),
+        outer_columns_(outer_columns),
         column_factory_(column_factory) {
     // Collect all column references from call-site argument expressions so they
-    // are recognized as outer columns (definition depth 0) and marked as
-    // correlated references when accessed inside inner subqueries.
+    // are recognized as outer columns and marked as correlated references when
+    // accessed inside inner subqueries.
     std::vector<std::unique_ptr<const ResolvedColumnRef>> column_refs;
     for (const auto& [_, expr] : argument_map_) {
       if (expr != nullptr && CollectColumnRefs(*expr, &column_refs).ok()) {
         for (const auto& ref : column_refs) {
-          outer_argument_columns_.insert(ref->column());
+          outer_columns_.insert(ref->column());
         }
         column_refs.clear();
       }
     }
-  }
-
-  // WITH expr scope tracking. Registers the columns introduced by each
-  // WITH expr assignment along with their definition subquery depth so they are
-  // recognized as local bindings rather than function arguments.
-  absl::Status PreVisitResolvedWithExpr(const ResolvedWithExpr& node) override {
-    std::vector<ResolvedColumn> added_cols;
-    added_cols.reserve(node.assignment_list_size());
-    for (const auto& col : node.assignment_list()) {
-      if (active_with_expr_columns_depth_
-              .try_emplace(col->column(), subquery_depth_)
-              .second) {
-        added_cols.push_back(col->column());
-      }
-    }
-    added_with_expr_columns_stack_.push_back(std::move(added_cols));
-    return absl::OkStatus();
-  }
-
-  // Pops the WITH expr column scope, erasing the columns introduced by the
-  // corresponding PreVisit.
-  absl::StatusOr<std::unique_ptr<const ResolvedNode>> PostVisitResolvedWithExpr(
-      std::unique_ptr<const ResolvedWithExpr> node) override {
-    for (const ResolvedColumn& col : added_with_expr_columns_stack_.back()) {
-      active_with_expr_columns_depth_.erase(col);
-    }
-    added_with_expr_columns_stack_.pop_back();
-    return node;
   }
 
   absl::Status PreVisitResolvedWithEntry(
@@ -268,26 +238,20 @@ class ResolvedArgumentRefReplacer : public ResolvedASTRewriteVisitor {
                                           column_map);
   }
 
-  // Adjusts ResolvedColumnRef nodes that reference outer WITH expr columns or
-  // call-site argument columns to set the correct correlation flag based on
-  // the current subquery depth.
+  // Adjusts ResolvedColumnRef nodes that reference outer columns or call-site
+  // argument columns to set the correct correlation flag based on the current
+  // subquery depth.
   absl::StatusOr<std::unique_ptr<const ResolvedNode>>
   PostVisitResolvedColumnRef(
       std::unique_ptr<const ResolvedColumnRef> node) override {
-    std::optional<int> definition_depth =
-        GetColumnDefinitionDepth(node->column());
-    if (!definition_depth.has_value()) {
-      return node;
+    const ResolvedColumn& col = node->column();
+    if (subquery_depth_ > 0 && outer_columns_.contains(col)) {
+      if (!correlated_columns_stack_.empty()) {
+        correlated_columns_stack_.back().insert(col);
+      }
+      return ToBuilder(std::move(node)).set_is_correlated(true).Build();
     }
-
-    // Mark columns correlated only if defined outside the current subquery
-    // (definition_depth < subquery_depth_). Columns defined at or within the
-    // current subquery depth are local and excluded from parameter_list.
-    bool is_correlated = subquery_depth_ > *definition_depth;
-    if (is_correlated && !correlated_columns_stack_.empty()) {
-      correlated_columns_stack_.back().insert(node->column());
-    }
-    return ToBuilder(std::move(node)).set_is_correlated(is_correlated).Build();
+    return node;
   }
 
   // Replaces ResolvedRelationArgumentScan nodes for TVF table arguments
@@ -299,7 +263,8 @@ class ResolvedArgumentRefReplacer : public ResolvedASTRewriteVisitor {
       return node;
     }
     absl::string_view arg_name = node->name();
-    ArgScanBuilder* scan_builder = googlesql_base::FindOrNull(table_arg_map_, arg_name);
+    const ArgScanBuilder* scan_builder =
+        googlesql_base::FindOrNull(table_arg_map_, arg_name);
     GOOGLESQL_RET_CHECK_NE(scan_builder, nullptr);
     GOOGLESQL_ASSIGN_OR_RETURN(std::unique_ptr<const ResolvedScan> arg_scan,
                      (*scan_builder)(node.get()));
@@ -319,18 +284,10 @@ class ResolvedArgumentRefReplacer : public ResolvedASTRewriteVisitor {
     correlated_columns_stack_.push_back({});
 
     GOOGLESQL_ASSIGN_OR_RETURN(subquery, VisitAll<ResolvedScan>(std::move(subquery)));
-
-    subquery_depth_--;
-    absl::btree_set<ResolvedColumn> captured =
-        std::move(correlated_columns_stack_.back());
-    correlated_columns_stack_.pop_back();
-
     builder.set_subquery(std::move(subquery));
 
-    GOOGLESQL_ASSIGN_OR_RETURN(
-        auto adjusted_param_list,
-        AdjustParameterList(builder.release_parameter_list(), captured));
-    builder.set_parameter_list(std::move(adjusted_param_list));
+    builder.set_parameter_list(
+        PopScopeAndAdjustParameterList(builder.release_parameter_list()));
 
     return std::move(builder).Build();
   }
@@ -360,20 +317,13 @@ class ResolvedArgumentRefReplacer : public ResolvedASTRewriteVisitor {
       GOOGLESQL_ASSIGN_OR_RETURN(join_expr, VisitAll<ResolvedExpr>(std::move(join_expr)));
     }
 
-    subquery_depth_--;
-    absl::btree_set<ResolvedColumn> captured =
-        std::move(correlated_columns_stack_.back());
-    correlated_columns_stack_.pop_back();
-
     builder.set_right_scan(std::move(right_scan));
     if (join_expr != nullptr) {
       builder.set_join_expr(std::move(join_expr));
     }
 
-    GOOGLESQL_ASSIGN_OR_RETURN(
-        std::vector<std::unique_ptr<const ResolvedColumnRef>> parameters,
-        AdjustParameterList(builder.release_parameter_list(), captured));
-    builder.set_parameter_list(std::move(parameters));
+    builder.set_parameter_list(
+        PopScopeAndAdjustParameterList(builder.release_parameter_list()));
     return std::move(builder).Build();
   }
 
@@ -394,18 +344,10 @@ class ResolvedArgumentRefReplacer : public ResolvedASTRewriteVisitor {
       correlated_columns_stack_.push_back({});
 
       GOOGLESQL_ASSIGN_OR_RETURN(subquery, VisitAll<ResolvedScan>(std::move(subquery)));
-
-      subquery_depth_--;
-      absl::btree_set<ResolvedColumn> captured =
-          std::move(correlated_columns_stack_.back());
-      correlated_columns_stack_.pop_back();
-
       builder.set_subquery(std::move(subquery));
 
-      GOOGLESQL_ASSIGN_OR_RETURN(
-          std::vector<std::unique_ptr<const ResolvedColumnRef>> parameters,
-          AdjustParameterList(builder.release_parameter_list(), captured));
-      builder.set_parameter_list(std::move(parameters));
+      builder.set_parameter_list(
+          PopScopeAndAdjustParameterList(builder.release_parameter_list()));
     }
 
     return std::move(builder).Build();
@@ -421,85 +363,61 @@ class ResolvedArgumentRefReplacer : public ResolvedASTRewriteVisitor {
   absl::StatusOr<std::unique_ptr<const ResolvedNode>>
   PostVisitResolvedInlineLambda(
       std::unique_ptr<const ResolvedInlineLambda> node) override {
+    auto builder = ToBuilder(std::move(node));
+    builder.set_parameter_list(
+        PopScopeAndAdjustParameterList(builder.release_parameter_list()));
+    return std::move(builder).Build();
+  }
+
+  // Pops the active subquery, lambda, or lateral join scope and returns the
+  // updated parameter list.
+  //
+  // ResolvedArgumentRefReplacer runs only on the UDF body being inlined, not on
+  // lambdas passed as call-site arguments (whose parameter lists are already
+  // populated during call-site analysis). Within the UDF body, references to
+  // UDF arguments inside nested lambdas or subqueries are originally
+  // ResolvedArgumentRefs, so they are not present in the lambda's initial
+  // parameter list. When those argument references are replaced with
+  // ResolvedColumnRefs (from caller arguments or intermediate WITH bindings),
+  // this function collects the newly introduced outer columns and appends them
+  // to the parameter list. Filtering against outer_columns_ and checking
+  // already_present ensures only valid new outer column bindings are added
+  // without duplicates.
+  std::vector<std::unique_ptr<const ResolvedColumnRef>>
+  PopScopeAndAdjustParameterList(
+      std::vector<std::unique_ptr<const ResolvedColumnRef>> parameters) {
+    // Exit current subquery depth and pop captured column references for this
+    // scope.
     subquery_depth_--;
     absl::btree_set<ResolvedColumn> captured =
         std::move(correlated_columns_stack_.back());
     correlated_columns_stack_.pop_back();
 
-    auto builder = ToBuilder(std::move(node));
-    GOOGLESQL_ASSIGN_OR_RETURN(
-        std::vector<std::unique_ptr<const ResolvedColumnRef>> parameters,
-        AdjustParameterList(builder.release_parameter_list(), captured));
-    builder.set_parameter_list(std::move(parameters));
-    return std::move(builder).Build();
-  }
-
-  // Returns the subquery definition depth for a column if it is an active
-  // WITH expr column or an outer argument column. Returns std::nullopt if the
-  // column is not tracked in either scope.
-  std::optional<int> GetColumnDefinitionDepth(const ResolvedColumn& col) const {
-    auto it = active_with_expr_columns_depth_.find(col);
-    if (it != active_with_expr_columns_depth_.end()) {
-      return it->second;
-    }
-    if (outer_argument_columns_.contains(col)) {
-      // Call-site argument expressions are evaluated outside the function body,
-      // so any column referenced by them has definition depth 0.
-      return 0;
-    }
-    return std::nullopt;
-  }
-
-  // Adjusts existing parameter entries for correct correlation flags and
-  // appends newly correlated WITH expr or outer argument columns to the
-  // parameter list.
-  absl::StatusOr<std::vector<std::unique_ptr<const ResolvedColumnRef>>>
-  AdjustParameterList(
-      std::vector<std::unique_ptr<const ResolvedColumnRef>> parameters,
-      const absl::btree_set<ResolvedColumn>& correlated_columns) {
-    // Update existing parameters to reflect correlation relative to the current
-    // subquery depth.
-    for (auto& param : parameters) {
-      std::optional<int> definition_depth =
-          GetColumnDefinitionDepth(param->column());
-      if (!definition_depth.has_value()) {
+    for (const ResolvedColumn& col : captured) {
+      // Filter captured references for columns defined outside the function
+      // body.
+      if (!outer_columns_.contains(col)) {
         continue;
       }
-      const bool is_correlated = subquery_depth_ > *definition_depth;
-      GOOGLESQL_ASSIGN_OR_RETURN(
-          param,
-          ToBuilder(std::move(param)).set_is_correlated(is_correlated).Build());
-    }
 
-    // Append newly correlated WITH expr columns or outer argument columns
-    // gathered from inner scopes while avoiding duplicate parameter entries.
-    for (const ResolvedColumn& col : correlated_columns) {
-      bool already_present = false;
-      for (const auto& param : parameters) {
-        if (param->column() == col) {
-          already_present = true;
-          break;
-        }
-      }
-
-      std::optional<int> definition_depth = GetColumnDefinitionDepth(col);
-      if (!definition_depth.has_value()) {
-        return MakeSqlError()
-               << "Correlated column not found in active scopes: "
-               << col.name();
-      }
-      const bool is_correlated = subquery_depth_ > *definition_depth;
+      // Add missing outer references to the parameter list. References in
+      // nested subqueries (subquery_depth_ > 0) are correlated, while
+      // references at the outermost subquery boundary (subquery_depth_ == 0)
+      // are uncorrelated.
+      bool already_present = absl::c_any_of(
+          parameters,
+          [&col](const auto& param) { return param->column() == col; });
       if (!already_present) {
-        parameters.push_back(
-            MakeResolvedColumnRef(col, /*is_correlated=*/is_correlated));
+        parameters.push_back(MakeResolvedColumnRef(
+            col, /*is_correlated=*/(subquery_depth_ > 0)));
       }
 
-      // Propagate columns upward if they remain correlated at the current depth
-      // so enclosing scopes also include them in their parameter lists.
-      if (is_correlated && !correlated_columns_stack_.empty()) {
+      // Forward captured outer columns to the enclosing parent subquery scope.
+      if (!correlated_columns_stack_.empty()) {
         correlated_columns_stack_.back().insert(col);
       }
     }
+    SortUniqueColumnRefs(parameters);
     return parameters;
   }
 
@@ -507,18 +425,13 @@ class ResolvedArgumentRefReplacer : public ResolvedASTRewriteVisitor {
   const ArgNameToExprMap& argument_map_;
 
   // Maps table argument names to their replacement relation scans.
-  ArgNameToScanBuilderMap& table_arg_map_;
+  const ArgNameToScanBuilderMap& table_arg_map_;
 
-  // Tracks the columns defined in active WITH expr expressions along with the
-  // subquery depth at which they were introduced, used to distinguish local
-  // bindings from function arguments and to set correct correlation flags
-  // across subquery boundaries.
-  WithExprColumnDepthMap active_with_expr_columns_depth_;
-
-  // Tracks the columns referenced across all call-site argument expressions in
-  // argument_map_. These columns have definition depth 0 and must be marked as
-  // correlated references when accessed from within inner subquery scopes.
-  absl::flat_hash_set<ResolvedColumn> outer_argument_columns_;
+  // Outer columns originating outside the function body from argument
+  // expressions or intermediate WITH bindings. Used to add inlined UDF argument
+  // columns to subquery parameter lists (does not include lambda parameter
+  // lists, which are handled separately during lambda inlining).
+  absl::flat_hash_set<ResolvedColumn> outer_columns_;
 
   // Optional column factory used during parameter replacement to allocate
   // fresh column IDs when remapping subqueries across multiple argument
@@ -534,21 +447,17 @@ class ResolvedArgumentRefReplacer : public ResolvedASTRewriteVisitor {
   absl::flat_hash_set<const ResolvedNode*> copied_subquery_args_;
 
   // Current nesting depth across subquery, lambda, and lateral join scopes.
-  // Used to determine whether a referenced WITH expr column is correlated
-  // relative to its definition depth.
   int subquery_depth_ = 0;
 
-  // Stack of sets accumulating correlated ResolvedWithExpr binding columns
-  // referenced within each nested subquery, lambda, or lateral join scope so
-  // they can be appended to parameter_list. A set is pushed on entry (PreVisit)
-  // and popped on exit (PostVisit) for each nested scope. Uses btree_set to
-  // ensure deterministic parameter ordering.
+  // Stack of sets accumulating correlated columns referenced within each nested
+  // subquery, lambda, lateral join, or graph call scope so they can be appended
+  // to parameter_list. A set is pushed on entry (PreVisit) and popped on exit
+  // (PostVisit) for each nested scope.
+  //
+  // Uses absl::btree_set instead of absl::flat_hash_set to guarantee a
+  // deterministic iteration order when propagating captured columns to
+  // enclosing scopes.
   std::vector<absl::btree_set<ResolvedColumn>> correlated_columns_stack_;
-
-  // Stack of column lists introduced by each traversed ResolvedWithExpr so they
-  // can be erased from active_with_expr_columns_depth_ upon leaving that WITH
-  // expression's scope.
-  std::vector<std::vector<ResolvedColumn>> added_with_expr_columns_stack_;
 
   // Track depth under a WITH entry (which must be a with on subquery).
   // Argument references in WITH scan are not supported.
@@ -601,6 +510,66 @@ static absl::StatusOr<bool> IsCallInlinableAndCollectInfo(
   return true;
 }
 
+// A visitor that updates is_correlated to false for specified outer column refs
+// if they are at the top level (not inside a subquery).
+class UncorrelateTopLevelColumnRefVisitor : public ResolvedASTVisitor {
+ public:
+  explicit UncorrelateTopLevelColumnRefVisitor(
+      const absl::flat_hash_set<ResolvedColumn>& columns)
+      : columns_(columns) {}
+
+ private:
+  absl::Status VisitResolvedColumnRef(const ResolvedColumnRef* node) override {
+    if (subquery_depth_ == 0 && columns_.contains(node->column())) {
+      const_cast<ResolvedColumnRef*>(node)->set_is_correlated(false);
+    }
+    return ResolvedASTVisitor::VisitResolvedColumnRef(node);
+  }
+
+  absl::Status VisitResolvedSubqueryExpr(
+      const ResolvedSubqueryExpr* node) override {
+    ++subquery_depth_;
+    GOOGLESQL_RETURN_IF_ERROR(ResolvedASTVisitor::VisitResolvedSubqueryExpr(node));
+    --subquery_depth_;
+
+    if (subquery_depth_ == 0) {
+      for (const auto& column_ref : node->parameter_list()) {
+        if (columns_.contains(column_ref->column())) {
+          const_cast<ResolvedColumnRef*>(column_ref.get())
+              ->set_is_correlated(false);
+        }
+      }
+    }
+    return absl::OkStatus();
+  }
+
+  absl::Status VisitResolvedInlineLambda(
+      const ResolvedInlineLambda* node) override {
+    ++subquery_depth_;
+    GOOGLESQL_RETURN_IF_ERROR(ResolvedASTVisitor::VisitResolvedInlineLambda(node));
+    --subquery_depth_;
+
+    if (subquery_depth_ == 0) {
+      for (const auto& column_ref : node->parameter_list()) {
+        if (columns_.contains(column_ref->column())) {
+          const_cast<ResolvedColumnRef*>(column_ref.get())
+              ->set_is_correlated(false);
+        }
+      }
+    }
+    return absl::OkStatus();
+  }
+
+  const absl::flat_hash_set<ResolvedColumn>& columns_;
+  int subquery_depth_ = 0;
+};
+
+absl::Status UncorrelateTopLevelColumnRefs(
+    ResolvedNode* node, const absl::flat_hash_set<ResolvedColumn>& columns) {
+  UncorrelateTopLevelColumnRefVisitor visitor(columns);
+  return node->Accept(&visitor);
+}
+
 // A visitor that replaces calls to SQL UDFs with the resolved function body.
 class SqlFunctionInlineVisitor : public ResolvedASTDeepCopyVisitor {
  public:
@@ -611,8 +580,44 @@ class SqlFunctionInlineVisitor : public ResolvedASTDeepCopyVisitor {
         fn_builder_(analyzer_options, catalog, type_factory) {}
 
  private:
+  absl::Status VisitResolvedSubqueryExpr(
+      const ResolvedSubqueryExpr* node) override {
+    in_subquery_depth_++;
+    GOOGLESQL_RETURN_IF_ERROR(CopyVisitResolvedSubqueryExpr(node));
+    in_subquery_depth_--;
+    return absl::OkStatus();
+  }
+
+  absl::Status VisitResolvedInlineLambda(
+      const ResolvedInlineLambda* node) override {
+    in_subquery_depth_++;
+    GOOGLESQL_RETURN_IF_ERROR(CopyVisitResolvedInlineLambda(node));
+    in_subquery_depth_--;
+    return absl::OkStatus();
+  }
+
+  absl::Status VisitResolvedJoinScan(const ResolvedJoinScan* node) override {
+    if (node->is_lateral()) {
+      in_subquery_depth_++;
+    }
+    GOOGLESQL_RETURN_IF_ERROR(CopyVisitResolvedJoinScan(node));
+    if (node->is_lateral()) {
+      in_subquery_depth_--;
+    }
+    return absl::OkStatus();
+  }
+
   absl::Status VisitResolvedFunctionCall(
       const ResolvedFunctionCall* node) override {
+    const Function* function = node->function();
+    if (function != nullptr && function->IsFunctionTypedParameter()) {
+      auto it = lambda_arg_map_.find(function->Name());
+      GOOGLESQL_RET_CHECK(it != lambda_arg_map_.end())
+          << "No lambda builder found for UDF lambda parameter: "
+          << function->Name();
+      return InlineLambdaCall(node, it->second);
+    }
+
     std::vector<std::string> arg_names;
     const ResolvedExpr* fn_expression;
     GOOGLESQL_ASSIGN_OR_RETURN(bool is_inlinable, IsCallInlinableAndCollectInfo(
@@ -624,6 +629,39 @@ class SqlFunctionInlineVisitor : public ResolvedASTDeepCopyVisitor {
       return InlineSqlFunction(node, arg_names, fn_expression);
     }
     return CopyVisitResolvedFunctionCall(node);
+  }
+
+  absl::Status VisitResolvedFunctionArgument(
+      const ResolvedFunctionArgument* node) override {
+    const bool is_function_typed_param =
+        node->function_ref() != nullptr &&
+        node->function_ref()->function() != nullptr &&
+        node->function_ref()->function()->IsFunctionTypedParameter();
+    if (!is_function_typed_param) {
+      return CopyVisitResolvedFunctionArgument(node);
+    }
+
+    // Handles transitive lambda parameter passing where an outer UDF's
+    // function-typed parameter is passed as an argument to an inner UDF call.
+    // Looks up the concrete lambda bound to this parameter in an enclosing call
+    // site and replaces the function_ref with a copy of the lambda.
+    const Function* function = node->function_ref()->function();
+    auto it = lambda_arg_map_.find(function->Name());
+    GOOGLESQL_RET_CHECK(it != lambda_arg_map_.end())
+        << "No lambda builder found for UDF lambda parameter: "
+        << function->Name();
+    GOOGLESQL_ASSIGN_OR_RETURN(std::unique_ptr<ResolvedInlineLambda> lambda_copy,
+                     ResolvedASTDeepCopyVisitor::Copy(it->second));
+    GOOGLESQL_ASSIGN_OR_RETURN(std::unique_ptr<ResolvedFunctionArgument> arg_copy,
+                     ResolvedASTDeepCopyVisitor::Copy(node));
+    GOOGLESQL_ASSIGN_OR_RETURN(std::unique_ptr<const ResolvedFunctionArgument> built,
+                     ToBuilder(std::move(arg_copy))
+                         .set_function_ref(nullptr)
+                         .set_inline_lambda(std::move(lambda_copy))
+                         .Build());
+    PushNodeToStack(absl::WrapUnique(
+        const_cast<ResolvedFunctionArgument*>(built.release())));
+    return absl::OkStatus();
   }
 
   // This function replaces a ResolvedFunctionCall that invokes a SQL function
@@ -640,8 +678,10 @@ class SqlFunctionInlineVisitor : public ResolvedASTDeepCopyVisitor {
   absl::Status InlineSqlFunction(const ResolvedFunctionCall* call,
                                  absl::Span<const std::string> argument_names,
                                  const ResolvedExpr* fn_expression) {
-    GOOGLESQL_RET_CHECK_EQ(call->argument_list_size(), argument_names.size());
-    GOOGLESQL_RET_CHECK_EQ(call->generic_argument_list_size(), 0);
+    const bool use_generic = call->generic_argument_list_size() > 0;
+    const int num_args = use_generic ? call->generic_argument_list_size()
+                                     : call->argument_list_size();
+    GOOGLESQL_RET_CHECK_EQ(num_args, argument_names.size());
     GOOGLESQL_RET_CHECK_NE(column_factory_, nullptr);
 
     // The input function body is potentially owned by a catalog or some other
@@ -670,6 +710,12 @@ class SqlFunctionInlineVisitor : public ResolvedASTDeepCopyVisitor {
       return absl::OkStatus();
     }
 
+    // Restores lambda parameter mappings upon exiting this call-site to prevent
+    // them from leaking into enclosing or sibling function calls.
+    absl::Cleanup restore_lambdas = [saved = lambda_arg_map_, this] {
+      lambda_arg_map_ = saved;
+    };
+
     ArgNameToExprMap arg_map;
     std::vector<std::unique_ptr<const ResolvedExpr>> col_refs;
     std::vector<std::unique_ptr<const ResolvedComputedColumn>>
@@ -677,26 +723,46 @@ class SqlFunctionInlineVisitor : public ResolvedASTDeepCopyVisitor {
     col_refs.reserve(argument_names.size());
     with_expr_bindings.reserve(argument_names.size());
 
-    for (int i = 0; i < call->argument_list_size(); ++i) {
-      // Copy the reference expression.
-      GOOGLESQL_RETURN_IF_ERROR(call->argument_list(i)->Accept(this));
-      auto arg_expr = ConsumeTopOfStack<ResolvedExpr>();
+    for (int i = 0; i < num_args; ++i) {
+      if (use_generic) {
+        const auto* gen_arg = call->generic_argument_list(i);
+        if (gen_arg->inline_lambda() != nullptr) {
+          lambda_arg_map_[argument_names[i]] = gen_arg->inline_lambda();
+          continue;
+        }
+        if (gen_arg->function_ref() != nullptr) {
+          const Function* fn = gen_arg->function_ref()->function();
+          auto it =
+              fn ? lambda_arg_map_.find(fn->Name()) : lambda_arg_map_.end();
+          GOOGLESQL_RET_CHECK(it != lambda_arg_map_.end())
+              << "Passing function references directly as UDF arguments is not "
+                 "supported by the inliner.";
+          lambda_arg_map_[argument_names[i]] = it->second;
+          continue;
+        }
+      }
+
+      const ResolvedExpr* arg_expr =
+          use_generic ? call->generic_argument_list(i)->expr()
+                      : call->argument_list(i);
+      GOOGLESQL_RET_CHECK_NE(arg_expr, nullptr);
+      GOOGLESQL_RETURN_IF_ERROR(arg_expr->Accept(this));
+      auto actual_arg = ConsumeTopOfStack<ResolvedExpr>();
       ResolvedColumn arg_column = column_factory_->MakeCol(
           absl::StrCat("$inlined_", call->function()->Name()),
-          argument_names[i], arg_expr->annotated_type());
+          argument_names[i], actual_arg->annotated_type());
       col_refs.push_back(
           MakeResolvedColumnRef(arg_column, /*is_correlated=*/false));
       arg_map[argument_names[i]] = col_refs.back().get();
       with_expr_bindings.push_back(
-          MakeResolvedComputedColumn(arg_column, std::move(arg_expr)));
+          MakeResolvedComputedColumn(arg_column, std::move(actual_arg)));
     }
 
     // Rewrite the function body so that it references the columns in
     // with_expr_bindings rather than having ResolvedArgumentRefs.
     GOOGLESQL_ASSIGN_OR_RETURN(std::unique_ptr<const ResolvedExpr> inlined,
                      InlineFunction(std::move(body_expr), arg_map,
-                                    std::move(with_expr_bindings),
-                                    /*column_factory=*/nullptr));
+                                    std::move(with_expr_bindings)));
     if (call->type_annotation_map() != nullptr) {
       const_cast<ResolvedExpr*>(inlined.get())
           ->set_type_annotation_map(call->type_annotation_map());
@@ -712,20 +778,16 @@ class SqlFunctionInlineVisitor : public ResolvedASTDeepCopyVisitor {
       std::unique_ptr<const ResolvedExpr> body,
       const ArgNameToExprMap& argument_map,
       std::vector<std::unique_ptr<const ResolvedComputedColumn>>
-          with_expr_bindings,
-      ColumnFactory* column_factory = nullptr) {
-    WithExprColumnDepthMap active_with_expr_columns;
+          with_expr_bindings) {
+    absl::flat_hash_set<ResolvedColumn> outer_columns;
     for (const auto& binding : with_expr_bindings) {
-      GOOGLESQL_RET_CHECK(active_with_expr_columns
-                    .emplace(binding->column(), /*subquery_depth=*/0)
-                    .second);
+      outer_columns.insert(binding->column());
     }
 
-    ArgNameToScanBuilderMap no_table_args;
     GOOGLESQL_ASSIGN_OR_RETURN(std::unique_ptr<const ResolvedExpr> replaced_body,
                      ResolvedArgumentRefReplacer::Replace(
-                         std::move(body), argument_map, no_table_args,
-                         active_with_expr_columns, column_factory));
+                         std::move(body), argument_map, /*table_arg_map=*/{},
+                         outer_columns));
 
     if (with_expr_bindings.empty()) {
       return std::move(replaced_body);
@@ -739,8 +801,100 @@ class SqlFunctionInlineVisitor : public ResolvedASTDeepCopyVisitor {
         .Build();
   }
 
+  // Prepares actual argument expressions for a lambda call site, remaps
+  // lambda parameters directly to intermediate WITH expression columns in-place
+  // via CopyResolvedASTAndRemapColumns, wraps the remapped body in a
+  // ResolvedWithExpr, and recursively visits the inlined expression.
+  absl::Status InlineLambdaCall(const ResolvedFunctionCall* call,
+                                const ResolvedInlineLambda* lambda) {
+    GOOGLESQL_RET_CHECK_EQ(lambda->argument_list_size(), call->argument_list_size());
+    GOOGLESQL_RET_CHECK_NE(column_factory_, nullptr);
+
+    ColumnReplacementMap column_map;
+
+    // Preserve captured outer parameters without remapping them to new columns.
+    for (const auto& param : lambda->parameter_list()) {
+      column_map[param->column()] = param->column();
+    }
+
+    // Evaluate call-site argument expressions and bind them to intermediate
+    // WITH expr columns for exactly once evaluation.
+    std::vector<std::unique_ptr<const ResolvedComputedColumn>> with_bindings;
+    for (int i = 0; i < lambda->argument_list_size(); ++i) {
+      GOOGLESQL_RETURN_IF_ERROR(call->argument_list(i)->Accept(this));
+      std::unique_ptr<const ResolvedExpr> actual_arg =
+          ConsumeTopOfStack<ResolvedExpr>();
+
+      std::string param_name = lambda->argument_list()[i].name();
+      ResolvedColumn arg_col = column_factory_->MakeCol(
+          "$inlined_lambda", param_name, actual_arg->annotated_type());
+      column_map[lambda->argument_list()[i]] = arg_col;
+      with_bindings.push_back(
+          MakeResolvedComputedColumn(arg_col, std::move(actual_arg)));
+    }
+
+    // Deep-copy lambda body while remapping argument columns directly to WITH
+    // expr columns and allocating fresh column IDs for internal lambda
+    // definitions.
+    GOOGLESQL_ASSIGN_OR_RETURN(std::unique_ptr<ResolvedExpr> body,
+                     CopyResolvedASTAndRemapColumns(
+                         *lambda->body(), *column_factory_, column_map));
+
+    // When copying a lambda body out of InlineLambda, references to captured
+    // outer variables within the lambda definition scope had is_correlated set
+    // relative to the InlineLambda definition boundary. Because the inline
+    // lambda wrapper is now being dissolved and inline expression variables are
+    // being bound via WITH, we must update is_correlated flags on captured
+    // outer references. This is only needed if the lambda is inlined at the top
+    // level (in_subquery_depth_ == 0).
+    if (lambda->parameter_list_size() > 0 && in_subquery_depth_ == 0) {
+      absl::flat_hash_set<ResolvedColumn> captured_columns;
+      for (const auto& param : lambda->parameter_list()) {
+        captured_columns.insert(param->column());
+      }
+      GOOGLESQL_RETURN_IF_ERROR(
+          UncorrelateTopLevelColumnRefs(body.get(), captured_columns));
+    }
+
+    // Handle SAFE error mode by wrapping the function body in an IFERROR call.
+    if (call->error_mode() == ResolvedFunctionCall::SAFE_ERROR_MODE) {
+      GOOGLESQL_RETURN_IF_ERROR(
+          fn_builder_.CheckCatalogSupportsSafeMode(call->function()->Name()));
+      Value null_value = Value::Null(body->type());
+      GOOGLESQL_ASSIGN_OR_RETURN(std::unique_ptr<const ResolvedExpr> iferror_call,
+                       fn_builder_.IfError(std::move(body),
+                                           MakeResolvedLiteral(null_value)));
+      body =
+          absl::WrapUnique(const_cast<ResolvedExpr*>(iferror_call.release()));
+    }
+
+    std::unique_ptr<const ResolvedExpr> inlined;
+    if (with_bindings.empty()) {
+      inlined = std::move(body);
+    } else {
+      GOOGLESQL_ASSIGN_OR_RETURN(inlined,
+                       ResolvedWithExprBuilder()
+                           .set_type(body->type())
+                           .set_type_annotation_map(body->type_annotation_map())
+                           .set_assignment_list(std::move(with_bindings))
+                           .set_expr(std::move(body))
+                           .Build());
+    }
+
+    if (call->type_annotation_map() != nullptr) {
+      const_cast<ResolvedExpr*>(inlined.get())
+          ->set_type_annotation_map(call->type_annotation_map());
+    }
+
+    // Inline any nested function calls.
+    GOOGLESQL_RETURN_IF_ERROR(inlined->Accept(this));
+    return absl::OkStatus();
+  }
+
   ColumnFactory* column_factory_;
   FunctionCallBuilder fn_builder_;
+  int in_subquery_depth_ = 0;
+  absl::flat_hash_map<std::string, const ResolvedInlineLambda*> lambda_arg_map_;
 };
 
 class SqlFunctionInliner : public Rewriter {
@@ -794,13 +948,13 @@ class SqlTableFunctionInlineVistor : public ResolvedASTDeepCopyVisitor {
   absl::Status ErrorIfArgumentIsCorrelated(const ResolvedNode& arg,
                                            int64_t arg_number,
                                            absl::string_view arg_name) {
-    std::vector<std::unique_ptr<const ResolvedColumnRef>> free_vars;
-    GOOGLESQL_RETURN_IF_ERROR(CollectColumnRefs(arg, &free_vars));
-    if (!free_vars.empty()) {
+    std::vector<std::unique_ptr<const ResolvedColumnRef>> column_refs;
+    GOOGLESQL_RETURN_IF_ERROR(CollectColumnRefs(arg, &column_refs));
+    if (!column_refs.empty()) {
       return absl::UnimplementedError(absl::StrCat(
           "TVF arguments that reference columns are not supported. ", "Arg #",
           arg_number, " ('", arg_name, "') references column '",
-          free_vars[0]->column().name(), "'."));
+          column_refs[0]->column().name(), "'."));
     }
     return absl::OkStatus();
   }
@@ -970,11 +1124,10 @@ class SqlTableFunctionInlineVistor : public ResolvedASTDeepCopyVisitor {
     // Rewrite the function body so that scalar argument references are replaced
     // by scalar subqueries scanning the scalars_cte_name CTE. TVFs do not use
     // top-level ResolvedWithExpr bindings.
-    WithExprColumnDepthMap empty_with_expr_columns;
     GOOGLESQL_ASSIGN_OR_RETURN(body_scan,
                      ResolvedArgumentRefReplacer::Replace(
                          std::move(body_scan), scalar_args, table_args,
-                         empty_with_expr_columns, column_factory_));
+                         /*outer_columns=*/{}, column_factory_));
 
     GOOGLESQL_RET_CHECK(!with_entry_list.empty());
     // This variable prevents use-after move ambiguity in the following stmt.
@@ -1299,8 +1452,6 @@ class SqlAggregateFunctionInlineVisitor : public ResolvedASTRewriteVisitor {
     ColumnReplacementMap internal_aggregate_remapping;
     ColumnReplacementMap no_replacements;
     ArgNameToScanBuilderMap no_table_args;
-    // UDAs do not use top-level ResolvedWithExpr bindings.
-    WithExprColumnDepthMap empty_with_expr_columns;
     for (auto& aggr_computed_col : details.aggregate_expression_list) {
       GOOGLESQL_ASSIGN_OR_RETURN(
           auto new_aggr_computed_col,
@@ -1308,8 +1459,7 @@ class SqlAggregateFunctionInlineVisitor : public ResolvedASTRewriteVisitor {
                                          no_replacements));
       GOOGLESQL_ASSIGN_OR_RETURN(new_aggr_computed_col,
                        ResolvedArgumentRefReplacer::Replace(
-                           std::move(new_aggr_computed_col), aggregate_args,
-                           no_table_args, empty_with_expr_columns));
+                           std::move(new_aggr_computed_col), aggregate_args));
       internal_aggregate_remapping.emplace(aggr_computed_col->column(),
                                            new_aggr_computed_col->column());
       context.new_aggr_col_list.push_back(new_aggr_computed_col->column());
@@ -1322,8 +1472,7 @@ class SqlAggregateFunctionInlineVisitor : public ResolvedASTRewriteVisitor {
     GOOGLESQL_ASSIGN_OR_RETURN(
         auto post_aggregate_expr,
         ResolvedArgumentRefReplacer::Replace(
-            std::move(post_aggregate_function_body), non_aggregate_args,
-            no_table_args, empty_with_expr_columns));
+            std::move(post_aggregate_function_body), non_aggregate_args));
     GOOGLESQL_ASSIGN_OR_RETURN(auto post_aggregate_computed_col,
                      ResolvedComputedColumnBuilder()
                          .set_column(details.computed_column)

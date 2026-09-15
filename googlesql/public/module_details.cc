@@ -57,12 +57,6 @@ constexpr absl::string_view kUdfServerCatalog = "udf_server_catalog";
 constexpr absl::string_view kUdfServerImportMode = "udf_server_import_mode";
 constexpr absl::string_view kAllowedReferences = "allowed_references";
 
-// Option values.
-constexpr absl::string_view kUdfServerModeManual = "MANUAL";
-constexpr absl::string_view kUdfServerModeAlwaysRunning =
-    "SERVER_ADDRESS_FROM_MODULE";
-constexpr absl::string_view kUdfServerModeOnDemand = "CALLER_PROVIDED";
-
 std::optional<std::string> FindStringOption(
     absl::flat_hash_map<std::string, Value>& module_options,
     absl::string_view key) {
@@ -103,24 +97,14 @@ std::optional<double> FindDoubleOption(
 
 absl::StatusOr<PerModuleOptions::UdfServerImportMode>
 GetUdfServerImportModeByName(absl::string_view udf_server_import_mode_string) {
-  // TODO: Use proto enum names instead of re-defining allowed values.
-  if (googlesql_base::CaseCompare(udf_server_import_mode_string,
-                                           kUdfServerModeAlwaysRunning) == 0) {
-    return PerModuleOptions::SERVER_ADDRESS_FROM_MODULE;
-  } else if (googlesql_base::CaseCompare(
-                 udf_server_import_mode_string, kUdfServerModeOnDemand) == 0) {
-    return PerModuleOptions::CALLER_PROVIDED;
-  } else if (googlesql_base::CaseCompare(udf_server_import_mode_string,
-                                                  kUdfServerModeManual) == 0) {
-    return PerModuleOptions::MANUAL;
-  } else {
-    return absl::InvalidArgumentError(absl::Substitute(
-        "Unrecognized mode: $0, allowed modes are [$1]",
-        udf_server_import_mode_string,
-        absl::StrJoin({kUdfServerModeAlwaysRunning, kUdfServerModeOnDemand,
-                       kUdfServerModeManual},
-                      ",")));
+  PerModuleOptions::UdfServerImportMode import_mode;
+  if (PerModuleOptions::UdfServerImportMode_Parse(
+          absl::AsciiStrToUpper(udf_server_import_mode_string), &import_mode)) {
+    return import_mode;
   }
+  return absl::InvalidArgumentError(
+      absl::Substitute("Unrecognized UDF server import mode: $0",
+                       udf_server_import_mode_string));
 }
 
 static absl::Status CheckModuleOptionType(const absl::string_view option_name,

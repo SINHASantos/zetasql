@@ -23,6 +23,7 @@
 #include "googlesql/parser/macros/macro_catalog.h"
 #include "googlesql/parser/macros/macro_expander.h"
 #include "googlesql/parser/macros/token_provider.h"
+#include "googlesql/public/catalog.h"
 #include "googlesql/public/options.pb.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
@@ -32,9 +33,8 @@ namespace parser {
 namespace macros {
 
 inline absl::StatusOr<ExpansionOutput> ExpandMacros(
-    absl::string_view filename, absl::string_view input,
-    const MacroCatalog& catalog, MacroExpanderOptions macro_expander_options,
-    int offset_in_original_input) {
+    absl::string_view filename, absl::string_view input, Catalog* catalog,
+    MacroExpanderOptions macro_expander_options, int offset_in_original_input) {
   return MacroExpander::ExpandMacros(
       std::make_unique<TokenProvider>(filename, input, /*start_offset=*/0,
                                       /*end_offset=*/std::nullopt,

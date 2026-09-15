@@ -231,6 +231,7 @@ class SampleCatalogImpl {
   //  various combinations of templated lambda arguments and other arguments.
   absl::Status LoadContrivedLambdaArgFunctions();
 
+  void AddOwnedTable(std::unique_ptr<SimpleTable> table);
   void AddOwnedTable(SimpleTable* table);
   absl::Status AddGeneratedColumnToTable(
       std::string column_name, std::vector<std::string> expression_columns,

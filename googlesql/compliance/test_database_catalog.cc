@@ -23,11 +23,10 @@
 #include <utility>
 #include <vector>
 
-#include "googlesql/common/internal_value.h"
 #include "googlesql/common/measure_analysis_utils.h"
-#include "googlesql/common/testing/testing_proto_util.h"
 #include "googlesql/compliance/test_driver.h"
 #include "googlesql/compliance/test_util.h"
+#include "googlesql/public/analyzer_output.h"
 #include "googlesql/public/builtin_function.h"
 #include "googlesql/public/builtin_function.pb.h"
 #include "googlesql/public/builtin_function_options.h"
@@ -47,10 +46,8 @@
 #include "absl/log/log.h"
 #include "absl/status/status.h"
 #include "googlesql/base/status_macros.h"
-#include "absl/strings/str_join.h"
 #include "absl/strings/string_view.h"
 #include "absl/types/span.h"
-#include "google/protobuf/compiler/importer.h"
 #include "google/protobuf/descriptor.h"
 #include "googlesql/base/ret_check.h"
 #include "googlesql/base/status_builder.h"
@@ -83,6 +80,20 @@ absl::Status UpdateBuiltinFunctionOptionsWithSuppliedArguments(
   builtin_function_options->argument_types[{
       googlesql::FN_SINGLE_VECTOR_SEARCH_TVF_STRING_WITH_PROTO_OPTIONS, 3}] =
       options_proto_type;
+  builtin_function_options->argument_types[{
+      googlesql::FN_BATCH_HYBRID_VECTOR_SEARCH_TVF_WITH_PROTO_OPTIONS, 6}] =
+      options_proto_type;
+  builtin_function_options->argument_types[{
+      googlesql::
+          FN_HYBRID_SINGLE_VECTOR_SEARCH_TVF_FLOAT_ARRAY_WITH_PROTO_OPTIONS,
+      5}] = options_proto_type;
+  builtin_function_options->argument_types[{
+      googlesql::
+          FN_HYBRID_SINGLE_VECTOR_SEARCH_TVF_DOUBLE_ARRAY_WITH_PROTO_OPTIONS,
+      5}] = options_proto_type;
+  builtin_function_options->argument_types[{
+      googlesql::FN_HYBRID_SINGLE_VECTOR_SEARCH_TVF_STRING_WITH_PROTO_OPTIONS,
+      5}] = options_proto_type;
   return absl::OkStatus();
 }
 }  // namespace

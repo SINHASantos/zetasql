@@ -32,7 +32,9 @@
 
 
 #include "googlesql/common/internal_analyzer_options.h"
+#include "googlesql/common/internal_analyzer_output_properties.h"
 #include "googlesql/common/options_utils.h"
+#include "googlesql/parser/macros/macro_catalog.h"
 #include "googlesql/parser/parse_tree.h"
 #include "googlesql/parser/parser.h"
 #include "googlesql/parser/parser_mode.h"
@@ -1069,7 +1071,7 @@ static absl::StatusOr<bool> RegisterMacro(absl::string_view sql,
   absl::Status parse_stmt = ParseStatement(
       sql,
       ParserOptions(config.analyzer_options().language(), kMacroExpansionMode,
-                    &config.macro_catalog()),
+                    &config.mutable_macro_catalog()),
       &parser_output);
   if (parse_stmt.ok() &&
       parser_output->statement()->Is<ASTDefineMacroStatement>()) {
@@ -1081,11 +1083,11 @@ static absl::StatusOr<bool> RegisterMacro(absl::string_view sql,
       return absl::InvalidArgumentError(
           "Macro visibility can be set only within a module");
     }
-    GOOGLESQL_RETURN_IF_ERROR(config.mutable_macro_catalog().RegisterMacro(
-        {.source_text = config.macro_sources().back(),
-         .location = define_macro_statement->location(),
-         .name_location = define_macro_statement->name()->location(),
-         .body_location = define_macro_statement->body()->location()}));
+    GOOGLESQL_RETURN_IF_ERROR(
+        config.mutable_macro_catalog().RegisterMacro(parser::macros::MacroInfo(
+            config.macro_sources().back(), define_macro_statement->location(),
+            define_macro_statement->name()->location(),
+            define_macro_statement->body()->location())));
 
     std::string macro_name = define_macro_statement->name()->GetAsString();
     GOOGLESQL_RETURN_IF_ERROR(
@@ -1097,11 +1099,12 @@ static absl::StatusOr<bool> RegisterMacro(absl::string_view sql,
 }
 
 static absl::StatusOr<const ASTNode*> ParseSql(
-    absl::string_view sql, const ExecuteQueryConfig& config,
+    absl::string_view sql, ExecuteQueryConfig& config,
     ParseResumeLocation* parse_resume_location, bool* at_end_of_input,
     std::unique_ptr<ParserOutput>* parser_output) {
   ParserOptions parser_options(config.analyzer_options().language(),
-                               kMacroExpansionMode, &config.macro_catalog());
+                               kMacroExpansionMode,
+                               &config.mutable_macro_catalog());
   const ASTNode* root = nullptr;
   switch (config.sql_mode()) {
     case SqlMode::kQuery: {
@@ -1212,12 +1215,14 @@ static absl::StatusOr<const ResolvedNode*> AnalyzeSql(
 }
 
 static absl::Status UnanalyzeQuery(const ResolvedNode* resolved_node,
+                                   const TargetSyntaxMap& target_syntax_map,
                                    ExecuteQueryConfig& config,
                                    ExecuteQueryWriter& writer) {
   SQLBuilder::SQLBuilderOptions sql_builder_options;
   sql_builder_options.language_options = config.analyzer_options().language();
   sql_builder_options.catalog = config.catalog();
   sql_builder_options.target_syntax_mode = config.target_syntax_mode();
+  sql_builder_options.target_syntax_map = target_syntax_map;
   SQLBuilder builder(sql_builder_options);
   GOOGLESQL_RETURN_IF_ERROR(builder.Process(*resolved_node));
   GOOGLESQL_ASSIGN_OR_RETURN(std::string sql, builder.GetSql());
@@ -2336,6 +2341,13 @@ static absl::Status ExecuteOneQuery(absl::string_view script,
     GOOGLESQL_RETURN_IF_ERROR(callback(resolved_node));
   }
 
+  // Extract target_syntax_map before analyzer_output is moved.
+  TargetSyntaxMap target_syntax_map;
+  if (analyzer_output) {
+    target_syntax_map = InternalAnalyzerOutputProperties::GetTargetSyntaxMap(
+        analyzer_output->analyzer_output_properties());
+  }
+
   // Only standalone DDL statements are executed even if not in "execute"
   // mode; DDLs in a multi-stmt are not.
   bool executed_as_ddl = false;
@@ -2364,7 +2376,8 @@ static absl::Status ExecuteOneQuery(absl::string_view script,
   }
 
   if (config.has_tool_mode(ToolMode::kUnAnalyze)) {
-    GOOGLESQL_RETURN_IF_ERROR(UnanalyzeQuery(resolved_node, config, writer));
+    GOOGLESQL_RETURN_IF_ERROR(
+        UnanalyzeQuery(resolved_node, target_syntax_map, config, writer));
   }
 
   if (config.has_tool_mode(ToolMode::kExplain) ||

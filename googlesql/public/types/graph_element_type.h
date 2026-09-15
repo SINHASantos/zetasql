@@ -177,7 +177,7 @@ class GraphElementType : public ListBackedType {
   bool IsSupportedType(const LanguageOptions& language_options) const override;
 
   // Returns if this GraphElementType is coercible to <to>.
-  bool ABSL_MUST_USE_RESULT CoercibleTo(const GraphElementType* to) const;
+  [[nodiscard]] bool CoercibleTo(const GraphElementType* to) const;
 
  protected:
   int64_t GetEstimatedOwnedMemoryBytesSize() const override

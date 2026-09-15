@@ -25,16 +25,22 @@
 namespace googlesql {
 
 // This file is a registry for GoogleSQL built-in DeclarativeTypes. It is the
-// source of truth for the specifications of those types.
-
-// Retrieves the handlers for the declarative built-in type with the given
-// `type_id`. Returns nullptr if no such handlers exist (therefore the type does
-// not support type parameters).
+// source of truth for the definition of these callbacks.
+// Retrieves the type parameter handlers for the declarative built-in type
+// with the given `type_id`. Returns std::nullopt if no such handlers exist.
 //
 // `type_id` is the "local_id" part of the built-in type's DeclarativeTypeId.
 // The namespace is assumed to be "GoogleSQL".
 std::optional<TypeParameterHandlers> GetBuiltinTypeParameterHandlers(
     absl::string_view type_id);
+
+// Retrieves the custom formatting callback for the declarative built-in type
+// with the given `type_id`. Returns std::nullopt if no such callback exists.
+//
+// `type_id` is the "local_id" part of the built-in type's DeclarativeTypeId.
+// The namespace is assumed to be "GoogleSQL".
+std::optional<DeclarativeTypeDescriptor::FormattingCustom::Callback>
+GetBuiltinCustomFormattingCallback(absl::string_view type_id);
 
 }  // namespace googlesql
 

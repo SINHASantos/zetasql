@@ -92,6 +92,14 @@ using TVFPostResolutionArgumentConstraintsCallback = std::function<absl::Status(
     const FunctionSignature&, const std::vector<TVFInputArgumentType>&,
     const LanguageOptions&)>;
 
+// This callback signature takes a matched signature and an argument list
+// as input. Callback implementations are intended to check whether the
+// annotations on the arguments of a TVF call are valid for a matched concrete
+// signature.
+using TVFCheckArgumentAnnotationsCallback = std::function<absl::Status(
+    const FunctionSignature&, const std::vector<TVFInputArgumentType>&,
+    const LanguageOptions&)>;
+
 // This callback signature takes matched signature, an argument list as input
 // and returns the computed output type for TVF call. New types should be
 // allocated in the provided TypeFactory.
@@ -131,6 +139,12 @@ struct TableValuedFunctionOptions {
   TableValuedFunctionOptions& set_compute_result_type_callback(
       TVFComputeResultTypeCallback callback) {
     compute_result_type_callback = std::move(callback);
+    return *this;
+  }
+
+  TableValuedFunctionOptions& set_check_argument_annotations_callback(
+      TVFCheckArgumentAnnotationsCallback callback) {
+    check_argument_annotations_callback = std::move(callback);
     return *this;
   }
 
@@ -189,6 +203,19 @@ struct TableValuedFunctionOptions {
   // `googlesql/common/errors.h` for which status code to return. Resolver code
   // will attach error at TVF call parse location.
   TVFComputeResultTypeCallback compute_result_type_callback = nullptr;
+
+  // If not nullptr, this callback is called after resolution to check whether
+  // the annotations on the arguments of a TVF call are valid for a matched
+  // concrete signature. If this callback is set, the standard argument
+  // annotation checks are skipped and this callback is used instead.
+  // By the time this is called, any named arguments have already been reordered
+  // to their positional indices, and any omitted optional arguments have been
+  // injected with their default values.
+  // If the callback returns a non-OK status, then analysis immediately fails.
+  // Please consult `googlesql/common/errors.h` for which status code to return.
+  // Resolver code will attach error at TVF call parse location.
+  TVFCheckArgumentAnnotationsCallback check_argument_annotations_callback =
+      nullptr;
 
   // A set of LanguageFeatures that need to be enabled for the function to be
   // loaded in GetBuiltinFunctionsAndTypes.

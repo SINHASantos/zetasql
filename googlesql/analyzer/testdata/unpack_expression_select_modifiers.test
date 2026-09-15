@@ -1,0 +1,479 @@
+[default language_features=MAXIMUM,+COLUMN_LIST_SPEC]
+[default show_sqlbuilder_output]
+[default use_constant_evaluator]
+[default sql_builder_target_syntax_mode=standard]
+
+
+[language_features=NONE,+SELECT_STAR_EXCEPT_REPLACE]
+SELECT * EXCEPT (**COLUMNS(['Key'])) FROM KeyValue
+
+--
+ERROR: Unpack expression is not supported [at 1:18]
+SELECT * EXCEPT (**COLUMNS(['Key'])) FROM KeyValue
+                 ^
+==
+
+SELECT * EXCEPT (**COLUMNS(['Key'])) FROM KeyValue
+--
+QueryStmt
++-output_column_list=
+| +-KeyValue.Value#2 AS Value [STRING]
++-query=
+  +-ProjectScan
+    +-column_list=[KeyValue.Value#2]
+    +-input_scan=
+      +-TableScan(column_list=[KeyValue.Value#2], table=KeyValue, column_index_list=[1])
+
+[SQLBUILDER_OUTPUT]
+SELECT
+  KeyValue.Value AS Value
+FROM
+  KeyValue;
+==
+
+SELECT * EXCEPT (**COLUMNS(ARRAY['Key'])) FROM KeyValue
+--
+QueryStmt
++-output_column_list=
+| +-KeyValue.Value#2 AS Value [STRING]
++-query=
+  +-ProjectScan
+    +-column_list=[KeyValue.Value#2]
+    +-input_scan=
+      +-TableScan(column_list=[KeyValue.Value#2], table=KeyValue, column_index_list=[1])
+
+[SQLBUILDER_OUTPUT]
+SELECT
+  KeyValue.Value AS Value
+FROM
+  KeyValue;
+==
+
+SELECT * EXCEPT (**COLUMNS(['Value'])) FROM KeyValue
+--
+QueryStmt
++-output_column_list=
+| +-KeyValue.Key#1 AS Key [INT64]
++-query=
+  +-ProjectScan
+    +-column_list=[KeyValue.Key#1]
+    +-input_scan=
+      +-TableScan(column_list=[KeyValue.Key#1], table=KeyValue, column_index_list=[0])
+
+[SQLBUILDER_OUTPUT]
+SELECT
+  KeyValue.Key AS Key
+FROM
+  KeyValue;
+==
+
+SELECT * EXCEPT (**COLUMNS(['Key', 'Value'])) FROM KeyValue
+--
+ERROR: SELECT * expands to zero columns after applying EXCEPT [at 1:8]
+SELECT * EXCEPT (**COLUMNS(['Key', 'Value'])) FROM KeyValue
+       ^
+==
+
+SELECT * EXCEPT (**COLUMNS(['Key']), **COLUMNS(['Value'])) FROM KeyValue
+
+--
+ERROR: SELECT * expands to zero columns after applying EXCEPT [at 1:8]
+SELECT * EXCEPT (**COLUMNS(['Key']), **COLUMNS(['Value'])) FROM KeyValue
+       ^
+==
+
+SELECT * EXCEPT (**COLUMNS(['Key']), Value) FROM KeyValue
+--
+ERROR: SELECT * expands to zero columns after applying EXCEPT [at 1:8]
+SELECT * EXCEPT (**COLUMNS(['Key']), Value) FROM KeyValue
+       ^
+==
+
+SELECT * EXCEPT (**COLUMNS([])) FROM KeyValue
+--
+QueryStmt
++-output_column_list=
+| +-KeyValue.Key#1 AS Key [INT64]
+| +-KeyValue.Value#2 AS Value [STRING]
++-query=
+  +-ProjectScan
+    +-column_list=KeyValue.[Key#1, Value#2]
+    +-input_scan=
+      +-TableScan(column_list=KeyValue.[Key#1, Value#2], table=KeyValue, column_index_list=[0, 1])
+
+[SQLBUILDER_OUTPUT]
+SELECT
+  KeyValue.Key AS Key,
+  KeyValue.Value AS Value
+FROM
+  KeyValue;
+==
+
+SELECT * EXCEPT (**COLUMNS(['a'])) FROM (select Key as a, Value as b from KeyValue)
+--
+QueryStmt
++-output_column_list=
+| +-KeyValue.Value#2 AS b [STRING]
++-query=
+  +-ProjectScan
+    +-column_list=[KeyValue.Value#2]
+    +-input_scan=
+      +-ProjectScan
+        +-column_list=KeyValue.[Key#1, Value#2]
+        +-input_scan=
+          +-TableScan(column_list=KeyValue.[Key#1, Value#2], table=KeyValue, column_index_list=[0, 1])
+
+[SQLBUILDER_OUTPUT]
+SELECT
+  projectscan_3.a_2 AS b
+FROM
+  (
+    SELECT
+      KeyValue.Key AS a_1,
+      KeyValue.Value AS a_2
+    FROM
+      KeyValue
+  ) AS projectscan_3;
+==
+
+# Duplicate column names
+SELECT * EXCEPT (**COLUMNS(['Key', 'Key'])) FROM KeyValue
+--
+ERROR: Duplicate column Key in SELECT * EXCEPT list [at 1:18]
+SELECT * EXCEPT (**COLUMNS(['Key', 'Key'])) FROM KeyValue
+                 ^
+==
+
+# Duplicate column names
+SELECT * EXCEPT (**COLUMNS(['Key']), Key) FROM KeyValue
+--
+ERROR: Duplicate column Key in SELECT * EXCEPT list [at 1:38]
+SELECT * EXCEPT (**COLUMNS(['Key']), Key) FROM KeyValue
+                                     ^
+==
+
+# Unpack in Subquery
+SELECT * FROM (SELECT * EXCEPT (**COLUMNS(['Key'])) FROM KeyValue)
+--
+QueryStmt
++-output_column_list=
+| +-KeyValue.Value#2 AS Value [STRING]
++-query=
+  +-ProjectScan
+    +-column_list=[KeyValue.Value#2]
+    +-input_scan=
+      +-ProjectScan
+        +-column_list=[KeyValue.Value#2]
+        +-input_scan=
+          +-TableScan(column_list=[KeyValue.Value#2], table=KeyValue, column_index_list=[1])
+
+[SQLBUILDER_OUTPUT]
+SELECT
+  KeyValue.Value AS Value
+FROM
+  KeyValue;
+==
+
+SELECT Key FROM (SELECT * EXCEPT (**COLUMNS(['Key'])) FROM KeyValue)
+
+--
+ERROR: Unrecognized name: Key [at 1:8]
+SELECT Key FROM (SELECT * EXCEPT (**COLUMNS(['Key'])) FROM KeyValue)
+       ^
+==
+
+# Unpack with ORDER BY
+SELECT * EXCEPT (**COLUMNS(['Key'])) FROM KeyValue ORDER BY Key
+--
+QueryStmt
++-output_column_list=
+| +-KeyValue.Value#2 AS Value [STRING]
++-query=
+  +-OrderByScan
+    +-column_list=[KeyValue.Value#2]
+    +-is_ordered=TRUE
+    +-input_scan=
+    | +-TableScan(column_list=KeyValue.[Key#1, Value#2], table=KeyValue, column_index_list=[0, 1])
+    +-order_by_item_list=
+      +-OrderByItem
+        +-column_ref=
+          +-ColumnRef(type=INT64, column=KeyValue.Key#1)
+
+[SQLBUILDER_OUTPUT]
+SELECT
+  keyvalue_3.a_2 AS Value
+FROM
+  (
+    SELECT
+      KeyValue.Key AS a_1,
+      KeyValue.Value AS a_2
+    FROM
+      KeyValue
+  ) AS keyvalue_3
+ORDER BY keyvalue_3.a_1;
+==
+
+# Unpack with GROUP BY
+SELECT * EXCEPT (**COLUMNS(['Value'])), COUNT(*) FROM KeyValue GROUP BY Key
+--
+QueryStmt
++-output_column_list=
+| +-$groupby.Key#4 AS Key [INT64]
+| +-$aggregate.$agg1#3 AS `$col2` [INT64]
++-query=
+  +-ProjectScan
+    +-column_list=[$groupby.Key#4, $aggregate.$agg1#3]
+    +-input_scan=
+      +-AggregateScan
+        +-column_list=[$groupby.Key#4, $aggregate.$agg1#3]
+        +-input_scan=
+        | +-TableScan(column_list=[KeyValue.Key#1], table=KeyValue, column_index_list=[0])
+        +-group_by_list=
+        | +-Key#4 := ColumnRef(type=INT64, column=KeyValue.Key#1)
+        +-aggregate_list=
+          +-$agg1#3 := AggregateFunctionCall(GoogleSQL:$count_star() -> INT64)
+
+[SQLBUILDER_OUTPUT]
+SELECT
+  keyvalue_2.a_1 AS Key,
+  COUNT(*) AS a_4
+FROM
+  (
+    SELECT
+      KeyValue.Key AS a_1
+    FROM
+      KeyValue
+  ) AS keyvalue_2
+GROUP BY 1;
+==
+
+# Case Sensitivity
+SELECT * EXCEPT (**COLUMNS(['key'])) FROM KeyValue
+--
+QueryStmt
++-output_column_list=
+| +-KeyValue.Value#2 AS Value [STRING]
++-query=
+  +-ProjectScan
+    +-column_list=[KeyValue.Value#2]
+    +-input_scan=
+      +-TableScan(column_list=[KeyValue.Value#2], table=KeyValue, column_index_list=[1])
+
+[SQLBUILDER_OUTPUT]
+SELECT
+  KeyValue.Value AS Value
+FROM
+  KeyValue;
+==
+
+SELECT t.* EXCEPT (**COLUMNS(['Key'])) FROM KeyValue t
+
+--
+QueryStmt
++-output_column_list=
+| +-KeyValue.Value#2 AS Value [STRING]
++-query=
+  +-ProjectScan
+    +-column_list=[KeyValue.Value#2]
+    +-input_scan=
+      +-TableScan(column_list=[KeyValue.Value#2], table=KeyValue, column_index_list=[1], alias="t")
+
+[SQLBUILDER_OUTPUT]
+SELECT
+  KeyValue.Value AS Value
+FROM
+  KeyValue;
+==
+
+# Value Table Tests
+
+# Unpack fields
+SELECT * EXCEPT (**COLUMNS(['a'])) FROM TestStructValueTable
+--
+QueryStmt
++-output_column_list=
+| +-$query.b#2 AS b [STRING]
++-query=
+  +-ProjectScan
+    +-column_list=[$query.b#2]
+    +-expr_list=
+    | +-b#2 :=
+    |   +-GetStructField
+    |     +-type=STRING
+    |     +-expr=
+    |     | +-ColumnRef(type=STRUCT<a INT32, b STRING>, column=TestStructValueTable.value#1)
+    |     +-field_idx=1
+    +-input_scan=
+      +-TableScan(column_list=[TestStructValueTable.value#1], table=TestStructValueTable, column_index_list=[0])
+
+[SQLBUILDER_OUTPUT]
+SELECT
+  teststructvaluetable_2.a_1.b AS b
+FROM
+  (
+    SELECT
+      TestStructValueTable AS a_1
+    FROM
+      TestStructValueTable
+  ) AS teststructvaluetable_2;
+==
+
+SELECT t.* EXCEPT (**COLUMNS(['a'])) FROM TestStructValueTable t
+
+--
+QueryStmt
++-output_column_list=
+| +-$query.b#2 AS b [STRING]
++-query=
+  +-ProjectScan
+    +-column_list=[$query.b#2]
+    +-expr_list=
+    | +-b#2 :=
+    |   +-GetStructField
+    |     +-type=STRING
+    |     +-expr=
+    |     | +-ColumnRef(type=STRUCT<a INT32, b STRING>, column=TestStructValueTable.value#1)
+    |     +-field_idx=1
+    +-input_scan=
+      +-TableScan(column_list=[TestStructValueTable.value#1], table=TestStructValueTable, column_index_list=[0], alias="t")
+
+[SQLBUILDER_OUTPUT]
+SELECT
+  teststructvaluetable_2.a_1.b AS b
+FROM
+  (
+    SELECT
+      TestStructValueTable AS a_1
+    FROM
+      TestStructValueTable
+  ) AS teststructvaluetable_2;
+==
+
+# Unpack fields - alias needed
+SELECT * EXCEPT (**COLUMNS(['a'])) FROM TestStructValueTable v
+--
+QueryStmt
++-output_column_list=
+| +-$query.b#2 AS b [STRING]
++-query=
+  +-ProjectScan
+    +-column_list=[$query.b#2]
+    +-expr_list=
+    | +-b#2 :=
+    |   +-GetStructField
+    |     +-type=STRING
+    |     +-expr=
+    |     | +-ColumnRef(type=STRUCT<a INT32, b STRING>, column=TestStructValueTable.value#1)
+    |     +-field_idx=1
+    +-input_scan=
+      +-TableScan(column_list=[TestStructValueTable.value#1], table=TestStructValueTable, column_index_list=[0], alias="v")
+
+[SQLBUILDER_OUTPUT]
+SELECT
+  teststructvaluetable_2.a_1.b AS b
+FROM
+  (
+    SELECT
+      TestStructValueTable AS a_1
+    FROM
+      TestStructValueTable
+  ) AS teststructvaluetable_2;
+==
+
+SELECT * EXCEPT (**COLUMNS(['c'])) FROM TestStructValueTable v
+
+--
+ERROR: Column c in SELECT * EXCEPT list does not exist [at 1:18]
+SELECT * EXCEPT (**COLUMNS(['c'])) FROM TestStructValueTable v
+                 ^
+==
+
+# Unpack the value column itself
+SELECT * EXCEPT (**COLUMNS(['v'])) FROM TestStructValueTable v
+--
+ERROR: Column v in SELECT * EXCEPT list does not exist [at 1:18]
+SELECT * EXCEPT (**COLUMNS(['v'])) FROM TestStructValueTable v
+                 ^
+==
+
+# Unpack a field from the proto value column
+SELECT * EXCEPT (**COLUMNS(['value'])) FROM TestBcPBValueProtoTable v
+--
+QueryStmt
++-output_column_list=
+| +-TestBcPBValueProtoTable.Filename#2 AS Filename [STRING]
+| +-TestBcPBValueProtoTable.RowId#3 AS RowId [INT64]
++-query=
+  +-ProjectScan
+    +-column_list=TestBcPBValueProtoTable.[Filename#2, RowId#3]
+    +-input_scan=
+      +-TableScan(column_list=TestBcPBValueProtoTable.[Filename#2, RowId#3], table=TestBcPBValueProtoTable, column_index_list=[1, 2], alias="v")
+
+[SQLBUILDER_OUTPUT]
+SELECT
+  TestBcPBValueProtoTable.Filename AS Filename,
+  TestBcPBValueProtoTable.RowId AS RowId
+FROM
+  TestBcPBValueProtoTable;
+
+==
+
+# Unpack a nested field from the proto value column
+SELECT * EXCEPT (**COLUMNS(['value.b'])) FROM TestBcPBValueProtoTable v
+--
+ERROR: Column `value.b` in SELECT * EXCEPT list does not exist [at 1:18]
+SELECT * EXCEPT (**COLUMNS(['value.b'])) FROM TestBcPBValueProtoTable v
+                 ^
+==
+
+SELECT * EXCEPT (**COLUMNS([TestConstantStringNamedKey])) FROM KeyValue
+--
+QueryStmt
++-output_column_list=
+| +-KeyValue.Value#2 AS Value [STRING]
++-query=
+  +-ProjectScan
+    +-column_list=[KeyValue.Value#2]
+    +-input_scan=
+      +-TableScan(column_list=[KeyValue.Value#2], table=KeyValue, column_index_list=[1])
+
+[SQLBUILDER_OUTPUT]
+SELECT
+  KeyValue.Value AS Value
+FROM
+  KeyValue;
+
+==
+
+SELECT * EXCEPT (**COLUMNS(TestConstantStringOneElementArray)) FROM KeyValue
+--
+QueryStmt
++-output_column_list=
+| +-KeyValue.Value#2 AS Value [STRING]
++-query=
+  +-ProjectScan
+    +-column_list=[KeyValue.Value#2]
+    +-input_scan=
+      +-TableScan(column_list=[KeyValue.Value#2], table=KeyValue, column_index_list=[1])
+
+[SQLBUILDER_OUTPUT]
+SELECT
+  KeyValue.Value AS Value
+FROM
+  KeyValue;
+==
+
+# Column not found
+SELECT * EXCEPT (**COLUMNS(['NonExistent'])) FROM KeyValue
+--
+ERROR: Column NonExistent in SELECT * EXCEPT list does not exist [at 1:18]
+SELECT * EXCEPT (**COLUMNS(['NonExistent'])) FROM KeyValue
+                 ^
+==
+
+# Name is not a column or field (using table alias)
+SELECT * EXCEPT (**COLUMNS(['KeyValue'])) FROM KeyValue
+--
+ERROR: Column KeyValue in SELECT * EXCEPT list does not exist [at 1:18]
+SELECT * EXCEPT (**COLUMNS(['KeyValue'])) FROM KeyValue
+                 ^

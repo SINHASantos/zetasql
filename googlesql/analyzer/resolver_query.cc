@@ -40,6 +40,7 @@
 #include "googlesql/base/logging.h"
 #include "googlesql/base/varsetter.h"
 #include "googlesql/analyzer/analytic_function_resolver.h"
+#include "googlesql/analyzer/column_list_spec.h"
 #include "googlesql/analyzer/constant_resolver_helper.h"
 #include "googlesql/analyzer/expr_matching_helpers.h"
 #include "googlesql/analyzer/expr_resolver_helper.h"
@@ -146,6 +147,7 @@
 #include "absl/strings/substitute.h"
 #include "absl/time/time.h"
 #include "absl/types/span.h"
+#include "googlesql/base/ret_check.h"
 #include "googlesql/base/map_util.h"
 #include "googlesql/base/stl_util.h"
 #include "googlesql/base/ret_check.h"
@@ -2994,20 +2996,37 @@ static absl::Status FillItemStructFromNameListColumns(
 }
 
 inline static absl::Status CheckExpressionIsUnparenthesizedIdentifier(
-    const ASTExpression* expression, const char* error_message) {
-  std::string full_error_message =
-      absl::StrCat("Expected unparenthesized identifier", error_message);
-  GOOGLESQL_RET_CHECK(expression->Is<ASTIdentifier>()) << full_error_message;
-  GOOGLESQL_RET_CHECK(!expression->parenthesized()) << full_error_message;
+    const ASTExpression* expression, absl::string_view error_message) {
+  auto error = [error_message] {
+    return absl::StrCat("Expected unparenthesized identifier", error_message);
+  };
+  GOOGLESQL_RET_CHECK(expression->Is<ASTIdentifier>()) << error();
+  GOOGLESQL_RET_CHECK(!expression->parenthesized()) << error();
+  return absl::OkStatus();
+}
+
+inline static absl::Status CheckExpressionIsUnparenthesizedIdentifierOrUnpack(
+    const ASTExpression* expression, absl::string_view error_message) {
+  auto error = [error_message] {
+    return absl::StrCat(
+        "Expected unparenthesized identifier or UNPACK expression",
+        error_message);
+  };
+  GOOGLESQL_RET_CHECK(expression->Is<ASTIdentifier>() ||
+            expression->Is<ASTUnpackExpression>())
+      << error();
+  GOOGLESQL_RET_CHECK(!expression->parenthesized()) << error();
   return absl::OkStatus();
 }
 
 inline static absl::Status CheckExpressionIsUnparenthesizedPathExpression(
-    const ASTExpression* expression, const char* error_message) {
-  std::string full_error_message =
-      absl::StrCat("Expected unparenthesized path expression", error_message);
-  GOOGLESQL_RET_CHECK(expression->Is<ASTPathExpression>()) << full_error_message;
-  GOOGLESQL_RET_CHECK(!expression->parenthesized()) << full_error_message;
+    const ASTExpression* expression, absl::string_view error_message) {
+  auto error = [error_message] {
+    return absl::StrCat("Expected unparenthesized path expression",
+                        error_message);
+  };
+  GOOGLESQL_RET_CHECK(expression->Is<ASTPathExpression>()) << error();
+  GOOGLESQL_RET_CHECK(!expression->parenthesized()) << error();
   return absl::OkStatus();
 }
 
@@ -3022,34 +3041,57 @@ absl::Status Resolver::ResolvePipeDrop(
 
   // Map with additional info for the columns we intend to drop.
   struct DropItem {
-    const ASTIdentifier* ast_identifier;
+    const ASTExpression* ast_identifier;
     bool found;  // false means not found yet.
   };
   absl::flat_hash_map<IdString, DropItem, IdStringCaseHash,
                       IdStringCaseEqualFunc>
       columns_to_drop;
 
+  auto query_resolution_info = std::make_unique<QueryResolutionInfo>(this);
   // Build the set and map, checking the names are valid to drop.
   for (const ASTExpression* expression :
        pipe_drop->column_list()->expression_list()) {
-    GOOGLESQL_RETURN_IF_ERROR(CheckExpressionIsUnparenthesizedIdentifier(
+    GOOGLESQL_RETURN_IF_ERROR(CheckExpressionIsUnparenthesizedIdentifierOrUnpack(
         expression, " as pipe DROP column"));
-    auto identifier = expression->GetAsOrDie<ASTIdentifier>();
-    const IdString column_name = identifier->GetAsIdString();
-    if (IsInternalAlias(column_name)) {
-      return MakeSqlErrorAt(identifier)
-             << "Cannot use pipe DROP with internal alias "
-             << ToIdentifierLiteral(column_name);
+    std::vector<std::pair<const ASTExpression*, IdString>> column_names;
+    if (expression->Is<ASTIdentifier>()) {
+      auto identifier = expression->GetAsOrDie<ASTIdentifier>();
+      const IdString column_name = identifier->GetAsIdString();
+      column_names.push_back({identifier, column_name});
+    } else if (expression->Is<ASTUnpackExpression>()) {
+      auto unpack_expression = expression->GetAsOrDie<ASTUnpackExpression>();
+      ExprResolutionInfo expr_resolution_info(
+          query_resolution_info.get(), scope,
+          ExprResolutionInfoOptions{.clause_name = "PIPE DROP"});
+
+      GOOGLESQL_ASSIGN_OR_RETURN(std::vector<IdString> unpacked_names,
+                       ResolveUnpackExpressionColumnNames(
+                           unpack_expression, &expr_resolution_info));
+      column_names.reserve(unpacked_names.size());
+      for (const IdString& column_name : unpacked_names) {
+        column_names.push_back({unpack_expression, column_name});
+      }
     }
-    if (!googlesql_base::InsertIfNotPresent(&columns_to_drop, column_name,
-                                 DropItem{identifier, /*found=*/false})) {
-      return MakeSqlErrorAt(identifier)
-             << "Duplicate column name in pipe DROP: "
-             << ToIdentifierLiteral(column_name);
+
+    for (const auto& [expression, column_name] : column_names) {
+      if (IsInternalAlias(column_name)) {
+        return MakeSqlErrorAt(expression)
+               << "Cannot use pipe DROP with internal alias "
+               << ToIdentifierLiteral(column_name);
+      }
+      if (!googlesql_base::InsertIfNotPresent(&columns_to_drop, column_name,
+                                   DropItem{expression, /*found=*/false})) {
+        return MakeSqlErrorAt(expression)
+               << "Duplicate column name in pipe DROP: "
+               << ToIdentifierLiteral(column_name);
+      }
+      column_names_to_drop.insert(column_name);
     }
-    column_names_to_drop.insert(column_name);
   }
-  GOOGLESQL_RET_CHECK(!columns_to_drop.empty());
+  if (columns_to_drop.empty()) {
+    return MakeSqlErrorAt(pipe_drop) << "No columns specified in pipe DROP";
+  }
 
   // Fill the map and check column names exist in the input table.
   GOOGLESQL_RETURN_IF_ERROR(FillItemStructFromNameListColumns(
@@ -5668,8 +5710,8 @@ absl::Status Resolver::CreateSelectNamelists(
       // We saw a non-aggregate SELECT column with the same alias as
       // an aggregate/analytic SELECT column.  Ensure that the related
       // NameTarget is ambiguous.
-      googlesql_base::InsertOrUpdate(error_name_targets, select_column_state->alias,
-                          NameTarget());
+      error_name_targets->insert_or_assign(select_column_state->alias,
+                                           NameTarget());
       return absl::OkStatus();
     }
 
@@ -6192,7 +6234,6 @@ absl::Status Resolver::AddNameListToSelectList(
   SelectColumnStateList* select_column_state_list =
       query_resolution_info->select_column_state_list();
   const ASTExpression* ast_expression = ast_select_column->expression();
-  const size_t orig_num_columns = select_column_state_list->Size();
   for (const NamedColumn& named_column : name_list->columns()) {
     // Process exclusions first because MakeColumnRef will add columns
     // to referenced_columns_ and then they cannot be pruned.
@@ -6240,18 +6281,6 @@ absl::Status Resolver::AddNameListToSelectList(
           std::move(column_ref),
           /*dot_star_source_expr_info=*/nullptr);
     }
-  }
-
-  // Detect if the */.* ended up expanding to zero columns after applying
-  // EXCEPT, and treat that as an error.
-  if (orig_num_columns == select_column_state_list->Size()) {
-    GOOGLESQL_RET_CHECK(column_replacements != nullptr &&
-              !column_replacements->excluded_columns.empty());
-    return MakeSqlErrorAt(ast_expression)
-           << "SELECT "
-           << (ast_expression->node_kind() == AST_DOT_STAR_WITH_MODIFIERS ? ".*"
-                                                                          : "*")
-           << " expands to zero columns after applying EXCEPT";
   }
 
   return absl::OkStatus();
@@ -6490,15 +6519,34 @@ absl::Status Resolver::ResolveSelectStarModifiers(
   }
 
   if (except_list != nullptr) {
+    std::vector<std::pair<const ASTNode*, IdString>> except_columns;
     for (const ASTExpression* ast_expression :
          except_list->expressions()->expression_list()) {
-      GOOGLESQL_RETURN_IF_ERROR(CheckExpressionIsUnparenthesizedIdentifier(
+      GOOGLESQL_RETURN_IF_ERROR(CheckExpressionIsUnparenthesizedIdentifierOrUnpack(
           ast_expression, " in SELECT * EXCEPT list"));
 
-      auto ast_identifier = ast_expression->GetAsOrDie<ASTIdentifier>();
-      const IdString identifier = ast_identifier->GetAsIdString();
+      if (ast_expression->Is<ASTIdentifier>()) {
+        const IdString identifier =
+            ast_expression->GetAsOrDie<ASTIdentifier>()->GetAsIdString();
+        except_columns.push_back({ast_expression, identifier});
+      } else if (ast_expression->Is<ASTUnpackExpression>()) {
+        ExprResolutionInfo expr_resolution_info(
+            query_resolution_info, scope,
+            ExprResolutionInfoOptions{.clause_name = "SELECT"});
+
+        GOOGLESQL_ASSIGN_OR_RETURN(std::vector<IdString> column_names,
+                         ResolveUnpackExpressionColumnNames(
+                             ast_expression->GetAsOrDie<ASTUnpackExpression>(),
+                             &expr_resolution_info));
+        for (const IdString& column_name : column_names) {
+          except_columns.push_back({ast_expression, column_name});
+        }
+      }
+    }
+
+    for (const auto& [ast_expression, identifier] : except_columns) {
       if (IsInternalAlias(identifier)) {
-        return MakeSqlErrorAt(ast_identifier)
+        return MakeSqlErrorAt(ast_expression)
                << "Cannot use EXCEPT with internal alias "
                << ToIdentifierLiteral(identifier);
       }
@@ -6515,7 +6563,7 @@ absl::Status Resolver::ResolveSelectStarModifiers(
       }
       switch (has_field) {
         case Type::HAS_NO_FIELD:
-          return MakeSqlErrorAt(ast_identifier)
+          return MakeSqlErrorAt(ast_expression)
                  << "Column " << ToIdentifierLiteral(identifier)
                  << " in SELECT * EXCEPT list does not exist";
         case Type::HAS_FIELD:
@@ -6530,7 +6578,7 @@ absl::Status Resolver::ResolveSelectStarModifiers(
       }
       if (!googlesql_base::InsertIfNotPresent(&column_replacements->excluded_columns,
                                    identifier)) {
-        return MakeSqlErrorAt(ast_identifier)
+        return MakeSqlErrorAt(ast_expression)
                << "Duplicate column " << ToIdentifierLiteral(identifier)
                << " in SELECT * EXCEPT list";
       }
@@ -6663,11 +6711,22 @@ absl::Status Resolver::ResolveSelectStar(
         &column_replacements));
   }
 
+  SelectColumnStateList* select_column_state_list =
+      query_resolution_info->select_column_state_list();
+  const size_t orig_num_columns = select_column_state_list->Size();
   const CorrelatedColumnsSetList correlated_columns_set_list;
   GOOGLESQL_RETURN_IF_ERROR(AddNameListToSelectList(
       ast_select_column, from_clause_name_list, correlated_columns_set_list,
       /*ignore_excluded_value_table_fields=*/true, query_resolution_info,
       &column_replacements));
+
+  // Detect if the * ended up expanding to zero columns after applying EXCEPT,
+  // and treat that as an error.
+  if (orig_num_columns == select_column_state_list->Size()) {
+    GOOGLESQL_RET_CHECK(!column_replacements.excluded_columns.empty());
+    return MakeSqlErrorAt(ast_select_expr)
+           << "SELECT * expands to zero columns after applying EXCEPT";
+  }
 
   return absl::OkStatus();
 }
@@ -6748,11 +6807,22 @@ absl::Status Resolver::ResolveSelectDotStar(
               &column_replacements));
         }
 
+        SelectColumnStateList* select_column_state_list =
+            query_resolution_info->select_column_state_list();
+        const size_t orig_num_columns = select_column_state_list->Size();
         GOOGLESQL_RETURN_IF_ERROR(AddNameListToSelectList(
             ast_select_column, target.scan_columns(),
             correlated_columns_set_list,
             /*ignore_excluded_value_table_fields=*/false, query_resolution_info,
             &column_replacements));
+
+        // Detect if the .* ended up expanding to zero columns after applying
+        // EXCEPT, and treat that as an error.
+        if (orig_num_columns == select_column_state_list->Size()) {
+          GOOGLESQL_RET_CHECK(!column_replacements.excluded_columns.empty());
+          return MakeSqlErrorAt(ast_dotstar)
+                 << "SELECT .* expands to zero columns after applying EXCEPT";
+        }
 
         return absl::OkStatus();
       }
@@ -6867,6 +6937,7 @@ static absl::StatusOr<DotStarSourceExprInfo*> AddDotStarSourceExprInfoIfNeeded(
       break;
     case AST_STAR:
     case AST_STAR_WITH_MODIFIERS:
+    case AST_UNPACK_EXPRESSION:
       return nullptr;
     default:
       GOOGLESQL_RET_CHECK_FAIL() << "Unexpected AST expression kind: "
@@ -7186,6 +7257,11 @@ absl::Status Resolver::ResolveSelectColumnFirstPass(
   const ASTExpression* ast_select_expr = ast_select_column->expression();
 
   switch (ast_select_expr->node_kind()) {
+    case AST_UNPACK_EXPRESSION: {
+      return ResolveUnpackExpressionInSelectList(
+          ast_select_column, from_clause_name_list, current_name_scope.get(),
+          query_resolution_info);
+    }
     case AST_STAR:
     case AST_STAR_WITH_MODIFIERS:
     case AST_DOT_STAR:
@@ -17138,8 +17214,14 @@ absl::Status Resolver::PrepareTVFInputArguments(
 
   bool is_sql_tvf = tvf_catalog_entry->Is<SQLTableValuedFunctionInterface>();
 
-  GOOGLESQL_RETURN_IF_ERROR(CheckTVFArgumentHasNoUnsupportedAnnotations(
-      is_sql_tvf, resolved_tvf_args, arg_locations));
+  // If the TVF provides a custom callback to validate argument annotations, we
+  // bypass the default strict engine check and defer to the TVF's custom
+  // validation logic.
+  if (tvf_catalog_entry->tvf_options().check_argument_annotations_callback ==
+      nullptr) {
+    GOOGLESQL_RETURN_IF_ERROR(CheckTVFArgumentHasNoUnsupportedAnnotations(
+        is_sql_tvf, resolved_tvf_args, arg_locations));
+  }
 
   // Add casts or coerce literals for TVF arguments.
   GOOGLESQL_RET_CHECK(result_signature->IsConcrete()) << ast_tvf->DebugString();
@@ -17359,6 +17441,13 @@ absl::Status Resolver::PrepareTVFInputArguments(
             TVFInputArgumentType(TVFRelation(tvf_relation_columns)));
       }
     }
+  }
+  if (tvf_catalog_entry->tvf_options().check_argument_annotations_callback !=
+      nullptr) {
+    GOOGLESQL_RETURN_IF_ERROR(StatusWithInternalErrorLocation(
+        tvf_catalog_entry->tvf_options().check_argument_annotations_callback(
+            *result_signature, tvf_input_arguments, language()),
+        ast_tvf));
   }
   return absl::OkStatus();
 }
@@ -19660,6 +19749,122 @@ absl::Status Resolver::ValidateMeasureSource(const ASTNode* ast_location,
     GOOGLESQL_RETURN_IF_ERROR(CheckRowIdentityColumns(ast_location, row_identity_columns,
                                             table, language(), measure_source));
   }
+  return absl::OkStatus();
+}
+
+absl::StatusOr<std::vector<IdString>>
+Resolver::ResolveUnpackExpressionColumnNames(
+    const ASTUnpackExpression* unpack_expression,
+    ExprResolutionInfo* expr_resolution_info) {
+  GOOGLESQL_RET_CHECK_NE(unpack_expression, nullptr);
+  GOOGLESQL_RET_CHECK_NE(expr_resolution_info, nullptr);
+
+  if (in_strict_mode()) {
+    return MakeSqlErrorAt(unpack_expression)
+           << "UNPACK is not allowed in strict name resolution mode";
+  }
+
+  if (!language().LanguageFeatureEnabled(FEATURE_COLUMN_LIST_SPEC)) {
+    return MakeSqlErrorAt(unpack_expression)
+           << "Unpack expression is not supported";
+  }
+
+  const ASTExpression* ast_expr = unpack_expression->expression();
+  if (ast_expr->node_kind() != AST_COLUMN_LIST_SPEC) {
+    return MakeSqlErrorAt(ast_expr)
+           << "Operator ** requires an argument of type COLUMN_LIST_SPEC, but "
+              "found "
+           << ast_expr->GetNodeKindString();
+  }
+
+  const ASTColumnListSpec* column_list_spec_expr =
+      ast_expr->GetAsOrDie<ASTColumnListSpec>();
+
+  std::unique_ptr<const ColumnListSpec> column_list_spec;
+  GOOGLESQL_RETURN_IF_ERROR(ResolveColumnListSpec(
+      column_list_spec_expr, expr_resolution_info, &column_list_spec));
+
+  return column_list_spec->column_names();
+}
+
+// Looks up a column name from an unpack expression in the given scope.
+// Validates that it's not an internal alias and that it refers to a column
+// or field. Returns the ResolvedColumn if found and valid.
+absl::StatusOr<ResolvedColumn> Resolver::LookupUnpackColumn(
+    IdString column_name, const ASTNode* ast_location, const NameScope* scope) {
+  if (IsInternalAlias(column_name)) {
+    return MakeSqlErrorAt(ast_location)
+           << "Column name provided to ** cannot be an internal alias "
+           << ToIdentifierLiteral(column_name);
+  }
+
+  NameTarget target;
+  GOOGLESQL_ASSIGN_OR_RETURN(bool name_found, scope->LookupName(column_name, &target));
+  if (!name_found) {
+    return MakeSqlErrorAt(ast_location)
+           << "Name " << column_name << " not found in the current scope";
+  }
+
+  if (!(target.IsColumn() || target.IsFieldOf())) {
+    return MakeSqlErrorAt(ast_location)
+           << "Name " << column_name
+           << " provided to ** does not refer to a column or field";
+  }
+
+  return target.IsColumn() ? target.column() : target.column_containing_field();
+}
+
+absl::Status Resolver::ResolveUnpackExpressionInSelectList(
+    const ASTSelectColumn* ast_select_column,
+    const std::shared_ptr<const NameList>& from_clause_name_list,
+    const NameScope* from_scan_scope,
+    QueryResolutionInfo* query_resolution_info) {
+  const ASTExpression* ast_expression = ast_select_column->expression();
+  if (!language().LanguageFeatureEnabled(FEATURE_COLUMN_LIST_SPEC)) {
+    return MakeSqlErrorAt(ast_expression)
+           << "COLUMN_LIST_SPEC feature is not enabled";
+  }
+
+  GOOGLESQL_RET_CHECK(from_clause_name_list != nullptr);
+  if (ast_select_column->alias() != nullptr) {
+    return MakeSqlErrorAt(ast_select_column->alias())
+           << "** expression cannot be aliased";
+  }
+
+  GOOGLESQL_RET_CHECK_EQ(ast_expression->node_kind(), AST_UNPACK_EXPRESSION);
+  const ASTUnpackExpression* unpack_expression =
+      ast_expression->GetAsOrDie<ASTUnpackExpression>();
+
+  if (from_clause_name_list->num_columns() == 0) {
+    return MakeSqlErrorAt(unpack_expression)
+           << "No columns found in the FROM clause to resolve **";
+  }
+
+  ExprResolutionInfo expr_resolution_info(
+      query_resolution_info, from_scan_scope,
+      ExprResolutionInfoOptions{.clause_name = "SELECT"});
+
+  GOOGLESQL_ASSIGN_OR_RETURN(std::vector<IdString> column_names,
+                   ResolveUnpackExpressionColumnNames(unpack_expression,
+                                                      &expr_resolution_info));
+
+  const ASTExpression* unpack_expression_arg = unpack_expression->expression();
+  for (IdString column_name : column_names) {
+    GOOGLESQL_ASSIGN_OR_RETURN(ResolvedColumn column,
+                     LookupUnpackColumn(column_name, unpack_expression_arg,
+                                        from_scan_scope));
+    std::unique_ptr<const ResolvedExpr> column_ref = MakeColumnRef(column);
+
+    query_resolution_info->select_column_state_list()->AddSelectColumn(
+        ast_select_column, column_name,
+        /*is_explicit=*/true,
+        ExprFindings{.has_aggregation = false,
+                     .has_analytic = false,
+                     .has_volatile = false},
+        /*resolved_expr=*/std::move(column_ref),
+        /*dot_star_source_expr_info=*/nullptr);
+  }
+
   return absl::OkStatus();
 }
 

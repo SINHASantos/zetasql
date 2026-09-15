@@ -27,10 +27,10 @@
 
 #include "googlesql/base/arena.h"
 #include "googlesql/parser/macros/diagnostic.h"
-#include "googlesql/parser/macros/macro_catalog.h"
 #include "googlesql/parser/macros/token_provider_base.h"
 #include "googlesql/parser/token_stream.h"
 #include "googlesql/parser/token_with_location.h"
+#include "googlesql/public/catalog.h"
 #include "googlesql/public/error_location.pb.h"
 #include "googlesql/public/parse_location.h"
 #include "absl/base/nullability.h"
@@ -82,19 +82,14 @@ struct ExpansionOutput {
   std::vector<absl::Status> warnings;
   std::unique_ptr<googlesql_base::UnsafeArena> arena;
   absl::btree_map<size_t, Expansion> location_map;
-  // This is used to maintain the ownership of the allocated stack frames.
-  // All newly allocated stack frames owned by this vector thereby avoiding
-  // memory leaks.
-  // std::unique_ptr is needed to avoid copying of this vector.
-  std::vector<std::unique_ptr<StackFrame>> stack_frames;
 };
 
 // GoogleSQL's implementation of the macro expander.
 class MacroExpander final : public TokenStream {
  public:
   static absl::StatusOr<std::unique_ptr<MacroExpander>> Create(
-      TokenStream* token_provider, const MacroCatalog& macro_catalog,
-      googlesql_base::UnsafeArena* arena, StackFrame::StackFrameFactory& stack_frame_factory,
+      TokenStream* token_provider, Catalog* /*absl_nullable*/ catalog,
+      googlesql_base::UnsafeArena* /*absl_nonnull*/ arena,
       MacroExpanderOptions macro_expander_options,
       StackFrame* /*absl_nullable*/ parent_location);
 
@@ -108,14 +103,14 @@ class MacroExpander final : public TokenStream {
   // Convenient non-streaming API to return all expanded tokens.
   static absl::StatusOr<ExpansionOutput> ExpandMacros(
       std::unique_ptr<TokenStream> token_provider,
-      const MacroCatalog& macro_catalog, MacroExpanderOptions options = {});
+      Catalog* /*absl_nullable*/ catalog, MacroExpanderOptions options = {});
 
  private:
-  MacroExpander(TokenProviderBase* token_provider,
-                const MacroCatalog& macro_catalog, googlesql_base::UnsafeArena* arena,
-                StackFrame::StackFrameFactory& stack_frame_factory,
-                MacroExpanderOptions macro_expander_options,
-                StackFrame* /*absl_nullable*/ parent_location);
+  MacroExpander(
+      TokenProviderBase* token_provider, Catalog* /*absl_nullable*/ catalog,
+      std::shared_ptr<StackFrame::StackFrameFactory> stack_frame_factory,
+      MacroExpanderOptions macro_expander_options,
+      StackFrame* /*absl_nullable*/ parent_location);
 
   // Collects warnings from the current expansion across all levels, hiding the
   // logic to cap the number of warnings.
@@ -171,17 +166,16 @@ class MacroExpander final : public TokenStream {
   };
 
   MacroExpander(
-      TokenProviderBase* token_provider, const MacroCatalog& macro_catalog,
-      googlesql_base::UnsafeArena* arena, StackFrame::StackFrameFactory& stack_frame_factory,
+      TokenProviderBase* token_provider, Catalog* /*absl_nullable*/ catalog,
+      std::shared_ptr<StackFrame::StackFrameFactory> stack_frame_factory,
       ExpansionState& expansion_state,
       const std::vector<std::vector<TokenWithLocation>> call_arguments,
       MacroExpanderOptions macro_expander_options,
       WarningCollector* override_warning_collector,
       StackFrame* /*absl_nullable*/ parent_location)
       : token_provider_(token_provider),
-        macro_catalog_(macro_catalog),
-        arena_(arena),
-        stack_frame_factory_(stack_frame_factory),
+        catalog_(catalog),
+        stack_frame_factory_(std::move(stack_frame_factory)),
         call_arguments_(std::move(call_arguments)),
         macro_expander_options_(macro_expander_options),
         owned_warning_collector_(
@@ -197,8 +191,8 @@ class MacroExpander final : public TokenStream {
   // replacing it.
   static absl::Status ExpandMacrosInternal(
       std::unique_ptr<TokenStream> token_provider,
-      const MacroCatalog& macro_catalog, googlesql_base::UnsafeArena* arena,
-      StackFrame::StackFrameFactory& stack_frame_factory,
+      Catalog* /*absl_nullable*/ catalog,
+      std::shared_ptr<StackFrame::StackFrameFactory> stack_frame_factory,
       ExpansionState& expansion_state,
       const std::vector<std::vector<TokenWithLocation>>& call_arguments,
       MacroExpanderOptions macro_expander_options,
@@ -312,7 +306,7 @@ class MacroExpander final : public TokenStream {
   // REQUIRES: The macro definition must have already been loaded from the
   //           macro catalog.
   absl::Status ExpandUserMacroInvocation(
-      const MacroInfo& macro_info, StackFrame& macro_invocation_stack_frame,
+      const Macro& macro, StackFrame& macro_invocation_stack_frame,
       const std::vector<TokenWithLocation>& unexpanded_args,
       const std::vector<std::vector<TokenWithLocation>>& expanded_args,
       std::vector<TokenWithLocation>& expanded_tokens);
@@ -389,7 +383,8 @@ class MacroExpander final : public TokenStream {
   absl::Status RaiseErrorOrAddWarning(absl::Status status);
 
   // Returns a string_view over the concatenation of the 2 input strings.
-  // If both inputs are non-empty, the concatenation is stored on `arena_`.
+  // If both inputs are non-empty, the concatenation is stored on
+  // `stack_frame_factory_->arena()`.
   // Otherwise, the returned string_view points to the non-empty input.
   // If both are empty, can return either.
   absl::string_view MaybeAllocateConcatenation(absl::string_view a,
@@ -422,21 +417,14 @@ class MacroExpander final : public TokenStream {
 
   TokenProviderBase* token_provider_;
 
-  // The macro catalog which contains current definitions.
+  // The catalog to use for macro expansion.
   // Never changes during the expansion of a statement.
-  const MacroCatalog& macro_catalog_;
+  Catalog* /*absl_nullable*/ catalog_ = nullptr;
 
-  // Used to allocate strings for spliced tokens. Must stay valid as long as
-  // the tokens referring to the spliced strings are still alive.
-  // IMPORTANT: The strings in the arena should never be modified, because they
-  // store their buffers in the arena as well. AllocateString() returns a
-  // string_view to enforce this.
-  googlesql_base::UnsafeArena* arena_ = nullptr;
-
-  // Used to create new stack frames. This is a factory class which will help
-  // in creating new stack frames and maintaining their ownership.
-  // Outside of the factory, no new stack frames should be created.
-  StackFrame::StackFrameFactory& stack_frame_factory_;
+  // Used to allocate new stack frames and spliced token strings on its
+  // underlying arena, and enforce the maximum stack frame limit. Outside of
+  // this factory, no new stack frames should be created.
+  std::shared_ptr<StackFrame::StackFrameFactory> stack_frame_factory_;
 
   // Used when we are expanding potentially splicing tokens, for example:
   //     $prefix(arg1)some_id$suffix1($somearg(a))$suffix2

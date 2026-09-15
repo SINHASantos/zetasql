@@ -334,6 +334,11 @@ absl::Status DefaultAnnotationSpec::CheckAndPropagateForSubqueryExpr(
   } else {
     // No way to propagate annotations by default for existence/in/like
     // subqueries.
+    // In the future, if some annotations need to override the behavior, we
+    // should then expose a dedicated virtual method for In/Like/Exists.., etc.
+    //
+    // In all circumstances, however, the 2 cases above (ARRAY subquery and
+    // scalar subquery) must NOT allow overriding.
     return absl::OkStatus();
   }
   auto* annotation = subquery_scan->column_list(0).type_annotation_map();

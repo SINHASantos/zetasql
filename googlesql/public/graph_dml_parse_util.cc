@@ -38,6 +38,27 @@ class GraphDmlVisitor : public DefaultParseTreeStatusVisitor {
     return absl::OkStatus();
   }
 
+  absl::Status VisitASTGqlSet(const ASTGqlSet* node,
+                              std::any& output) override {
+    has_graph_dml_ = true;
+    // Stop visiting children once the first DML node is found.
+    return absl::OkStatus();
+  }
+
+  absl::Status VisitASTGqlRemove(const ASTGqlRemove* node,
+                                 std::any& output) override {
+    has_graph_dml_ = true;
+    // Stop visiting children once the first DML node is found.
+    return absl::OkStatus();
+  }
+
+  absl::Status VisitASTGqlDelete(const ASTGqlDelete* node,
+                                 std::any& output) override {
+    has_graph_dml_ = true;
+    // Stop visiting children once the first DML node is found.
+    return absl::OkStatus();
+  }
+
   absl::Status Visit(const ASTNode* node, std::any& output) override {
     if (has_graph_dml_) {
       // Short-circuit traversal if a DML node has already been encountered
@@ -45,9 +66,6 @@ class GraphDmlVisitor : public DefaultParseTreeStatusVisitor {
     }
     return DefaultVisit(node, output);
   }
-
-  // TODO: b/474135498 - Add Visit methods for other Graph DML operators once
-  // they are added to the grammar.
 
  private:
   bool has_graph_dml_ = false;

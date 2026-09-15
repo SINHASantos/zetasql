@@ -1,0 +1,1401 @@
+# TODO: Add tests checking annotation propagation and partition key collation.
+[default reserve_align]
+[default required_features=ALIGN_OPERATOR,INTERVAL_TYPE]
+
+[prepare_database]
+CREATE TABLE TimeseriesData AS (
+  SELECT TIMESTAMP '2020-01-01 00:00:20+00' AS ts, 1 AS requests, 1.0 AS gcu, 'job_A' AS borg_job, 'cell1' AS borg_cell
+  UNION ALL
+  SELECT TIMESTAMP '2020-01-01 00:00:40+00' AS ts, 10 AS requests, 2.0 AS gcu, 'job_A' AS borg_job, 'cell1' AS borg_cell
+  UNION ALL
+  SELECT TIMESTAMP '2020-01-01 00:01:00+00' AS ts, 100 AS requests, 4.0 AS gcu, 'job_A' AS borg_job, 'cell1' AS borg_cell
+  UNION ALL
+  SELECT TIMESTAMP '2020-01-01 00:01:30+00' AS ts, 1000 AS requests, 8.0 AS gcu, 'job_A' AS borg_job, 'cell2' AS borg_cell
+
+  UNION ALL
+  SELECT TIMESTAMP '2020-01-01 00:02:00+00' AS ts, 10000 AS requests, 10.0 AS gcu, 'job_B' AS borg_job, 'cell1' AS borg_cell
+  UNION ALL
+  SELECT TIMESTAMP '2020-01-01 00:02:40+00' AS ts, 100000 AS requests, 20.0 AS gcu, 'job_B' AS borg_job, 'cell2' AS borg_cell
+);
+--
+ARRAY<STRUCT<ts TIMESTAMP,
+             requests INT64,
+             gcu DOUBLE,
+             borg_job STRING,
+             borg_cell STRING>>
+[{
+   2020-01-01 00:00:20+00,
+   1,
+   1,
+   "job_A",
+   "cell1"
+ },
+ {
+   2020-01-01 00:00:40+00,
+   10,
+   2,
+   "job_A",
+   "cell1"
+ },
+ {
+   2020-01-01 00:01:00+00,
+   100,
+   4,
+   "job_A",
+   "cell1"
+ },
+ {
+   2020-01-01 00:01:30+00,
+   1000,
+   8,
+   "job_A",
+   "cell2"
+ },
+ {
+   2020-01-01 00:02:00+00,
+   10000,
+   10,
+   "job_B",
+   "cell1"
+ },
+ {
+   2020-01-01 00:02:40+00,
+   100000,
+   20,
+   "job_B",
+   "cell2"
+ }]
+==
+
+[name=align_duplicate_timestamps_in_input_data_error]
+WITH DuplicateData AS (
+  SELECT TIMESTAMP '2020-01-01 00:00:10+00' AS ts, 10 AS requests
+  UNION ALL
+  SELECT TIMESTAMP '2020-01-01 00:00:10+00' AS ts, 20 AS requests
+)
+SELECT * FROM DuplicateData ALIGN (
+  TIMESTAMP ts
+  PERIOD INTERVAL 1 MINUTE
+);
+--
+ERROR: generic::out_of_range: Timestamp values must be unique within a partition
+==
+
+# When the TIMESTAMP expression produces identical timestamp values across rows,
+# ALIGN returns a duplicate timestamp error.
+[name=align_timestamp_expr_returns_duplicate_values_error]
+SELECT * FROM TimeseriesData ALIGN (
+  TIMESTAMP TIMESTAMP(DATE(current_timestamp()))
+  PERIOD INTERVAL 30 SECOND
+  ORIGIN EPOCH
+);
+--
+ERROR: generic::out_of_range: Timestamp values must be unique within a partition
+==
+
+# A constant TIMESTAMP literal evaluates to the same value for all rows, causing
+# a duplicate timestamp error.
+[name=align_timestamp_expr_literal_causes_duplicate_timestamps_error]
+SELECT * FROM TimeseriesData ALIGN (
+  TIMESTAMP TIMESTAMP '2020-01-01 00:00:30+00'
+  PERIOD INTERVAL 30 SECOND
+  ORIGIN EPOCH
+);
+--
+ERROR: generic::out_of_range: Timestamp values must be unique within a partition
+==
+
+[name=align_null_timestamp_in_input_data_error]
+WITH NullData AS (
+  SELECT CAST(NULL AS TIMESTAMP) AS ts, 10 AS requests
+)
+SELECT * FROM NullData ALIGN (
+  TIMESTAMP ts
+  PERIOD INTERVAL 1 MINUTE
+);
+--
+ERROR: generic::out_of_range: Timestamp value in a time-series cannot be NULL
+==
+
+[name=align_empty_input_table_zero_output_rows_with_correct_schema]
+SELECT * FROM (SELECT * FROM TimeseriesData WHERE false) ALIGN (
+  TIMESTAMP ts
+  PERIOD INTERVAL 1 MINUTE
+  ORIGIN EPOCH
+)
+--
+ARRAY<STRUCT<ts TIMESTAMP>>[]
+==
+
+# TIMESTAMP clause is not required if the input table contains a column
+# named `timestamp` having type TIMESTAMP.
+[name=align_default_timestamp_column]
+WITH TimeseriesDataTimestampColumn AS (
+  SELECT ts AS timestamp, * FROM TimeseriesData
+)
+SELECT * FROM TimeseriesDataTimestampColumn ALIGN (
+  PERIOD INTERVAL 30 SECOND
+  ORIGIN EPOCH
+);
+--
+ARRAY<STRUCT<timestamp TIMESTAMP>>[unknown order:
+  {2020-01-01 00:00:30+00},
+  {2020-01-01 00:01:00+00},
+  {2020-01-01 00:01:30+00},
+  {2020-01-01 00:02:00+00},
+  {2020-01-01 00:02:30+00}
+]
+==
+
+# The TIMESTAMP clause can be any expression yielding a TIMESTAMP.
+[name=align_timestamp_expression_with_timestamp_add]
+SELECT * FROM TimeseriesData ALIGN (
+  TIMESTAMP TIMESTAMP_ADD(ts, INTERVAL 15 SECOND)
+  PERIOD INTERVAL 30 SECOND
+  ORIGIN EPOCH
+);
+--
+ARRAY<STRUCT<timestamp TIMESTAMP>>[unknown order:
+  {2020-01-01 00:01:00+00},
+  {2020-01-01 00:01:30+00},
+  {2020-01-01 00:02:00+00},
+  {2020-01-01 00:02:30+00}
+]
+==
+
+# An alias on the TIMESTAMP clause defines the column name for the output
+# aligned timestamp.
+[name=align_timestamp_expr_alias_is_aligned_timestamp_column_name]
+SELECT * FROM TimeseriesData ALIGN (
+  TIMESTAMP ts as align_ts
+  PERIOD INTERVAL 1 MINUTE
+  ORIGIN EPOCH
+);
+--
+ARRAY<STRUCT<align_ts TIMESTAMP>>[unknown order:
+  {2020-01-01 00:01:00+00},
+  {2020-01-01 00:02:00+00}
+]
+==
+
+[name=align_null_period_error]
+SELECT * FROM TimeseriesData ALIGN (
+  TIMESTAMP ts
+  PERIOD CAST(NULL AS INTERVAL)
+  ORIGIN EPOCH
+  PARTITION BY borg_job
+);
+--
+ERROR: generic::out_of_range: ALIGN PERIOD evaluated to NULL
+==
+
+[name=align_negative_period_error]
+SELECT * FROM TimeseriesData ALIGN (
+  TIMESTAMP ts
+  PERIOD INTERVAL -1 MINUTE
+  ORIGIN EPOCH
+  PARTITION BY borg_job
+);
+--
+ERROR: generic::out_of_range: ALIGN PERIOD must be positive
+==
+
+[name=align_zero_period_error]
+SELECT * FROM TimeseriesData ALIGN (
+  TIMESTAMP ts
+  PERIOD INTERVAL 0 DAY
+  ORIGIN EPOCH
+  PARTITION BY borg_job
+);
+--
+ERROR: generic::out_of_range: ALIGN PERIOD must be positive
+==
+
+# PERIOD can be an expression evaluating to an INTERVAL.
+[name=align_period_expression_from_timestamp_subtraction]
+SELECT * FROM TimeseriesData ALIGN (
+  TIMESTAMP ts
+  PERIOD TIMESTAMP '2020-01-01 00:01:10+00' - TIMESTAMP '2020-01-01 00:00:40+00'
+  ORIGIN EPOCH
+  PARTITION BY borg_job
+);
+--
+ARRAY<STRUCT<borg_job STRING, ts TIMESTAMP>>[unknown order:
+  {
+    "job_A",
+    2020-01-01 00:00:30+00
+  },
+  {
+    "job_A",
+    2020-01-01 00:01:00+00
+  },
+  {
+    "job_B",
+    2020-01-01 00:02:00+00
+  },
+  {
+    "job_B",
+    2020-01-01 00:02:30+00
+  }
+]
+==
+
+[name=align_period_expr_using_function_call_expression]
+[required_features=ALIGN_OPERATOR,INTERVAL_TYPE,NAMED_ARGUMENTS]
+SELECT * FROM TimeseriesData ALIGN (
+  TIMESTAMP ts
+  PERIOD MAKE_INTERVAL(minute => 1, second => 20)
+  ORIGIN TIMESTAMP '2020-01-01 00:00:00+00'
+  PARTITION BY borg_job
+);
+--
+ARRAY<STRUCT<borg_job STRING, ts TIMESTAMP>>[
+  {
+    "job_A",
+    2020-01-01 00:01:20+00
+  }
+]
+==
+
+[name=align_period_expr_subsecond_interval_with_subsecond_within_range]
+WITH Timeseries AS (
+  SELECT TIMESTAMP '2020-01-01 00:00:00.0011+00' AS ts, 10 AS requests
+  UNION ALL
+  SELECT TIMESTAMP '2020-01-01 00:00:00.0012+00' AS ts, 100 AS requests
+  UNION ALL
+  SELECT TIMESTAMP '2020-01-01 00:00:01+00' AS ts, 1000 AS requests
+)
+SELECT * FROM Timeseries ALIGN (
+  TIMESTAMP ts
+  PERIOD INTERVAL "0.001" SECOND
+  ORIGIN EPOCH
+  METRICS SUM(requests) WITHIN (1 PERIOD PRECEDING) AS sum_requests
+);
+--
+ARRAY<STRUCT<sum_requests INT64, ts TIMESTAMP>>[unknown order:
+  {
+    1000,
+    2020-01-01 00:00:01+00
+  },
+  {
+    110,
+    2020-01-01 00:00:00.002+00
+  }
+]
+==
+
+# TODO: Optimize the aligned timestamp increment logic for sparse
+# data so that it skips to the next viable aligned timestamp if the all metrics
+# have relative within bounds. Update this test to make the timestamps really
+# sparse.
+[name=align_period_expr_subsecond_interval_with_sparse_input_data]
+WITH Timeseries AS (
+  SELECT TIMESTAMP '2020-01-01 00:00:00.000011+00' AS ts, 10 AS requests
+  UNION ALL
+  SELECT TIMESTAMP '2020-01-01 00:00:00.000012+00' AS ts, 100 AS requests
+  UNION ALL
+  SELECT TIMESTAMP '2020-01-01 00:00:01+00' AS ts, 1000 AS requests
+)
+SELECT * FROM Timeseries ALIGN (
+  TIMESTAMP ts
+  PERIOD INTERVAL 1 MICROSECOND
+  ORIGIN EPOCH
+  METRICS SUM(requests) WITHIN (1 PERIOD PRECEDING) AS sum_requests
+);
+--
+ARRAY<STRUCT<sum_requests INT64, ts TIMESTAMP>>[unknown order:
+  {
+    100,
+    2020-01-01 00:00:00.000012+00
+  },
+  {
+    10,
+    2020-01-01 00:00:00.000011+00
+  },
+  {
+    1000,
+    2020-01-01 00:00:01+00
+  }
+]
+==
+
+[name=align_period_expr_large_interval_within_offset_overflow_error]
+SELECT * FROM TimeseriesData ALIGN (
+  TIMESTAMP ts
+  PERIOD INTERVAL 365 * 10000 DAY
+  ORIGIN EPOCH
+  METRICS SUM(requests) WITHIN (RANGE FROM 2 PERIOD PRECEDING TO 1 PERIOD FOLLOWING) AS sum_requests
+);
+--
+ERROR: generic::out_of_range: Interval field days '7300000' is out of range -3660000 to 3660000
+==
+
+# TODO: Check if the range should be clamped to min and max allowed
+# values of Timestamp for such cases. Update the test name accordingly.
+# Relative WITHIN intervals combined with an extremely large PERIOD result in
+# the lower/upper bound of aligned timestamp range to be outside the valid
+# range of Timestamps, causing an error.
+[name=align_period_expr_large_interval_window_underflows_min_timestamp_error]
+SELECT * FROM TimeseriesData ALIGN (
+  TIMESTAMP ts
+  PERIOD INTERVAL 365 * 10000 DAY
+  ORIGIN EPOCH
+  METRICS SUM(requests) WITHIN (RANGE FROM 1 PERIOD PRECEDING TO 1 PERIOD FOLLOWING) AS sum_requests
+);
+--
+ARRAY<STRUCT<sum_requests INT64, ts TIMESTAMP>>[
+  {
+    111111,
+    1970-01-01 00:00:00+00
+  }
+]
+==
+
+[name=align_origin_clause_is_timestamp_literal]
+SELECT * FROM TimeseriesData ALIGN (
+  TIMESTAMP ts
+  PERIOD INTERVAL 1 MINUTE
+  ORIGIN TIMESTAMP '2020-01-01 00:00:30+00'
+  PARTITION BY borg_job
+);
+--
+ARRAY<STRUCT<borg_job STRING, ts TIMESTAMP>>[unknown order:
+  {
+    "job_A",
+    2020-01-01 00:00:30+00
+  },
+  {
+    "job_B",
+    2020-01-01 00:02:30+00
+  }
+]
+==
+
+# ORIGIN EPOCH with 1-minute period aligns points to minute boundaries.
+[name=align_origin_epoch]
+SELECT * FROM TimeseriesData ALIGN (
+  TIMESTAMP ts
+  PERIOD INTERVAL 1 MINUTE
+  ORIGIN EPOCH
+  PARTITION BY borg_job
+);
+--
+ARRAY<STRUCT<borg_job STRING, ts TIMESTAMP>>[unknown order:
+  {
+    "job_A",
+    2020-01-01 00:01:00+00
+  },
+  {
+    "job_B",
+    2020-01-01 00:02:00+00
+  }
+]
+==
+
+# Aligned timestamps are an integer multiple of the period away from the origin
+# and the origin can be any timestamp, including timestamps greater than the
+# max input timestamp.
+[name=align_origin_greater_than_max_input_timestamp]
+SELECT * FROM TimeseriesData ALIGN (
+  TIMESTAMP ts
+  PERIOD INTERVAL 1 MINUTE
+  ORIGIN TIMESTAMP_ADD('2020-01-01 00:00:00+00', INTERVAL "1" DAY)
+  PARTITION BY borg_job
+);
+--
+ARRAY<STRUCT<borg_job STRING, ts TIMESTAMP>>[unknown order:
+  {
+    "job_A",
+    2020-01-01 00:01:00+00
+  },
+  {
+    "job_B",
+    2020-01-01 00:02:00+00
+  }
+]
+==
+
+[name=align_output_within_negative_interval_bound_error]
+SELECT * FROM TimeseriesData ALIGN (
+  TIMESTAMP ts
+  PERIOD INTERVAL 1 MINUTE
+  ORIGIN EPOCH
+  OUTPUT WITHIN INTERVAL -10 SECOND PRECEDING
+  PARTITION BY borg_job
+);
+--
+ERROR: generic::out_of_range: ALIGN bound interval must be positive
+==
+
+# Provably empty WITHIN ranges result in an error.
+[name=align_output_within_clause_empty_within_range_error]
+SELECT * FROM TimeseriesData ALIGN (
+  TIMESTAMP ts
+  PERIOD INTERVAL 1 MINUTE
+  ORIGIN EPOCH
+  OUTPUT WITHIN RANGE FROM INTERVAL 1 MINUTE PRECEDING TO 2 PERIOD PRECEDING
+  PARTITION BY borg_job
+);
+--
+ERROR: generic::out_of_range: OUTPUT WITHIN range is empty: WITHIN (lower_bound=INTERVAL PRECEDING($interval(ConstExpr(1), ConstExpr(MINUTE))), upper_bound=PERIOD PRECEDING(ConstExpr(2)))
+==
+
+# Final aligned timestamp range is left closed and right open. In this test
+# case the metrics clause is missing and the final range is calculated based
+# on the intersection of OUTPUT WITHIN range and the input partition max/min
+# timestamps. So the upper bound is TIMESTAMP '2020-01-01 00:01:30+00', which is
+# not present in the output aligned timestamps.
+[name=align_output_aligned_timestamp_bounds_left_closed_right_open]
+SELECT * FROM TimeseriesData ALIGN (
+  TIMESTAMP ts
+  PERIOD INTERVAL 30 SECOND
+  ORIGIN EPOCH
+  OUTPUT WITHIN RANGE FROM TIMESTAMP '2020-01-01 00:01:00+00' TO TIMESTAMP '2020-01-01 00:01:30+00'
+  PARTITION BY borg_job
+);
+--
+ARRAY<STRUCT<borg_job STRING, ts TIMESTAMP>>[
+  {
+    "job_A",
+    2020-01-01 00:01:00+00
+  }
+]
+==
+
+[name=align_partition_by_clause_expr_with_alias]
+SELECT * FROM TimeseriesData ALIGN (
+  TIMESTAMP ts
+  PERIOD INTERVAL 1 MINUTE
+  ORIGIN EPOCH
+  PARTITION BY concat(borg_job, "_", borg_cell) AS job_cell
+  METRICS CONCAT(job_cell, "_", CAST(SUM(requests) WITHIN (1 PERIOD PRECEDING) AS STRING)) AS total_requests
+);
+--
+ARRAY<STRUCT<
+        job_cell STRING,
+        total_requests STRING,
+        ts TIMESTAMP
+      >>
+[unknown order:{
+                 "job_A_cell2",
+                 "job_A_cell2_1000",
+                 2020-01-01 00:02:00+00
+               },
+               {
+                 "job_B_cell2",
+                 "job_B_cell2_100000",
+                 2020-01-01 00:03:00+00
+               },
+               {
+                 "job_A_cell1",
+                 "job_A_cell1_111",
+                 2020-01-01 00:01:00+00
+               },
+               {
+                 "job_B_cell1",
+                 "job_B_cell1_10000",
+                 2020-01-01 00:02:00+00
+               }]
+==
+
+# When rows have NULL values in the PARTITION BY column, all such rows are
+# grouped into a single partition.
+[name=align_partition_by_null_values]
+WITH TimeseriesWithNulls AS (
+  SELECT TIMESTAMP '2020-01-01 00:00:20+00' AS ts, 10 AS requests, CAST(NULL AS STRING) AS job
+  UNION ALL
+  SELECT TIMESTAMP '2020-01-01 00:00:40+00' AS ts, 20 AS requests, CAST(NULL AS STRING) AS job
+  UNION ALL
+  SELECT TIMESTAMP '2020-01-01 00:01:20+00' AS ts, 30 AS requests, CAST(NULL AS STRING) AS job
+  UNION ALL
+  SELECT TIMESTAMP '2020-01-01 00:00:30+00' AS ts, 100 AS requests, 'job_A' AS job
+)
+SELECT * FROM TimeseriesWithNulls ALIGN (
+  TIMESTAMP ts
+  PERIOD INTERVAL 1 MINUTE
+  ORIGIN EPOCH
+  PARTITION BY job
+  METRICS SUM(requests) WITHIN (1 PERIOD PRECEDING) AS sum_requests
+);
+--
+ARRAY<STRUCT<job STRING, sum_requests INT64, ts TIMESTAMP>>[unknown order:
+  {
+    NULL,
+    30,
+    2020-01-01 00:02:00+00
+  },
+  {
+    NULL,
+    30,
+    2020-01-01 00:01:00+00
+  },
+  {
+    "job_A",
+    100,
+    2020-01-01 00:01:00+00
+  }
+]
+==
+
+# TODO: This should result in an error. Do the WITHIN range
+# validation before the row generation loop.
+[name=align_metrics_provably_empty_within_range_error]
+SELECT * FROM TimeseriesData ALIGN (
+  TIMESTAMP ts
+  PERIOD INTERVAL 1 MINUTE
+  ORIGIN EPOCH
+  PARTITION BY borg_job
+  METRICS
+    SUM(requests) WITHIN (RANGE FROM 2.5 PERIOD PRECEDING TO INTERVAL 5 MINUTE PRECEDING) AS total_requests
+);
+--
+ARRAY<STRUCT<borg_job STRING, total_requests INT64, ts TIMESTAMP>>[]
+==
+
+
+# An empty WITHIN () clause defaults to an unbounded range, aggregating all rows
+# in the partition.
+[name=align_metrics_within_empty_clause_defaults_to_unbounded_range]
+SELECT * FROM TimeseriesData ALIGN (
+  TIMESTAMP ts
+  PERIOD INTERVAL 1 MINUTE
+  ORIGIN EPOCH
+  PARTITION BY borg_job
+  METRICS
+    SUM(requests) WITHIN () AS total_requests
+);
+--
+ARRAY<STRUCT<borg_job STRING, total_requests INT64, ts TIMESTAMP>>[unknown order:
+  {
+    "job_B",
+    110000,
+    2020-01-01 00:02:00+00
+  },
+  {
+    "job_A",
+    1111,
+    2020-01-01 00:01:00+00
+  }
+]
+==
+
+# Test case using different ways to represent the same WITHIN range - looking
+# back one period from the aligned timestamp: (T - 1 PERIOD, T].
+[name=align_metrics_relative_bound_preceding]
+SELECT * FROM TimeseriesData ALIGN (
+  TIMESTAMP ts
+  PERIOD INTERVAL 1 MINUTE
+  ORIGIN EPOCH
+  PARTITION BY borg_job
+  METRICS
+    SUM(requests) WITHIN (1 PERIOD) AS sum_requests_1,
+    SUM(requests) WITHIN (INTERVAL 1 MINUTE) AS sum_requests_2,
+    SUM(requests) WITHIN (1 PERIOD PRECEDING) AS sum_requests_3,
+    SUM(requests) WITHIN (INTERVAL 1 MINUTE PRECEDING) AS sum_requests_4,
+    SUM(requests) WITHIN (RANGE FROM 1 PERIOD PRECEDING) AS sum_requests_5,
+    SUM(requests) WITHIN (RANGE FROM INTERVAL 1 MINUTE PRECEDING) AS sum_requests_6
+);
+--
+ARRAY<STRUCT<borg_job STRING,
+             sum_requests_1 INT64,
+             sum_requests_2 INT64,
+             sum_requests_3 INT64,
+             sum_requests_4 INT64,
+             sum_requests_5 INT64,
+             sum_requests_6 INT64,
+             ts TIMESTAMP>>
+[unknown order:{
+                 "job_A",
+                 1000,
+                 1000,
+                 1000,
+                 1000,
+                 1000,
+                 1000,
+                 2020-01-01 00:02:00+00
+               },
+               {
+                 "job_B",
+                 100000,
+                 100000,
+                 100000,
+                 100000,
+                 100000,
+                 100000,
+                 2020-01-01 00:03:00+00
+               },
+               {
+                 "job_A",
+                 111,
+                 111,
+                 111,
+                 111,
+                 111,
+                 111,
+                 2020-01-01 00:01:00+00
+               },
+               {
+                 "job_B",
+                 10000,
+                 10000,
+                 10000,
+                 10000,
+                 10000,
+                 10000,
+                 2020-01-01 00:02:00+00
+               }]
+==
+
+# Test case using different ways to represent the same WITHIN range - looking
+# forward one period from the aligned timestamp: (T, T + 1 PERIOD].
+[name=align_metrics_relative_bound_following]
+SELECT * FROM TimeseriesData ALIGN (
+  TIMESTAMP ts
+  PERIOD INTERVAL 1 MINUTE
+  ORIGIN EPOCH
+  PARTITION BY borg_job
+  METRICS
+    SUM(requests) WITHIN (1 PERIOD FOLLOWING) AS sum_requests_1,
+    SUM(requests) WITHIN (INTERVAL 1 MINUTE FOLLOWING) AS sum_requests_2,
+    SUM(requests) WITHIN (RANGE TO 1 PERIOD FOLLOWING) AS sum_requests_3,
+    SUM(requests) WITHIN (RANGE TO INTERVAL 1 MINUTE FOLLOWING) AS sum_requests_4
+);
+--
+ARRAY<STRUCT<borg_job STRING,
+             sum_requests_1 INT64,
+             sum_requests_2 INT64,
+             sum_requests_3 INT64,
+             sum_requests_4 INT64,
+             ts TIMESTAMP>>
+[unknown order:{
+                 "job_A",
+                 1000,
+                 1000,
+                 1000,
+                 1000,
+                 2020-01-01 00:01:00+00
+               },
+               {
+                 "job_B",
+                 100000,
+                 100000,
+                 100000,
+                 100000,
+                 2020-01-01 00:02:00+00
+               },
+               {
+                 "job_A",
+                 111,
+                 111,
+                 111,
+                 111,
+                 2020-01-01 00:00:00+00
+               },
+               {
+                 "job_B",
+                 10000,
+                 10000,
+                 10000,
+                 10000,
+                 2020-01-01 00:01:00+00
+               }]
+==
+
+[name=align_metrics_within_range_with_relative_preceding_and_following_bounds]
+SELECT * FROM TimeseriesData ALIGN (
+  TIMESTAMP ts
+  PERIOD INTERVAL 1 MINUTE
+  ORIGIN EPOCH
+  PARTITION BY borg_job
+  METRICS
+    SUM(requests) WITHIN (RANGE FROM 1 PERIOD PRECEDING TO INTERVAL 1 MINUTE FOLLOWING) AS sum_req
+);
+--
+ARRAY<STRUCT<borg_job STRING, sum_req INT64, ts TIMESTAMP>>[unknown order:
+  {
+    "job_A",
+    1111,
+    2020-01-01 00:01:00+00
+  },
+  {
+    "job_B",
+    10000,
+    2020-01-01 00:01:00+00
+  },
+  {
+    "job_B",
+    100000,
+    2020-01-01 00:03:00+00
+  },
+  {
+    "job_A",
+    111,
+    2020-01-01 00:00:00+00
+  },
+  {
+    "job_A",
+    1000,
+    2020-01-01 00:02:00+00
+  },
+  {
+    "job_B",
+    110000,
+    2020-01-01 00:02:00+00
+  }
+]
+==
+
+# Test case with possible WITHIN ranges having the lower bound as UNBOUNDED
+# PRECEDING: (-inf, upper_bound].
+[name=align_metrics_unbounded_preceding_lower_bound]
+SELECT * FROM TimeseriesData ALIGN (
+  TIMESTAMP ts
+  PERIOD INTERVAL 1 MINUTE
+  ORIGIN EPOCH
+  PARTITION BY borg_job
+  METRICS
+    SUM(requests) WITHIN (UNBOUNDED PRECEDING) AS sum_requests_1,
+    SUM(requests) WITHIN (RANGE FROM UNBOUNDED PRECEDING) AS sum_requests_2,
+    SUM(requests) WITHIN (RANGE FROM UNBOUNDED PRECEDING TO INTERVAL 1 MINUTE PRECEDING) AS sum_requests_3,
+    SUM(requests) WITHIN (RANGE FROM UNBOUNDED PRECEDING TO INTERVAL 1 MINUTE FOLLOWING) AS sum_requests_4,
+    SUM(requests) WITHIN (RANGE FROM UNBOUNDED PRECEDING TO UNBOUNDED FOLLOWING) AS sum_requests_5
+);
+--
+ARRAY<STRUCT<borg_job STRING,
+             sum_requests_1 INT64,
+             sum_requests_2 INT64,
+             sum_requests_3 INT64,
+             sum_requests_4 INT64,
+             sum_requests_5 INT64,
+             ts TIMESTAMP>>
+[unknown order:{
+                 "job_A",
+                 111,
+                 111,
+                 NULL,
+                 1111,
+                 1111,
+                 2020-01-01 00:01:00+00
+               },
+               {
+                 "job_A",
+                 1111,
+                 1111,
+                 1111,
+                 1111,
+                 1111,
+                 2020-01-01 00:03:00+00
+               },
+               {
+                 "job_B",
+                 10000,
+                 10000,
+                 NULL,
+                 110000,
+                 110000,
+                 2020-01-01 00:02:00+00
+               },
+               {
+                 "job_B",
+                 110000,
+                 110000,
+                 110000,
+                 110000,
+                 110000,
+                 2020-01-01 00:04:00+00
+               },
+               {
+                 "job_A",
+                 NULL,
+                 NULL,
+                 NULL,
+                 111,
+                 1111,
+                 2020-01-01 00:00:00+00
+               },
+               {
+                 "job_A",
+                 1111,
+                 1111,
+                 111,
+                 1111,
+                 1111,
+                 2020-01-01 00:02:00+00
+               },
+               {
+                 "job_B",
+                 NULL,
+                 NULL,
+                 NULL,
+                 10000,
+                 110000,
+                 2020-01-01 00:01:00+00
+               },
+               {
+                 "job_B",
+                 110000,
+                 110000,
+                 10000,
+                 110000,
+                 110000,
+                 2020-01-01 00:03:00+00
+               }]
+==
+
+# Test case with possible WITHIN ranges having the upper bound as UNBOUNDED
+# FOLLOWING: (lower_bound, +inf).
+[name=align_metrics_unbounded_following_upper_bound]
+SELECT * FROM TimeseriesData ALIGN (
+  TIMESTAMP ts
+  PERIOD INTERVAL 1 MINUTE
+  ORIGIN EPOCH
+  PARTITION BY borg_job
+  METRICS
+    SUM(requests) WITHIN (UNBOUNDED FOLLOWING) AS sum_requests_1,
+    SUM(requests) WITHIN (RANGE TO UNBOUNDED FOLLOWING) AS sum_requests_2,
+    SUM(requests) WITHIN (RANGE FROM INTERVAL 1 MINUTE PRECEDING TO UNBOUNDED FOLLOWING) AS sum_requests_3,
+    SUM(requests) WITHIN (RANGE FROM INTERVAL 1 MINUTE FOLLOWING TO UNBOUNDED FOLLOWING) AS sum_requests_4,
+    SUM(requests) WITHIN (RANGE FROM UNBOUNDED PRECEDING TO UNBOUNDED FOLLOWING) AS sum_requests_5
+);
+--
+ARRAY<STRUCT<borg_job STRING,
+             sum_requests_1 INT64,
+             sum_requests_2 INT64,
+             sum_requests_3 INT64,
+             sum_requests_4 INT64,
+             sum_requests_5 INT64,
+             ts TIMESTAMP>>
+[unknown order:{
+                 "job_A",
+                 1111,
+                 1111,
+                 1111,
+                 1000,
+                 1111,
+                 2020-01-01 00:00:00+00
+               },
+               {
+                 "job_A",
+                 NULL,
+                 NULL,
+                 1000,
+                 NULL,
+                 1111,
+                 2020-01-01 00:02:00+00
+               },
+               {
+                 "job_B",
+                 110000,
+                 110000,
+                 110000,
+                 100000,
+                 110000,
+                 2020-01-01 00:01:00+00
+               },
+               {
+                 "job_B",
+                 NULL,
+                 NULL,
+                 100000,
+                 NULL,
+                 110000,
+                 2020-01-01 00:03:00+00
+               },
+               {
+                 "job_A",
+                 1111,
+                 1111,
+                 1111,
+                 1111,
+                 1111,
+                 2019-12-31 23:59:00+00
+               },
+               {
+                 "job_A",
+                 1000,
+                 1000,
+                 1111,
+                 NULL,
+                 1111,
+                 2020-01-01 00:01:00+00
+               },
+               {
+                 "job_B",
+                 110000,
+                 110000,
+                 110000,
+                 110000,
+                 110000,
+                 2020-01-01 00:00:00+00
+               },
+               {
+                 "job_B",
+                 100000,
+                 100000,
+                 110000,
+                 NULL,
+                 110000,
+                 2020-01-01 00:02:00+00
+               }]
+==
+
+[name=align_metrics_within_ranges_using_absolute_timestamp_bounds]
+SELECT * FROM TimeseriesData ALIGN (
+  TIMESTAMP ts
+  PERIOD INTERVAL 1 MINUTE
+  ORIGIN TIMESTAMP '2020-01-01 00:00:00+00'
+  OUTPUT WITHIN RANGE FROM TIMESTAMP '2020-01-01 00:01:00+00' TO TIMESTAMP '2020-01-01 00:02:00+00'
+  PARTITION BY borg_job
+  METRICS
+    SUM(requests) WITHIN (RANGE FROM TIMESTAMP '2020-01-01 00:00:00+00') AS sum_requests_1,
+    SUM(requests) WITHIN (RANGE TO TIMESTAMP '2020-01-01 00:02:00+00') AS sum_requests_2,
+    SUM(requests) WITHIN (RANGE FROM TIMESTAMP '2020-01-01 00:00:00+00' TO TIMESTAMP '2020-01-01 00:02:00+00') AS sum_requests_3
+);
+--
+ARRAY<STRUCT<borg_job STRING,
+             sum_requests_1 INT64,
+             sum_requests_2 INT64,
+             sum_requests_3 INT64,
+             ts TIMESTAMP>>
+[unknown order:{
+                 "job_B",
+                 NULL,
+                 10000,
+                 10000,
+                 2020-01-01 00:01:00+00
+               },
+               {
+                 "job_A",
+                 111,
+                 1000,
+                 1111,
+                 2020-01-01 00:01:00+00
+               }]
+==
+
+# PERIOD multipliers can be fractional (e.g. 0.5 PERIOD with a 1-minute period = 30 seconds).
+[name=align_metrics_fractional_period_multiplier]
+SELECT * FROM TimeseriesData ALIGN (
+  TIMESTAMP ts
+  PERIOD INTERVAL 1 MINUTE
+  ORIGIN EPOCH
+  PARTITION BY borg_job
+  METRICS
+    SUM(requests) WITHIN (0.5 PERIOD PRECEDING) AS sum_req
+);
+--
+ARRAY<STRUCT<borg_job STRING, sum_req INT64, ts TIMESTAMP>>[unknown order:
+  {
+    "job_B",
+    10000,
+    2020-01-01 00:02:00+00
+  },
+  {
+    "job_A",
+    110,
+    2020-01-01 00:01:00+00
+  },
+  {
+    "job_B",
+    100000,
+    2020-01-01 00:03:00+00
+  }
+]
+==
+
+[name=align_metrics_zero_period_multiplier_error]
+SELECT * FROM TimeseriesData ALIGN (
+  TIMESTAMP ts
+  PERIOD INTERVAL 1 MINUTE
+  ORIGIN EPOCH
+  PARTITION BY borg_job
+  METRICS
+    SUM(requests) WITHIN (0.0 PERIOD PRECEDING) AS sum_req
+);
+--
+ERROR: generic::out_of_range: ALIGN PERIOD multiplier must be positive
+==
+
+[name=align_metrics_negative_period_multiplier_error]
+SELECT * FROM TimeseriesData ALIGN (
+  TIMESTAMP ts
+  PERIOD INTERVAL 1 MINUTE
+  ORIGIN EPOCH
+  PARTITION BY borg_job
+  METRICS
+    SUM(requests) WITHIN (-1 PERIOD PRECEDING) AS sum_req
+);
+--
+ERROR: generic::out_of_range: ALIGN PERIOD multiplier must be positive
+==
+
+[name=align_metrics_nan_period_multiplier_error]
+SELECT * FROM TimeseriesData ALIGN (
+  TIMESTAMP ts
+  PERIOD INTERVAL 1 MINUTE
+  ORIGIN EPOCH
+  PARTITION BY borg_job
+  METRICS
+    SUM(requests) WITHIN (CAST('NaN' AS DOUBLE) PERIOD PRECEDING) AS sum_req
+);
+--
+ERROR: generic::out_of_range: ALIGN PERIOD multiplier must be positive
+==
+
+[name=align_metrics_large_period_multiplier_overflow_error]
+SELECT * FROM TimeseriesData ALIGN (
+  TIMESTAMP ts
+  PERIOD INTERVAL 365 DAY
+  ORIGIN EPOCH
+  PARTITION BY borg_job
+  METRICS
+    SUM(requests) WITHIN (1000000 PERIOD PRECEDING) AS sum_req
+);
+--
+ERROR: generic::out_of_range: Interval field days '365000000' is out of range -3660000 to 3660000
+==
+
+[name=align_metrics_within_range_with_both_preceding_bounds]
+SELECT * FROM TimeseriesData ALIGN (
+  TIMESTAMP ts
+  PERIOD INTERVAL 1 MINUTE
+  ORIGIN EPOCH
+  PARTITION BY borg_job
+  METRICS
+    SUM(requests) WITHIN (RANGE FROM INTERVAL 90 SECOND PRECEDING TO INTERVAL 1 MINUTE PRECEDING) AS sum_req
+);
+--
+ARRAY<STRUCT<borg_job STRING, sum_req INT64, ts TIMESTAMP>>[unknown order:
+  {
+    "job_B",
+    10000,
+    2020-01-01 00:03:00+00
+  },
+  {
+    "job_A",
+    110,
+    2020-01-01 00:02:00+00
+  },
+  {
+    "job_B",
+    100000,
+    2020-01-01 00:04:00+00
+  }
+]
+==
+
+[name=align_metrics_within_range_with_both_following_bounds]
+SELECT * FROM TimeseriesData ALIGN (
+  TIMESTAMP ts
+  PERIOD INTERVAL 1 MINUTE
+  ORIGIN EPOCH
+  PARTITION BY borg_job
+  METRICS
+    SUM(requests) WITHIN (RANGE FROM INTERVAL 1 MINUTE FOLLOWING TO INTERVAL 90 SECOND FOLLOWING) AS sum_req
+);
+--
+ARRAY<STRUCT<borg_job STRING, sum_req INT64, ts TIMESTAMP>>[unknown order:
+  {
+    "job_A",
+    1000,
+    2020-01-01 00:00:00+00
+  },
+  {
+    "job_A",
+    1,
+    2019-12-31 23:59:00+00
+  }
+]
+==
+
+[name=align_metrics_having_estimator_functions_with_relative_and_absolute_bounds]
+SELECT * FROM TimeseriesData ALIGN (
+  TIMESTAMP ts
+  PERIOD INTERVAL 1 MINUTE
+  ORIGIN EPOCH
+  METRICS
+    SUM(requests) WITHIN (1 PERIOD PRECEDING) AS m1,
+    SUM(requests) WITHIN (RANGE FROM UNBOUNDED PRECEDING TO 1 PERIOD FOLLOWING) AS m2,
+    SUM(requests) WITHIN (RANGE TO TIMESTAMP '2020-01-01 00:02:00+00') AS m3,
+    SUM(requests) WITHIN (RANGE FROM TIMESTAMP '2020-01-01 00:10:00+00') AS m4
+);
+--
+ARRAY<STRUCT<m1 INT64, m2 INT64, m3 INT64, m4 INT64, ts TIMESTAMP>>[unknown order:
+  {
+    111,
+    11111,
+    11000,
+    NULL,
+    2020-01-01 00:01:00+00
+  },
+  {
+    100000,
+    111111,
+    NULL,
+    NULL,
+    2020-01-01 00:03:00+00
+  },
+  {
+    NULL,
+    111,
+    11111,
+    NULL,
+    2020-01-01 00:00:00+00
+  },
+  {
+    11000,
+    111111,
+    NULL,
+    NULL,
+    2020-01-01 00:02:00+00
+  }
+]
+==
+
+[name=align_metrics_expression_combining_estimator_functions]
+SELECT * FROM TimeseriesData ALIGN (
+  TIMESTAMP ts
+  PERIOD INTERVAL 1 MINUTE
+  ORIGIN EPOCH
+  OUTPUT WITHIN RANGE FROM TIMESTAMP '2020-01-01 00:01:00+00' TO TIMESTAMP '2020-01-01 00:02:30+00'
+  PARTITION BY borg_job
+  METRICS
+    MIN(gcu) WITHIN (1 PERIOD PRECEDING) + MAX(gcu) WITHIN (1 PERIOD PRECEDING) AS minmax
+);
+--
+ARRAY<STRUCT<borg_job STRING, minmax DOUBLE, ts TIMESTAMP>>[unknown order:
+  {
+    "job_A",
+    16,
+    2020-01-01 00:02:00+00
+  },
+  {
+    "job_A",
+    5,
+    2020-01-01 00:01:00+00
+  },
+  {
+    "job_B",
+    20,
+    2020-01-01 00:02:00+00
+  }
+]
+==
+
+[name=align_aligned_timestamp_reference_in_estimator_expression]
+SELECT * FROM TimeseriesData ALIGN (
+  TIMESTAMP ts
+  PERIOD INTERVAL 1 MINUTE
+  ORIGIN EPOCH
+  OUTPUT WITHIN RANGE FROM TIMESTAMP '2020-01-01 00:02:00+00' TO TIMESTAMP '2020-01-01 00:03:00+00'
+  PARTITION BY borg_job
+  METRICS
+    UNIX_SECONDS(aligned_timestamp) + COUNT(requests) WITHIN (1 PERIOD PRECEDING) AS metric_with_aligned_ts
+);
+--
+ARRAY<STRUCT<
+        borg_job STRING,
+        metric_with_aligned_ts INT64,
+        ts TIMESTAMP
+      >>
+[unknown order:{
+                 "job_B",
+                 1577836921,
+                 2020-01-01 00:02:00+00
+               },
+               {
+                 "job_A",
+                 1577836921,
+                 2020-01-01 00:02:00+00
+               }]
+==
+
+[name=align_metrics_aligned_timestamp_reference_in_estimator_function_call]
+SELECT * FROM TimeseriesData ALIGN (
+  TIMESTAMP ts
+  PERIOD INTERVAL 1 MINUTE
+  ORIGIN EPOCH
+  OUTPUT WITHIN RANGE FROM TIMESTAMP '2020-01-01 00:02:00+00' TO TIMESTAMP '2020-01-01 00:03:00+00'
+  PARTITION BY borg_job
+  METRICS
+    MAX(TIMESTAMP_ADD(ts, INTERVAL 5 SECOND)) WITHIN (1 PERIOD PRECEDING) AS timestamp_metric,
+    MAX(TIMESTAMP_ADD(aligned_timestamp, INTERVAL 5 SECOND)) WITHIN (1 PERIOD PRECEDING) AS aligned_timestamp_metric
+);
+--
+ARRAY<STRUCT<
+        borg_job STRING,
+        timestamp_metric TIMESTAMP,
+        aligned_timestamp_metric TIMESTAMP,
+        ts TIMESTAMP
+      >>
+[unknown order:{
+                 "job_B",
+                 2020-01-01 00:02:05+00,
+                 2020-01-01 00:02:05+00,
+                 2020-01-01 00:02:00+00
+               },
+               {
+                 "job_A",
+                 2020-01-01 00:01:35+00,
+                 2020-01-01 00:02:05+00,
+                 2020-01-01 00:02:00+00
+               }]
+==
+
+[name=align_partition_col_and_expr_reference_in_estimator_expression]
+SELECT * FROM TimeseriesData ALIGN (
+  TIMESTAMP ts
+  PERIOD INTERVAL 1 MINUTE
+  ORIGIN EPOCH
+  OUTPUT WITHIN RANGE FROM TIMESTAMP '2020-01-01 00:01:00+00' TO TIMESTAMP '2020-01-01 00:02:30+00'
+  PARTITION BY borg_job, CONCAT(borg_job, "_", borg_cell) AS job_cell
+  METRICS
+    SUM(requests * IF(borg_job = 'job_A', 2, 1)) WITHIN (1 PERIOD PRECEDING) AS weighted_requests,
+    CONCAT(job_cell, "_", CAST(COUNT(requests) WITHIN (1 PERIOD PRECEDING) AS STRING)) AS concat_requests
+);
+--
+ARRAY<STRUCT<
+        borg_job STRING,
+        job_cell STRING,
+        weighted_requests INT64,
+        concat_requests STRING,
+        ts TIMESTAMP
+      >>
+[unknown order:{
+                 "job_A",
+                 "job_A_cell2",
+                 2000,
+                 "job_A_cell2_1",
+                 2020-01-01 00:02:00+00
+               },
+               {
+                 "job_A",
+                 "job_A_cell1",
+                 222,
+                 "job_A_cell1_3",
+                 2020-01-01 00:01:00+00
+               },
+               {
+                 "job_B",
+                 "job_B_cell1",
+                 10000,
+                 "job_B_cell1_1",
+                 2020-01-01 00:02:00+00
+               }]
+==
+
+[name=align_correlated_references_in_various_expressions]
+SELECT * FROM (
+  SELECT INTERVAL 1 MINUTE AS corelated_interval,
+         TIMESTAMP('2020-01-01 00:00:01+00') AS corelated_ts,
+         1 AS corelated_metric_col,
+         "xyz" AS correlated_key)
+WHERE EXISTS(SELECT * FROM TimeseriesData ALIGN (
+    TIMESTAMP ts + corelated_interval
+    PERIOD corelated_interval
+    ORIGIN corelated_ts
+    PARTITION BY CONCAT(correlated_key, "_", borg_job) AS pk
+    METRICS corelated_ts + SUM(corelated_interval) WITHIN (INTERVAL corelated_metric_col MINUTE PRECEDING) AS m1,
+            LENGTH(FORMAT_TIMESTAMP("%b %Y", corelated_ts)) + SUM(corelated_metric_col + requests) WITHIN () AS m2
+))
+--
+ARRAY<STRUCT<
+        corelated_interval INTERVAL,
+        corelated_ts TIMESTAMP,
+        corelated_metric_col INT64,
+        correlated_key STRING
+      >>
+[{
+   0-0 0 0:1:0,
+   2020-01-01 00:00:01+00,
+   1,
+   "xyz"
+ }]
+==
+
+# ALIGN prunes output rows in which all metric values evaluate to NULL. In this
+# test, aligned timestamp 00:03:00 has no data in its within windows, so both
+# metrics evaluate to NULL and the row is omitted from the output. Aligned
+# timestamps where at least one of the metrics is not NULL are retained.
+[name=align_output_null_pruning]
+WITH SparseTimeseriesData AS (
+  SELECT TIMESTAMP '2020-01-01 00:00:20+00' AS ts, 10 AS requests, 1.0 AS gcu, 'job_A' AS borg_job
+  UNION ALL
+  SELECT TIMESTAMP '2020-01-01 00:03:20+00' AS ts, 20 AS requests, 2.0 AS gcu, 'job_A' AS borg_job
+)
+SELECT * FROM SparseTimeseriesData ALIGN (
+  TIMESTAMP ts
+  PERIOD INTERVAL 1 MINUTE
+  ORIGIN EPOCH
+  PARTITION BY borg_job
+  METRICS
+    SUM(requests) WITHIN (1 PERIOD PRECEDING) AS sparse_requests,
+    AVG(gcu) WITHIN (2 PERIOD PRECEDING) AS sparse_gcu
+);
+--
+ARRAY<STRUCT<
+        borg_job STRING,
+        sparse_requests INT64,
+        sparse_gcu DOUBLE,
+        ts TIMESTAMP
+      >>
+[unknown order:{
+                 "job_A",
+                 NULL,
+                 1,
+                 2020-01-01 00:02:00+00
+               },
+               {
+                 "job_A",
+                 NULL,
+                 2,
+                 2020-01-01 00:05:00+00
+               },
+               {
+                 "job_A",
+                 10,
+                 1,
+                 2020-01-01 00:01:00+00
+               },
+               {
+                 "job_A",
+                 20,
+                 2,
+                 2020-01-01 00:04:00+00
+               }]
+==
+
+# Default timezone in reference implementation is "America/Los_Angeles".
+# A timestamp without an explicit timezone is interpreted to be in "-08" or
+# "-07" depending whether the date falls in standard or daylight savings time.
+# The UTC equivalent of the timestamps in the input data are:
+#   2020-01-01 08:01:00+00
+#   2020-01-01 02:01:00+00
+#   2019-12-31 22:01:00+00
+# The timestamps in the result are always rendered in UTC/+00.
+[name=align_timeseries_with_multiple_timezones]
+WITH TimeseriesMultipleTimezones AS (
+  SELECT TIMESTAMP '2020-01-01 00:01:00' AS ts, 100 AS requests, 10.0 AS gcu, 'job_B' AS borg_job, 'cell1' AS borg_cell
+  UNION ALL
+  SELECT TIMESTAMP '2020-01-01 00:01:00-02' AS ts, 200 AS requests, 20.0 AS gcu, 'job_B' AS borg_job, 'cell1' AS borg_cell
+  UNION ALL
+  SELECT TIMESTAMP '2020-01-01 00:01:00+02' AS ts, 300 AS requests, 30.0 AS gcu, 'job_B' AS borg_job, 'cell2' AS borg_cell
+)
+SELECT * FROM TimeseriesMultipleTimezones ALIGN (
+  TIMESTAMP ts
+  PERIOD INTERVAL 1 HOUR
+  ORIGIN EPOCH
+);
+--
+ARRAY<STRUCT<ts TIMESTAMP>>[unknown order:
+  {2019-12-31 23:00:00+00},
+  {2020-01-01 00:00:00+00},
+  {2020-01-01 01:00:00+00},
+  {2020-01-01 02:00:00+00},
+  {2020-01-01 03:00:00+00},
+  {2020-01-01 04:00:00+00},
+  {2020-01-01 05:00:00+00},
+  {2020-01-01 06:00:00+00},
+  {2020-01-01 07:00:00+00},
+  {2020-01-01 08:00:00+00}
+]

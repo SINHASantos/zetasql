@@ -18,11 +18,17 @@
 
 #include <string>
 
+#include "googlesql/tools/execute_query/web/init.js.h"
+#include "googlesql/tools/execute_query/web/local_storage_manager.js.h"
 #include "googlesql/tools/execute_query/web/page_body.html.h"
-#include "googlesql/tools/execute_query/web/rewrite_steps.js.h"
+#include "absl/strings/str_join.h"
+#include "absl/strings/string_view.h"
 #include "googlesql/tools/execute_query/web/page_template.html.h"
+#include "googlesql/tools/execute_query/web/rewrite_steps.js.h"
+#include "googlesql/tools/execute_query/web/splitter.js.h"
 #include "googlesql/tools/execute_query/web/style.css.h"
 #include "googlesql/tools/execute_query/web/table.html.h"
+#include "googlesql/tools/execute_query/web/theme.js.h"
 
 namespace googlesql {
 
@@ -36,7 +42,15 @@ QueryWebTemplates::QueryWebTemplates()
       style_css_(embedded_resources::kStyleCSS),
       page_body_(embedded_resources::kPageBody),
       table_(embedded_resources::kTable),
-      inline_js_(embedded_resources::kRewriteStepsJS) {}
+      inline_js_(absl::StrJoin(
+          {
+              embedded_resources::kLocalStorageManagerJS,
+              embedded_resources::kThemeJS,
+              embedded_resources::kSplitterJS,
+              embedded_resources::kRewriteStepsJS,
+              embedded_resources::kInitJS,
+          },
+          "\n")) {}
 
 const std::string& QueryWebTemplates::GetWebPageContents() const {
   return page_template_;

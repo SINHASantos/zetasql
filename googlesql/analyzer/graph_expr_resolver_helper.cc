@@ -265,106 +265,97 @@ GetGraphLabelExprOp(const ASTGraphLabelOperation* ast_graph_label_expr) {
   }
 }
 
+static std::unique_ptr<const ResolvedLiteral> MakeResolvedStringLiteral(
+    absl::string_view string_val) {
+  return MakeResolvedLiteral(types::StringType(), Value::String(string_val),
+                             /*has_explicit_type=*/true);
+}
+
 absl::StatusOr<std::unique_ptr<const ResolvedGraphLabelExpr>>
 ResolveGraphLabelExpr(
     const ASTGraphLabelExpression* ast_graph_label_expr,
-    const GraphElementTable::Kind element_kind,
+    GraphElementTable::Kind element_kind,
     const absl::flat_hash_set<const GraphElementLabel*>& valid_static_labels,
     const PropertyGraph* property_graph, bool supports_dynamic_labels,
     bool element_table_contains_dynamic_label) {
   if (ast_graph_label_expr == nullptr) {
     return nullptr;
   }
-  std::unique_ptr<ResolvedGraphLabelExpr> output;
-  switch (ast_graph_label_expr->node_kind()) {
-    case AST_GRAPH_WILDCARD_LABEL: {
-      GOOGLESQL_ASSIGN_OR_RETURN(output,
-                       ResolvedGraphWildCardLabelBuilder().BuildMutable());
-      break;
-    }
-    case AST_GRAPH_ELEMENT_LABEL: {
-      const GraphElementLabel* label = nullptr;
-      absl::string_view name =
-          ast_graph_label_expr->GetAsOrDie<ASTGraphElementLabel>()
-              ->name()
-              ->GetAsStringView();
-      GOOGLESQL_ASSIGN_OR_RETURN(std::unique_ptr<const ResolvedLiteral> label_name,
-                       ResolvedLiteralBuilder()
-                           .set_type(types::StringType())
-                           .set_value(Value::String(name))
-                           .set_has_explicit_type(true)
-                           .Build());
-      absl::Status find_status = property_graph->FindLabelByName(
-          ast_graph_label_expr->GetAsOrDie<ASTGraphElementLabel>()
-              ->name()
-              ->GetAsStringView(),
-          label);
-      if (!find_status.ok()) {
-        if (element_table_contains_dynamic_label) {
-          return ResolvedGraphLabelBuilder()
-              .set_label_name(std::move(label_name))
-              .Build();
-        } else {
-          return MakeSqlErrorAt(ast_graph_label_expr) << find_status.message();
+  GOOGLESQL_ASSIGN_OR_RETURN(
+      std::unique_ptr<ResolvedGraphLabelExpr> output,
+      [&]() -> absl::StatusOr<std::unique_ptr<ResolvedGraphLabelExpr>> {
+        switch (ast_graph_label_expr->node_kind()) {
+          case AST_GRAPH_WILDCARD_LABEL: {
+            return ResolvedGraphWildCardLabelBuilder().BuildMutable();
+          }
+          case AST_GRAPH_ELEMENT_LABEL: {
+            const GraphElementLabel* label = nullptr;
+            absl::string_view name =
+                ast_graph_label_expr->GetAsOrDie<ASTGraphElementLabel>()
+                    ->name()
+                    ->GetAsStringView();
+            absl::Status find_status =
+                property_graph->FindLabelByName(name, label);
+            if (!find_status.ok()) {
+              if (element_table_contains_dynamic_label) {
+                return ResolvedGraphLabelBuilder()
+                    .set_label_name(MakeResolvedStringLiteral(name))
+                    .BuildMutable();
+              }
+              return MakeSqlErrorAt(ast_graph_label_expr)
+                     << find_status.message();
+            }
+            // If the label was successfully found, but not present in the set
+            // of valid static labels, then it must be a label for the wrong
+            // element kind e.g. an edge only label in a label expression
+            // referring to a node pattern. Report a user error message in this
+            // case.
+            if (!valid_static_labels.contains(label)) {
+              bool is_node = element_kind == GraphElementTable::Kind::kNode;
+              absl::string_view kind_str = is_node ? "node" : "edge";
+              absl::string_view correct_kind_str = is_node ? "edge" : "node";
+              return MakeSqlErrorAt(ast_graph_label_expr) << absl::StrFormat(
+                         "Label %s is only valid for %ss, but used here on a "
+                         "%s",
+                         label->Name(), correct_kind_str, kind_str);
+            }
+            ResolvedGraphLabelBuilder builder =
+                ResolvedGraphLabelBuilder().set_label(label);
+            if (supports_dynamic_labels) {
+              builder.set_label_name(MakeResolvedStringLiteral(name));
+            }
+            return std::move(builder).BuildMutable();
+          }
+          case AST_GRAPH_LABEL_OPERATION: {
+            const auto* ast_graph_label_operation =
+                ast_graph_label_expr->GetAsOrDie<ASTGraphLabelOperation>();
+            const auto& inputs = ast_graph_label_operation->inputs();
+            std::vector<std::unique_ptr<const ResolvedGraphLabelExpr>>
+                operand_list;
+            operand_list.reserve(inputs.size());
+            for (const ASTGraphLabelExpression* input : inputs) {
+              GOOGLESQL_ASSIGN_OR_RETURN(
+                  std::unique_ptr<const ResolvedGraphLabelExpr> next_operand,
+                  ResolveGraphLabelExpr(input, element_kind,
+                                        valid_static_labels, property_graph,
+                                        supports_dynamic_labels,
+                                        element_table_contains_dynamic_label));
+              operand_list.emplace_back(std::move(next_operand));
+            }
+            GOOGLESQL_ASSIGN_OR_RETURN(
+                ResolvedGraphLabelNaryExprEnums_GraphLogicalOpType op,
+                GetGraphLabelExprOp(ast_graph_label_operation));
+            return ResolvedGraphLabelNaryExprBuilder()
+                .set_op(op)
+                .set_operand_list(std::move(operand_list))
+                .BuildMutable();
+          }
+          default:
+            GOOGLESQL_RET_CHECK_FAIL() << "Unrecognized graph label node type";
         }
-      }
-      // If the label was successfully found, but not present in the set of
-      // valid static labels, then it must be a label for the wrong element kind
-      // e.g. an edge only label in a label expression referring to a node
-      // pattern. Report a user error message in this case.
-      if (!valid_static_labels.contains(label)) {
-        absl::string_view kind_str =
-            (element_kind == GraphElementTable::Kind::kNode) ? "node" : "edge";
-        absl::string_view correct_kind_str =
-            (kind_str == "node") ? "edge" : "node";
-        return MakeSqlErrorAt(ast_graph_label_expr) << absl::StrFormat(
-                   "Label %s is only valid for %ss, but used here on a %s",
-                   label->Name(), correct_kind_str, kind_str);
-      }
-      ResolvedGraphLabelBuilder builder =
-          ResolvedGraphLabelBuilder().set_label(label);
-      if (supports_dynamic_labels) {
-        builder.set_label_name(std::move(label_name));
-      }
-      GOOGLESQL_ASSIGN_OR_RETURN(output, std::move(builder).BuildMutable());
-      break;
-    }
-    case AST_GRAPH_LABEL_OPERATION: {
-      std::vector<std::unique_ptr<const ResolvedGraphLabelExpr>> operand_list;
-      const ASTGraphLabelOperation* ast_graph_label_operation =
-          ast_graph_label_expr->GetAsOrDie<ASTGraphLabelOperation>();
-      auto& inputs = ast_graph_label_operation->inputs();
-      operand_list.reserve(inputs.size());
-      for (const ASTGraphLabelExpression* input : inputs) {
-        GOOGLESQL_ASSIGN_OR_RETURN(
-            std::unique_ptr<const ResolvedGraphLabelExpr> next_operand,
-            ResolveGraphLabelExpr(input, element_kind, valid_static_labels,
-                                  property_graph, supports_dynamic_labels,
-                                  element_table_contains_dynamic_label));
-        operand_list.emplace_back(std::move(next_operand));
-      }
-      GOOGLESQL_ASSIGN_OR_RETURN(ResolvedGraphLabelNaryExprEnums_GraphLogicalOpType op,
-                       GetGraphLabelExprOp(ast_graph_label_operation));
-      GOOGLESQL_ASSIGN_OR_RETURN(output, ResolvedGraphLabelNaryExprBuilder()
-                                   .set_op(op)
-                                   .set_operand_list(std::move(operand_list))
-                                   .BuildMutable());
-      break;
-    }
-    default:
-      GOOGLESQL_RET_CHECK_FAIL() << "Unrecognized graph label node type";
-  }
+      }());
   output->SetParseLocationRange(ast_graph_label_expr->location());
   return output;
-}
-
-static absl::StatusOr<std::unique_ptr<const ResolvedLiteral>>
-GetResolvedLiteralForPropertyName(absl::string_view property_name) {
-  return ResolvedLiteralBuilder()
-      .set_value(Value::String(property_name))
-      .set_type(types::StringType())
-      .set_has_explicit_type(true)
-      .Build();
 }
 
 absl::StatusOr<std::unique_ptr<const ResolvedGraphGetElementProperty>>
@@ -381,12 +372,12 @@ ResolveGraphGetElementProperty(
   if (element_type->FindPropertyType(property_name) == nullptr) {
     if (element_type->is_dynamic()) {
       GOOGLESQL_RET_CHECK(supports_dynamic_properties);
-      GOOGLESQL_ASSIGN_OR_RETURN(get_element_property_expr,
-                       std::move(builder)
-                           .set_type(types::JsonType())
-                           .set_property_name(
-                               GetResolvedLiteralForPropertyName(property_name))
-                           .Build());
+      GOOGLESQL_ASSIGN_OR_RETURN(
+          get_element_property_expr,
+          std::move(builder)
+              .set_type(types::JsonType())
+              .set_property_name(MakeResolvedStringLiteral(property_name))
+              .Build());
     } else {
       return MakeSqlErrorAt(error_location)
              << "Property " << property_name
@@ -400,8 +391,7 @@ ResolveGraphGetElementProperty(
     GOOGLESQL_RET_CHECK(prop_dcl != nullptr);
 
     if (supports_dynamic_properties) {
-      builder.set_property_name(
-          GetResolvedLiteralForPropertyName(property_name));
+      builder.set_property_name(MakeResolvedStringLiteral(property_name));
     }
     GOOGLESQL_ASSIGN_OR_RETURN(get_element_property_expr, std::move(builder)
                                                     .set_type(prop_dcl->Type())

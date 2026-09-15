@@ -368,6 +368,7 @@ QueryStmt
                     |     | +-ColumnRef(type=GRAPH_NODE(aml_dynamic)<code INT64, id INT64, nodeJsonProp JSON, nodeLabelCol STRING, DYNAMIC>, column=$element_table.n#1)
                     |     +-label_expr=
                     |       +-GraphLabel
+                    |         +-parse_location=75-94
                     |         +-label_name=
                     |           +-Literal(type=STRING, value="DynamicLabelUnknown", has_explicit_type=TRUE)
                     +-input_scan=
@@ -450,6 +451,7 @@ QueryStmt
                     |     | +-ColumnRef(type=GRAPH_NODE(aml_dynamic_multi)<code INT64, id INT64, nodeJsonProp JSON, nodeLabelCol ARRAY<STRING>, DYNAMIC>, column=$element_table.n#1)
                     |     +-label_expr=
                     |       +-GraphLabel
+                    |         +-parse_location=81-100
                     |         +-label_name=
                     |           +-Literal(type=STRING, value="DynamicLabelUnknown", has_explicit_type=TRUE)
                     +-input_scan=
@@ -544,6 +546,7 @@ QueryStmt
                     |         +-op=OR
                     |         +-operand_list=
                     |           +-GraphLabel
+                    |           | +-parse_location=76-95
                     |           | +-label_name=
                     |           |   +-Literal(type=STRING, value="DynamicLabelUnknown", has_explicit_type=TRUE)
                     |           +-GraphLabel
@@ -635,6 +638,7 @@ QueryStmt
                     |         +-op=OR
                     |         +-operand_list=
                     |           +-GraphLabel
+                    |           | +-parse_location=82-101
                     |           | +-label_name=
                     |           |   +-Literal(type=STRING, value="DynamicLabelUnknown", has_explicit_type=TRUE)
                     |           +-GraphLabel
@@ -734,6 +738,7 @@ QueryStmt
                     |         +-op=AND
                     |         +-operand_list=
                     |           +-GraphLabel
+                    |           | +-parse_location=76-95
                     |           | +-label_name=
                     |           |   +-Literal(type=STRING, value="DynamicLabelUnknown", has_explicit_type=TRUE)
                     |           +-GraphLabel
@@ -825,6 +830,7 @@ QueryStmt
                     |         +-op=AND
                     |         +-operand_list=
                     |           +-GraphLabel
+                    |           | +-parse_location=82-101
                     |           | +-label_name=
                     |           |   +-Literal(type=STRING, value="DynamicLabelUnknown", has_explicit_type=TRUE)
                     |           +-GraphLabel
@@ -925,6 +931,7 @@ QueryStmt
                     |         +-operand_list=
                     |           +-GraphWildCardLabel(parse_location=75-76)
                     |           +-GraphLabel
+                    |             +-parse_location=79-98
                     |             +-label_name=
                     |               +-Literal(type=STRING, value="DynamicLabelUnknown", has_explicit_type=TRUE)
                     +-input_scan=
@@ -1016,6 +1023,7 @@ QueryStmt
                     |           | +-label_name=
                     |           |   +-Literal(type=STRING, value="Entity", has_explicit_type=TRUE)
                     |           +-GraphLabel
+                    |             +-parse_location=84-103
                     |             +-label_name=
                     |               +-Literal(type=STRING, value="DynamicLabelUnknown", has_explicit_type=TRUE)
                     +-input_scan=
@@ -1103,6 +1111,7 @@ QueryStmt
                     |         +-operand_list=
                     |           +-GraphWildCardLabel(parse_location=81-82)
                     |           +-GraphLabel
+                    |             +-parse_location=85-104
                     |             +-label_name=
                     |               +-Literal(type=STRING, value="DynamicLabelUnknown", has_explicit_type=TRUE)
                     +-input_scan=
@@ -1194,6 +1203,7 @@ QueryStmt
                     |           | +-label_name=
                     |           |   +-Literal(type=STRING, value="Entity", has_explicit_type=TRUE)
                     |           +-GraphLabel
+                    |             +-parse_location=90-109
                     |             +-label_name=
                     |               +-Literal(type=STRING, value="DynamicLabelUnknown", has_explicit_type=TRUE)
                     +-input_scan=
@@ -1289,6 +1299,7 @@ QueryStmt
                     |         +-op=OR
                     |         +-operand_list=
                     |           +-GraphLabel
+                    |           | +-parse_location=75-94
                     |           | +-label_name=
                     |           |   +-Literal(type=STRING, value="DynamicLabelUnknown", has_explicit_type=TRUE)
                     |           +-GraphWildCardLabel(parse_location=97-98)
@@ -1376,6 +1387,7 @@ QueryStmt
                     |         +-op=OR
                     |         +-operand_list=
                     |           +-GraphLabel
+                    |           | +-parse_location=75-94
                     |           | +-label_name=
                     |           |   +-Literal(type=STRING, value="DynamicLabelUnknown", has_explicit_type=TRUE)
                     |           +-GraphLabel
@@ -1467,6 +1479,7 @@ QueryStmt
                     |         +-op=OR
                     |         +-operand_list=
                     |           +-GraphLabel
+                    |           | +-parse_location=81-100
                     |           | +-label_name=
                     |           |   +-Literal(type=STRING, value="DynamicLabelUnknown", has_explicit_type=TRUE)
                     |           +-GraphWildCardLabel(parse_location=103-104)
@@ -1554,6 +1567,7 @@ QueryStmt
                     |         +-op=OR
                     |         +-operand_list=
                     |           +-GraphLabel
+                    |           | +-parse_location=81-100
                     |           | +-label_name=
                     |           |   +-Literal(type=STRING, value="DynamicLabelUnknown", has_explicit_type=TRUE)
                     |           +-GraphLabel
@@ -1653,6 +1667,7 @@ QueryStmt
                     |         +-op=OR
                     |         +-operand_list=
                     |           +-GraphLabel
+                    |           | +-parse_location=75-94
                     |           | +-label_name=
                     |           |   +-Literal(type=STRING, value="DynamicLabelUnknown", has_explicit_type=TRUE)
                     |           +-GraphLabelNaryExpr
@@ -1660,6 +1675,7 @@ QueryStmt
                     |             +-op=AND
                     |             +-operand_list=
                     |               +-GraphLabel
+                    |               | +-parse_location=99-107
                     |               | +-label_name=
                     |               |   +-Literal(type=STRING, value="Dynamic1", has_explicit_type=TRUE)
                     |               +-GraphLabelNaryExpr
@@ -1667,6 +1683,7 @@ QueryStmt
                     |                 +-op=NOT
                     |                 +-operand_list=
                     |                   +-GraphLabel
+                    |                     +-parse_location=111-119
                     |                     +-label_name=
                     |                       +-Literal(type=STRING, value="Dynamic2", has_explicit_type=TRUE)
                     +-input_scan=
@@ -1753,6 +1770,7 @@ QueryStmt
                     |         +-op=OR
                     |         +-operand_list=
                     |           +-GraphLabel
+                    |           | +-parse_location=81-100
                     |           | +-label_name=
                     |           |   +-Literal(type=STRING, value="DynamicLabelUnknown", has_explicit_type=TRUE)
                     |           +-GraphLabelNaryExpr
@@ -1760,6 +1778,7 @@ QueryStmt
                     |             +-op=AND
                     |             +-operand_list=
                     |               +-GraphLabel
+                    |               | +-parse_location=105-113
                     |               | +-label_name=
                     |               |   +-Literal(type=STRING, value="Dynamic1", has_explicit_type=TRUE)
                     |               +-GraphLabelNaryExpr
@@ -1767,6 +1786,7 @@ QueryStmt
                     |                 +-op=NOT
                     |                 +-operand_list=
                     |                   +-GraphLabel
+                    |                     +-parse_location=117-125
                     |                     +-label_name=
                     |                       +-Literal(type=STRING, value="Dynamic2", has_explicit_type=TRUE)
                     +-input_scan=
@@ -1845,6 +1865,7 @@ QueryStmt
                   | |   |   |   +-op=NOT
                   | |   |   |   +-operand_list=
                   | |   |   |     +-GraphLabel
+                  | |   |   |       +-parse_location=54-62
                   | |   |   |       +-label_name=
                   | |   |   |         +-Literal(type=STRING, value="Dynamic1", has_explicit_type=TRUE)
                   | |   |   +-target_element_table_list=[aml_dynamic.DynamicGraphNode]
@@ -1989,6 +2010,7 @@ QueryStmt
                   | |   |   +-column_list=[$element_table.n#1]
                   | |   |   +-label_expr=
                   | |   |   | +-GraphLabel
+                  | |   |   |   +-parse_location=53-61
                   | |   |   |   +-label_name=
                   | |   |   |     +-Literal(type=STRING, value="Dynamic1", has_explicit_type=TRUE)
                   | |   |   +-target_element_table_list=[aml_dynamic.DynamicGraphNode]
@@ -2133,6 +2155,7 @@ QueryStmt
                   | |   |   |   +-op=NOT
                   | |   |   |   +-operand_list=
                   | |   |   |     +-GraphLabel
+                  | |   |   |       +-parse_location=60-68
                   | |   |   |       +-label_name=
                   | |   |   |         +-Literal(type=STRING, value="Dynamic1", has_explicit_type=TRUE)
                   | |   |   +-target_element_table_list=[aml_dynamic_multi.DynamicMultiLabelGraphNode]
@@ -2206,6 +2229,7 @@ QueryStmt
                   | |   |   |   +-op=NOT
                   | |   |   |   +-operand_list=
                   | |   |   |     +-GraphLabel
+                  | |   |   |       +-parse_location=60-76
                   | |   |   |       +-label_name=
                   | |   |   |         +-Literal(type=STRING, value="DynamicGraphNode", has_explicit_type=TRUE)
                   | |   |   +-target_element_table_list=[aml_dynamic_multi.DynamicMultiLabelGraphNode]
@@ -2275,6 +2299,7 @@ QueryStmt
                   | |   |   +-column_list=[$element_table.n#1]
                   | |   |   +-label_expr=
                   | |   |   | +-GraphLabel
+                  | |   |   |   +-parse_location=59-67
                   | |   |   |   +-label_name=
                   | |   |   |     +-Literal(type=STRING, value="Dynamic1", has_explicit_type=TRUE)
                   | |   |   +-target_element_table_list=[aml_dynamic_multi.DynamicMultiLabelGraphNode]
@@ -2344,6 +2369,7 @@ QueryStmt
                   | |   |   +-column_list=[$element_table.n#1]
                   | |   |   +-label_expr=
                   | |   |   | +-GraphLabel
+                  | |   |   |   +-parse_location=59-75
                   | |   |   |   +-label_name=
                   | |   |   |     +-Literal(type=STRING, value="DynamicGraphNode", has_explicit_type=TRUE)
                   | |   |   +-target_element_table_list=[aml_dynamic_multi.DynamicMultiLabelGraphNode]
@@ -2436,6 +2462,7 @@ QueryStmt
                   | |   | | |   +-op=NOT
                   | |   | | |   +-operand_list=
                   | |   | | |     +-GraphLabel
+                  | |   | | |       +-parse_location=55-63
                   | |   | | |       +-label_name=
                   | |   | | |         +-Literal(type=STRING, value="Dynamic1", has_explicit_type=TRUE)
                   | |   | | +-target_element_table_list=[aml_dynamic.DynamicGraphEdge]
@@ -2638,6 +2665,7 @@ QueryStmt
                   | |   | | +-column_list=[$element_table.e#2]
                   | |   | | +-label_expr=
                   | |   | | | +-GraphLabel
+                  | |   | | |   +-parse_location=54-62
                   | |   | | |   +-label_name=
                   | |   | | |     +-Literal(type=STRING, value="Dynamic1", has_explicit_type=TRUE)
                   | |   | | +-target_element_table_list=[aml_dynamic.DynamicGraphEdge]
@@ -2840,6 +2868,7 @@ QueryStmt
                   | |   | | |   +-op=NOT
                   | |   | | |   +-operand_list=
                   | |   | | |     +-GraphLabel
+                  | |   | | |       +-parse_location=61-69
                   | |   | | |       +-label_name=
                   | |   | | |         +-Literal(type=STRING, value="Dynamic1", has_explicit_type=TRUE)
                   | |   | | +-target_element_table_list=[aml_dynamic_multi.DynamicSingleLabelGraphEdge]
@@ -2942,6 +2971,7 @@ QueryStmt
                   | |   | | |   +-op=NOT
                   | |   | | |   +-operand_list=
                   | |   | | |     +-GraphLabel
+                  | |   | | |       +-parse_location=61-77
                   | |   | | |       +-label_name=
                   | |   | | |         +-Literal(type=STRING, value="DynamicGraphEdge", has_explicit_type=TRUE)
                   | |   | | +-target_element_table_list=[aml_dynamic_multi.DynamicSingleLabelGraphEdge]
@@ -3040,6 +3070,7 @@ QueryStmt
                   | |   | | +-column_list=[$element_table.e#2]
                   | |   | | +-label_expr=
                   | |   | | | +-GraphLabel
+                  | |   | | |   +-parse_location=60-68
                   | |   | | |   +-label_name=
                   | |   | | |     +-Literal(type=STRING, value="Dynamic1", has_explicit_type=TRUE)
                   | |   | | +-target_element_table_list=[aml_dynamic_multi.DynamicSingleLabelGraphEdge]
@@ -3138,6 +3169,7 @@ QueryStmt
                   | |   | | +-column_list=[$element_table.e#2]
                   | |   | | +-label_expr=
                   | |   | | | +-GraphLabel
+                  | |   | | |   +-parse_location=60-76
                   | |   | | |   +-label_name=
                   | |   | | |     +-Literal(type=STRING, value="DynamicGraphEdge", has_explicit_type=TRUE)
                   | |   | | +-target_element_table_list=[aml_dynamic_multi.DynamicSingleLabelGraphEdge]
@@ -3236,6 +3268,7 @@ QueryStmt
                   | |   |   |   +-op=OR
                   | |   |   |   +-operand_list=
                   | |   |   |     +-GraphLabel
+                  | |   |   |     | +-parse_location=54-73
                   | |   |   |     | +-label_name=
                   | |   |   |     |   +-Literal(type=STRING, value="DynamicLabelUnknown", has_explicit_type=TRUE)
                   | |   |   |     +-GraphLabelNaryExpr
@@ -3243,6 +3276,7 @@ QueryStmt
                   | |   |   |       +-op=AND
                   | |   |   |       +-operand_list=
                   | |   |   |         +-GraphLabel
+                  | |   |   |         | +-parse_location=77-85
                   | |   |   |         | +-label_name=
                   | |   |   |         |   +-Literal(type=STRING, value="Dynamic1", has_explicit_type=TRUE)
                   | |   |   |         +-GraphLabelNaryExpr
@@ -3250,6 +3284,7 @@ QueryStmt
                   | |   |   |           +-op=NOT
                   | |   |   |           +-operand_list=
                   | |   |   |             +-GraphLabel
+                  | |   |   |               +-parse_location=89-97
                   | |   |   |               +-label_name=
                   | |   |   |                 +-Literal(type=STRING, value="Dynamic2", has_explicit_type=TRUE)
                   | |   |   +-target_element_table_list=[aml_dynamic.DynamicGraphNode]
@@ -3330,6 +3365,7 @@ QueryStmt
                   | |   |   |   +-op=OR
                   | |   |   |   +-operand_list=
                   | |   |   |     +-GraphLabel
+                  | |   |   |     | +-parse_location=55-74
                   | |   |   |     | +-label_name=
                   | |   |   |     |   +-Literal(type=STRING, value="DynamicLabelUnknown", has_explicit_type=TRUE)
                   | |   |   |     +-GraphLabelNaryExpr
@@ -3337,6 +3373,7 @@ QueryStmt
                   | |   |   |       +-op=AND
                   | |   |   |       +-operand_list=
                   | |   |   |         +-GraphLabel
+                  | |   |   |         | +-parse_location=78-86
                   | |   |   |         | +-label_name=
                   | |   |   |         |   +-Literal(type=STRING, value="Dynamic1", has_explicit_type=TRUE)
                   | |   |   |         +-GraphLabelNaryExpr
@@ -3344,6 +3381,7 @@ QueryStmt
                   | |   |   |           +-op=NOT
                   | |   |   |           +-operand_list=
                   | |   |   |             +-GraphLabel
+                  | |   |   |               +-parse_location=90-98
                   | |   |   |               +-label_name=
                   | |   |   |                 +-Literal(type=STRING, value="Dynamic2", has_explicit_type=TRUE)
                   | |   |   +-target_element_table_list=[aml_dynamic.DynamicGraphNode]
@@ -3424,6 +3462,7 @@ QueryStmt
                   | |   |   |   +-op=OR
                   | |   |   |   +-operand_list=
                   | |   |   |     +-GraphLabel
+                  | |   |   |     | +-parse_location=60-79
                   | |   |   |     | +-label_name=
                   | |   |   |     |   +-Literal(type=STRING, value="DynamicLabelUnknown", has_explicit_type=TRUE)
                   | |   |   |     +-GraphLabelNaryExpr
@@ -3431,6 +3470,7 @@ QueryStmt
                   | |   |   |       +-op=AND
                   | |   |   |       +-operand_list=
                   | |   |   |         +-GraphLabel
+                  | |   |   |         | +-parse_location=83-91
                   | |   |   |         | +-label_name=
                   | |   |   |         |   +-Literal(type=STRING, value="Dynamic1", has_explicit_type=TRUE)
                   | |   |   |         +-GraphLabelNaryExpr
@@ -3438,6 +3478,7 @@ QueryStmt
                   | |   |   |           +-op=NOT
                   | |   |   |           +-operand_list=
                   | |   |   |             +-GraphLabel
+                  | |   |   |               +-parse_location=95-103
                   | |   |   |               +-label_name=
                   | |   |   |                 +-Literal(type=STRING, value="Dynamic2", has_explicit_type=TRUE)
                   | |   |   +-target_element_table_list=[aml_dynamic_multi.DynamicMultiLabelGraphNode]
@@ -3518,6 +3559,7 @@ QueryStmt
                   | |   |   |   +-op=OR
                   | |   |   |   +-operand_list=
                   | |   |   |     +-GraphLabel
+                  | |   |   |     | +-parse_location=61-80
                   | |   |   |     | +-label_name=
                   | |   |   |     |   +-Literal(type=STRING, value="DynamicLabelUnknown", has_explicit_type=TRUE)
                   | |   |   |     +-GraphLabelNaryExpr
@@ -3525,6 +3567,7 @@ QueryStmt
                   | |   |   |       +-op=AND
                   | |   |   |       +-operand_list=
                   | |   |   |         +-GraphLabel
+                  | |   |   |         | +-parse_location=84-92
                   | |   |   |         | +-label_name=
                   | |   |   |         |   +-Literal(type=STRING, value="Dynamic1", has_explicit_type=TRUE)
                   | |   |   |         +-GraphLabelNaryExpr
@@ -3532,6 +3575,7 @@ QueryStmt
                   | |   |   |           +-op=NOT
                   | |   |   |           +-operand_list=
                   | |   |   |             +-GraphLabel
+                  | |   |   |               +-parse_location=96-104
                   | |   |   |               +-label_name=
                   | |   |   |                 +-Literal(type=STRING, value="Dynamic2", has_explicit_type=TRUE)
                   | |   |   +-target_element_table_list=[aml_dynamic_multi.DynamicMultiLabelGraphNode]
@@ -3621,6 +3665,7 @@ QueryStmt
                   | |   |   |   +-op=OR
                   | |   |   |   +-operand_list=
                   | |   |   |     +-GraphLabel
+                  | |   |   |     | +-parse_location=53-72
                   | |   |   |     | +-label_name=
                   | |   |   |     |   +-Literal(type=STRING, value="DynamicLabelUnknown", has_explicit_type=TRUE)
                   | |   |   |     +-GraphWildCardLabel(parse_location=75-76)
@@ -3702,6 +3747,7 @@ QueryStmt
                   | |   |   |   +-op=OR
                   | |   |   |   +-operand_list=
                   | |   |   |     +-GraphLabel
+                  | |   |   |     | +-parse_location=53-72
                   | |   |   |     | +-label_name=
                   | |   |   |     |   +-Literal(type=STRING, value="DynamicLabelUnknown", has_explicit_type=TRUE)
                   | |   |   |     +-GraphLabel
@@ -3787,6 +3833,7 @@ QueryStmt
                   | |   |   |   +-op=OR
                   | |   |   |   +-operand_list=
                   | |   |   |     +-GraphLabel
+                  | |   |   |     | +-parse_location=59-78
                   | |   |   |     | +-label_name=
                   | |   |   |     |   +-Literal(type=STRING, value="DynamicLabelUnknown", has_explicit_type=TRUE)
                   | |   |   |     +-GraphWildCardLabel(parse_location=81-82)
@@ -3868,6 +3915,7 @@ QueryStmt
                   | |   |   |   +-op=OR
                   | |   |   |   +-operand_list=
                   | |   |   |     +-GraphLabel
+                  | |   |   |     | +-parse_location=59-78
                   | |   |   |     | +-label_name=
                   | |   |   |     |   +-Literal(type=STRING, value="DynamicLabelUnknown", has_explicit_type=TRUE)
                   | |   |   |     +-GraphLabel
@@ -4268,6 +4316,7 @@ QueryStmt
                   | |   |   |   +-op=NOT
                   | |   |   |   +-operand_list=
                   | |   |   |     +-GraphLabel
+                  | |   |   |       +-parse_location=59-75
                   | |   |   |       +-label_name=
                   | |   |   |         +-Literal(type=STRING, value="DynamicGraphNode", has_explicit_type=TRUE)
                   | |   |   +-target_element_table_list=[aml_dynamic_multi.DynamicMultiLabelGraphNode]
@@ -4351,6 +4400,7 @@ QueryStmt
                   | |   |   |   +-Literal(type=INT64, value=10)
                   | |   |   +-label_expr=
                   | |   |   | +-GraphLabel
+                  | |   |   |   +-parse_location=52-65
                   | |   |   |   +-label_name=
                   | |   |   |     +-Literal(type=STRING, value="DynamicLabel1", has_explicit_type=TRUE)
                   | |   |   +-target_element_table_list=[aml_dynamic.DynamicGraphNode]
@@ -4432,6 +4482,7 @@ QueryStmt
                   | |   |   |   +-Parameter(type=BOOL, name="test_param_bool")
                   | |   |   +-label_expr=
                   | |   |   | +-GraphLabel
+                  | |   |   |   +-parse_location=52-65
                   | |   |   |   +-label_name=
                   | |   |   |     +-Literal(type=STRING, value="DynamicLabel1", has_explicit_type=TRUE)
                   | |   |   +-target_element_table_list=[aml_dynamic.DynamicGraphNode]
@@ -4513,6 +4564,7 @@ QueryStmt
                   | |   |   |   +-Parameter(type=INT32, name="test_param_int32")
                   | |   |   +-label_expr=
                   | |   |   | +-GraphLabel
+                  | |   |   |   +-parse_location=52-65
                   | |   |   |   +-label_name=
                   | |   |   |     +-Literal(type=STRING, value="DynamicLabel1", has_explicit_type=TRUE)
                   | |   |   +-target_element_table_list=[aml_dynamic.DynamicGraphNode]
@@ -4594,6 +4646,7 @@ QueryStmt
                   | |   |   |   +-Literal(type=UINT64, value=10, has_explicit_type=TRUE)
                   | |   |   +-label_expr=
                   | |   |   | +-GraphLabel
+                  | |   |   |   +-parse_location=52-65
                   | |   |   |   +-label_name=
                   | |   |   |     +-Literal(type=STRING, value="DynamicLabel1", has_explicit_type=TRUE)
                   | |   |   +-target_element_table_list=[aml_dynamic.DynamicGraphNode]
@@ -4675,6 +4728,7 @@ QueryStmt
                   | |   |   |   +-Parameter(type=FLOAT, name="test_param_float")
                   | |   |   +-label_expr=
                   | |   |   | +-GraphLabel
+                  | |   |   |   +-parse_location=52-65
                   | |   |   |   +-label_name=
                   | |   |   |     +-Literal(type=STRING, value="DynamicLabel1", has_explicit_type=TRUE)
                   | |   |   +-target_element_table_list=[aml_dynamic.DynamicGraphNode]
@@ -4756,6 +4810,7 @@ QueryStmt
                   | |   |   |   +-Parameter(type=DOUBLE, name="test_param_double")
                   | |   |   +-label_expr=
                   | |   |   | +-GraphLabel
+                  | |   |   |   +-parse_location=52-65
                   | |   |   |   +-label_name=
                   | |   |   |     +-Literal(type=STRING, value="DynamicLabel1", has_explicit_type=TRUE)
                   | |   |   +-target_element_table_list=[aml_dynamic.DynamicGraphNode]
@@ -4837,6 +4892,7 @@ QueryStmt
                   | |   |   |   +-Literal(type=STRING, value="abc")
                   | |   |   +-label_expr=
                   | |   |   | +-GraphLabel
+                  | |   |   |   +-parse_location=52-65
                   | |   |   |   +-label_name=
                   | |   |   |     +-Literal(type=STRING, value="DynamicLabel1", has_explicit_type=TRUE)
                   | |   |   +-target_element_table_list=[aml_dynamic.DynamicGraphNode]
@@ -4918,6 +4974,7 @@ QueryStmt
                   | |   |   |   +-Literal(type=INT64, value=10)
                   | |   |   +-label_expr=
                   | |   |   | +-GraphLabel
+                  | |   |   |   +-parse_location=58-71
                   | |   |   |   +-label_name=
                   | |   |   |     +-Literal(type=STRING, value="DynamicLabel1", has_explicit_type=TRUE)
                   | |   |   +-target_element_table_list=[aml_dynamic_multi.DynamicMultiLabelGraphNode]
@@ -4999,6 +5056,7 @@ QueryStmt
                   | |   |   |   +-Parameter(type=BOOL, name="test_param_bool")
                   | |   |   +-label_expr=
                   | |   |   | +-GraphLabel
+                  | |   |   |   +-parse_location=58-71
                   | |   |   |   +-label_name=
                   | |   |   |     +-Literal(type=STRING, value="DynamicLabel1", has_explicit_type=TRUE)
                   | |   |   +-target_element_table_list=[aml_dynamic_multi.DynamicMultiLabelGraphNode]
@@ -5080,6 +5138,7 @@ QueryStmt
                   | |   |   |   +-Parameter(type=INT32, name="test_param_int32")
                   | |   |   +-label_expr=
                   | |   |   | +-GraphLabel
+                  | |   |   |   +-parse_location=58-71
                   | |   |   |   +-label_name=
                   | |   |   |     +-Literal(type=STRING, value="DynamicLabel1", has_explicit_type=TRUE)
                   | |   |   +-target_element_table_list=[aml_dynamic_multi.DynamicMultiLabelGraphNode]
@@ -5161,6 +5220,7 @@ QueryStmt
                   | |   |   |   +-Literal(type=UINT64, value=10, has_explicit_type=TRUE)
                   | |   |   +-label_expr=
                   | |   |   | +-GraphLabel
+                  | |   |   |   +-parse_location=58-71
                   | |   |   |   +-label_name=
                   | |   |   |     +-Literal(type=STRING, value="DynamicLabel1", has_explicit_type=TRUE)
                   | |   |   +-target_element_table_list=[aml_dynamic_multi.DynamicMultiLabelGraphNode]
@@ -5242,6 +5302,7 @@ QueryStmt
                   | |   |   |   +-Parameter(type=FLOAT, name="test_param_float")
                   | |   |   +-label_expr=
                   | |   |   | +-GraphLabel
+                  | |   |   |   +-parse_location=58-71
                   | |   |   |   +-label_name=
                   | |   |   |     +-Literal(type=STRING, value="DynamicLabel1", has_explicit_type=TRUE)
                   | |   |   +-target_element_table_list=[aml_dynamic_multi.DynamicMultiLabelGraphNode]
@@ -5323,6 +5384,7 @@ QueryStmt
                   | |   |   |   +-Parameter(type=DOUBLE, name="test_param_double")
                   | |   |   +-label_expr=
                   | |   |   | +-GraphLabel
+                  | |   |   |   +-parse_location=58-71
                   | |   |   |   +-label_name=
                   | |   |   |     +-Literal(type=STRING, value="DynamicLabel1", has_explicit_type=TRUE)
                   | |   |   +-target_element_table_list=[aml_dynamic_multi.DynamicMultiLabelGraphNode]
@@ -5404,6 +5466,7 @@ QueryStmt
                   | |   |   |   +-Literal(type=STRING, value="abc")
                   | |   |   +-label_expr=
                   | |   |   | +-GraphLabel
+                  | |   |   |   +-parse_location=58-71
                   | |   |   |   +-label_name=
                   | |   |   |     +-Literal(type=STRING, value="DynamicLabel1", has_explicit_type=TRUE)
                   | |   |   +-target_element_table_list=[aml_dynamic_multi.DynamicMultiLabelGraphNode]
@@ -5487,6 +5550,7 @@ QueryStmt
               | |   |   +-column_list=[$element_table.n#1]
               | |   |   +-label_expr=
               | |   |   | +-GraphLabel
+              | |   |   |   +-parse_location=27-40
               | |   |   |   +-label_name=
               | |   |   |     +-Literal(type=STRING, value="DynamicLabel1", has_explicit_type=TRUE)
               | |   |   +-target_element_table_list=[aml_dynamic.DynamicGraphNode]
@@ -5585,6 +5649,7 @@ QueryStmt
               | |   | | +-column_list=[$element_table.n#2]
               | |   | | +-label_expr=
               | |   | | | +-GraphLabel
+              | |   | | |   +-parse_location=28-41
               | |   | | |   +-label_name=
               | |   | | |     +-Literal(type=STRING, value="DynamicLabel1", has_explicit_type=TRUE)
               | |   | | +-target_element_table_list=[aml_dynamic.DynamicGraphEdge]
@@ -5693,6 +5758,7 @@ QueryStmt
               | |   |   +-column_list=[$element_table.n#1]
               | |   |   +-label_expr=
               | |   |   | +-GraphLabel
+              | |   |   |   +-parse_location=27-40
               | |   |   |   +-label_name=
               | |   |   |     +-Literal(type=STRING, value="DynamicLabel1", has_explicit_type=TRUE)
               | |   |   +-target_element_table_list=[aml_dynamic.DynamicGraphNode]
@@ -5786,6 +5852,7 @@ QueryStmt
               | |   |   +-column_list=[$element_table.n#1]
               | |   |   +-label_expr=
               | |   |   | +-GraphLabel
+              | |   |   |   +-parse_location=27-40
               | |   |   |   +-label_name=
               | |   |   |     +-Literal(type=STRING, value="DynamicLabel1", has_explicit_type=TRUE)
               | |   |   +-target_element_table_list=[aml_dynamic.DynamicGraphNode]
@@ -5885,6 +5952,7 @@ QueryStmt
               | |   | | +-column_list=[$element_table.n#2]
               | |   | | +-label_expr=
               | |   | | | +-GraphLabel
+              | |   | | |   +-parse_location=28-41
               | |   | | |   +-label_name=
               | |   | | |     +-Literal(type=STRING, value="DynamicLabel1", has_explicit_type=TRUE)
               | |   | | +-target_element_table_list=[aml_dynamic.DynamicGraphEdge]
@@ -6007,6 +6075,7 @@ QueryStmt
               | |   | | +-column_list=[$element_table.n#2]
               | |   | | +-label_expr=
               | |   | | | +-GraphLabel
+              | |   | | |   +-parse_location=28-41
               | |   | | |   +-label_name=
               | |   | | |     +-Literal(type=STRING, value="DynamicLabel1", has_explicit_type=TRUE)
               | |   | | +-target_element_table_list=[aml_dynamic.DynamicGraphEdge]
@@ -6151,6 +6220,7 @@ QueryStmt
                   | |   |   |     +-Literal(type=INT64, value=10)
                   | |   |   +-label_expr=
                   | |   |   | +-GraphLabel
+                  | |   |   |   +-parse_location=52-65
                   | |   |   |   +-label_name=
                   | |   |   |     +-Literal(type=STRING, value="DynamicLabel1", has_explicit_type=TRUE)
                   | |   |   +-target_element_table_list=[aml_dynamic.DynamicGraphNode]
@@ -6242,6 +6312,7 @@ QueryStmt
                   | |   |   |     +-Literal(type=INT64, value=10)
                   | |   |   +-label_expr=
                   | |   |   | +-GraphLabel
+                  | |   |   |   +-parse_location=52-65
                   | |   |   |   +-label_name=
                   | |   |   |     +-Literal(type=STRING, value="DynamicLabel1", has_explicit_type=TRUE)
                   | |   |   +-target_element_table_list=[aml_dynamic.DynamicGraphNode]
@@ -6333,6 +6404,7 @@ QueryStmt
                   | |   |   |     +-Literal(type=INT64, value=10)
                   | |   |   +-label_expr=
                   | |   |   | +-GraphLabel
+                  | |   |   |   +-parse_location=52-65
                   | |   |   |   +-label_name=
                   | |   |   |     +-Literal(type=STRING, value="DynamicLabel1", has_explicit_type=TRUE)
                   | |   |   +-target_element_table_list=[aml_dynamic.DynamicGraphNode]
@@ -6424,6 +6496,7 @@ QueryStmt
                   | |   |   |     +-Literal(type=INT64, value=10)
                   | |   |   +-label_expr=
                   | |   |   | +-GraphLabel
+                  | |   |   |   +-parse_location=52-65
                   | |   |   |   +-label_name=
                   | |   |   |     +-Literal(type=STRING, value="DynamicLabel1", has_explicit_type=TRUE)
                   | |   |   +-target_element_table_list=[aml_dynamic.DynamicGraphNode]
@@ -6515,6 +6588,7 @@ QueryStmt
                   | |   |   |     +-Literal(type=INT64, value=10)
                   | |   |   +-label_expr=
                   | |   |   | +-GraphLabel
+                  | |   |   |   +-parse_location=52-65
                   | |   |   |   +-label_name=
                   | |   |   |     +-Literal(type=STRING, value="DynamicLabel1", has_explicit_type=TRUE)
                   | |   |   +-target_element_table_list=[aml_dynamic.DynamicGraphNode]
@@ -6606,6 +6680,7 @@ QueryStmt
                   | |   |   |     +-Literal(type=INT64, value=10)
                   | |   |   +-label_expr=
                   | |   |   | +-GraphLabel
+                  | |   |   |   +-parse_location=52-65
                   | |   |   |   +-label_name=
                   | |   |   |     +-Literal(type=STRING, value="DynamicLabel1", has_explicit_type=TRUE)
                   | |   |   +-target_element_table_list=[aml_dynamic.DynamicGraphNode]
@@ -6697,6 +6772,7 @@ QueryStmt
                   | |   |   |     +-Literal(type=INT64, value=10)
                   | |   |   +-label_expr=
                   | |   |   | +-GraphLabel
+                  | |   |   |   +-parse_location=52-65
                   | |   |   |   +-label_name=
                   | |   |   |     +-Literal(type=STRING, value="DynamicLabel1", has_explicit_type=TRUE)
                   | |   |   +-target_element_table_list=[aml_dynamic.DynamicGraphNode]
@@ -6788,6 +6864,7 @@ QueryStmt
                   | |   |   |     +-Literal(type=INT64, value=10)
                   | |   |   +-label_expr=
                   | |   |   | +-GraphLabel
+                  | |   |   |   +-parse_location=58-71
                   | |   |   |   +-label_name=
                   | |   |   |     +-Literal(type=STRING, value="DynamicLabel1", has_explicit_type=TRUE)
                   | |   |   +-target_element_table_list=[aml_dynamic_multi.DynamicMultiLabelGraphNode]
@@ -6879,6 +6956,7 @@ QueryStmt
                   | |   |   |     +-Literal(type=INT64, value=10)
                   | |   |   +-label_expr=
                   | |   |   | +-GraphLabel
+                  | |   |   |   +-parse_location=58-71
                   | |   |   |   +-label_name=
                   | |   |   |     +-Literal(type=STRING, value="DynamicLabel1", has_explicit_type=TRUE)
                   | |   |   +-target_element_table_list=[aml_dynamic_multi.DynamicMultiLabelGraphNode]
@@ -6970,6 +7048,7 @@ QueryStmt
                   | |   |   |     +-Literal(type=INT64, value=10)
                   | |   |   +-label_expr=
                   | |   |   | +-GraphLabel
+                  | |   |   |   +-parse_location=58-71
                   | |   |   |   +-label_name=
                   | |   |   |     +-Literal(type=STRING, value="DynamicLabel1", has_explicit_type=TRUE)
                   | |   |   +-target_element_table_list=[aml_dynamic_multi.DynamicMultiLabelGraphNode]
@@ -7061,6 +7140,7 @@ QueryStmt
                   | |   |   |     +-Literal(type=INT64, value=10)
                   | |   |   +-label_expr=
                   | |   |   | +-GraphLabel
+                  | |   |   |   +-parse_location=58-71
                   | |   |   |   +-label_name=
                   | |   |   |     +-Literal(type=STRING, value="DynamicLabel1", has_explicit_type=TRUE)
                   | |   |   +-target_element_table_list=[aml_dynamic_multi.DynamicMultiLabelGraphNode]
@@ -7152,6 +7232,7 @@ QueryStmt
                   | |   |   |     +-Literal(type=INT64, value=10)
                   | |   |   +-label_expr=
                   | |   |   | +-GraphLabel
+                  | |   |   |   +-parse_location=58-71
                   | |   |   |   +-label_name=
                   | |   |   |     +-Literal(type=STRING, value="DynamicLabel1", has_explicit_type=TRUE)
                   | |   |   +-target_element_table_list=[aml_dynamic_multi.DynamicMultiLabelGraphNode]
@@ -7243,6 +7324,7 @@ QueryStmt
                   | |   |   |     +-Literal(type=INT64, value=10)
                   | |   |   +-label_expr=
                   | |   |   | +-GraphLabel
+                  | |   |   |   +-parse_location=58-71
                   | |   |   |   +-label_name=
                   | |   |   |     +-Literal(type=STRING, value="DynamicLabel1", has_explicit_type=TRUE)
                   | |   |   +-target_element_table_list=[aml_dynamic_multi.DynamicMultiLabelGraphNode]
@@ -7334,6 +7416,7 @@ QueryStmt
                   | |   |   |     +-Literal(type=INT64, value=10)
                   | |   |   +-label_expr=
                   | |   |   | +-GraphLabel
+                  | |   |   |   +-parse_location=58-71
                   | |   |   |   +-label_name=
                   | |   |   |     +-Literal(type=STRING, value="DynamicLabel1", has_explicit_type=TRUE)
                   | |   |   +-target_element_table_list=[aml_dynamic_multi.DynamicMultiLabelGraphNode]
@@ -7418,6 +7501,7 @@ QueryStmt
                   | |   |   +-column_list=[$element_table.n#1]
                   | |   |   +-label_expr=
                   | |   |   | +-GraphLabel
+                  | |   |   |   +-parse_location=52-65
                   | |   |   |   +-label_name=
                   | |   |   |     +-Literal(type=STRING, value="DynamicLabel1", has_explicit_type=TRUE)
                   | |   |   +-target_element_table_list=[aml_dynamic.DynamicGraphNode]
@@ -7493,6 +7577,7 @@ QueryStmt
                   | |   |   +-column_list=[$element_table.n#1]
                   | |   |   +-label_expr=
                   | |   |   | +-GraphLabel
+                  | |   |   |   +-parse_location=58-71
                   | |   |   |   +-label_name=
                   | |   |   |     +-Literal(type=STRING, value="DynamicLabel1", has_explicit_type=TRUE)
                   | |   |   +-target_element_table_list=[aml_dynamic_multi.DynamicMultiLabelGraphNode]

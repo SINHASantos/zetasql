@@ -54,6 +54,7 @@
 #include "googlesql/public/type.pb.h"
 #include "googlesql/public/types/array_type.h"
 #include "googlesql/public/types/collation.h"
+#include "googlesql/public/types/declarative_type.h"
 #include "googlesql/public/types/enum_type.h"
 #include "googlesql/public/types/proto_type.h"
 #include "googlesql/public/types/struct_type.h"
@@ -2985,6 +2986,40 @@ TEST(AnalyzerTest, AnalyzeExpressionForAssignmentToTypeWithModifiers) {
               IsOkAndHolds(true))
       << "Annotation map: "
       << output->resolved_expr()->type_annotation_map()->DebugString();
+}
+
+TEST(AnalyzerTest, FormatDeclarativeTypeWithCustomFormatting) {
+  AnalyzerOptions options;
+  options.mutable_language()->EnableMaximumLanguageFeaturesForDevelopment();
+  TypeFactory type_factory;
+  const Type* decl_type = nullptr;
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(
+      decl_type,
+      type_factory.MakeDeclarativeType(
+          DeclarativeTypeDescriptor()
+              .set_type_id({"NS", "DeclTypeWithCustomFormatting"})
+              .set_display_name("DeclTypeWithCustomFormatting")
+              .set_backing_type(type_factory.get_int64())
+              .set_coercion_from_backing_type(
+                  DeclarativeTypeDescriptor::AllowCoercionMode::kExplicitOnly)
+              .set_coercion_to_backing_type(
+                  DeclarativeTypeDescriptor::AllowCoercionMode::kExplicitOnly)
+              .set_formatting_strategy(
+                  DeclarativeTypeDescriptor::FormattingCustom(
+                      +[](const ValueContent&,
+                          const DeclarativeTypeDescriptor::FormattingCustom::
+                              FormatOptions&) {
+                        return std::string("CUSTOM");
+                      }))));
+
+  SimpleCatalog catalog("test_catalog", &type_factory);
+  catalog.AddBuiltinFunctions(BuiltinFunctionOptions(options.language()));
+  catalog.AddType("DeclTypeWithCustomFormatting", decl_type);
+
+  std::unique_ptr<const AnalyzerOutput> output;
+  GOOGLESQL_ASSERT_OK(AnalyzeStatement(
+      "SELECT FORMAT('%T', CAST(NULL AS DeclTypeWithCustomFormatting))",
+      options, &catalog, &type_factory, &output));
 }
 
 }  // namespace googlesql

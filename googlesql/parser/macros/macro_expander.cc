@@ -40,6 +40,7 @@
 #include "googlesql/parser/token_stream.h"
 #include "googlesql/parser/token_with_location.h"
 #include "googlesql/proto/internal_error_location.pb.h"
+#include "googlesql/public/catalog.h"
 #include "googlesql/public/error_helpers.h"
 #include "googlesql/public/parse_location.h"
 #include "googlesql/public/strings.h"
@@ -196,25 +197,27 @@ std::vector<absl::Status> MacroExpander::WarningCollector::ReleaseWarnings() {
 }
 
 absl::StatusOr<std::unique_ptr<MacroExpander>> MacroExpander::Create(
-    TokenStream* token_provider, const MacroCatalog& macro_catalog,
-    googlesql_base::UnsafeArena* arena, StackFrame::StackFrameFactory& stack_frame_factory,
+    TokenStream* token_provider, Catalog* /*absl_nullable*/ catalog,
+    googlesql_base::UnsafeArena* /*absl_nonnull*/ arena,
     MacroExpanderOptions macro_expander_options,
     StackFrame* /*absl_nullable*/ parent_location) {
   TokenProviderBase* token_provider_base =
       dynamic_cast<TokenProviderBase*>(token_provider);
   GOOGLESQL_RET_CHECK(token_provider_base != nullptr);
+  GOOGLESQL_RET_CHECK(arena != nullptr);
+  auto stack_frame_factory = std::make_shared<StackFrame::StackFrameFactory>(
+      arena, macro_expander_options.max_number_of_stack_frames);
   return absl::WrapUnique(new MacroExpander(
-      token_provider_base, macro_catalog, arena, stack_frame_factory,
+      token_provider_base, catalog, std::move(stack_frame_factory),
       macro_expander_options, parent_location));
 }
 
-MacroExpander::MacroExpander(TokenProviderBase* token_provider,
-                             const MacroCatalog& macro_catalog,
-                             googlesql_base::UnsafeArena* arena,
-                             StackFrame::StackFrameFactory& stack_frame_factory,
-                             MacroExpanderOptions macro_expander_options,
-                             StackFrame* /*absl_nullable*/ parent_location)
-    : MacroExpander(token_provider, macro_catalog, arena, stack_frame_factory,
+MacroExpander::MacroExpander(
+    TokenProviderBase* token_provider, Catalog* /*absl_nullable*/ catalog,
+    std::shared_ptr<StackFrame::StackFrameFactory> stack_frame_factory,
+    MacroExpanderOptions macro_expander_options,
+    StackFrame* /*absl_nullable*/ parent_location)
+    : MacroExpander(token_provider, catalog, std::move(stack_frame_factory),
                     // Public constructor, expansion state uses the owned
                     // (empty) expansion state from this MacroExpander.
                     owned_expansion_state_,
@@ -222,20 +225,19 @@ MacroExpander::MacroExpander(TokenProviderBase* token_provider,
                     /*override_warning_collector=*/nullptr, parent_location) {}
 
 absl::StatusOr<ExpansionOutput> MacroExpander::ExpandMacros(
-    std::unique_ptr<TokenStream> token_provider,
-    const MacroCatalog& macro_catalog,
+    std::unique_ptr<TokenStream> token_provider, Catalog* /*absl_nullable*/ catalog,
     MacroExpanderOptions macro_expander_options) {
   ExpansionOutput expansion_output;
   ExpansionState expansion_state;
-  StackFrame::StackFrameFactory stack_frame_factory(
-      macro_expander_options.max_number_of_stack_frames,
-      expansion_output.stack_frames);
   expansion_output.arena = CreateUnsafeArena();
+  auto stack_frame_factory = std::make_shared<StackFrame::StackFrameFactory>(
+      expansion_output.arena.get(),
+      macro_expander_options.max_number_of_stack_frames);
   WarningCollector warning_collector(
       macro_expander_options.diagnostic_options.max_warning_count);
   GOOGLESQL_RETURN_IF_ERROR(ExpandMacrosInternal(
-      std::move(token_provider), macro_catalog, expansion_output.arena.get(),
-      stack_frame_factory, expansion_state,
+      std::move(token_provider), catalog, std::move(stack_frame_factory),
+      expansion_state,
       /*call_arguments=*/{}, macro_expander_options,
       /*parent_location=*/nullptr, &expansion_output.location_map,
       expansion_output.expanded_tokens, warning_collector,
@@ -352,7 +354,7 @@ absl::string_view MacroExpander::MaybeAllocateConcatenation(
     return a;
   }
 
-  return AllocateString(absl::StrCat(a, b), arena_);
+  return AllocateString(absl::StrCat(a, b), stack_frame_factory_->arena());
 }
 
 // TODO : Update token provider to have the options or state of macro expander.
@@ -565,14 +567,16 @@ absl::StatusOr<TokenWithLocation> MacroExpander::ExpandAndMaybeSpliceMacroItem(
                      MakeInvocationStackFrame(unexpanded_macro_token));
     std::vector<TokenWithLocation> unexpanded_args;
     std::vector<std::vector<TokenWithLocation>> expanded_args;
-    std::optional<MacroInfo> macro_info;
+    const Macro* macro = nullptr;
 
     // The following check exists to prevent arguments from being parsed
     // and expanded if the invoked macro does not exist. This applies only to
     // user macro invocations in LENIENT mode.
     if (unexpanded_macro_token.kind == Token::MACRO_INVOCATION) {
-      macro_info = macro_catalog_.Find(macro_name);
-      if (!macro_info.has_value()) {
+      if (catalog_ != nullptr) {
+        GOOGLESQL_RETURN_IF_ERROR(catalog_->GetMacro(std::string(macro_name), &macro));
+      }
+      if (macro == nullptr) {
         GOOGLESQL_RETURN_IF_ERROR(RaiseErrorOrAddWarning(MakeSqlErrorAt(
             unexpanded_macro_token.location.start(),
             absl::StrFormat("Macro '%s' not found.", macro_name))));
@@ -591,10 +595,10 @@ absl::StatusOr<TokenWithLocation> MacroExpander::ExpandAndMaybeSpliceMacroItem(
           macro_name, *invocation_stack_frame, unexpanded_args, expanded_args,
           expanded_tokens));
     } else {
-      GOOGLESQL_RET_CHECK(macro_info.has_value());
-      GOOGLESQL_RETURN_IF_ERROR(ExpandUserMacroInvocation(
-          *macro_info, *invocation_stack_frame, unexpanded_args, expanded_args,
-          expanded_tokens));
+      GOOGLESQL_RET_CHECK_NE(macro, nullptr);
+      GOOGLESQL_RETURN_IF_ERROR(ExpandUserMacroInvocation(*macro, *invocation_stack_frame,
+                                                unexpanded_args, expanded_args,
+                                                expanded_tokens));
     }
   }
 
@@ -745,8 +749,8 @@ absl::Status MacroExpander::ExpandPotentiallySplicingTokens() {
   } else if (!pending_token.preceding_whitespaces.empty()) {
     // This is the case where the last part of our chunk has all been empty
     // expansions. We need to hold onto these whitespaces for the next chunk.
-    pending_whitespaces_ =
-        AllocateString(pending_token.preceding_whitespaces, arena_);
+    pending_whitespaces_ = AllocateString(pending_token.preceding_whitespaces,
+                                          stack_frame_factory_->arena());
   }
   return absl::OkStatus();
 }
@@ -868,9 +872,9 @@ absl::Status MacroExpander::ParseAndExpandArgs(
     // argument is expanded.
     GOOGLESQL_ASSIGN_OR_RETURN(
         StackFrame * child_stack_frame,
-        stack_frame_factory_.MakeStackFrame(
+        stack_frame_factory_->MakeStackFrame(
             AllocateString(std::string("arg:$" + std::to_string(arg_index)),
-                           arena_),
+                           stack_frame_factory_->arena()),
             StackFrame::FrameType::kMacroArg,
             ParseLocationRange(
                 ParseLocationPoint::FromByteOffset(
@@ -900,10 +904,9 @@ absl::Status MacroExpander::ParseAndExpandArgs(
         // If we only pass the arg as the input, the location offsets will start
         // from 0.
         token_provider_->CreateNewInstance(arg_start_offset, arg_end_offset),
-        macro_catalog_, arena_, stack_frame_factory_, expansion_state_,
-        call_arguments_, macro_expander_options_, child_stack_frame,
-        location_map_, expanded_arg, warning_collector_,
-        &max_arg_ref_index_in_current_arg,
+        catalog_, stack_frame_factory_, expansion_state_, call_arguments_,
+        macro_expander_options_, child_stack_frame, location_map_, expanded_arg,
+        warning_collector_, &max_arg_ref_index_in_current_arg,
         /*drop_comments=*/true));
 
     // Delink the macro invocation from the argument expansion.
@@ -1014,13 +1017,13 @@ absl::Status MacroExpander::ExpandMacroArgumentReference(
       continue;
     }
     GOOGLESQL_ASSIGN_OR_RETURN(StackFrame * copy_stack_frame,
-                     stack_frame_factory_.AllocateStackFrame());
+                     stack_frame_factory_->AllocateStackFrame());
     expanded_token.stack_frame = copy_stack_frame;
     while (stack_frame != nullptr) {
       *copy_stack_frame = *stack_frame;
       if (stack_frame->parent != nullptr) {
         GOOGLESQL_ASSIGN_OR_RETURN(copy_stack_frame->parent,
-                         stack_frame_factory_.AllocateStackFrame());
+                         stack_frame_factory_->AllocateStackFrame());
         copy_stack_frame = copy_stack_frame->parent;
       }
       stack_frame = stack_frame->parent;
@@ -1031,8 +1034,9 @@ absl::Status MacroExpander::ExpandMacroArgumentReference(
     // NOTE : This newly added reference node will be attached to macro
     // invocation node.
     GOOGLESQL_ASSIGN_OR_RETURN(copy_stack_frame->parent,
-                     stack_frame_factory_.MakeStackFrame(
-                         AllocateString(absl::StrCat("$", arg_index), arena_),
+                     stack_frame_factory_->MakeStackFrame(
+                         AllocateString(absl::StrCat("$", arg_index),
+                                        stack_frame_factory_->arena()),
                          StackFrame::FrameType::kArgRef, token.location,
                          token_provider_->input(),
                          token_provider_->offset_in_original_input(),
@@ -1142,8 +1146,8 @@ absl::Status MacroExpander::ExpandIdentifierBuiltin(
   expanded_tokens.push_back(TokenWithLocation{
       .kind = Token::IDENTIFIER,
       .location = builtin_invocation_frame.location,
-      .text =
-          AllocateString(ToIdentifierLiteral(spliced_identifier_name), arena_),
+      .text = AllocateString(ToIdentifierLiteral(spliced_identifier_name),
+                             stack_frame_factory_->arena()),
       .stack_frame = &builtin_invocation_frame});
   return absl::OkStatus();
 }
@@ -1177,11 +1181,11 @@ absl::Status MacroExpander::ExpandStringBuiltin(
     result = ToSingleQuotedStringLiteral(result);
   }
 
-  expanded_tokens.push_back(
-      TokenWithLocation{.kind = Token::STRING_LITERAL,
-                        .location = builtin_invocation_frame.location,
-                        .text = AllocateString(result, arena_),
-                        .stack_frame = &builtin_invocation_frame});
+  expanded_tokens.push_back(TokenWithLocation{
+      .kind = Token::STRING_LITERAL,
+      .location = builtin_invocation_frame.location,
+      .text = AllocateString(result, stack_frame_factory_->arena()),
+      .stack_frame = &builtin_invocation_frame});
   return absl::OkStatus();
 }
 
@@ -1274,7 +1278,7 @@ absl::Status MacroExpander::ValidateStringBuiltinInvocation(
 // REQUIRES: The macro definition must have already been loaded from the
 //           macro catalog.
 absl::Status MacroExpander::ExpandUserMacroInvocation(
-    const MacroInfo& macro_info, StackFrame& macro_invocation_stack_frame,
+    const Macro& macro, StackFrame& macro_invocation_stack_frame,
     const std::vector<TokenWithLocation>& unexpanded_args,
     const std::vector<std::vector<TokenWithLocation>>& expanded_args,
     std::vector<TokenWithLocation>& expanded_tokens) {
@@ -1288,19 +1292,18 @@ absl::Status MacroExpander::ExpandUserMacroInvocation(
   // of the macro in question, not the top-level.
   ErrorMessageOptions& child_error_options =
       child_macro_expander_options.diagnostic_options.error_message_options;
-  child_error_options.input_original_start_line =
-      macro_info.definition_start_line;
+  child_error_options.input_original_start_line = macro.definition_start_line();
   child_error_options.input_original_start_column =
-      macro_info.definition_start_column;
+      macro.definition_start_column();
 
   // The macro definition can contain anything, not necessarily a statement or
   // a script. Expanding a definition for an invocation always occurs in raw
   // tokenization, without carrying over comments.
   auto child_token_provider = token_provider_->CreateNewInstance(
-      macro_info.location.start().filename(), macro_info.source_text,
-      /*start_offset=*/macro_info.body_location.start().GetByteOffset(),
-      /*end_offset=*/macro_info.body_location.end().GetByteOffset(),
-      macro_info.definition_start_offset);
+      macro.location().start().filename(), macro.source_text(),
+      /*start_offset=*/macro.body_location().start().GetByteOffset(),
+      /*end_offset=*/macro.body_location().end().GetByteOffset(),
+      macro.definition_start_offset());
 
   // The number of explicit arguments is the number of arguments written by the
   // user, without the implicit $0 argument, which is the macro name.
@@ -1313,11 +1316,10 @@ absl::Status MacroExpander::ExpandUserMacroInvocation(
                           "Cycle detected in macro expansion");
   }
   GOOGLESQL_RETURN_IF_ERROR(ExpandMacrosInternal(
-      std::move(child_token_provider), macro_catalog_, arena_,
-      stack_frame_factory_, expansion_state_, std::move(expanded_args),
-      child_macro_expander_options, &macro_invocation_stack_frame,
-      location_map_, expanded_tokens, warning_collector_,
-      &max_arg_ref_in_definition,
+      std::move(child_token_provider), catalog_, stack_frame_factory_,
+      expansion_state_, std::move(expanded_args), child_macro_expander_options,
+      &macro_invocation_stack_frame, location_map_, expanded_tokens,
+      warning_collector_, &max_arg_ref_in_definition,
       /*drop_comments=*/true));
   // Track that we are no longer in a cycle including this macro.
   expansion_state_.UnmarkAsVisited(macro_invocation_stack_frame.name);
@@ -1339,7 +1341,7 @@ absl::Status MacroExpander::ExpandUserMacroInvocation(
     expanded_tokens.back().preceding_whitespaces = "";
     location_map_->insert_or_assign(
         invocation_location.start().GetByteOffset(),
-        Expansion{.macro_name = std::string(macro_info.name()),
+        Expansion{.macro_name = std::string(macro.Name()),
                   .full_match = std::string(absl::ClippedSubstr(
                       token_provider_->input(),
                       invocation_location.start().GetByteOffset(),
@@ -1502,10 +1504,9 @@ absl::StatusOr<TokenWithLocation> MacroExpander::ExpandLiteral(
     }
 
     GOOGLESQL_RETURN_IF_ERROR(ExpandMacrosInternal(
-        std::move(child_token_provider), macro_catalog_, arena_,
-        stack_frame_factory_, expansion_state_, call_arguments_,
-        macro_expander_options_, parent_location_, location_map_,
-        expanded_tokens, warning_collector_,
+        std::move(child_token_provider), catalog_, stack_frame_factory_,
+        expansion_state_, call_arguments_, macro_expander_options_,
+        parent_location_, location_map_, expanded_tokens, warning_collector_,
         /*out_max_arg_ref_index=*/nullptr, /*drop_comments=*/true));
 
     GOOGLESQL_RET_CHECK(!expanded_tokens.empty())
@@ -1549,8 +1550,8 @@ absl::StatusOr<TokenWithLocation> MacroExpander::ExpandLiteral(
         } else {
           // We need to break the literal
           TokenWithLocation current_literal = literal_token;
-          current_literal.text =
-              AllocateString(QuoteText(content, quoting), arena_);
+          current_literal.text = AllocateString(QuoteText(content, quoting),
+                                                stack_frame_factory_->arena());
           GOOGLESQL_ASSIGN_OR_RETURN(current_literal,
                            AdvancePendingToken(std::move(pending_token),
                                                std::move(current_literal)));
@@ -1578,14 +1579,14 @@ absl::StatusOr<TokenWithLocation> MacroExpander::ExpandLiteral(
     return original_literal_token;
   }
 
-  literal_token.text = AllocateString(QuoteText(content, quoting), arena_);
+  literal_token.text = AllocateString(QuoteText(content, quoting),
+                                      stack_frame_factory_->arena());
   return literal_token;
 }
 
 absl::Status MacroExpander::ExpandMacrosInternal(
-    std::unique_ptr<TokenStream> token_provider,
-    const MacroCatalog& macro_catalog, googlesql_base::UnsafeArena* arena,
-    StackFrame::StackFrameFactory& stack_frame_factory,
+    std::unique_ptr<TokenStream> token_provider, Catalog* /*absl_nullable*/ catalog,
+    std::shared_ptr<StackFrame::StackFrameFactory> stack_frame_factory,
     ExpansionState& expansion_state,
     const std::vector<std::vector<TokenWithLocation>>& call_arguments,
     MacroExpanderOptions macro_expander_options,
@@ -1610,7 +1611,7 @@ absl::Status MacroExpander::ExpandMacrosInternal(
       dynamic_cast<TokenProviderBase*>(token_provider.get());
   GOOGLESQL_RET_CHECK(token_provider_base != nullptr);
   auto expander = absl::WrapUnique(new MacroExpander(
-      token_provider_base, macro_catalog, arena, stack_frame_factory,
+      token_provider_base, catalog, std::move(stack_frame_factory),
       expansion_state, call_arguments, macro_expander_options,
       &warning_collector, parent_location));
   expander->location_map_ = location_map;
@@ -1642,8 +1643,9 @@ absl::StatusOr<StackFrame*> MacroExpander::MakeInvocationStackFrame(
   GOOGLESQL_ASSIGN_OR_RETURN(absl::string_view macro_name,
                    GetMacroName(invocation_token));
 
-  return stack_frame_factory_.MakeStackFrame(
-      AllocateString(absl::StrCat(name_suffix, macro_name), arena_),
+  return stack_frame_factory_->MakeStackFrame(
+      AllocateString(absl::StrCat(name_suffix, macro_name),
+                     stack_frame_factory_->arena()),
       StackFrame::FrameType::kMacroInvocation, invocation_token.location,
       token_provider_->input(), token_provider_->offset_in_original_input(),
       macro_expander_options_.diagnostic_options.error_message_options

@@ -67,60 +67,58 @@ TEST(MakeNodeVector, LowestCommonAncestorTypeTraitsInheritance) {
   using GrandChild2A = ResolvedLiteral;
   using GrandChild2B = ResolvedParameter;
 
+  static_assert(std::is_same_v<LowestCommonAncestor<Root, Root>::type, Root>,
+                "identity on Root");
   static_assert(
-      std::is_same<LowestCommonAncestor<Root, Root>::type, Root>::value,
-      "identity on Root");
-  static_assert(
-      std::is_same<LowestCommonAncestor<Child1, Child1>::type, Child1>::value,
+      std::is_same_v<LowestCommonAncestor<Child1, Child1>::type, Child1>,
       "identity on Child");
+  static_assert(std::is_same_v<LowestCommonAncestor<Child1, Root>::type, Root>,
+                "Root is LCA of Root and Child");
   static_assert(
-      std::is_same<LowestCommonAncestor<Child1, Root>::type, Root>::value,
-      "Root is LCA of Root and Child");
-  static_assert(std::is_same<LowestCommonAncestor<Child1, GrandChild1A>::type,
-                             Child1>::value,
-                "Parent is LCA of Parent and Child");
+      std::is_same_v<LowestCommonAncestor<Child1, GrandChild1A>::type, Child1>,
+      "Parent is LCA of Parent and Child");
   static_assert(
-      std::is_same<LowestCommonAncestor<Child1, Child2>::type, Root>::value,
+      std::is_same_v<LowestCommonAncestor<Child1, Child2>::type, Root>,
       "Root is LCA of siblings");
   static_assert(
-      std::is_same<LowestCommonAncestor<GrandChild1A, GrandChild1B>::type,
-                   Child1>::value,
+      std::is_same_v<LowestCommonAncestor<GrandChild1A, GrandChild1B>::type,
+                     Child1>,
       "Parent is LCA of siblings");
   static_assert(
-      std::is_same<LowestCommonAncestor<GrandChild1A, GrandChild2B>::type,
-                   Root>::value,
+      std::is_same_v<LowestCommonAncestor<GrandChild1A, GrandChild2B>::type,
+                     Root>,
       "Root is LCA of grandchildren (from different families)");
 
-  static_assert(std::is_same<LowestCommonAncestor<Root>::type, Root>::value,
+  static_assert(std::is_same_v<LowestCommonAncestor<Root>::type, Root>,
                 "Single Arg identity (on root)");
-  static_assert(std::is_same<LowestCommonAncestor<Child1>::type, Child1>::value,
+  static_assert(std::is_same_v<LowestCommonAncestor<Child1>::type, Child1>,
                 "Sing Arg identity (non-root)");
   static_assert(
-      std::is_same<LowestCommonAncestor<Root, Root, Root>::type, Root>::value,
+      std::is_same_v<LowestCommonAncestor<Root, Root, Root>::type, Root>,
       "multi-arg identity (root)");
 
-  static_assert(std::is_same<LowestCommonAncestor<Child1, Child1, Child1>::type,
-                             Child1>::value,
-                "multi-arg identity (non-root)");
   static_assert(
-      std::is_same<LowestCommonAncestor<Child1, Child1, Child1, Child1>::type,
-                   Child1>::value,
+      std::is_same_v<LowestCommonAncestor<Child1, Child1, Child1>::type,
+                     Child1>,
+      "multi-arg identity (non-root)");
+  static_assert(
+      std::is_same_v<LowestCommonAncestor<Child1, Child1, Child1, Child1>::type,
+                     Child1>,
       "");
-  static_assert(std::is_same<LowestCommonAncestor<GrandChild1A, Child1,
-                                                  GrandChild1A, Child1>::type,
-                             Child1>::value,
+  static_assert(std::is_same_v<LowestCommonAncestor<GrandChild1A, Child1,
+                                                    GrandChild1A, Child1>::type,
+                               Child1>,
                 "Parent is LCA of mixed multi-arg");
   static_assert(
-      std::is_same<
-          LowestCommonAncestor<GrandChild1A, GrandChild2A, Child1>::type,
-          Root>::value,
+      std::is_same_v<
+          LowestCommonAncestor<GrandChild1A, GrandChild2A, Child1>::type, Root>,
       "Root is LCA of mixed multi-arg");
 
   static_assert(
-      std::is_same<
+      std::is_same_v<
           LowestCommonAncestor<
               Child1, LowestCommonAncestor<Child1, Child1>::type>::type,
-          Child1>::value,
+          Child1>,
       "Chaining works");
 }
 
@@ -130,33 +128,31 @@ TEST(MakeNodeVector, LowestCommonAncestorTypeTraitsConstness) {
   using CRoot = const Root;
   using CChild = const Child1;
 
-  static_assert(std::is_same<LowestCommonAncestor<CRoot>::type, CRoot>::value,
+  static_assert(std::is_same_v<LowestCommonAncestor<CRoot>::type, CRoot>,
                 "Basic constness");
 
-  static_assert(
-      std::is_same<LowestCommonAncestor<Root, CRoot>::type, CRoot>::value,
-      "Const wins");
+  static_assert(std::is_same_v<LowestCommonAncestor<Root, CRoot>::type, CRoot>,
+                "Const wins");
+
+  static_assert(std::is_same_v<LowestCommonAncestor<Root, CChild>::type, CRoot>,
+                "Const wins, with const child");
 
   static_assert(
-      std::is_same<LowestCommonAncestor<Root, CChild>::type, CRoot>::value,
-      "Const wins, with const child");
-
-  static_assert(
-      std::is_same<LowestCommonAncestor<CRoot, CChild>::type, CRoot>::value,
+      std::is_same_v<LowestCommonAncestor<CRoot, CChild>::type, CRoot>,
       "Const wins, with all const inputs");
 
   static_assert(
-      std::is_same<LowestCommonAncestor<Root, Root, Root, CChild>::type,
-                   CRoot>::value,
+      std::is_same_v<LowestCommonAncestor<Root, Root, Root, CChild>::type,
+                     CRoot>,
       "Const wins, not a democracy");
 
   static_assert(
-      std::is_same<LowestCommonAncestor<CChild, Root, Root, Root>::type,
-                   CRoot>::value,
+      std::is_same_v<LowestCommonAncestor<CChild, Root, Root, Root>::type,
+                     CRoot>,
       "Const wins, position doesn't matter");
   static_assert(
-      std::is_same<LowestCommonAncestor<Root, CChild, Root, Root>::type,
-                   CRoot>::value,
+      std::is_same_v<LowestCommonAncestor<Root, CChild, Root, Root>::type,
+                     CRoot>,
       "Const wins, position doesn't matter");
 }
 
@@ -170,14 +166,12 @@ TEST(MakeNodeVector, MakeNodeVectorTypeTraits) {
   using RootVector = std::vector<std::unique_ptr<ResolvedNode>>;
   using CRootVector = std::vector<std::unique_ptr<const ResolvedNode>>;
 
-  static_assert(std::is_same<NodeVectorT<Root>, RootVector>::value, "");
-  static_assert(std::is_same<NodeVectorT<Root, Child1>, RootVector>::value, "");
-  static_assert(std::is_same<NodeVectorT<Child1, Child2>, RootVector>::value,
+  static_assert(std::is_same_v<NodeVectorT<Root>, RootVector>, "");
+  static_assert(std::is_same_v<NodeVectorT<Root, Child1>, RootVector>, "");
+  static_assert(std::is_same_v<NodeVectorT<Child1, Child2>, RootVector>, "");
+  static_assert(std::is_same_v<NodeVectorT<Child1, Child2, Child3>, RootVector>,
                 "");
-  static_assert(
-      std::is_same<NodeVectorT<Child1, Child2, Child3>, RootVector>::value, "");
-  static_assert(std::is_same<NodeVectorT<CChild1, Child2>, CRootVector>::value,
-                "");
+  static_assert(std::is_same_v<NodeVectorT<CChild1, Child2>, CRootVector>, "");
 }
 
 TEST(MakeNodeVector, MakeVectorBasicConstruction) {

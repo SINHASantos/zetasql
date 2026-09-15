@@ -381,6 +381,9 @@ absl::Status ProtoType::GetTypeKindFromFieldDescriptor(
         case FieldFormat::UUID:
           *kind = TYPE_UUID;
           break;
+        case FieldFormat::VARIANT:
+          *kind = TYPE_VARIANT;
+          break;
         case FieldFormat::RANGE_DATES_ENCODED:
         case FieldFormat::RANGE_DATETIMES_ENCODED:
         case FieldFormat::RANGE_TIMESTAMPS_ENCODED:

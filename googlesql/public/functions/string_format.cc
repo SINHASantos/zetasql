@@ -36,6 +36,7 @@
 #include "googlesql/public/options.pb.h"
 #include "googlesql/public/strings.h"
 #include "googlesql/public/type.pb.h"
+#include "googlesql/public/types/declarative_type.h"
 #include "googlesql/public/types/proto_type.h"
 #include "googlesql/public/types/type.h"
 #include "googlesql/public/types/type_factory.h"
@@ -197,6 +198,15 @@ bool StringFormatEvaluator::ValueAsString(const Value& value,
         return false;
       }
       break;
+    case TYPE_DECLARATIVE:
+      if (!value.type()->AsDeclarativeType()->SupportsFormatting()) {
+        status_.Update(googlesql_base::InternalErrorBuilder()
+                       << "Type does not support formatting: "
+                       << value.type()->DebugString());
+        return false;
+      }
+      cord_buffer_.Append(value.DebugString());
+      break;
     default:
       status_.Update(googlesql_base::InternalErrorBuilder()
                      << "No support for type while: "
@@ -269,12 +279,14 @@ bool StringFormatEvaluator::ProcessType(const Type* arg_type) {
                                   arg_type->ShortTypeName(product_mode_)));
     return false;
   } else if (arg_type->IsDeclarativeType()) {
-    // TODO: b/836885041 - Support formatting for declarative types.
-    status_ =
-        absl::Status(absl::StatusCode::kUnimplemented,
-                     absl::StrCat("Cannot format type ",
-                                  arg_type->ShortTypeName(product_mode_)));
-    return false;
+    const DeclarativeType* decl_type = arg_type->AsDeclarativeType();
+    if (!decl_type->SupportsFormatting()) {
+      status_ =
+          absl::Status(absl::StatusCode::kUnimplemented,
+                       absl::StrCat("Cannot format type ",
+                                    arg_type->ShortTypeName(product_mode_)));
+      return false;
+    }
   }
   return true;
 }
@@ -438,6 +450,14 @@ bool StringFormatEvaluator::ValueLiteralSetter(const FormatPart& part,
       status_ = ValueError(part.var_index, json.status().message());
       return false;
     }
+  }
+
+  if (value_var->type()->IsDeclarativeType() &&
+      !value_var->type()->AsDeclarativeType()->SupportsFormatting()) {
+    status_.Update(googlesql_base::InternalErrorBuilder()
+                   << "Type does not support formatting: "
+                   << value_var->type()->DebugString());
+    return false;
   }
 
   // FLOAT/DOUBLE always use FLOAT32/FLOAT64 in Format function.
@@ -838,6 +858,7 @@ FormatPart::SetterFn StringFormatEvaluator::MakeValueAsStringSetter(
     case TYPE_NUMERIC:
     case TYPE_JSON:
     case TYPE_RANGE:
+    case TYPE_DECLARATIVE:
       return &StringFormatEvaluator::ValueAsStringSetter;
     default:
       break;
@@ -876,6 +897,7 @@ FormatPart::SetterFn StringFormatEvaluator::MakeValueLiteralSetter(
     case TYPE_NUMERIC:
     case TYPE_JSON:
     case TYPE_RANGE:
+    case TYPE_DECLARATIVE:
       return &StringFormatEvaluator::ValueLiteralSetter;
 
     default:

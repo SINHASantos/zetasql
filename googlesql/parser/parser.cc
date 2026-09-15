@@ -26,12 +26,12 @@
 #include "googlesql/common/errors.h"
 #include "googlesql/common/warning_sink.h"
 #include "googlesql/parser/ast_node_kind.h"
-#include "googlesql/parser/macros/macro_catalog.h"
 #include "googlesql/parser/parse_tree.h"
 #include "googlesql/parser/parser_internal.h"
 #include "googlesql/parser/parser_mode.h"
 #include "googlesql/parser/parser_runtime_info.h"
 #include "googlesql/parser/statement_properties.h"
+#include "googlesql/public/catalog.h"
 #include "googlesql/public/error_helpers.h"
 #include "googlesql/public/id_string.h"
 #include "googlesql/public/language_options.h"
@@ -63,12 +63,12 @@ static ErrorMessageOptions GetDefaultErrorMessageOptions() {
 
 ParserOptions::ParserOptions() : ParserOptions(LanguageOptions{}) {}
 
-ParserOptions::ParserOptions(
-    std::shared_ptr<IdStringPool> id_string_pool,
-    std::shared_ptr<googlesql_base::UnsafeArena> arena, LanguageOptions language_options,
-    ErrorMessageOptions error_message_options,
-    parser::MacroExpansionMode macro_expansion_mode,
-    const parser::macros::MacroCatalog* /*absl_nullable*/ macro_catalog)
+ParserOptions::ParserOptions(std::shared_ptr<IdStringPool> id_string_pool,
+                             std::shared_ptr<googlesql_base::UnsafeArena> arena,
+                             LanguageOptions language_options,
+                             ErrorMessageOptions error_message_options,
+                             parser::MacroExpansionMode macro_expansion_mode,
+                             Catalog* /*absl_nullable*/ catalog)
     : arena_(arena != nullptr
                  ? std::move(arena)
                  : std::make_shared<googlesql_base::UnsafeArena>(/*block_size=*/4096)),
@@ -77,27 +77,27 @@ ParserOptions::ParserOptions(
                           : std::make_shared<IdStringPool>(arena_)),
       language_options_(std::move(language_options)),
       macro_expansion_mode_(macro_expansion_mode),
-      macro_catalog_(macro_catalog),
+      catalog_(catalog),
       error_message_options_(std::move(error_message_options)) {}
 
 ParserOptions::ParserOptions(LanguageOptions language_options,
                              MacroExpansionMode macro_expansion_mode,
-                             const MacroCatalog* macro_catalog)
+                             Catalog* catalog)
     : ParserOptions(/*id_string_pool=*/nullptr, /*arena=*/nullptr,
                     std::move(language_options),
                     GetDefaultErrorMessageOptions(), macro_expansion_mode,
-                    macro_catalog) {}
+                    catalog) {}
 
 ParserOptions::ParserOptions(std::shared_ptr<IdStringPool> id_string_pool,
                              std::shared_ptr<googlesql_base::UnsafeArena> arena,
                              LanguageOptions language_options,
                              MacroExpansionMode macro_expansion_mode,
-                             const MacroCatalog* macro_catalog)
+                             Catalog* catalog)
     : arena_(std::move(arena)),
       id_string_pool_(std::move(id_string_pool)),
       language_options_(std::move(language_options)),
       macro_expansion_mode_(macro_expansion_mode),
-      macro_catalog_(macro_catalog),
+      catalog_(catalog),
       error_message_options_(GetDefaultErrorMessageOptions()) {}
 
 ParserOptions::~ParserOptions() = default;
@@ -147,8 +147,9 @@ absl::Status ParseStatement(absl::string_view statement_string,
       statement_string, /*start_byte_offset=*/0,
       parser_options.id_string_pool().get(), parser_options.arena().get(),
       parser_options.language_options(), parser_options.macro_expansion_mode(),
-      parser_options.macro_catalog(), &ast_node, *runtime_info, warning_sink,
-      &other_allocated_ast_nodes, /*ast_statement_properties=*/nullptr,
+      parser_options.catalog(), &ast_node, *runtime_info, warning_sink,
+      &other_allocated_ast_nodes,
+      /*ast_statement_properties=*/nullptr,
       /*statement_end_byte_offset=*/nullptr);
   GOOGLESQL_RETURN_IF_ERROR(ConvertInternalErrorLocationAndAdjustErrorString(
       parser_options.error_message_options(), statement_string, status));
@@ -178,7 +179,7 @@ absl::Status ParseScript(absl::string_view script_string,
       ParserMode::kScript, /*filename=*/absl::string_view(), script_string,
       /*start_byte_offset=*/0, parser_options.id_string_pool().get(),
       parser_options.arena().get(), parser_options.language_options(),
-      parser_options.macro_expansion_mode(), parser_options.macro_catalog(),
+      parser_options.macro_expansion_mode(), parser_options.catalog(),
       &ast_node, *runtime_info, warning_sink, &other_allocated_ast_nodes,
       /*ast_statement_properties=*/nullptr,
       /*statement_end_byte_offset=*/nullptr);
@@ -221,7 +222,7 @@ absl::Status ParseNextStatementInternal(ParseResumeLocation* resume_location,
       mode, resume_location->filename(), resume_location->input(),
       resume_location->byte_position(), parser_options.id_string_pool().get(),
       parser_options.arena().get(), parser_options.language_options(),
-      parser_options.macro_expansion_mode(), parser_options.macro_catalog(),
+      parser_options.macro_expansion_mode(), parser_options.catalog(),
       &ast_node, *runtime_info, warning_sink, &other_allocated_ast_nodes,
       /*ast_statement_properties=*/nullptr, &next_statement_byte_offset);
   GOOGLESQL_RETURN_IF_ERROR(ConvertInternalErrorLocationAndAdjustErrorString(
@@ -281,7 +282,7 @@ absl::Status ParseType(absl::string_view type_string,
       ParserMode::kType, /* filename = */ absl::string_view(), type_string,
       0 /* offset */, parser_options.id_string_pool().get(),
       parser_options.arena().get(), parser_options.language_options(),
-      parser_options.macro_expansion_mode(), parser_options.macro_catalog(),
+      parser_options.macro_expansion_mode(), parser_options.catalog(),
       &ast_node, *runtime_info, warning_sink, &other_allocated_ast_nodes,
       /*ast_statement_properties=*/nullptr,
       /*statement_end_byte_offset=*/nullptr);
@@ -312,7 +313,7 @@ absl::Status ParseExpression(absl::string_view expression_string,
       ParserMode::kExpression, /* filename = */ absl::string_view(),
       expression_string, 0 /* offset */, parser_options.id_string_pool().get(),
       parser_options.arena().get(), parser_options.language_options(),
-      parser_options.macro_expansion_mode(), parser_options.macro_catalog(),
+      parser_options.macro_expansion_mode(), parser_options.catalog(),
       &ast_node, *runtime_info, warning_sink, &other_allocated_ast_nodes,
       /*ast_statement_properties=*/nullptr,
       /*statement_end_byte_offset=*/nullptr);
@@ -345,7 +346,7 @@ absl::Status ParseExpression(const ParseResumeLocation& resume_location,
       resume_location.input(), resume_location.byte_position(),
       parser_options.id_string_pool().get(), parser_options.arena().get(),
       parser_options.language_options(), parser_options.macro_expansion_mode(),
-      parser_options.macro_catalog(), &ast_node, *runtime_info, warning_sink,
+      parser_options.catalog(), &ast_node, *runtime_info, warning_sink,
       &other_allocated_ast_nodes,
       /*ast_statement_properties=*/nullptr,
       /*statement_end_byte_offset=*/nullptr);
@@ -365,17 +366,16 @@ absl::Status ParseExpression(const ParseResumeLocation& resume_location,
 ASTNodeKind ParseStatementKind(absl::string_view input,
                                const LanguageOptions& language_options,
                                MacroExpansionMode macro_expansion_mode,
-                               const MacroCatalog* macro_catalog,
-                               bool* statement_is_ctas) {
+                               Catalog* catalog, bool* statement_is_ctas) {
   return ParseNextStatementKind(ParseResumeLocation::FromStringView(input),
-                                language_options, macro_expansion_mode,
-                                macro_catalog, statement_is_ctas);
+                                language_options, macro_expansion_mode, catalog,
+                                statement_is_ctas);
 }
 
 ASTNodeKind ParseNextStatementKind(const ParseResumeLocation& resume_location,
                                    const LanguageOptions& language_options,
                                    MacroExpansionMode macro_expansion_mode,
-                                   const MacroCatalog* macro_catalog,
+                                   Catalog* catalog,
                                    bool* next_statement_is_ctas) {
   GOOGLESQL_DCHECK_OK(resume_location.Validate());
 
@@ -388,7 +388,8 @@ ASTNodeKind ParseNextStatementKind(const ParseResumeLocation& resume_location,
   ParseInternal(ParserMode::kNextStatementKind, resume_location.filename(),
                 resume_location.input(), resume_location.byte_position(),
                 &id_string_pool, &arena, language_options, macro_expansion_mode,
-                macro_catalog, /*output=*/nullptr, *runtime_info, warning_sink,
+                catalog,
+                /*output=*/nullptr, *runtime_info, warning_sink,
                 &other_allocated_ast_nodes, &ast_statement_properties,
                 /*statement_end_byte_offset=*/nullptr)
       // TODO: b/196226376 - Return this if is isn't a parsing error.
@@ -424,7 +425,7 @@ absl::Status ParseNextStatementProperties(
       resume_location.input(), resume_location.byte_position(),
       parser_options.id_string_pool().get(), parser_options.arena().get(),
       parser_options.language_options(), parser_options.macro_expansion_mode(),
-      parser_options.macro_catalog(), &output, *runtime_info, warning_sink,
+      parser_options.catalog(), &output, *runtime_info, warning_sink,
       allocated_ast_nodes, ast_statement_properties,
       /*statement_end_byte_offset=*/nullptr);
 

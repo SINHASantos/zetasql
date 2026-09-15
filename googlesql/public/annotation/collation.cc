@@ -158,18 +158,6 @@ absl::Status CollationAnnotation::CheckAndPropagateForFunctionCallBase(
   return absl::OkStatus();
 }
 
-absl::Status CollationAnnotation::CheckAndPropagateForMakeMap(
-    const ResolvedMakeMap& make_map,
-    StructAnnotationMap* result_annotation_map) {
-  GOOGLESQL_RETURN_IF_ERROR(DefaultAnnotationSpec::CheckAndPropagateForMakeMap(
-      make_map, result_annotation_map));
-  if (CollationAnnotation::ExistsIn(result_annotation_map)) {
-    return MakeSqlError()
-           << "Collation is not supported on MAP or its key and value types";
-  }
-  return absl::OkStatus();
-}
-
 // TODO: Rewrite the util function
 // GetCollationFromFunctionArguments below with this function to avoid logic
 // duplication. Need to return some information from this function for proper

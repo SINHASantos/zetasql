@@ -87,7 +87,7 @@ class GraphPathType : public ListBackedType {
   bool IsSupportedType(const LanguageOptions& language_options) const override;
 
   // Returns if this GraphPathType is coercible to <to>.
-  bool ABSL_MUST_USE_RESULT CoercibleTo(const GraphPathType* to) const;
+  [[nodiscard]] bool CoercibleTo(const GraphPathType* to) const;
 
  protected:
   int64_t GetEstimatedOwnedMemoryBytesSize() const override

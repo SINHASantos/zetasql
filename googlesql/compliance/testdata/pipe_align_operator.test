@@ -1,0 +1,246 @@
+# Compliance tests for ALIGN operator in pipes syntax .
+[default reserve_align]
+[default required_features=ALIGN_OPERATOR,INTERVAL_TYPE,PIPES]
+
+[prepare_database]
+CREATE TABLE TimeseriesData AS (
+  SELECT TIMESTAMP '2020-01-01 00:00:20+00' AS ts, 1 AS requests, 1.0 AS gcu, 'job_A' AS borg_job, 'cell1' AS borg_cell
+  UNION ALL
+  SELECT TIMESTAMP '2020-01-01 00:00:40+00' AS ts, 10 AS requests, 2.0 AS gcu, 'job_A' AS borg_job, 'cell1' AS borg_cell
+  UNION ALL
+  SELECT TIMESTAMP '2020-01-01 00:01:00+00' AS ts, 100 AS requests, 4.0 AS gcu, 'job_A' AS borg_job, 'cell1' AS borg_cell
+  UNION ALL
+  SELECT TIMESTAMP '2020-01-01 00:01:30+00' AS ts, 1000 AS requests, 8.0 AS gcu, 'job_A' AS borg_job, 'cell2' AS borg_cell
+
+  UNION ALL
+  SELECT TIMESTAMP '2020-01-01 00:02:00+00' AS ts, 10000 AS requests, 10.0 AS gcu, 'job_B' AS borg_job, 'cell1' AS borg_cell
+  UNION ALL
+  SELECT TIMESTAMP '2020-01-01 00:02:40+00' AS ts, 100000 AS requests, 20.0 AS gcu, 'job_B' AS borg_job, 'cell2' AS borg_cell
+);
+--
+ARRAY<STRUCT<ts TIMESTAMP,
+             requests INT64,
+             gcu DOUBLE,
+             borg_job STRING,
+             borg_cell STRING>>
+[{
+   2020-01-01 00:00:20+00,
+   1,
+   1,
+   "job_A",
+   "cell1"
+ },
+ {
+   2020-01-01 00:00:40+00,
+   10,
+   2,
+   "job_A",
+   "cell1"
+ },
+ {
+   2020-01-01 00:01:00+00,
+   100,
+   4,
+   "job_A",
+   "cell1"
+ },
+ {
+   2020-01-01 00:01:30+00,
+   1000,
+   8,
+   "job_A",
+   "cell2"
+ },
+ {
+   2020-01-01 00:02:00+00,
+   10000,
+   10,
+   "job_B",
+   "cell1"
+ },
+ {
+   2020-01-01 00:02:40+00,
+   100000,
+   20,
+   "job_B",
+   "cell2"
+ }]
+==
+
+# TIMESTAMP clause is not required if the input table contains a column
+# named `timestamp` having type TIMESTAMP.
+[name=pipe_align_default_timestamp_column]
+WITH TimeseriesDataTimestampColumn AS (
+  SELECT ts AS timestamp, * FROM TimeseriesData
+)
+FROM TimeseriesDataTimestampColumn
+|> ALIGN (
+  PERIOD INTERVAL 30 SECOND
+  ORIGIN EPOCH
+);
+--
+ARRAY<STRUCT<timestamp TIMESTAMP>>[unknown order:
+  {2020-01-01 00:00:30+00},
+  {2020-01-01 00:01:00+00},
+  {2020-01-01 00:01:30+00},
+  {2020-01-01 00:02:00+00},
+  {2020-01-01 00:02:30+00}
+]
+==
+
+# Final aligned timestamp range is left closed and right open. In this test
+# case the metrics clause is missing and the final range is calculated based
+# on the intersection of OUTPUT WITHIN range and the input partition max/min
+# timestamps. So the upper bound is TIMESTAMP '2020-01-01 00:01:30+00', which is
+# not present in the output aligned timestamps.
+[name=pipe_align_output_aligned_timestamp_bounds_left_closed_right_open]
+FROM TimeseriesData
+|> ALIGN (
+  TIMESTAMP ts
+  PERIOD INTERVAL 30 SECOND
+  ORIGIN TIMESTAMP '2020-01-01 00:00:30+00'
+  OUTPUT WITHIN RANGE FROM TIMESTAMP '2020-01-01 00:01:00+00' TO TIMESTAMP '2020-01-01 00:01:30+00'
+  PARTITION BY borg_job
+);
+--
+ARRAY<STRUCT<borg_job STRING, ts TIMESTAMP>>[
+  {
+    "job_A",
+    2020-01-01 00:01:00+00
+  }
+]
+==
+
+[name=pipe_align_metrics_within_range_with_relative_preceding_and_following_bounds]
+FROM TimeseriesData
+|> ALIGN (
+  TIMESTAMP ts
+  PERIOD INTERVAL 2 MINUTE
+  ORIGIN EPOCH
+  PARTITION BY borg_job
+  METRICS
+    SUM(requests) WITHIN (INTERVAL 1 MINUTE PRECEDING) AS sum_requests_preceding,
+    SUM(requests) WITHIN (1 PERIOD FOLLOWING) AS sum_requests_following,
+    SUM(requests) WITHIN (RANGE FROM 1 PERIOD PRECEDING TO INTERVAL 1 MINUTE FOLLOWING) AS sum_request_both
+);
+--
+ARRAY<STRUCT<
+        borg_job STRING,
+        sum_requests_preceding INT64,
+        sum_requests_following INT64,
+        sum_request_both INT64,
+        ts TIMESTAMP
+      >>
+[unknown order:{
+                 "job_A",
+                 1000,
+                 NULL,
+                 1111,
+                 2020-01-01 00:02:00+00
+               },
+               {
+                 "job_B",
+                 10000,
+                 100000,
+                 110000,
+                 2020-01-01 00:02:00+00
+               },
+               {
+                 "job_A",
+                 NULL,
+                 1111,
+                 111,
+                 2020-01-01 00:00:00+00
+               },
+               {
+                 "job_B",
+                 NULL,
+                 10000,
+                 NULL,
+                 2020-01-01 00:00:00+00
+               },
+               {
+                 "job_B",
+                 NULL,
+                 NULL,
+                 100000,
+                 2020-01-01 00:04:00+00
+               }]
+==
+
+[name=pipe_align_metrics_within_ranges_using_absolute_timestamp_bounds]
+FROM TimeseriesData
+|> ALIGN (
+  TIMESTAMP ts
+  PERIOD INTERVAL 1 MINUTE
+  ORIGIN TIMESTAMP '2020-01-01 00:00:00+00'
+  OUTPUT WITHIN RANGE FROM TIMESTAMP '2020-01-01 00:01:00+00' TO TIMESTAMP '2020-01-01 00:02:00+00'
+  PARTITION BY borg_job
+  METRICS
+    SUM(requests) WITHIN (RANGE FROM TIMESTAMP '2020-01-01 00:00:00+00') as sum_requests_1,
+    SUM(requests) WITHIN (RANGE TO TIMESTAMP '2020-01-01 00:02:00+00') as sum_requests_2,
+    SUM(requests) WITHIN (RANGE FROM TIMESTAMP '2020-01-01 00:00:00+00' TO TIMESTAMP '2020-01-01 00:02:00+00') AS sum_requests_3
+);
+--
+ARRAY<STRUCT<borg_job STRING,
+             sum_requests_1 INT64,
+             sum_requests_2 INT64,
+             sum_requests_3 INT64,
+             ts TIMESTAMP>>
+[unknown order:{
+                 "job_B",
+                 NULL,
+                 10000,
+                 10000,
+                 2020-01-01 00:01:00+00
+               },
+               {
+                 "job_A",
+                 111,
+                 1000,
+                 1111,
+                 2020-01-01 00:01:00+00
+               }]
+==
+
+[name=pipe_align_partition_col_and_expr_reference_in_estimator_expression]
+FROM TimeseriesData
+|> ALIGN (
+  TIMESTAMP ts
+  PERIOD INTERVAL 1 MINUTE
+  ORIGIN EPOCH
+  OUTPUT WITHIN RANGE FROM TIMESTAMP '2020-01-01 00:01:00+00' TO TIMESTAMP '2020-01-01 00:02:30+00'
+  PARTITION BY borg_job, CONCAT(borg_job, "_", borg_cell) as job_cell
+  METRICS
+    SUM(requests * IF(borg_job = 'job_A', 2, 1)) WITHIN (1 PERIOD PRECEDING) AS weighted_requests,
+    CONCAT(job_cell, "_", CAST(COUNT(requests) WITHIN (1 PERIOD PRECEDING) AS STRING)) AS concat_requests
+);
+--
+ARRAY<STRUCT<
+        borg_job STRING,
+        job_cell STRING,
+        weighted_requests INT64,
+        concat_requests STRING,
+        ts TIMESTAMP
+      >>
+[unknown order:{
+                 "job_A",
+                 "job_A_cell2",
+                 2000,
+                 "job_A_cell2_1",
+                 2020-01-01 00:02:00+00
+               },
+               {
+                 "job_A",
+                 "job_A_cell1",
+                 222,
+                 "job_A_cell1_3",
+                 2020-01-01 00:01:00+00
+               },
+               {
+                 "job_B",
+                 "job_B_cell1",
+                 10000,
+                 "job_B_cell1_1",
+                 2020-01-01 00:02:00+00
+               }]

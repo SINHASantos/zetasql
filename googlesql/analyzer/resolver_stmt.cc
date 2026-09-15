@@ -1248,6 +1248,10 @@ absl::Status Resolver::ResolveQueryStatement(
     *output_stmt = MakeResolvedTerminalQueryStmt(std::move(resolved_scan));
   } else {
     GOOGLESQL_RET_CHECK(*output_name_list != nullptr);
+    if ((*output_name_list)->columns().empty()) {
+      return MakeSqlErrorAt(query_stmt) << "Output column list is empty";
+    }
+
     *output_stmt = MakeResolvedQueryStmt(
         MakeOutputColumnList(**output_name_list),
         (*output_name_list)->is_value_table(), std::move(resolved_scan));
@@ -5156,6 +5160,20 @@ static ResolvedCreateStatementEnums::DeterminismLevel ConvertDeterminismLevel(
   }
 }
 
+static absl::Status ValidateColumnListSpecArguments(
+    const FunctionArgumentInfo& arg_info, const ASTNode* location,
+    absl::string_view function_type_description) {
+  for (const auto* arg_details : arg_info.GetArgumentDetails()) {
+    if (arg_details->arg_type.type() != nullptr &&
+        arg_details->arg_type.type()->IsColumnListSpec()) {
+      return MakeSqlErrorAt(location)
+             << "COLUMN_LIST_SPEC arguments are only allowed in SQL "
+             << function_type_description;
+    }
+  }
+  return absl::OkStatus();
+}
+
 absl::Status Resolver::ResolveCreateFunctionStatement(
     const ASTCreateFunctionStatement* ast_statement,
     std::unique_ptr<ResolvedStatement>* output) {
@@ -5241,6 +5259,8 @@ absl::Status Resolver::ResolveCreateFunctionStatement(
                << "Lambda arguments are only allowed in SQL functions";
       }
     }
+    GOOGLESQL_RETURN_IF_ERROR(ValidateColumnListSpecArguments(
+        *arg_info, ast_statement->function_declaration(), "functions"));
   }
   const std::string language_string =
       is_remote ? "REMOTE"
@@ -5704,6 +5724,12 @@ absl::Status Resolver::ResolveCreateTableFunctionStatement(
     code_string = std::string(sql_.substr(
         range.start().GetByteOffset(),
         range.end().GetByteOffset() - range.start().GetByteOffset()));
+  }
+
+  if (language_string != "SQL") {
+    GOOGLESQL_RETURN_IF_ERROR(ValidateColumnListSpecArguments(
+        *arg_info, ast_statement->function_declaration(),
+        "table-valued functions"));
   }
 
   // At this point the statement is well formed, up to but not including

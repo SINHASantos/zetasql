@@ -25,6 +25,7 @@
 #include "googlesql/analyzer/rewriters/rewriter_relevance_checker.h"
 #include "googlesql/public/catalog.h"
 #include "googlesql/public/options.pb.h"
+#include "googlesql/public/sql_tvf.h"
 #include "googlesql/public/templated_sql_function.h"
 #include "googlesql/public/templated_sql_tvf.h"
 #include "googlesql/resolved_ast/column_factory.h"

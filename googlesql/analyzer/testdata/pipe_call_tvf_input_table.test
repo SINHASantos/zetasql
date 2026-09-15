@@ -132,7 +132,8 @@ FROM
           KeyValue.Key AS a_3,
           KeyValue.Value AS a_4
         FROM
-          KeyValue
+          (TABLE KeyValue
+          )
       ) AS keyvalue_5
   )) AS tvfscan_6;
 
@@ -145,7 +146,8 @@ SELECT
      a_1 AS a_1
 |> CALL TVF_TWO_RELATION_ARGS_RETURN_PROTO_VALUE_TABLE((
      FROM
-       KeyValue
+       (TABLE KeyValue
+       )
      |> SELECT
           KeyValue.Key AS a_3,
           KeyValue.Value AS a_4
@@ -206,7 +208,8 @@ FROM
           KeyValue.Key AS a_1,
           KeyValue.Value AS a_2
         FROM
-          KeyValue
+          (TABLE KeyValue
+          )
       ) AS keyvalue_3
   ), (
     SELECT
@@ -221,7 +224,8 @@ FROM
 [SQLBUILDER_TARGET_SYNTAX_MODE pipe]
 [SQLBUILDER_OUTPUT]
 FROM
-  KeyValue
+  (TABLE KeyValue
+  )
 |> SELECT
      KeyValue.Key AS a_1,
      KeyValue.Value AS a_2

@@ -154,77 +154,6 @@ class GroupValue {
   std::vector<absl::Status> accumulator_errors_;
 };
 
-// When array values without known orders are used as grouping keys, we can't
-// know if two rows that have arrays with the same bag of values will group
-// together (by that key) or not. The query is non-deterministic. Tracking
-// collisions of bags of values is expensive. Tracking that within nested
-// values (structs with arrays etc) is super exensive. On the other end of the
-// spectrum, setting the non-determinism signal the first time we see an
-// unordered array as a group by key disqualifies a lot of useful queries.
-//
-// This data structure is helping us find an inexpensive -- somewhat arbitrary
-// -- middle ground. For each grouping key, we find all of the array values
-// in the nested value. If there is even a collision where an array without
-// known order co-exists in the same column as any other array (known or
-// unknown order) that has the same length, then we will set the
-// non-determinism signal.
-struct UnorderedArrayCollisionTracker {
-  struct PerArrayLengthData {
-    int total_examples_seen = 0;
-    bool unordered_example_seen = false;
-  };
-  using PerKeyData =
-      absl::flat_hash_map</*array_length*/ int, PerArrayLengthData>;
-  absl::flat_hash_map</*key_index*/ int, PerKeyData> tracking;
-
-  // Finds all the arrays nested in the value and records presence of those
-  // array lengths and whether they are associated with an unordered array.
-  bool CouldIndicateNondetermisticGrouping(int key_index, const Value& value) {
-    absl::flat_hash_set<int> array_lengths;
-    std::vector<const Value*> pending_values;
-    pending_values.push_back(&value);
-    while (!pending_values.empty()) {
-      const Value& current_value = *pending_values.back();
-      pending_values.pop_back();
-      if (current_value.is_null()) {
-        continue;
-      }
-      if (current_value.type()->IsArray()) {
-        array_lengths.insert(current_value.num_elements());
-        if (current_value.type()->AsArray()->element_type()->IsStruct()) {
-          for (int i = 0; i < current_value.num_elements(); ++i) {
-            pending_values.push_back(&current_value.element(i));
-          }
-        }
-      }
-      if (current_value.type()->IsStruct()) {
-        for (int i = 0; i < current_value.num_fields(); ++i) {
-          if (current_value.type()->IsArray() ||
-              current_value.type()->IsStruct()) {
-            pending_values.push_back(&current_value.field(i));
-          }
-        }
-      }
-    }
-
-    bool contains_unordered_array =
-        InternalValue::ContainsArrayWithUncertainOrder(value);
-    for (int array_length : array_lengths) {
-      PerKeyData& key_index_data = tracking[key_index];
-      PerArrayLengthData& array_length_data = key_index_data[array_length];
-      array_length_data.total_examples_seen++;
-      if (contains_unordered_array) {
-        array_length_data.unordered_example_seen = true;
-      }
-      if (array_length_data.unordered_example_seen &&
-          array_length_data.total_examples_seen > 1) {
-        return true;
-      }
-    }
-    return false;
-  }
-};
-
 // Prepare collators for each KeyArg in `keys`.
 absl::StatusOr<std::vector<CollatorPtrInfo>> SetupCollators(
     absl::Span<const TupleData* const> params,
@@ -314,12 +243,15 @@ absl::Status AccumulateTuple(
       if (  // Once we know the query is known to be non-deterministic, we
             // short-circuit to avoid any overhead from non-determinism
             // detection.
-          context->IsDeterministicOutput() &&
-          unordered_array_collision_tracker.CouldIndicateNondetermisticGrouping(
-              i, slot->value()) &&
-          // On the first row we know it is not real non-determinism yet.
-          !group_map.empty()) {
-        context->SetNonDeterministicOutput();
+          context->IsDeterministicOutput()) {
+        GOOGLESQL_ASSIGN_OR_RETURN(
+            bool could_indicate_nondeterministic_grouping,
+            unordered_array_collision_tracker
+                .CouldIndicateNondetermisticGrouping(i, slot->value()));
+        // On the first row we know it is not real non-determinism yet.
+        if (could_indicate_nondeterministic_grouping && !group_map.empty()) {
+          context->SetNonDeterministicOutput();
+        }
       }
 
       Value* collated_slot_value =

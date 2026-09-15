@@ -268,6 +268,12 @@ absl::Status TypeToProtoConverter::MakeFieldDescriptor(
                                                    FieldFormat::UUID);
       break;
     }
+    case TYPE_VARIANT: {
+      proto_field->set_type(google::protobuf::FieldDescriptorProto::TYPE_BYTES);
+      proto_field->mutable_options()->SetExtension(googlesql::format,
+                                                   FieldFormat::VARIANT);
+      break;
+    }
     case TYPE_RANGE: {
       proto_field->set_type(google::protobuf::FieldDescriptorProto::TYPE_BYTES);
       const RangeType* range_type = field_type->AsRange();
@@ -392,9 +398,6 @@ absl::Status TypeToProtoConverter::MakeFieldDescriptor(
     case TYPE_COLUMN_LIST_SPEC:
       return absl::UnimplementedError(
           "Proto type conversion for COLUMN_LIST_SPEC is not yet implemented.");
-    case TYPE_VARIANT:
-      return absl::UnimplementedError(
-          "Proto type conversion for VARIANT is not yet implemented.");
     case __TypeKind__switch_must_have_a_default__:
     case TYPE_UNKNOWN:
       break;  // Error generated below.

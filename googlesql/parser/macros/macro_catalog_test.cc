@@ -19,10 +19,10 @@
 #include <memory>
 
 #include "googlesql/base/testing/status_matchers.h"
-#include "googlesql/parser/ast_enums.pb.h"
 #include "googlesql/parser/parse_tree.h"
 #include "googlesql/parser/parser.h"
 #include "googlesql/parser/parser_mode.h"
+#include "googlesql/public/catalog.h"
 #include "googlesql/public/language_options.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -55,14 +55,9 @@ absl::StatusOr<MacroInfo> CreateMacroInfo(absl::string_view macro_definition) {
 
   const ASTDefineMacroStatement* define_macro_ast =
       parser_output->statement()->GetAsOrDie<ASTDefineMacroStatement>();
-  return MacroInfo{
-      .source_text = macro_definition,
-      .location = define_macro_ast->location(),
-      .name_location = define_macro_ast->name()->location(),
-      .body_location = define_macro_ast->body()->location(),
-      .visibility = static_cast<ASTDefineMacroStatementEnums::MacroVisibility>(
-          define_macro_ast->visibility()),
-  };
+  return MacroInfo(macro_definition, define_macro_ast->location(),
+                   define_macro_ast->name()->location(),
+                   define_macro_ast->body()->location());
 }
 
 absl::StatusOr<std::unique_ptr<MacroCatalog>> CreateCatalogWithMacro(
@@ -79,26 +74,6 @@ TEST(MacroCatalogTest, MacroInfoNameAndBody) {
 
   EXPECT_EQ(macro.name(), "macro_name");
   EXPECT_EQ(macro.body(), "macro_body");
-  EXPECT_EQ(macro.visibility,
-            ASTDefineMacroStatementEnums::MACRO_VISIBILITY_UNSPECIFIED);
-}
-
-TEST(MacroCatalogTest, MacroInfoVisibilityPublic) {
-  GOOGLESQL_ASSERT_OK_AND_ASSIGN(
-      const MacroInfo& macro,
-      CreateMacroInfo("DEFINE PUBLIC MACRO macro_name macro_body;"));
-
-  EXPECT_EQ(macro.name(), "macro_name");
-  EXPECT_EQ(macro.visibility, ASTDefineMacroStatementEnums::PUBLIC);
-}
-
-TEST(MacroCatalogTest, MacroInfoVisibilityPrivate) {
-  GOOGLESQL_ASSERT_OK_AND_ASSIGN(
-      const MacroInfo& macro,
-      CreateMacroInfo("DEFINE PRIVATE MACRO macro_name macro_body;"));
-
-  EXPECT_EQ(macro.name(), "macro_name");
-  EXPECT_EQ(macro.visibility, ASTDefineMacroStatementEnums::PRIVATE);
 }
 
 TEST(MacroCatalogTest, RegisterMacroWithOverwritesDisabled) {
@@ -144,6 +119,29 @@ TEST(MacroCatalogTest, MacroVersioningUponRedefinition) {
   GOOGLESQL_ASSERT_OK(macro_catalog_2->RegisterMacro(new_macro));
   EXPECT_THAT(macro_catalog_2->Find("macro_name"), Optional(new_macro));
   EXPECT_THAT(macro_catalog_2->Find("unchanged"), Optional(unchanged_macro));
+}
+
+TEST(MacroCatalogTest, FindPtrAndGetMacro) {
+  MacroCatalog macro_catalog;
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(const MacroInfo& macro,
+                       CreateMacroInfo("DEFINE MACRO macro_name macro_body;"));
+  GOOGLESQL_ASSERT_OK(macro_catalog.RegisterMacro(macro));
+
+  const MacroInfo* found_ptr = macro_catalog.FindPtr("macro_name");
+  ASSERT_NE(found_ptr, nullptr);
+  EXPECT_EQ(*found_ptr, macro);
+
+  EXPECT_EQ(macro_catalog.FindPtr("non_existent"), nullptr);
+
+  const Macro* catalog_macro = nullptr;
+  GOOGLESQL_ASSERT_OK(macro_catalog.GetMacro("macro_name", &catalog_macro));
+  ASSERT_NE(catalog_macro, nullptr);
+  EXPECT_EQ(catalog_macro->Name(), "macro_name");
+  EXPECT_EQ(catalog_macro->body(), "macro_body");
+
+  const Macro* missing_macro = nullptr;
+  GOOGLESQL_ASSERT_OK(macro_catalog.GetMacro("non_existent", &missing_macro));
+  EXPECT_EQ(missing_macro, nullptr);
 }
 
 }  // namespace macros

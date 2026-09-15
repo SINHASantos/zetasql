@@ -616,8 +616,6 @@ void GetMapCoreFunctions(TypeFactory* type_factory,
         FN_MAP_DELETE,
         FunctionSignatureOptions().set_rejects_collation()}},
       FunctionOptions().AddRequiredLanguageFeature(FEATURE_MAP_TYPE));
-  // TODO: b/431223433 - Ideally, rewrite should use ARRAY_FILTER, but rewriter
-  // calling a lambda within a lambda shape is not supported yet.
   constexpr absl::string_view kMapFilterSql = R"sql(
     (
       IF(

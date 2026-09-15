@@ -35,6 +35,7 @@
 #include "googlesql/public/parse_location.h"
 #include "googlesql/public/strings.h"
 #include "googlesql/public/table_valued_function.h"
+#include "googlesql/public/type.pb.h"
 #include "googlesql/public/types/collation.h"
 #include "googlesql/public/types/type.h"
 #include "googlesql/public/types/type_deserializer.h"
@@ -826,7 +827,7 @@ bool FunctionArgumentType::IsConcrete() const {
 bool FunctionArgumentType::IsTemplated() const {
   // It is templated if it is not a fixed scalar, it is not a fixed relation,
   // and it is not a void argument. It is also templated if it is a lambda that
-  // has a templated argument or body.
+  // has a templated argument or body, or if it is a Column List Spec.
   if (kind_ == ARG_KIND_LAMBDA) {
     for (const FunctionArgumentType& arg_type : lambda().argument_types()) {
       if (arg_type.IsTemplated()) {
@@ -834,6 +835,10 @@ bool FunctionArgumentType::IsTemplated() const {
       }
     }
     return lambda().body_type().IsTemplated();
+  }
+  if (type_ != nullptr && type_->IsColumnListSpec()) {
+    ABSL_DCHECK(kind_ == ARG_KIND_EXPR_FIXED);
+    return true;
   }
   return kind_ != ARG_KIND_EXPR_FIXED && !IsFixedRelation() && !IsVoid();
 }

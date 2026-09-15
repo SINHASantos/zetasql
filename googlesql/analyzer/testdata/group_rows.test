@@ -4193,3 +4193,106 @@ SELECT key FROM TestTable WHERE EXISTS(SELECT 1 FROM GROUP ROWS)
 ERROR: GROUP ROWS is not allowed in WHERE clause [at 1:40]
 SELECT key FROM TestTable WHERE EXISTS(SELECT 1 FROM GROUP ROWS)
                                        ^
+==
+
+[show_sqlbuilder_output]
+# Group rows subquery with a filtered table scan.
+SELECT
+  key,
+  ARRAY(
+    WITH group_rows() AS GROUP ROWS
+    SELECT key
+    FROM group_rows()
+  ) AS sub
+FROM TestTable
+WHERE key > 0
+GROUP BY key
+--
+QueryStmt
++-output_column_list=
+| +-$groupby.key#7 AS key [INT32]
+| +-$expr_subquery.$group_rows_subquery#11 AS sub [ARRAY<INT32>]
++-query=
+  +-ProjectScan
+    +-column_list=[$groupby.key#7, $expr_subquery.$group_rows_subquery#11]
+    +-input_scan=
+      +-AggregateScan
+        +-column_list=[$groupby.key#7, $expr_subquery.$group_rows_subquery#11]
+        +-input_scan=
+        | +-FilterScan
+        |   +-column_list=TestTable.[key#1, TestEnum#2, KitchenSink#3]
+        |   +-input_scan=
+        |   | +-TableScan(column_list=TestTable.[key#1, TestEnum#2, KitchenSink#3], table=TestTable, column_index_list=[0, 1, 2])
+        |   +-filter_expr=
+        |     +-FunctionCall(GoogleSQL:$greater(INT32, INT32) -> BOOL)
+        |       +-ColumnRef(type=INT32, column=TestTable.key#1)
+        |       +-Literal(type=INT32, value=0)
+        +-group_by_list=
+        | +-key#7 := ColumnRef(type=INT32, column=TestTable.key#1)
+        +-aggregate_list=
+          +-$group_rows_subquery#11 :=
+            +-SubqueryExpr
+              +-type=ARRAY<INT32>
+              +-subquery_type=ARRAY
+              +-subquery=
+                +-ProjectScan
+                  +-column_list=[TestTable.key#8]
+                  +-input_scan=
+                    +-GroupRowsScan
+                      +-column_list=[TestTable.key#8]
+                      +-input_column_list=
+                        +-key#8 := ColumnRef(type=INT32, column=TestTable.key#1)
+                        +-TestEnum#9 := ColumnRef(type=ENUM<googlesql_test.TestEnum>, column=TestTable.TestEnum#2)
+                        +-KitchenSink#10 := ColumnRef(type=PROTO<googlesql_test.KitchenSinkPB>, column=TestTable.KitchenSink#3)
+
+[SQLBUILDER_TARGET_SYNTAX_MODE standard]
+[SQLBUILDER_OUTPUT]
+SELECT
+  filterscan_4.a_1 AS key,
+  ARRAY(WITH
+      group_rows_5() AS GROUP ROWS
+    SELECT
+      gr_6.a_1 AS a_7
+    FROM
+      group_rows_5() AS gr_6
+  ) AS sub
+FROM
+  (
+    SELECT
+      TestTable.key AS a_1,
+      TestTable.TestEnum AS a_2,
+      TestTable.KitchenSink AS a_3
+    FROM
+      TestTable
+    WHERE
+      (TestTable.key) > CAST(0 AS INT32)
+  ) AS filterscan_4
+GROUP BY 1;
+
+[SQLBUILDER_TARGET_SYNTAX_MODE pipe]
+[SQLBUILDER_OUTPUT]
+FROM
+  TestTable
+|> WHERE
+     (TestTable.key) > CAST(0 AS INT32)
+|> SELECT
+     TestTable.key AS a_1,
+     TestTable.TestEnum AS a_2,
+     TestTable.KitchenSink AS a_3
+|> AS filterscan_4
+|> EXTEND
+     filterscan_4.a_1 AS a_5
+|> AGGREGATE
+     ARRAY(WITH
+         group_rows_6() AS GROUP ROWS
+       FROM
+         group_rows_6() AS gr_7
+       |> SELECT
+            gr_7.a_1 AS a_8
+     ) AS a_9
+   GROUP BY a_5
+|> AS aggregatescan_10
+|> SELECT
+     aggregatescan_10.a_5 AS key,
+     aggregatescan_10.a_9 AS sub;
+

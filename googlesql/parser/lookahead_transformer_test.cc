@@ -98,7 +98,6 @@ static std::unique_ptr<GoogleSqlTokenizer> MakeTokenStream(
 class LookaheadTransformerTest : public ::testing::Test {
  public:
   std::vector<Token> GetAllTokens(ParserMode mode, absl::string_view sql) {
-    StackFrame::StackFrameFactory stack_frame_factory;
     auto token_stream = MakeTokenStream(sql);
     auto tokenizer =
         LookaheadTransformer::Create(mode, options_, token_stream.get());
@@ -161,7 +160,6 @@ absl::StatusOr<Token> GetNextToken(LookaheadTransformer& tokenizer,
 }
 
 TEST_F(LookaheadTransformerTest, Lookahead1) {
-  StackFrame::StackFrameFactory stack_frame_factory;
   auto token_stream = MakeTokenStream("a 1 SELECT");
   GOOGLESQL_ASSERT_OK_AND_ASSIGN(
       auto lexer, LookaheadTransformer::Create(ParserMode::kStatement, options_,
@@ -193,7 +191,6 @@ TEST_F(LookaheadTransformerTest, Lookahead1) {
 }
 
 TEST_F(LookaheadTransformerTest, Lookahead2) {
-  StackFrame::StackFrameFactory stack_frame_factory;
   auto token_stream = MakeTokenStream("a 1 SELECT");
   GOOGLESQL_ASSERT_OK_AND_ASSIGN(
       auto lexer, LookaheadTransformer::Create(ParserMode::kStatement, options_,
@@ -228,7 +225,6 @@ TEST_F(LookaheadTransformerTest, Lookahead2) {
 }
 
 TEST_F(LookaheadTransformerTest, Lookahead2BeforeLookahead1) {
-  StackFrame::StackFrameFactory stack_frame_factory;
   auto token_stream = MakeTokenStream("a 1 SELECT");
   GOOGLESQL_ASSERT_OK_AND_ASSIGN(
       auto lexer, LookaheadTransformer::Create(ParserMode::kStatement, options_,
@@ -250,7 +246,6 @@ TEST_F(LookaheadTransformerTest, Lookahead2BeforeLookahead1) {
 }
 
 TEST_F(LookaheadTransformerTest, Lookahead2NoEnoughTokens) {
-  StackFrame::StackFrameFactory stack_frame_factory;
   auto token_stream = MakeTokenStream("");
   GOOGLESQL_ASSERT_OK_AND_ASSIGN(
       auto lexer, LookaheadTransformer::Create(ParserMode::kStatement, options_,
@@ -274,7 +269,6 @@ TEST_F(LookaheadTransformerTest, Lookahead2NoEnoughTokens) {
 }
 
 TEST_F(LookaheadTransformerTest, LookaheadTransformerReturnsYyeofWhenErrors) {
-  StackFrame::StackFrameFactory stack_frame_factory;
   auto token_stream = MakeTokenStream("SELECT * EXCEPT 1");
   GOOGLESQL_ASSERT_OK_AND_ASSIGN(
       auto lexer, LookaheadTransformer::Create(ParserMode::kStatement, options_,
@@ -885,11 +879,9 @@ static absl::Status RegisterMacros(absl::string_view source,
     auto def_macro_stmt =
         output->statement()->GetAsOrNull<ASTDefineMacroStatement>();
     GOOGLESQL_RET_CHECK(def_macro_stmt != nullptr);
-    GOOGLESQL_RETURN_IF_ERROR(macro_catalog.RegisterMacro(
-        {.source_text = source,
-         .location = def_macro_stmt->location(),
-         .name_location = def_macro_stmt->name()->location(),
-         .body_location = def_macro_stmt->body()->location()}));
+    GOOGLESQL_RETURN_IF_ERROR(macro_catalog.RegisterMacro(macros::MacroInfo(
+        source, def_macro_stmt->location(), def_macro_stmt->name()->location(),
+        def_macro_stmt->body()->location())));
   }
   return absl::OkStatus();
 }
@@ -899,16 +891,15 @@ TEST_F(LookaheadTransformerTest, TokensFromDifferentFilesCannotFuse) {
   GOOGLESQL_ASSERT_OK(
       RegisterMacros("DEFINE MACRO greater_than >", options_, macro_catalog));
   auto arena = std::make_unique<googlesql_base::UnsafeArena>(/*block_size=*/4096);
-  StackFrame::StackFrameFactory stack_frame_factory;
 
   constexpr absl::string_view kInput = ">$greater_than";
   auto token_stream = std::make_unique<macros::TokenProvider>(
       "fake_file", kInput, 0, std::nullopt, 0);
-  GOOGLESQL_ASSERT_OK_AND_ASSIGN(auto macro_expander,
-                       macros::MacroExpander::Create(
-                           token_stream.get(), macro_catalog, arena.get(),
-                           stack_frame_factory, macros::MacroExpanderOptions{},
-                           /*parent_location=*/nullptr));
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(
+      auto macro_expander,
+      macros::MacroExpander::Create(token_stream.get(), &macro_catalog,
+                                    arena.get(), macros::MacroExpanderOptions{},
+                                    /*parent_location=*/nullptr));
   GOOGLESQL_ASSERT_OK_AND_ASSIGN(
       auto lexer, LookaheadTransformer::Create(ParserMode::kStatement, options_,
                                                macro_expander.get()));

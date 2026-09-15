@@ -371,3 +371,31 @@ SELECT
 # ==============================================================================
 # FORMATTING TESTS
 # ==============================================================================
+
+# FORMAT produces an analysis error for DeclInt (default behavior is DISALLOWED)
+SELECT
+  FORMAT("%T", CAST(NULL AS DeclInt))
+--
+ERROR: generic::unimplemented: Cannot format type DeclInt [at 2:3]
+  FORMAT("%T", CAST(NULL AS DeclInt))
+  ^
+==
+
+
+# Confirm that FORMAT produces an analysis error for
+# DeclTypeAllPropertiesDisallowed.
+SELECT
+  FORMAT("%T", CAST(NULL AS DeclTypeAllPropertiesDisallowed))
+--
+ERROR: generic::unimplemented: Cannot format type DeclTypeAllPropertiesDisallowed [at 2:3]
+  FORMAT("%T", CAST(NULL AS DeclTypeAllPropertiesDisallowed))
+  ^
+==
+
+SELECT
+  FORMAT("%t", CAST(NULL AS DeclTypeAllPropertiesDisallowed))
+--
+ERROR: generic::unimplemented: Cannot format type DeclTypeAllPropertiesDisallowed [at 2:3]
+  FORMAT("%t", CAST(NULL AS DeclTypeAllPropertiesDisallowed))
+  ^
+

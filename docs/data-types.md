@@ -2619,6 +2619,9 @@ STRUCT&lt;inner_array ARRAY&lt;INT64&gt;&gt;
 ### Constructing a struct 
 <a id="constructing_a_struct"></a>
 
+You can construct a struct using tuple syntax, typeless struct syntax, or
+typed struct syntax.
+
 #### Tuple syntax
 
 ```

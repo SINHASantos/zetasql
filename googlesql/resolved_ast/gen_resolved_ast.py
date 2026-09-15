@@ -7624,6 +7624,17 @@ value.
 
       <where_expr> is required.
 
+      If `using_scan` is present, `table_scan` is joined with `using_scan`
+      using join conditions in `where_expr`. Rows selected after joining
+      and filtering are targeted for deletion. When the same target table row
+      gets matched more than once, it only gets deleted once.
+      `using_scan` is only allowed for a top-level DELETE statement, meaning
+      `table_scan` must be present and `array_offset_column` must not be
+      present.
+
+      `using_scan` is enabled by FEATURE_DML_DELETE_WITH_JOIN.
+      See (broken link) for more details.
+
       If <returning> is present, the DELETE statement will return deleted rows
       back. It can only occur on top-level statements.
 
@@ -7689,6 +7700,17 @@ value.
               tag_id=8,
               ignorable=IGNORABLE_DEFAULT,
               is_optional_constructor_arg=True,
+          ),
+          Field(
+              'using_scan',
+              'ResolvedScan',
+              tag_id=9,
+              ignorable=IGNORABLE_DEFAULT,
+              is_optional_constructor_arg=True,
+              comment="""
+              The scan representing the data source from the USING clause in
+              a DELETE statement.
+              """,
           ),
       ],
   )
@@ -13770,6 +13792,27 @@ ResolvedArgumentRef(y)
               comment="""
               A vector of field updates that should be applied to the protocol
               buffer that is being modified.
+              """,
+          ),
+          Field(
+              'update_element_column',
+              SCALAR_RESOLVED_COLUMN,
+              tag_id=5,
+              column_is_created=True,
+              comment="""
+              This ResolvedColumn is created to store the original value being
+              updated. It holds a copy of the value returned by `expr`.
+
+              This column is visible to the `expr` in
+              `update_field_item_list`, allowing those expressions to
+              reference the original UPDATE input value.
+
+              In nested UPDATE constructors, this allows ResolvedColumnRefs
+              that reference the input value from a specific UPDATE.
+
+              (If the LHS path traverses repeated fields in nested update
+              constructor, then this column represents an individual element
+              of the repeated field.)
               """,
           ),
       ],

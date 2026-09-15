@@ -90,7 +90,7 @@ documentation commonly uses.
 
 <span class="var">query_expr</span>:
   [ <a href="#with_clause">WITH</a> [ <a href="#recursive_keyword">RECURSIVE</a> ] { <a href="#simple_cte"><span class="var">non_recursive_cte</span></a> | <a href="#recursive_cte"><span class="var">recursive_cte</span></a> }[, ...] ]
-  { <span class="var">select</span> | ( <span class="var">query_expr</span> ) | <a href="#set_clause"><span class="var">set_operation</span></a> }
+  { <span class="var">select</span> | <a href="#table_statement"><span class="var">table_statement</span></a> | ( <span class="var">query_expr</span> ) | <a href="#set_clause"><span class="var">set_operation</span></a> }
   [ <a href="#order_by_clause">ORDER</a> <a href="#order_by_clause">BY</a> <span class="var">expression</span> [{ ASC | DESC }] [, ...] ]
   [ <a href="#limit_and_offset_clause">LIMIT</a> <span class="var">count</span> [ OFFSET <span class="var">skip_rows</span> ] ]
 
@@ -623,6 +623,100 @@ The `WITH` clause hides any permanent tables with the same name
 for the duration of the query, unless you qualify the table name, for example:
 
  `db.Roster`.
+
+## `TABLE` statement 
+<a id="table_statement"></a>
+
+<pre>
+TABLE { <span class="var">table_name</span> | <span class="var">tvf_call</span> }
+  [ <a href="#set_clause"><span class="var">set_operation</span></a> <span class="var">table_statement</span> ... ]
+  [ <a href="#order_by_clause">ORDER</a> <a href="#order_by_clause">BY</a> <span class="var">expression</span> [{ ASC | DESC }] [, ...] ]
+  [ <a href="#limit_and_offset_clause">LIMIT</a> <span class="var">count</span> [ OFFSET <span class="var">skip_rows</span> ] ]
+</pre>
+
+The `TABLE` statement queries an existing table or table-valued function (TVF) 
+and returns all of its rows without requiring an enclosing `SELECT * FROM ...` query.
+For standard tables, the `TABLE` statement is equivalent to `SELECT * FROM <table>`.
+For value tables, the `TABLE` statement is equivalent to
+`SELECT AS VALUE v FROM <table> AS v`.
+
+A `TABLE` statement can appear anywhere a query expression is permitted, including
+as a standalone top-level query, with common table expressions (CTEs), and
+as subqueries.
+
+The `TABLE` statement supports the query-level clauses `ORDER BY` and
+`LIMIT`, as well as set operations like `UNION ALL`.
+It doesn't directly support other standard query clauses, such as `WHERE`,
+`GROUP BY`, or `TABLESAMPLE`. To apply unsupported clauses, enclose the `TABLE`
+statement as a subquery, such as `SELECT * FROM (TABLE MyTable) WHERE x = 1`.
+The `TABLE` statement also can't be used to replace a table name in a `FROM`
+clause, for example, `SELECT * FROM TABLE MyTable` is invalid.
+
+Examples:
+
+The following example returns all rows and columns from the `Roster` table
+using the `TABLE` statement:
+
+```googlesql
+TABLE Roster;
+
+/*------------+----------+
+ | LastName   | SchoolID |
+ +------------+----------+
+ | Adams      | 50       |
+ | Buchanan   | 52       |
+ | Coolidge   | 52       |
+ | Davis      | 51       |
+ | Eisenhower | 77       |
+ +------------+----------*/
+```
+
+The following example applies `ORDER BY` and `LIMIT` clauses directly to a
+`TABLE` statement query on the `Roster` table.
+
+```googlesql
+TABLE Roster ORDER BY LastName LIMIT 3;
+
+/*----------+----------+
+ | LastName | SchoolID |
+ +----------+----------+
+ | Adams    | 50       |
+ | Buchanan | 52       |
+ | Coolidge | 52       |
+ +----------+----------*/
+```
+
+The following example uses a `TABLE` statement with a common table expression
+(CTE) called `TopScorers`:
+
+```googlesql
+WITH TopScorers AS (
+  SELECT LastName, PointsScored
+  FROM PlayerStats
+  WHERE PointsScored > 10
+)
+TABLE TopScorers;
+
+/*----------+--------------+
+ | LastName | PointsScored |
+ +----------+--------------+
+ | Buchanan | 13           |
+ +----------+--------------*/
+```
+
+The following example calls and queries a table-valued function (TVF) called
+`CustomerRangeWithCustomerType` using the `TABLE` statement:
+
+```googlesql
+TABLE CustomerRangeWithCustomerType(100, 200);
+
+/*------------+--------------------+---------------------------+
+ | CustomerId | Info               | type                      |
+ +------------+--------------------+---------------------------+
+ | 105        | "Active account"   | CUSTOMER_TYPE_ADVERTISER  |
+ | 180        | "Inactive account" | CUSTOMER_TYPE_ADVERTISER  |
+ +------------+--------------------+---------------------------*/
+```
 
 ## `UNNEST` operator 
 <a id="unnest_operator"></a>

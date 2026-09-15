@@ -206,7 +206,13 @@ std::unique_ptr<MatcherCollection<absl::Status>> ReferenceExpectedErrorMatcher(
       absl::StatusCode::kOutOfRange,
       "Invalid input to JSON_ARRAY: Unsupported argument type "
       "TOKENLIST for TO_JSON"));
-
+  // The status code is Unimplemented because the function implementation is
+  // throws that status.
+  // TODO: Investigate why TOKENLIST is generated in RQG for
+  // TO_JSON.
+  error_matchers.emplace_back(std::make_unique<StatusSubstringMatcher>(
+      absl::StatusCode::kUnimplemented,
+      "Unsupported argument type TOKENLIST for TO_JSON"));
   error_matchers.emplace_back(std::make_unique<StatusRegexMatcher>(
       absl::StatusCode::kInvalidArgument,
       "Unsupported argument to (JSON_OBJECT|JSON_ARRAY): MAP.* "

@@ -286,7 +286,7 @@ static Location MakeLocation(int start_offset, int end_offset) {
 }
 
 static absl::StatusOr<ExpansionOutput> ExpandMacros(
-    const absl::string_view text, const MacroCatalog& macro_catalog,
+    const absl::string_view text, MacroCatalog& macro_catalog,
     MacroExpanderOptions macro_expander_options = {
         .diagnostic_options = {
             .error_message_options = {
@@ -295,12 +295,11 @@ static absl::StatusOr<ExpansionOutput> ExpandMacros(
       std::make_unique<TokenProvider>(kTopFileName, text, /*start_offset=*/0,
                                       /*end_offset=*/std::nullopt,
                                       /*offset_in_original_input=*/0),
-      macro_catalog, macro_expander_options);
+      &macro_catalog, macro_expander_options);
 }
 
 static absl::StatusOr<ExpansionOutput> ExpandMacros(
-    const absl::string_view text, const MacroCatalog& macro_catalog,
-    bool is_strict,
+    const absl::string_view text, MacroCatalog& macro_catalog, bool is_strict,
     DiagnosticOptions diagnostic_options = {
         .error_message_options = {
             .mode = ErrorMessageMode::ERROR_MESSAGE_ONE_LINE}}) {
@@ -309,7 +308,7 @@ static absl::StatusOr<ExpansionOutput> ExpandMacros(
                                       /*start_offset=*/0,
                                       /*end_offset=*/std::nullopt,
                                       /*offset_in_original_input=*/0),
-      macro_catalog,
+      &macro_catalog,
       {
           .is_strict = is_strict,
           .diagnostic_options = diagnostic_options,
@@ -336,12 +335,9 @@ static void RegisterMacros(absl::string_view source,
     auto def_macro_stmt =
         output->statement()->GetAsOrNull<ASTDefineMacroStatement>();
     ASSERT_TRUE(def_macro_stmt != nullptr);
-    GOOGLESQL_ASSERT_OK(macro_catalog.RegisterMacro(
-        {.source_text = source,
-         .location = def_macro_stmt->location(),
-         .name_location = def_macro_stmt->name()->location(),
-         .body_location = def_macro_stmt->body()->location(),
-         .definition_start_offset = start_offset}));
+    GOOGLESQL_ASSERT_OK(macro_catalog.RegisterMacro(MacroInfo(
+        source, def_macro_stmt->location(), def_macro_stmt->name()->location(),
+        def_macro_stmt->body()->location(), start_offset)));
   }
 }
 
@@ -360,15 +356,10 @@ static void RegisterMacroAt(absl::string_view source,
   auto def_macro_stmt =
       output->statement()->GetAsOrNull<ASTDefineMacroStatement>();
   ASSERT_TRUE(def_macro_stmt != nullptr);
-  GOOGLESQL_ASSERT_OK(macro_catalog.RegisterMacro({
-      .source_text = source,
-      .location = def_macro_stmt->location(),
-      .name_location = def_macro_stmt->name()->location(),
-      .body_location = def_macro_stmt->body()->location(),
-      .definition_start_offset = start_offset,
-      .definition_start_line = original_start_line,
-      .definition_start_column = original_start_column,
-  }));
+  GOOGLESQL_ASSERT_OK(macro_catalog.RegisterMacro(MacroInfo(
+      source, def_macro_stmt->location(), def_macro_stmt->name()->location(),
+      def_macro_stmt->body()->location(), start_offset, original_start_line,
+      original_start_column)));
 }
 
 // This test is to ensure that the size of the StackFrame struct does not
@@ -408,18 +399,13 @@ TEST(MacroExpanderTest, ErrorsCanPrintLocation) {
 
 TEST(MacroExpanderTest, ErrorsCanPrintLocation_EmptyFileNames) {
   MacroCatalog macro_catalog;
-  GOOGLESQL_ASSERT_OK(macro_catalog.RegisterMacro({
-      .source_text = "DEFINE MACRO m $unknown",
-      .location = MakeLocation("", 0, 23),
-      .name_location = MakeLocation("", 13, 14),
-      .body_location = MakeLocation("", 14, 23),
-  }));
-  GOOGLESQL_ASSERT_OK(macro_catalog.RegisterMacro({
-      .source_text = "DEFINE MACRO m2 $m()",
-      .location = MakeLocation("", 0, 20),
-      .name_location = MakeLocation("", 13, 15),
-      .body_location = MakeLocation("", 15, 20),
-  }));
+  GOOGLESQL_ASSERT_OK(macro_catalog.RegisterMacro(
+      MacroInfo("DEFINE MACRO m $unknown", MakeLocation("", 0, 23),
+                MakeLocation("", 13, 14), MakeLocation("", 14, 23))));
+
+  GOOGLESQL_ASSERT_OK(macro_catalog.RegisterMacro(
+      MacroInfo("DEFINE MACRO m2 $m()", MakeLocation("", 0, 20),
+                MakeLocation("", 13, 15), MakeLocation("", 15, 20))));
 
   EXPECT_THAT(
       MacroExpander::ExpandMacros(
@@ -427,7 +413,7 @@ TEST(MacroExpanderTest, ErrorsCanPrintLocation_EmptyFileNames) {
                                           /*start_offset=*/0,
                                           /*end_offset=*/std::nullopt,
                                           /*offset_in_original_input=*/0),
-          macro_catalog,
+          &macro_catalog,
           {.is_strict = true,
            .diagnostic_options =
                {.error_message_options =
@@ -508,11 +494,10 @@ TEST(MacroExpanderTest, TracksCountOfUnexpandedTokensConsumedIncludingEOF) {
       /*start_offset=*/0, /*end_offset=*/std::nullopt,
       /*offset_in_original_input=*/0);
   auto arena = std::make_unique<googlesql_base::UnsafeArena>(/*block_size=*/1024);
-  StackFrame::StackFrameFactory stack_frame_factory;
   GOOGLESQL_ASSERT_OK_AND_ASSIGN(
       std::unique_ptr<MacroExpander> expander,
-      MacroExpander::Create(token_provider.get(), macro_catalog, arena.get(),
-                            stack_frame_factory, MacroExpanderOptions{},
+      MacroExpander::Create(token_provider.get(), &macro_catalog, arena.get(),
+                            MacroExpanderOptions{},
                             /*parent_location=*/nullptr));
 
   ASSERT_THAT(expander->GetNextToken(),
@@ -530,11 +515,10 @@ TEST(MacroExpanderTest,
       kTopFileName, "$m", /*start_offset=*/0,
       /*end_offset=*/std::nullopt, /*offset_in_original_input=*/0);
   auto arena = std::make_unique<googlesql_base::UnsafeArena>(/*block_size=*/1024);
-  StackFrame::StackFrameFactory stack_frame_factory;
   GOOGLESQL_ASSERT_OK_AND_ASSIGN(
       std::unique_ptr<MacroExpander> expander,
-      MacroExpander::Create(token_provider.get(), macro_catalog, arena.get(),
-                            stack_frame_factory, MacroExpanderOptions{},
+      MacroExpander::Create(token_provider.get(), &macro_catalog, arena.get(),
+                            MacroExpanderOptions{},
                             /*parent_location=*/nullptr));
 
   ASSERT_THAT(expander->GetNextToken(), IsOkAndHolds(TokenIs(TokenWithLocation{
@@ -1738,18 +1722,19 @@ class UnknownBuiltinMacroInvocationTest
     : public ::testing::TestWithParam<bool> {};
 
 TEST_P(UnknownBuiltinMacroInvocationTest, TestMacroBuiltinInvocation) {
-  EXPECT_THAT(
-      ExpandMacros("$$TEST()", MacroCatalog(), /*is_strict=*/GetParam()),
-      StatusIs(absl::StatusCode::kInvalidArgument,
-               HasSubstr("Builtin macro 'TEST' not found")));
+  MacroCatalog macro_catalog;
+  EXPECT_THAT(ExpandMacros("$$TEST()", macro_catalog, /*is_strict=*/GetParam()),
+              StatusIs(absl::StatusCode::kInvalidArgument,
+                       HasSubstr("Builtin macro 'TEST' not found")));
 }
 
 INSTANTIATE_TEST_SUITE_P(UnknownBuiltinMacroInvocationTestSuite,
                          UnknownBuiltinMacroInvocationTest, Bool());
 
 TEST(MacroExpanderTest, TestBuiltinMacroRequiresParenthesesInStrictMode) {
+  MacroCatalog macro_catalog;
   EXPECT_THAT(
-      ExpandMacros("$$IDENTIFIER", MacroCatalog(), /*is_strict=*/true),
+      ExpandMacros("$$IDENTIFIER", macro_catalog, /*is_strict=*/true),
       StatusIs(
           absl::StatusCode::kInvalidArgument,
           HasSubstr("Invocation of macro 'IDENTIFIER' missing argument list")));

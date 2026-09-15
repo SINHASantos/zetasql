@@ -1194,10 +1194,12 @@ cc_library(
         "proto_util.cc",
         "value.cc",
         "value_inl.h",
+        "variant_value.cc",
     ],
     hdrs = [
         "proto_util.h",
         "value.h",
+        "variant_value.h",
     ],
     deps = [
         ":civil_time",
@@ -1310,6 +1312,22 @@ cc_test(
         "@com_google_absl//absl/types:span",
         "@com_google_protobuf//:protobuf",
         "@com_google_protobuf//:protobuf_lite",
+    ],
+)
+
+cc_test(
+    name = "variant_value_test",
+    srcs = ["variant_value_test.cc"],
+    deps = [
+        ":interval_value",
+        ":json_value",
+        ":simple_token_list",
+        ":type",
+        ":value",
+        "//googlesql/base/testing:googlesql_gtest_main",
+        "//googlesql/base/testing:status_matchers",
+        "//googlesql/testdata:test_schema_cc_proto",
+        "@com_google_absl//absl/status",
     ],
 )
 
@@ -2152,6 +2170,7 @@ cc_library(
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/types:span",
     ],
 )
 
@@ -2899,6 +2918,7 @@ cc_test(
         ":language_options",
         ":options_cc_proto",
         ":simple_catalog",
+        ":strings",
         ":type",
         ":type_cc_proto",
         ":value",
@@ -2913,6 +2933,7 @@ cc_test(
         "//googlesql/common:evaluator_test_table",
         "//googlesql/public/functions:date_time_util",
         "//googlesql/public/types",
+        "//googlesql/public/types:value_representations",
         "//googlesql/reference_impl:evaluation",
         "//googlesql/resolved_ast",
         "//googlesql/resolved_ast:resolved_node_kind_cc_proto",

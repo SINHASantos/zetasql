@@ -42,20 +42,47 @@ absl::StatusOr<std::unique_ptr<ParserOutput>> ParseQuery(
 
 TEST(GraphDmlParseUtilTest, HasGraphDmlReturnsTrueForInsert) {
   GOOGLESQL_ASSERT_OK_AND_ASSIGN(
-      auto result1,
+      const std::unique_ptr<ParserOutput> result1,
       ParseQuery("GRAPH Fin MATCH (a) INSERT (a)-[:Edge]->(:Node)"));
   EXPECT_THAT(HasGraphDml(result1->node()), absl_testing::IsOkAndHolds(true));
 
   GOOGLESQL_ASSERT_OK_AND_ASSIGN(
-      auto result2,
+      const std::unique_ptr<ParserOutput> result2,
       ParseQuery("GRAPH Fin MATCH (a) INSERT (a)-[:Edge]->(:Node) RETURN a"));
   EXPECT_THAT(HasGraphDml(result2->node()), absl_testing::IsOkAndHolds(true));
 }
 
 TEST(GraphDmlParseUtilTest, HasGraphDmlReturnsFalseForPureMatch) {
   // Identical query structure but without the terminal INSERT operator.
-  GOOGLESQL_ASSERT_OK_AND_ASSIGN(auto result, ParseQuery("GRAPH Fin MATCH (a) RETURN a"));
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(const std::unique_ptr<ParserOutput> result,
+                       ParseQuery("GRAPH Fin MATCH (a) RETURN a"));
   EXPECT_THAT(HasGraphDml(result->node()), absl_testing::IsOkAndHolds(false));
+}
+
+TEST(GraphDmlParseUtilTest, HasGraphDmlReturnsTrueForSet) {
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(const std::unique_ptr<ParserOutput> result,
+                       ParseQuery("GRAPH Fin MATCH (a) SET a.prop = 1"));
+  EXPECT_THAT(HasGraphDml(result->node()), absl_testing::IsOkAndHolds(true));
+}
+
+TEST(GraphDmlParseUtilTest, HasGraphDmlReturnsTrueForRemove) {
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(const std::unique_ptr<ParserOutput> result,
+                       ParseQuery("GRAPH Fin MATCH (a) REMOVE a.prop"));
+  EXPECT_THAT(HasGraphDml(result->node()), absl_testing::IsOkAndHolds(true));
+}
+
+TEST(GraphDmlParseUtilTest, HasGraphDmlReturnsTrueForDelete) {
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(const std::unique_ptr<ParserOutput> result1,
+                       ParseQuery("GRAPH Fin MATCH (a) DELETE a"));
+  EXPECT_THAT(HasGraphDml(result1->node()), absl_testing::IsOkAndHolds(true));
+
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(const std::unique_ptr<ParserOutput> result2,
+                       ParseQuery("GRAPH Fin MATCH (a) NODETACH DELETE a"));
+  EXPECT_THAT(HasGraphDml(result2->node()), absl_testing::IsOkAndHolds(true));
+
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(const std::unique_ptr<ParserOutput> result3,
+                       ParseQuery("GRAPH Fin MATCH (a) DETACH DELETE a"));
+  EXPECT_THAT(HasGraphDml(result3->node()), absl_testing::IsOkAndHolds(true));
 }
 
 }  // namespace

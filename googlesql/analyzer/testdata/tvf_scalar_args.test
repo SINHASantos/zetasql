@@ -3861,7 +3861,6 @@ select (select column_bool from
     15.3  -- must_be_non_null with default
 )) from SimpleTypes;
 --
-
 ERROR: Table-valued function TVF_POSITIONAL_SCALAR_ARGS_WITH_CONSTRAINTS cannot be used on argument of type ARRAY<JSON> because the array's element type does not support equality [at 2:3]
   tvf_positional_scalar_args_with_constraints(
   ^
@@ -3883,7 +3882,6 @@ select (select column_bool from
     15.3  -- must_be_non_null with default
 )) from SimpleTypes;
 --
-
 ERROR: Table-valued function TVF_POSITIONAL_SCALAR_ARGS_WITH_CONSTRAINTS cannot be used on argument of type ARRAY<STRUCT<STRING, ARRAY<STRING>>> because the array's element type does not support ordering [at 2:3]
   tvf_positional_scalar_args_with_constraints(
   ^
@@ -3905,7 +3903,6 @@ select (select column_bool from
     15.3  -- must_be_non_null with default
 )) from SimpleTypes;
 --
-
 ERROR: Table-valued function TVF_POSITIONAL_SCALAR_ARGS_WITH_CONSTRAINTS cannot be used on argument of type ARRAY<STRUCT<DOUBLE, ARRAY<DOUBLE>>> because the array's element type does not support grouping [at 2:3]
   tvf_positional_scalar_args_with_constraints(
   ^
@@ -3937,3 +3934,114 @@ select (select column_bool from
 ERROR: Argument 3 to table-valued function TVF_POSITIONAL_SCALAR_ARGS_WITH_CONSTRAINTS must be at most 100 [at 5:5]
     500.0, -- max_value = 100
     ^
+==
+
+select * from tvf_rejects_collation_in_callback('a');
+--
+QueryStmt
++-output_column_list=
+| +-tvf_rejects_collation_in_callback.result#1 AS result [BOOL]
++-query=
+  +-ProjectScan
+    +-column_list=[tvf_rejects_collation_in_callback.result#1]
+    +-input_scan=
+      +-TVFScan
+        +-column_list=[tvf_rejects_collation_in_callback.result#1]
+        +-tvf=tvf_rejects_collation_in_callback
+        +-signature=(literal STRING) -> TABLE<result BOOL>
+        +-argument_list=
+        | +-FunctionArgument
+        |   +-expr=
+        |     +-Literal(type=STRING, value="a")
+        +-column_index_list=[0]
+        +-function_call_signature=(STRING) -> TABLE<result BOOL>
+==
+
+# Java error for the tests below:
+# Collation "und:ci" on argument of TVF call is not allowed [at 1:49]
+# Java tests lose the check_argument_annotations_callback during catalog
+# deserialization, causing the fallback collation check to reject the argument.
+[default no_java]
+[default language_features=MAXIMUM,+ANNOTATION_FRAMEWORK,+COLLATION_SUPPORT,+COLLATION_IN_EXPLICIT_CAST,+USE_OPERATION_COLLATION_FOR_NULLIF]
+
+select * from tvf_rejects_collation_in_callback(CAST('a' AS STRING COLLATE 'und:ci'));
+--
+ERROR: Custom mock TVF rejects scalar argument with annotation [at 1:15]
+select * from tvf_rejects_collation_in_callback(CAST('a' AS STRING COLLATE 'u...
+              ^
+==
+
+select * from tvf_rejects_collation_in_callback(collate('a', 'und:ci'));
+--
+ERROR: Custom mock TVF rejects scalar argument with annotation [at 1:15]
+select * from tvf_rejects_collation_in_callback(collate('a', 'und:ci'));
+              ^
+==
+
+select * from tvf_allows_collation_in_callback('a');
+--
+QueryStmt
++-output_column_list=
+| +-tvf_allows_collation_in_callback.result#1 AS result [BOOL]
++-query=
+  +-ProjectScan
+    +-column_list=[tvf_allows_collation_in_callback.result#1]
+    +-input_scan=
+      +-TVFScan
+        +-column_list=[tvf_allows_collation_in_callback.result#1]
+        +-tvf=tvf_allows_collation_in_callback
+        +-signature=(literal STRING) -> TABLE<result BOOL>
+        +-argument_list=
+        | +-FunctionArgument
+        |   +-expr=
+        |     +-Literal(type=STRING, value="a")
+        +-column_index_list=[0]
+        +-function_call_signature=(STRING) -> TABLE<result BOOL>
+==
+
+select * from tvf_allows_collation_in_callback(CAST('a' AS STRING COLLATE 'und:ci'));
+--
+QueryStmt
++-output_column_list=
+| +-tvf_allows_collation_in_callback.result#1 AS result [BOOL]
++-query=
+  +-ProjectScan
+    +-column_list=[tvf_allows_collation_in_callback.result#1]
+    +-input_scan=
+      +-TVFScan
+        +-column_list=[tvf_allows_collation_in_callback.result#1]
+        +-tvf=tvf_allows_collation_in_callback
+        +-signature=(STRING {Collation:"und:ci"}) -> TABLE<result BOOL>
+        +-argument_list=
+        | +-FunctionArgument
+        |   +-expr=
+        |     +-Cast(STRING -> STRING)
+        |       +-type_annotation_map={Collation:"und:ci"}
+        |       +-Literal(type=STRING, value="a", has_explicit_type=TRUE)
+        |       +-type_modifiers=collation:und:ci
+        +-column_index_list=[0]
+        +-function_call_signature=(STRING) -> TABLE<result BOOL>
+==
+
+select * from tvf_allows_collation_in_callback(collate('a', 'und:ci'));
+--
+QueryStmt
++-output_column_list=
+| +-tvf_allows_collation_in_callback.result#1 AS result [BOOL]
++-query=
+  +-ProjectScan
+    +-column_list=[tvf_allows_collation_in_callback.result#1]
+    +-input_scan=
+      +-TVFScan
+        +-column_list=[tvf_allows_collation_in_callback.result#1]
+        +-tvf=tvf_allows_collation_in_callback
+        +-signature=(STRING {Collation:"und:ci"}) -> TABLE<result BOOL>
+        +-argument_list=
+        | +-FunctionArgument
+        |   +-expr=
+        |     +-FunctionCall(GoogleSQL:collate(STRING, STRING) -> STRING)
+        |       +-type_annotation_map={Collation:"und:ci"}
+        |       +-Literal(type=STRING, value="a")
+        |       +-Literal(type=STRING, value="und:ci", preserve_in_literal_remover=TRUE)
+        +-column_index_list=[0]
+        +-function_call_signature=(STRING) -> TABLE<result BOOL>

@@ -19,10 +19,11 @@
 #include <utility>
 #include <vector>
 
-#include "googlesql/base/logging.h"
 #include "googlesql/public/options.pb.h"
+#include "absl/base/log_severity.h"
 #include "absl/container/flat_hash_map.h"
 #include "googlesql/base/check.h"
+#include "absl/log/log.h"
 #include "absl/synchronization/mutex.h"
 
 namespace googlesql {

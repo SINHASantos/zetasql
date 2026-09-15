@@ -280,29 +280,64 @@ message DeclarativeTypeProto {
     optional string version_id = 3 [default = ""];
   }
 
+  // Specifies the allowed coercion mode(s) to or from the backing type.
+  // A `DeclarativeTypeDescriptor` uses a separate field for each direction.
   enum AllowCoercionMode {
+    // Should never be used. This is here only to properly detect unset values
+    // as invalid in any logic.
     ALLOW_COERCION_MODE_UNSPECIFIED = 0;
+    // Disallows coercion in the given direction.
     ALLOW_COERCION_MODE_NO_COERCION = 1;
+    // Only explicit coercion is allowed in the given direction.
     ALLOW_COERCION_MODE_EXPLICIT_ONLY = 2;
+    // All coercion is allowed in the given direction.
     ALLOW_COERCION_MODE_ALLOW_ALL_COERCION = 3;
   }
 
+  // Specifies the returnability of the type.
   enum ReturningStrategy {
+    // Should never be used. This is here only to properly detect unset values
+    // as invalid in any logic.
     RETURNING_UNSPECIFIED = 0;
+    // The type is not returnable.
     RETURNING_DISALLOWED = 1;
+    // The type's returnability is delegated to the backing type.
     RETURNING_DELEGATED = 2;
   }
 
+  // Specifies the equality of the type.
   enum EqualityStrategy {
+    // Should never be used. This is here only to properly detect unset values
+    // as invalid in any logic.
     EQUALITY_UNSPECIFIED = 0;
-    EQUALITY_DELEGATED = 1;
-    EQUALITY_DISALLOWED = 2;
+    // The type disallows equality.
+    EQUALITY_DISALLOWED = 1;
+    // The type's equality is delegated to the backing type.
+    EQUALITY_DELEGATED = 2;
   }
 
+  // Specifies the type parameter handling for the type.
   enum TypeParamsStrategy {
+    // Should never be used. This is here only to properly detect unset values
+    // as invalid in any logic.
     TYPE_PARAMS_UNSPECIFIED = 0;
+    // The type disallows type parameters.
     TYPE_PARAMS_DISALLOWED = 1;
+    // The type's handling of type parameters (i.e., resolution and validation)
+    // is defined via opaque callbacks.
     TYPE_PARAMS_CUSTOM = 2;
+  }
+
+  // Specifies formatting for the type.
+  enum FormattingStrategy {
+    // Should never be used. This is here only to properly detect unset values
+    // as invalid in any logic.
+    FORMATTING_UNSPECIFIED = 0;
+    // The type disallows formatting.
+    // Calling FORMAT() on this type leads to an analysis error.
+    FORMATTING_DISALLOWED = 1;
+    // The type's formatting is defined via an opaque callback.
+    FORMATTING_CUSTOM = 2;
   }
 
   // Uniquely identifies a declarative type. This is the only factor determining
@@ -339,4 +374,7 @@ message DeclarativeTypeProto {
 
   // The type parameter handling strategy for this declarative type.
   optional TypeParamsStrategy type_params_strategy = 9;
+
+  // The formatting strategy for this declarative type.
+  optional FormattingStrategy formatting_strategy = 11;
 }

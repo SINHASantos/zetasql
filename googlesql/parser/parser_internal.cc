@@ -46,6 +46,7 @@
 #include "googlesql/parser/tm_token.h"
 #include "googlesql/parser/token_stream.h"
 #include "googlesql/parser/token_with_location.h"
+#include "googlesql/public/catalog.h"
 #include "googlesql/public/id_string.h"
 #include "googlesql/public/language_options.h"
 #include "googlesql/public/options.pb.h"
@@ -517,9 +518,9 @@ absl::Status ParseInternal(
     ParserMode mode, absl::string_view filename, absl::string_view input,
     int start_byte_offset, IdStringPool* id_string_pool, googlesql_base::UnsafeArena* arena,
     const LanguageOptions& language_options,
-    MacroExpansionMode macro_expansion_mode,
-    const macros::MacroCatalog* macro_catalog, std::unique_ptr<ASTNode>* output,
-    ParserRuntimeInfo& runtime_info, WarningSink& warning_sink,
+    MacroExpansionMode macro_expansion_mode, Catalog* catalog,
+    std::unique_ptr<ASTNode>* output, ParserRuntimeInfo& runtime_info,
+    WarningSink& warning_sink,
     std::vector<std::unique_ptr<ASTNode>>* other_allocated_ast_nodes,
     ASTStatementProperties* ast_statement_properties,
     int* statement_end_byte_offset) {
@@ -535,18 +536,13 @@ absl::Status ParseInternal(
           /*offset_in_original_input=*/0);
       TokenStream* token_stream = token_provider.get();
 
-      auto stack_frame_factory =
-          std::make_unique<StackFrame::StackFrameFactory>();
       std::unique_ptr<macros::MacroExpander> macro_expander;
       if (macro_expansion_mode != MacroExpansionMode::kNone) {
-        if (macro_catalog == nullptr) {
-          macro_catalog = &macros::MacroCatalog::EmptyMacroCatalog();
-        }
         bool is_strict = macro_expansion_mode == MacroExpansionMode::kStrict;
         GOOGLESQL_ASSIGN_OR_RETURN(
             macro_expander,
             macros::MacroExpander::Create(
-                token_stream, *macro_catalog, arena, *stack_frame_factory,
+                token_stream, catalog, arena,
                 /*macro_expander_options=*/{.is_strict = is_strict},
                 /*parent_location=*/nullptr));
         token_stream = macro_expander.get();

@@ -337,6 +337,13 @@ bool IsScanUnsupportedInPipeSyntax(const ResolvedScan* node) {
   }
 }
 
+bool UseTableClause(const ResolvedScan* node,
+                    const LanguageOptions& language_options) {
+  return node->node_source() == kNodeSourceTableClause &&
+         language_options.LanguageFeatureEnabled(
+             FEATURE_TOP_LEVEL_TABLE_STATEMENTS);
+}
+
 absl::Status VisitResolvedGraphNodeTableReferenceInternal(
     const ResolvedGraphNodeTableReference* node, absl::string_view prefix,
     std::string& edge_table_sql) {
@@ -2922,7 +2929,12 @@ absl::Status SQLBuilder::VisitResolvedTableScan(const ResolvedTableScan* node) {
   auto query_expression =
       std::make_unique<QueryExpression>(this->options_.target_syntax_mode);
   std::string from;
-  absl::StrAppend(&from, TableToIdentifierLiteral(node->table()));
+  if (UseTableClause(node, options_.language_options)) {
+    absl::StrAppend(&from, "(TABLE ", TableToIdentifierLiteral(node->table()),
+                    " )");
+  } else {
+    absl::StrAppend(&from, TableToIdentifierLiteral(node->table()));
+  }
   if (node->hint_list_size() > 0) {
     absl::StrAppend(&from, " ");
     GOOGLESQL_RETURN_IF_ERROR(AppendHintsIfPresent(node->hint_list(), &from));
@@ -4202,7 +4214,12 @@ absl::Status SQLBuilder::VisitResolvedRelationArgumentScan(
     const ResolvedRelationArgumentScan* node) {
   auto query_expression =
       std::make_unique<QueryExpression>(this->options_.target_syntax_mode);
-  GOOGLESQL_RET_CHECK(query_expression->TrySetFromClause(node->name()));
+  if (UseTableClause(node, options_.language_options)) {
+    GOOGLESQL_RET_CHECK(query_expression->TrySetFromClause(
+        absl::StrCat("(TABLE ", node->name(), ")")));
+  } else {
+    GOOGLESQL_RET_CHECK(query_expression->TrySetFromClause(node->name()));
+  }
   SQLAliasPairList select_list;
   if (node->is_value_table()) {
     GOOGLESQL_RET_CHECK_EQ(1, node->column_list().size());
@@ -4452,7 +4469,7 @@ int SQLBuilder::max_seen_alias_id() const {
 
 void SQLBuilder::SetPathForColumn(const ResolvedColumn& column,
                                   const std::string& path) {
-  googlesql_base::InsertOrUpdate(&mutable_column_paths(), column.column_id(), path);
+  mutable_column_paths().insert_or_assign(column.column_id(), path);
 }
 
 void SQLBuilder::SetPathForColumnList(const ResolvedColumnList& column_list,
@@ -5792,6 +5809,15 @@ static absl::Status CheckNoSuccessiveAggregateScansWithDeferredColumns(
   return absl::OkStatus();
 }
 
+static bool HasGroupRowsSubquery(const ResolvedAggregateScanBase* node) {
+  for (const auto& computed_column : node->aggregate_list()) {
+    if (computed_column->expr()->Is<ResolvedSubqueryExpr>()) {
+      return true;
+    }
+  }
+  return false;
+}
+
 absl::Status SQLBuilder::ProcessAggregateScanBase(
     const ResolvedAggregateScanBase* node, bool is_differencial_privacy_scan,
     absl::flat_hash_map<int, int> grouping_column_id_map,
@@ -5803,7 +5829,11 @@ absl::Status SQLBuilder::ProcessAggregateScanBase(
         node->grouping_set_list(), node->rollup_column_list(),
         rollup_column_id_list, grouping_set_ids_info));
   }
-  if (!query_expression->CanSetGroupByClause()) {
+  // Group rows subqueries reference input columns via internal aliases (e.g.
+  // `gr.a_1`). We must wrap the input scan in a subquery so the synthesized
+  // GROUP ROWS TVF exposes these aliases, even if the input scan was flattened
+  // and had its SELECT clause stripped (e.g. FilterScan over TableScan).
+  if (!query_expression->CanSetGroupByClause() || HasGroupRowsSubquery(node)) {
     GOOGLESQL_RETURN_IF_ERROR(WrapQueryExpression(node->input_scan(), query_expression));
   }
 
@@ -6161,8 +6191,14 @@ absl::Status SQLBuilder::VisitResolvedWithRefScan(
       std::make_unique<QueryExpression>(this->options_.target_syntax_mode);
   const std::string alias = GetScanAlias(node);
   std::string from;
-  absl::StrAppend(&from, ToIdentifierLiteral(node->with_query_name()), " AS ",
-                  alias);
+  if (UseTableClause(node, options_.language_options)) {
+    absl::StrAppend(&from, "(TABLE ",
+                    ToIdentifierLiteral(node->with_query_name()), ") AS ",
+                    alias);
+  } else {
+    absl::StrAppend(&from, ToIdentifierLiteral(node->with_query_name()), " AS ",
+                    alias);
+  }
   const ResolvedScan* with_scan =
       googlesql_base::FindOrDie(state_.with_query_name_to_scan, node->with_query_name());
   GOOGLESQL_RET_CHECK_EQ(node->column_list_size(), with_scan->column_list_size());
@@ -8237,6 +8273,28 @@ absl::Status SQLBuilder::VisitResolvedDeleteStmt(
     SetPathForColumn(offset_column, offset_alias);
     absl::StrAppend(&sql, " WITH OFFSET AS ", offset_alias);
   }
+
+  if (node->using_scan() != nullptr) {
+    GOOGLESQL_RETURN_IF_ERROR(SetPathForColumnsInScan(node->using_scan(), ""));
+    GOOGLESQL_ASSIGN_OR_RETURN(std::unique_ptr<QueryFragment> from,
+                     ProcessNode(node->using_scan()));
+    std::unique_ptr<QueryExpression> query_expression(
+        from->query_expression.release());
+    if (IsPipeSyntaxTargetMode()) {
+      GOOGLESQL_RETURN_IF_ERROR(
+          WrapQueryExpression(node->using_scan(), query_expression.get()));
+      absl::StrAppend(&sql, " USING (",
+                      query_expression->GetSQLQuery(TargetSyntaxMode::kPipe),
+                      ")");
+    } else {
+      if (!query_expression->HasFromClause()) {
+        GOOGLESQL_RETURN_IF_ERROR(
+            WrapQueryExpression(node->using_scan(), query_expression.get()));
+      }
+      absl::StrAppend(&sql, " USING ", query_expression->FromClause());
+    }
+  }
+
   if (node->where_expr() != nullptr) {
     GOOGLESQL_ASSIGN_OR_RETURN(std::unique_ptr<QueryFragment> where,
                      ProcessNode(node->where_expr()));
@@ -10334,13 +10392,32 @@ absl::Status SQLBuilder::VisitResolvedAuxLoadDataStmt(
 
 absl::Status SQLBuilder::VisitResolvedUpdateConstructor(
     const ResolvedUpdateConstructor* node) {
+  GOOGLESQL_RET_CHECK(node->update_element_column().IsInitialized());
+  node->update_element_column();  // Mark field as visited.
+
+  const bool is_recursive_update_with_repeated_field =
+      node->expr()->Is<ResolvedColumnRef>() &&
+      node->expr()->GetAs<ResolvedColumnRef>()->column() ==
+          node->update_element_column();
+
   std::string text;
-  absl::StrAppend(&text, "UPDATE (");
-  GOOGLESQL_ASSIGN_OR_RETURN(std::unique_ptr<QueryFragment> proto_expr,
-                   ProcessNode(node->expr()));
-  absl::StrAppend(&text, proto_expr->GetSQL(), ")");
-  if (!node->alias().empty()) {
-    absl::StrAppend(&text, " AS ", node->alias());
+  if (is_recursive_update_with_repeated_field) {
+    GOOGLESQL_RET_CHECK(
+        mutable_pending_columns()
+            .insert({node->update_element_column().column_id(), kEmptyAlias})
+            .second);
+  } else {
+    std::unique_ptr<QueryFragment> proto_expr;
+    absl::StrAppend(&text, "UPDATE (");
+    GOOGLESQL_ASSIGN_OR_RETURN(proto_expr, ProcessNode(node->expr()));
+    absl::StrAppend(&text, proto_expr->GetSQL(), ")");
+    if (!node->alias().empty()) {
+      absl::StrAppend(&text, " AS ", node->alias());
+    }
+    GOOGLESQL_RET_CHECK(mutable_pending_columns()
+                  .insert({node->update_element_column().column_id(),
+                           proto_expr->GetSQL()})
+                  .second);
   }
   std::string update_field_item_sql;
   for (const std::unique_ptr<const ResolvedUpdateFieldItem>& update_item :
@@ -10390,6 +10467,8 @@ absl::Status SQLBuilder::VisitResolvedUpdateConstructor(
                     modified_value->GetSQL());
   }
   absl::StrAppend(&text, "{", update_field_item_sql, "\n}");
+
+  mutable_pending_columns().erase(node->update_element_column().column_id());
 
   PushQueryFragment(node, text);
   return absl::OkStatus();

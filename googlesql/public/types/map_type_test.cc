@@ -594,10 +594,23 @@ TEST(MapTest, MakeMapWithLanguageOptions) {
                        "MAP key type GEOGRAPHY is not groupable"));
   EXPECT_THAT(factory.MakeMapType(types::VariantType(), types::StringType(),
                                   language_map_enabled),
-              IsOk());
+              StatusIs(absl::StatusCode::kInvalidArgument,
+                       "MAP key type VARIANT is not groupable"));
   EXPECT_THAT(factory.MakeMapType(types::StringType(), types::VariantType(),
                                   language_map_enabled),
               IsOk());
+  const StructType* struct_with_variant;
+  GOOGLESQL_ASSERT_OK(factory.MakeStructType({{"v", types::VariantType()}},
+                                   &struct_with_variant));
+  EXPECT_THAT(factory.MakeMapType(struct_with_variant, types::StringType(),
+                                  language_map_enabled),
+              StatusIs(absl::StatusCode::kInvalidArgument,
+                       "MAP key type STRUCT is not groupable"));
+  EXPECT_THAT(
+      factory.MakeMapType(struct_with_variant, types::StringType(),
+                          language_map_array_struct_grouping_enabled),
+      StatusIs(absl::StatusCode::kInvalidArgument,
+               "MAP key type STRUCT containing VARIANT is not groupable"));
   EXPECT_THAT(factory.MakeMapType(types::StringType(), types::GeographyType(),
                                   language_map_enabled_geography_enabled),
               IsOk())
@@ -617,6 +630,18 @@ TEST(MapTest, MakeMapWithLanguageOptions) {
   EXPECT_THAT(factory.MakeMapType(array_of_struct_type, types::StringType(),
                                   language_map_array_struct_grouping_enabled),
               IsOk());
+  const ArrayType* array_of_variant_type;
+  GOOGLESQL_ASSERT_OK(
+      factory.MakeArrayType(types::VariantType(), &array_of_variant_type));
+  EXPECT_THAT(factory.MakeMapType(array_of_variant_type, types::StringType(),
+                                  language_map_enabled),
+              StatusIs(absl::StatusCode::kInvalidArgument,
+                       "MAP key type ARRAY is not groupable"));
+  EXPECT_THAT(
+      factory.MakeMapType(array_of_variant_type, types::StringType(),
+                          language_map_enabled_array_grouping_enabled),
+      StatusIs(absl::StatusCode::kInvalidArgument,
+               "MAP key type ARRAY containing VARIANT is not groupable"));
 }
 
 TEST(TypeFactoryTest, MapTypesAreCached) {

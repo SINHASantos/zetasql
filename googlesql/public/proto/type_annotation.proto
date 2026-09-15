@@ -176,6 +176,9 @@ message FieldFormat {
     // A GoogleSQL UUID value. These values are encoded as 16 bytes (2 uint64s).
     UUID = 19;
 
+    // A GoogleSQL VARIANT value.
+    VARIANT = 22;
+
     // User code that switches on this enum must have a default case so
     // builds won't break if new enums get added.
     __FieldFormat_Type__switch_must_have_a_default__ = -1;

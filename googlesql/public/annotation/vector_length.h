@@ -17,12 +17,16 @@
 #ifndef GOOGLESQL_PUBLIC_ANNOTATION_VECTOR_LENGTH_H_
 #define GOOGLESQL_PUBLIC_ANNOTATION_VECTOR_LENGTH_H_
 
+#include <cstdint>
+#include <optional>
+
 #include "googlesql/public/annotation/default_annotation_spec.h"
 #include "googlesql/public/parse_location.h"
 #include "googlesql/public/types/annotation.h"
 #include "googlesql/public/types/type.h"
 #include "googlesql/resolved_ast/resolved_ast.h"
 #include "absl/status/status.h"
+#include "absl/status/statusor.h"
 
 namespace googlesql {
 
@@ -32,6 +36,8 @@ namespace googlesql {
 // ResolvedAst nodes.
 class VectorLengthAnnotation : public DefaultAnnotationSpec {
  public:
+  static constexpr int64_t kUnconstrained = -1;
+
   VectorLengthAnnotation() = default;
   ~VectorLengthAnnotation() override = default;
 
@@ -39,9 +45,31 @@ class VectorLengthAnnotation : public DefaultAnnotationSpec {
 
   int Id() const override { return GetId(); }
 
+  // Extracts the effective vector length from <annotation_map>.
+  // Returns std::nullopt if:
+  // - <annotation_map> is nullptr,
+  // - VectorLengthAnnotation is not present in <annotation_map>, or
+  // - VectorLengthAnnotation has value <= 0 (e.g. kUnconstrained = -1).
+  // Returns the vector length if it is a valid, fixed length (> 0).
+  static absl::StatusOr<std::optional<int64_t>> GetEffectiveLength(
+      const AnnotationMap* annotation_map);
+
+  // Returns false when <map> is nullptr or VectorLengthAnnotation is not
+  // present in <map> or any of its nested AnnotationMaps.
+  static bool ExistsIn(const AnnotationMap* map) {
+    return map != nullptr && map->Has<VectorLengthAnnotation>();
+  }
+
+  // Propagates vector length annotations from the referenced column.
+  // Unannotated vector columns (or nested vector slots) are assigned
+  // kUnconstrained (-1).
+  absl::Status CheckAndPropagateForColumnRef(
+      const ResolvedColumnRef& column_ref,
+      AnnotationMap* result_annotation_map) override;
+
   // Determines whether the vector length should be propagated to the function's
-  // result. Currently handles specific vector functions such as ENCODE_VECTOR
-  // where the output vector length is derived from the function arguments.
+  // result. Handles specific vector functions such as ENCODE_VECTOR as well
+  // as general function signatures (e.g. ARRAY_CONCAT, IF, CASE).
   absl::Status CheckAndPropagateForFunctionCallBase(
       const ResolvedFunctionCallBase& function_call,
       AnnotationMap* result_annotation_map) override;
@@ -59,9 +87,15 @@ class VectorLengthAnnotation : public DefaultAnnotationSpec {
       const AnnotationMap* input_map, AnnotationMap& result_annotation_map,
       bool return_null_on_error, const ParseLocationRange* error_location);
 
-  // If one of the annotation is null, we simply drop the annotation. If both
-  // annotations are non-null, then we verify the annotations match, otherwise
-  // we report an error.
+  // Merges scalar vector length annotations from `in` into `out`.
+  //
+  // - If `in` or `out` is unannotated (nullptr, e.g. untyped NULL or empty
+  //   container literal), the other's annotation is retained (identity).
+  // - If matching (`in == out`), `out` retains the length.
+  // - If conflicting (`in != out`), `out` transitions to `kUnconstrained`
+  //   (-1).
+  // - If either is `kUnconstrained` (-1), the result transitions to
+  //   `kUnconstrained` (absorbing).
   absl::Status ScalarMergeIfCompatible(const AnnotationMap* in,
                                        AnnotationMap& out) const override;
 };

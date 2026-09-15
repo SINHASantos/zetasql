@@ -24,6 +24,7 @@
 #include <iterator>
 #include <limits>
 #include <memory>
+#include <optional>
 #include <random>
 #include <string>
 #include <utility>
@@ -37,10 +38,13 @@
 #include "googlesql/public/table_valued_function.h"
 #include "googlesql/public/type.h"
 #include "googlesql/public/types/struct_type.h"
+#include "googlesql/public/types/type.h"
 #include "googlesql/public/types/type_factory.h"
 #include "googlesql/public/value.h"
 #include "googlesql/reference_impl/evaluation.h"
 #include "googlesql/reference_impl/function.h"
+#include "absl/algorithm/container.h"
+#include "absl/container/flat_hash_set.h"
 #include "googlesql/base/check.h"
 #include "absl/random/distributions.h"
 #include "absl/status/status.h"
@@ -624,6 +628,10 @@ absl::StatusOr<Value> BatchVectorSearchResultIterator::ComputeDistance(
     return functions::EuclideanDistanceDense(v1, v2);
   } else if (distance_type_ == "DOT_PRODUCT") {
     GOOGLESQL_ASSIGN_OR_RETURN(Value dot_product, functions::DotProduct(v1, v2));
+    // A larger dot product indicates greater similarity, whereas vector search
+    // orders results by distance in ascending order (where a smaller distance
+    // represents closer neighbors). Therefore, the dot product is negated so
+    // that higher similarity corresponds to a smaller distance.
     return Value::Double(-dot_product.ToDouble());
   }
   return absl::OutOfRangeError(
@@ -861,7 +869,7 @@ class KMeansResultIterator : public EvaluatorTableIterator {
                           std::move(distinct_vectors)};
   }
 
-  absl::Status RunKMeansIterations(const std::vector<Value>& valid_vectors,
+  absl::Status RunKMeansIterations(absl::Span<const Value> valid_vectors,
                                    const Type* element_type,
                                    std::vector<Value>& centroids) {
     int64_t actual_k = centroids.size();

@@ -628,8 +628,8 @@ class TypeFactory : public TypeFactoryBase {
   TypeFlatHashSet<> cached_extended_types_ ABSL_GUARDED_BY(store_->mutex_);
 
   // Cached declarative types.
-  absl::flat_hash_map<TypeId, const DeclarativeType*> cached_declarative_types_
-      ABSL_GUARDED_BY(store_->mutex_);
+  absl::flat_hash_map<DeclarativeTypeId, const DeclarativeType*>
+      cached_declarative_types_ ABSL_GUARDED_BY(store_->mutex_);
 
   // Set in constructor and never changed.
   const int nesting_depth_limit_;

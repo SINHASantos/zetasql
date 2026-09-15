@@ -295,6 +295,8 @@ class FunctionCallBuilder {
     return annotation_propagator_;
   }
 
+  TypeFactory& type_factory() { return type_factory_; }
+
   // Construct ResolvedFunctionCall for IF(<condition>, <then_case>,
   // <else_case>)
   //

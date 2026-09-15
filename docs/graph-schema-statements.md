@@ -44,8 +44,8 @@ CREATE
   PROPERTY GRAPH
   [ IF NOT EXISTS ]
   <span class="var">property_graph_name</span>
-  [ OPTIONS (<span class="var">key</span>=<span class="var">value</span>, ...) ]
-  <span class="var">property_graph_content</span>;
+  <span class="var">property_graph_content</span>
+  [ OPTIONS (<span class="var">key</span>=<span class="var">value</span>, ...) ];
 
 <span class="var">property_graph_content</span>:
   <span class="var">node_tables</span>
@@ -75,9 +75,6 @@ Note: all GQL examples in the GQL reference use the
   appear with `IF NOT EXISTS`.
 + `IF NOT EXISTS`: If any property graph exists with the same name, the
   `CREATE` statement has no effect. Can't appear with `OR REPLACE`.
-+ `OPTIONS`: If you have schema options, you can add them when you create
-  the property graph. These options are system-specific and follow the
-  GoogleSQL [`HINT` syntax][hints]
 + `property_graph_name`: The name of the property graph. This name can be a
   path expression. This name must not conflict with the name of an existing
   table, view, or property graph.
@@ -121,6 +118,7 @@ Note: all GQL examples in the GQL reference use the
   ```
 + `element_list`: A list of element (node or edge) definitions.
 + `element`: Refer to [Element definition][element-definition] for details.
++ `OPTIONS`: A list of options for the property graph.
 
 ### Element definition 
 <a id="element_definition"></a>
@@ -194,8 +192,6 @@ rules:
   + By default, the element key is the primary key of the input table.
 
   + Element keys can be explicitly defined with the `KEY` clause.
-
-  
 + `node_element_key`: The element key for a node.
 
   ```googlesql

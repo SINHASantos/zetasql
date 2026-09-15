@@ -42,9 +42,12 @@
 #include "googlesql/public/language_options.h"
 #include "googlesql/public/options.pb.h"
 #include "googlesql/public/simple_catalog.h"
+#include "googlesql/public/strings.h"
 #include "googlesql/public/type.h"
 #include "googlesql/public/type.pb.h"
+#include "googlesql/public/types/declarative_type.h"
 #include "googlesql/public/types/type_factory.h"
+#include "googlesql/public/types/value_representations.h"
 #include "googlesql/public/value.h"
 #include "googlesql/reference_impl/evaluation.h"
 #include "googlesql/resolved_ast/resolved_ast.h"
@@ -67,6 +70,7 @@
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_format.h"
 #include "absl/strings/string_view.h"
+#include "absl/strings/substitute.h"
 #include "absl/time/civil_time.h"
 #include "absl/time/time.h"
 #include "absl/types/span.h"
@@ -2028,6 +2032,105 @@ TEST(EvaluatorTest, ResolvedExprValidatedWithCorrectLanguageOptions) {
           absl::StatusCode::kInternal,
           HasSubstr("Found recursive scan, but WITH RECURSIVE and pipe "
                     "RECURSIVE UNION are both disabled in language features")));
+}
+
+static constexpr absl::string_view kDeclStrTypeName = "DeclStr";
+
+struct DeclarativeTypeFormattingCallbackTestCase {
+  std::string format_template;  // `%t` or `%T`
+  Value input_backing_value;    // Must have the backing type of DeclStr.
+  std::string expected_output;
+};
+
+class DeclarativeTypeFormattingCallbackTest
+    : public ::testing::TestWithParam<
+          DeclarativeTypeFormattingCallbackTestCase> {};
+
+INSTANTIATE_TEST_SUITE_P(
+    DeclarativeTypeFormattingCallbackTestSuite,
+    DeclarativeTypeFormattingCallbackTest,
+    testing::ValuesIn<DeclarativeTypeFormattingCallbackTestCase>({
+        // NULL in FORMAT() is handled before we hit Type::FormatValueContent()
+        {"%t", Value::NullString(), "NULL"},
+        {"%T", Value::NullString(), "NULL"},
+        // Non-NULL, no quotes to escape
+        {"%t", Value::String("foo"), "DeclStr(foo)"},
+        {"%T", Value::String("foo"), R"sql(CAST("foo" AS DeclStr))sql"},
+        // Non-NULL, quotes to escape
+        {"%t", Value::String("foo'bar"), "DeclStr(foo'bar)"},
+        {"%T", Value::String("foo'bar"), R"sql(CAST("foo'bar" AS DeclStr))sql"},
+    }));
+
+TEST_P(DeclarativeTypeFormattingCallbackTest,
+       DeclarativeTypeFormattingCallbackTest) {
+  const auto& test_case = GetParam();
+  PreparedExpression expr(
+      absl::Substitute("FORMAT('$0',@p)", test_case.format_template),
+      EvaluatorOptions());
+  LanguageOptions language_options = LanguageOptions::MaximumFeatures();
+  language_options.EnableLanguageFeature(FEATURE_DECLARATIVE_TYPE_FRAMEWORK);
+
+  auto catalog = std::make_unique<SimpleCatalog>("TestCatalog");
+  catalog->AddBuiltinFunctions(BuiltinFunctionOptions::AllReleasedFunctions());
+
+  using FormatOptions =
+      DeclarativeTypeDescriptor::FormattingCustom::FormatOptions;
+  const auto fmt_cb = +[](const ValueContent& value,
+                          const FormatOptions& options) -> std::string {
+    absl::string_view str = value.GetAs<internal::StringRef*>()->value();
+    switch (options.mode) {
+      case FormatOptions::Mode::kDebug:
+        return absl::StrCat(kDeclStrTypeName, "(", str, ")");
+      case FormatOptions::Mode::kSQLLiteral:
+      case FormatOptions::Mode::kSQLExpression:
+        return absl::StrCat("CAST(", ToStringLiteral(str), " AS ",
+                            kDeclStrTypeName, ")");
+    }
+  };
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(
+      const Type* decl_type,
+      catalog->type_factory()->MakeDeclarativeType(
+          DeclarativeTypeDescriptor()
+              .set_type_id(
+                  DeclarativeTypeId{.name_space = "NS",
+                                    .local_id = std::string(kDeclStrTypeName),
+                                    .version_id = ""})
+              .set_display_name(kDeclStrTypeName)
+              .set_backing_type(types::StringType())
+              .set_coercion_from_backing_type(
+                  DeclarativeTypeDescriptor::AllowCoercionMode::kExplicitOnly)
+              .set_coercion_to_backing_type(
+                  DeclarativeTypeDescriptor::AllowCoercionMode::kExplicitOnly)
+              .set_formatting_strategy(
+                  DeclarativeTypeDescriptor::FormattingCustom(fmt_cb))));
+
+  catalog->AddType(kDeclStrTypeName, decl_type);
+
+  // Analysis
+  AnalyzerOptions analyzer_options(language_options);
+  analyzer_options.set_parameter_mode(PARAMETER_NAMED);
+  GOOGLESQL_ASSERT_OK(analyzer_options.AddQueryParameter("p", decl_type));
+
+  GOOGLESQL_ASSERT_OK(expr.Prepare(analyzer_options, catalog.get()));
+
+  // Execution
+  Value input_value;
+  if (test_case.input_backing_value.is_null()) {
+    input_value = Value::Null(decl_type);
+  } else {
+    GOOGLESQL_ASSERT_OK_AND_ASSIGN(input_value,
+                         Value::Declarative(decl_type->AsDeclarativeType(),
+                                            test_case.input_backing_value));
+  }
+  ExpressionOptions expr_options;
+  expr_options.parameters = {{"p", input_value}};
+
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(Value value, expr.ExecuteAfterPrepare(expr_options));
+
+  ASSERT_TRUE(value.type()->IsString()) << value.DebugString();
+  ASSERT_FALSE(value.is_null());
+  ASSERT_TRUE(value.is_valid());
+  EXPECT_EQ(value.string_value(), test_case.expected_output);
 }
 
 TEST_F(UDFEvalTest, OkUDFEvaluator) {

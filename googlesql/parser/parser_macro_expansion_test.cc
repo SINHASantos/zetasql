@@ -62,11 +62,9 @@ static void RegisterMacros(absl::string_view source,
     auto def_macro_stmt =
         output->statement()->GetAsOrNull<ASTDefineMacroStatement>();
     ASSERT_TRUE(def_macro_stmt != nullptr);
-    GOOGLESQL_ASSERT_OK(macro_catalog.RegisterMacro(
-        {.source_text = source,
-         .location = def_macro_stmt->location(),
-         .name_location = def_macro_stmt->name()->location(),
-         .body_location = def_macro_stmt->body()->location()}));
+    GOOGLESQL_ASSERT_OK(macro_catalog.RegisterMacro(macros::MacroInfo(
+        source, def_macro_stmt->location(), def_macro_stmt->name()->location(),
+        def_macro_stmt->body()->location())));
   }
 }
 

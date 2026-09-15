@@ -16,12 +16,14 @@
 
 #include "googlesql/public/functions/string_format.h"
 
+#include <cstdint>
 #include <string>
 #include <vector>
 
 #include "googlesql/base/testing/status_matchers.h"
 #include "googlesql/public/options.pb.h"
 #include "googlesql/public/types/array_type.h"
+#include "googlesql/public/types/declarative_type.h"
 #include "googlesql/public/types/graph_element_type.h"
 #include "googlesql/public/types/struct_type.h"
 #include "googlesql/public/types/type.h"
@@ -31,6 +33,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "absl/status/status.h"
+#include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
 #include "absl/types/span.h"
 
@@ -204,6 +207,50 @@ TEST(CheckStringFormat, UnsupportedForDeclarativeTypes) {
       StringFormatUtf8("%t", {Value::Null(declarative_type)},
                        ProductMode::PRODUCT_EXTERNAL, &output, &is_null),
       StatusIs(absl::StatusCode::kUnimplemented));
+}
+
+using FormatOptions =
+    DeclarativeTypeDescriptor::FormattingCustom::FormatOptions;
+
+TEST(CheckStringFormat, SupportedForDeclarativeTypesWithCustomCallback) {
+  TypeFactory type_factory;
+  auto format_cb =
+      +[](const ValueContent& value, const FormatOptions& opts) -> std::string {
+    int64_t v = value.GetAs<int64_t>();
+    if (opts.mode == FormatOptions::Mode::kSQLLiteral) {
+      return absl::StrCat("LITERAL(", v, ")");
+    }
+    return absl::StrCat("TERSE(", v, ")");
+  };
+
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(
+      const Type* declarative_type,
+      type_factory.MakeDeclarativeType(
+          DeclarativeTypeDescriptor()
+              .set_type_id({"NS", "T_FMT"})
+              .set_display_name("t_fmt")
+              .set_backing_type(type_factory.get_int64())
+              .set_formatting_strategy(
+                  DeclarativeTypeDescriptor::FormattingCustom(format_cb))));
+
+  GOOGLESQL_EXPECT_OK(CheckStringFormatUtf8ArgumentTypes("%t", {declarative_type},
+                                               ProductMode::PRODUCT_EXTERNAL));
+  GOOGLESQL_EXPECT_OK(CheckStringFormatUtf8ArgumentTypes("%T", {declarative_type},
+                                               ProductMode::PRODUCT_EXTERNAL));
+
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(Value val,
+                       Value::Declarative(declarative_type->AsDeclarativeType(),
+                                          Value::Int64(42)));
+
+  std::string output;
+  bool is_null = false;
+  GOOGLESQL_EXPECT_OK(StringFormatUtf8("%t", {val}, ProductMode::PRODUCT_EXTERNAL,
+                             &output, &is_null));
+  EXPECT_EQ(output, "TERSE(42)");
+
+  GOOGLESQL_EXPECT_OK(StringFormatUtf8("%T", {val}, ProductMode::PRODUCT_EXTERNAL,
+                             &output, &is_null));
+  EXPECT_EQ(output, "LITERAL(42)");
 }
 
 }  // namespace functions

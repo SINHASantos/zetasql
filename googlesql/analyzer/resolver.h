@@ -32,6 +32,7 @@
 
 #include "googlesql/analyzer/annotation_propagator.h"
 #include "googlesql/analyzer/column_cycle_detector.h"
+#include "googlesql/analyzer/column_list_spec.h"
 #include "googlesql/analyzer/container_hash_equals.h"
 #include "googlesql/analyzer/estimator_function_resolver.h"
 #include "googlesql/analyzer/expr_matching_helpers.h"
@@ -43,6 +44,7 @@
 #include "googlesql/analyzer/set_operation_resolver_base.h"
 #include "googlesql/common/warning_sink.h"
 #include "googlesql/parser/parse_tree.h"
+#include "googlesql/parser/parse_tree_errors.h"
 #include "googlesql/public/analyzer_options.h"
 #include "googlesql/public/analyzer_output_properties.h"
 #include "googlesql/public/catalog.h"
@@ -1332,6 +1334,16 @@ class Resolver {
     return absl::OkStatus();
   }
 
+  // Extracts the column names from the resolved expression of a column list
+  // spec.
+  // The resolved expression must be an array of strings, or a make_array
+  // function call with array elements of string literals or constants,
+  // otherwise an error is returned.
+  absl::StatusOr<std::vector<IdString>>
+  ValidateAndExtractColumnListSpecColumnNames(
+      const ASTExpression& columns_expr,
+      const ResolvedExpr& columns_resolved_expr);
+
   // Resolve the primary key from column definitions.
   absl::Status ResolvePrimaryKey(
       absl::Span<const ASTTableElement* const> table_elements,
@@ -1750,12 +1762,17 @@ class Resolver {
       const ASTDeleteStatement* ast_statement,
       std::unique_ptr<ResolvedDeleteStmt>* output);
   // <target_alias> is the alias of the target, which must be in the topmost
-  // scope of <scope>.
+  // scope of <scope>. <resolved_table_scan> is the resolved scan of the target
+  // table (non-null for top-level DELETE, null for nested DELETE in UPDATE).
+  // <resolved_using_scan> is the resolved scan for the USING clause if present.
+  // TODO: b/558878058 - Document the intricacies of <target_name_list> and
+  // <scope>.
   absl::Status ResolveDeleteStatementImpl(
       const ASTDeleteStatement* ast_statement, IdString target_alias,
       const std::shared_ptr<const NameList>& target_name_list,
       const NameScope* scope,
-      std::unique_ptr<const ResolvedTableScan> table_scan,
+      std::unique_ptr<const ResolvedTableScan> resolved_table_scan,
+      std::unique_ptr<const ResolvedScan> resolved_using_scan,
       std::unique_ptr<ResolvedDeleteStmt>* output);
 
   absl::Status ResolveUndropStatement(
@@ -5380,6 +5397,7 @@ class Resolver {
       const ASTNode& location,
       std::unique_ptr<const ResolvedExpr> expr_to_modify, std::string alias,
       const ASTBracedConstructor& ast_braced_constructor,
+      const ResolvedColumn& update_element_column,
       ExprResolutionInfo* expr_resolution_info);
 
   absl::Status ResolveUpdateConstructor(
@@ -5863,6 +5881,44 @@ class Resolver {
       ExprResolutionInfo* expr_resolution_info,
       std::unique_ptr<const ResolvedExpr>* resolved_expr_out);
 
+  // Resolves Column List Spec.
+  // Requires:
+  //  - Feature FEATURE_COLUMN_LIST_SPEC is enabled.
+  //  - Column list spec is not null.
+  //  - Column list spec resolves to an array of strings.
+  //  - Array elements are not null or empty strings and are strings.
+  absl::Status ResolveColumnListSpec(
+      const ASTColumnListSpec* column_list_spec,
+      ExprResolutionInfo* expr_resolution_info,
+      std::unique_ptr<const ColumnListSpec>* column_list_spec_out);
+
+  absl::StatusOr<ResolvedColumn> LookupUnpackColumn(IdString column_name,
+                                                    const ASTNode* ast_location,
+                                                    const NameScope* scope);
+
+  // Resolves an unpack expression to its list of column names.
+  // Requires:
+  //  - Feature is enabled.
+  //  - Unpack expression is not null.
+  //  - Unpack expression resolves to a column list spec.
+  absl::StatusOr<std::vector<IdString>> ResolveUnpackExpressionColumnNames(
+      const ASTUnpackExpression* unpack_expression,
+      ExprResolutionInfo* expr_resolution_info);
+
+  // Resolves Unpack Expression in Select List.
+  // Requires:
+  //  - Feature is enabled.
+  //  - Select column is not null.
+  //  - Select column has an unpack expression.
+  //  - Unpack expression resolves to a column list spec.
+  //  - Column list spec is not empty.
+  //  - Column names returned by the column list spec are resolveable in the
+  //    from_scan_scope.
+  absl::Status ResolveUnpackExpressionInSelectList(
+      const ASTSelectColumn* ast_select_column,
+      const std::shared_ptr<const NameList>& from_clause_name_list,
+      const NameScope* from_scan_scope,
+      QueryResolutionInfo* query_resolution_info);
   absl::Status ResolveLockMode(
       const ASTLockMode* ast_lock_mode,
       std::unique_ptr<const ResolvedLockMode>* resolved);

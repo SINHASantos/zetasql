@@ -6022,6 +6022,19 @@ FROM UNNEST([NULL, 1, -2, 3, -2, 1, NULL]) AS x;
 ```
 
 ```googlesql
+SELECT
+  ARRAY_AGG(x IGNORE NULLS WHERE x < 0) AS negative_array_agg,
+  ARRAY_AGG(x IGNORE NULLS WHERE x > 0) AS positive_array_agg
+FROM UNNEST([NULL, 1, -2, 3, -2, 1, NULL]) AS x;
+
+/*--------------------+--------------------+
+ | negative_array_agg | positive_array_agg |
+ +--------------------+--------------------+
+ | [-2, -2]           | [1, 3, 1]          |
+ +--------------------+--------------------*/
+```
+
+```googlesql
 SELECT ARRAY_AGG(x ORDER BY ABS(x)) AS array_agg
 FROM UNNEST([2, 1, -2, 3, -2, 1, 2]) AS x;
 

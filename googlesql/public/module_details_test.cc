@@ -18,6 +18,9 @@
 
 #include <memory>
 #include <optional>
+#include <string>
+#include <utility>
+#include <vector>
 
 #include "googlesql/common/resolution_scope.h"
 #include "googlesql/common/testing/proto_matchers.h"
@@ -39,6 +42,7 @@
 #include "absl/status/statusor.h"
 #include "absl/strings/str_join.h"
 #include "absl/strings/string_view.h"
+#include "absl/strings/substitute.h"
 #include "google/protobuf/text_format.h"
 #include "googlesql/base/ret_check.h"
 
@@ -286,18 +290,16 @@ TEST_F(ModuleDetailsTest, WrongTypeAllowedReferencesShouldFail) {
 }
 
 TEST_F(ModuleDetailsTest, WrongValueImportModeShouldFail) {
-  EXPECT_THAT(
-      BuildModuleDetailsFromStatement(R"(
+  EXPECT_THAT(BuildModuleDetailsFromStatement(R"(
                    module a.b options(
                      stub_module_type='udf_server_catalog',
                      udf_server_address='dummy_address',
                      udf_namespace='dummy_namespace',
                      udf_server_import_mode='WRONG_MODE',
                      udf_scaling_factor=2.5))"),
-      StatusIs(absl::StatusCode::kInvalidArgument,
-               ::testing::HasSubstr(
-                   "Unrecognized mode: WRONG_MODE, allowed modes are "
-                   "[SERVER_ADDRESS_FROM_MODULE,CALLER_PROVIDED,MANUAL]")));
+              StatusIs(absl::StatusCode::kInvalidArgument,
+                       ::testing::HasSubstr(
+                           "Unrecognized UDF server import mode: WRONG_MODE")));
 }
 
 TEST_F(ModuleDetailsTest, AllowedReferencesBuiltin) {
@@ -340,6 +342,41 @@ TEST_F(ModuleDetailsTest, GenerateNonEmptyUDFModule) {
                 udf_scaling_factor: 2.5
                 udf_namespace: "dummy_namespace"
               )pb")));
+}
+
+TEST_F(ModuleDetailsTest, GenerateUDFModuleWithImportModes) {
+  for (const auto& [mode_str, mode_enum] : std::vector<
+           std::pair<std::string, PerModuleOptions::UdfServerImportMode>>{
+           {"UNKNOWN", PerModuleOptions::UNKNOWN},
+           {"SERVER_ADDRESS_FROM_MODULE",
+            PerModuleOptions::SERVER_ADDRESS_FROM_MODULE},
+           {"CALLER_PROVIDED", PerModuleOptions::CALLER_PROVIDED},
+           {"MANUAL", PerModuleOptions::MANUAL},
+           {"CALLER_PROVIDED_COPROCESSOR",
+            PerModuleOptions::CALLER_PROVIDED_COPROCESSOR},
+           {"CALLER_PROVIDED_UDFP", PerModuleOptions::CALLER_PROVIDED_UDFP},
+           {"CALLER_PROVIDED_INPROCESS",
+            PerModuleOptions::CALLER_PROVIDED_INPROCESS},
+           {"caller_provided_coprocessor",
+            PerModuleOptions::CALLER_PROVIDED_COPROCESSOR},
+           {"caller_provided_udfp", PerModuleOptions::CALLER_PROVIDED_UDFP},
+           {"caller_provided_inprocess",
+            PerModuleOptions::CALLER_PROVIDED_INPROCESS},
+       }) {
+    GOOGLESQL_ASSERT_OK_AND_ASSIGN(ModuleDetails module_details,
+                         BuildModuleDetailsFromStatement(absl::Substitute(
+                             R"(
+              MODULE a.b OPTIONS (
+                stub_module_type = 'udf_server_catalog',
+                udf_server_address = 'dummy_address',
+                udf_namespace = 'dummy_namespace',
+                udf_server_import_mode = '$0',
+                udf_scaling_factor = 2.5))",
+                             mode_str)));
+    ASSERT_TRUE(module_details.udf_server_options().has_value());
+    EXPECT_EQ(module_details.udf_server_options()->udf_server_import_mode(),
+              mode_enum);
+  }
 }
 
 TEST_F(ModuleDetailsTest, GlobalOptionsOverrideUDFModules) {

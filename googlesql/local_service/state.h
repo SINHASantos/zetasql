@@ -116,9 +116,8 @@ class SharedStatePool {
   int64_t next_id_ ABSL_GUARDED_BY(mutex_);
   std::map<int64_t, std::shared_ptr<T>> saved_states_ ABSL_GUARDED_BY(mutex_);
 
-  static_assert(
-      std::is_base_of<GenericState, T>::value,
-      "SharedStatePool only works with subclass of GenericState");
+  static_assert(std::is_base_of_v<GenericState, T>,
+                "SharedStatePool only works with subclass of GenericState");
 };
 
 // Base class of saved states with an int64 id.

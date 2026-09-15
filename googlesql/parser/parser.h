@@ -27,11 +27,11 @@
 #include "googlesql/common/errors.h"
 #include "googlesql/common/warning_sink.h"
 #include "googlesql/parser/ast_node_kind.h"  
-#include "googlesql/parser/macros/macro_catalog.h"
 #include "googlesql/parser/parse_tree.h"
 #include "googlesql/parser/parser_mode.h"
 #include "googlesql/parser/parser_runtime_info.h"
 #include "googlesql/parser/statement_properties.h"
+#include "googlesql/public/catalog.h"
 #include "googlesql/public/error_helpers.h"
 #include "googlesql/public/language_options.h"
 #include "googlesql/public/options.pb.h"
@@ -61,18 +61,17 @@ class ParserOptions {
   ABSL_DEPRECATED("Use the constructor overload that accepts LanguageOptions.")
   ParserOptions();
 
-  ParserOptions(
-      std::shared_ptr<IdStringPool> id_string_pool,
-      std::shared_ptr<googlesql_base::UnsafeArena> arena, LanguageOptions language_options,
-      ErrorMessageOptions error_message_options,
-      parser::MacroExpansionMode macro_expansion_mode,
-      const parser::macros::MacroCatalog* /*absl_nullable*/ macro_catalog);
+  ParserOptions(std::shared_ptr<IdStringPool> id_string_pool,
+                std::shared_ptr<googlesql_base::UnsafeArena> arena,
+                LanguageOptions language_options,
+                ErrorMessageOptions error_message_options,
+                parser::MacroExpansionMode macro_expansion_mode,
+                Catalog* /*absl_nullable*/ catalog = nullptr);
 
-  explicit ParserOptions(
-      LanguageOptions language_options,
-      parser::MacroExpansionMode macro_expansion_mode =
-          parser::MacroExpansionMode::kNone,
-      const parser::macros::MacroCatalog* macro_catalog = nullptr);
+  explicit ParserOptions(LanguageOptions language_options,
+                         parser::MacroExpansionMode macro_expansion_mode =
+                             parser::MacroExpansionMode::kNone,
+                         Catalog* catalog = nullptr);
 
   // This will make a _copy_ of language_options. It is not referenced after
   // construction.
@@ -89,7 +88,7 @@ class ParserOptions {
                 LanguageOptions language_options = {},
                 parser::MacroExpansionMode macro_expansion_mode =
                     parser::MacroExpansionMode::kNone,
-                const parser::macros::MacroCatalog* macro_catalog = nullptr);
+                Catalog* catalog = nullptr);
 
   ~ParserOptions();
 
@@ -134,9 +133,7 @@ class ParserOptions {
     return error_message_options_;
   }
 
-  const parser::macros::MacroCatalog* macro_catalog() const {
-    return macro_catalog_;
-  }
+  Catalog* catalog() const { return catalog_; }
 
   parser::MacroExpansionMode macro_expansion_mode() const {
     return macro_expansion_mode_;
@@ -153,7 +150,7 @@ class ParserOptions {
 
   LanguageOptions language_options_;
   parser::MacroExpansionMode macro_expansion_mode_;
-  const parser::macros::MacroCatalog* macro_catalog_ = nullptr;
+  Catalog* catalog_ = nullptr;
   ErrorMessageOptions error_message_options_;
 };
 
@@ -358,17 +355,17 @@ std::string Unparse(const ASTNode* root);
 // returns -1.
 // <*statement_is_ctas> will be set to true iff the query is CREATE
 // TABLE AS SELECT or CREATE LIVE TABLE AS SELECT, and false otherwise.
-ASTNodeKind ParseStatementKind(
-    absl::string_view input, const LanguageOptions& language_options,
-    parser::MacroExpansionMode macro_expansion_mode,
-    const parser::macros::MacroCatalog* macro_catalog, bool* statement_is_ctas);
+ASTNodeKind ParseStatementKind(absl::string_view input,
+                               const LanguageOptions& language_options,
+                               parser::MacroExpansionMode macro_expansion_mode,
+                               Catalog* catalog, bool* statement_is_ctas);
 
 inline ASTNodeKind ParseStatementKind(absl::string_view input,
                                       const LanguageOptions& language_options,
                                       bool* statement_is_ctas) {
   return ParseStatementKind(input, language_options,
                             parser::MacroExpansionMode::kNone,
-                            /*macro_catalog=*/nullptr, statement_is_ctas);
+                            /*catalog=*/nullptr, statement_is_ctas);
 }
 
 // Similar to ParseStatementKind, but determines the statement kind for the next
@@ -381,16 +378,15 @@ inline ASTNodeKind ParseStatementKind(absl::string_view input,
 ASTNodeKind ParseNextStatementKind(
     const ParseResumeLocation& resume_location,
     const LanguageOptions& language_options,
-    parser::MacroExpansionMode macro_expansion_mode,
-    const parser::macros::MacroCatalog* macro_catalog,
+    parser::MacroExpansionMode macro_expansion_mode, Catalog* catalog,
     bool* next_statement_is_ctas);
 
 inline ASTNodeKind ParseNextStatementKind(
     const ParseResumeLocation& resume_location,
     const LanguageOptions& language_options, bool* next_statement_is_ctas) {
-  return ParseNextStatementKind(
-      resume_location, language_options, parser::MacroExpansionMode::kNone,
-      /*macro_catalog=*/nullptr, next_statement_is_ctas);
+  return ParseNextStatementKind(resume_location, language_options,
+                                parser::MacroExpansionMode::kNone,
+                                /*catalog=*/nullptr, next_statement_is_ctas);
 }
 
 // Parse the first few keywords from <resume_location> (ignoring whitespace

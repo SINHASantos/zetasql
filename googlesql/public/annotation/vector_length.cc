@@ -20,11 +20,12 @@
 #include <optional>
 #include <vector>
 
-#include "googlesql/common/errors.h"
 #include "googlesql/public/annotation/default_annotation_spec.h"
 #include "googlesql/public/builtin_function.pb.h"
 #include "googlesql/public/constant.h"
+#include "googlesql/public/function.pb.h"
 #include "googlesql/public/parse_location.h"
+#include "googlesql/public/types/annotation.h"
 #include "googlesql/public/types/simple_value.h"
 #include "googlesql/public/types/type.h"
 #include "googlesql/public/types/type_parameters.h"
@@ -107,7 +108,61 @@ absl::StatusOr<std::optional<int64_t>> GetVectorLengthFromAnnotationMap(
   return in_length->int64_value();
 }
 
+// Applies kUnconstrained (-1) to any unannotated VECTOR slots in the annotation
+// map.
+absl::Status ApplyUnconstrainedVectorLength(const Type* type,
+                                            AnnotationMap* annotation_map) {
+  if (annotation_map == nullptr) {
+    return absl::OkStatus();
+  }
+  if (IsVectorType(type)) {
+    GOOGLESQL_RET_CHECK(type->ComponentTypes().empty());
+    if (!annotation_map->Has<VectorLengthAnnotation>()) {
+      annotation_map->SetAnnotation<VectorLengthAnnotation>(
+          SimpleValue::Int64(VectorLengthAnnotation::kUnconstrained));
+    }
+    return absl::OkStatus();
+  }
+
+  std::vector<const Type*> component_types = type->ComponentTypes();
+  if (component_types.empty()) {
+    return absl::OkStatus();
+  }
+
+  GOOGLESQL_RET_CHECK(annotation_map->IsStructMap());
+  StructAnnotationMap* struct_annotation_map = annotation_map->AsStructMap();
+  GOOGLESQL_RET_CHECK_EQ(struct_annotation_map->num_fields(), component_types.size());
+  for (int i = 0; i < component_types.size(); ++i) {
+    GOOGLESQL_RETURN_IF_ERROR(ApplyUnconstrainedVectorLength(
+        component_types[i], struct_annotation_map->mutable_field(i)));
+  }
+  return absl::OkStatus();
+}
+
 }  // namespace
+
+absl::StatusOr<std::optional<int64_t>>
+VectorLengthAnnotation::GetEffectiveLength(
+    const AnnotationMap* annotation_map) {
+  GOOGLESQL_ASSIGN_OR_RETURN(std::optional<int64_t> length,
+                   GetVectorLengthFromAnnotationMap(annotation_map));
+  if (!length.has_value() || *length <= 0) {
+    return std::nullopt;
+  }
+  return length;
+}
+
+absl::Status VectorLengthAnnotation::CheckAndPropagateForColumnRef(
+    const ResolvedColumnRef& column_ref, AnnotationMap* result_annotation_map) {
+  if (result_annotation_map == nullptr) {
+    return absl::OkStatus();
+  }
+
+  GOOGLESQL_RETURN_IF_ERROR(MergeAnnotations(column_ref.column().type_annotation_map(),
+                                   *result_annotation_map));
+  return ApplyUnconstrainedVectorLength(column_ref.column().type(),
+                                        result_annotation_map);
+}
 
 absl::Status VectorLengthAnnotation::PropagateFromTypeParameters(
     const Type* target_type, const TypeParameters& target_type_params,
@@ -143,7 +198,8 @@ absl::Status VectorLengthAnnotation::PropagateFromTypeParameters(
           SimpleValue::Int64(*target_length));
       return absl::OkStatus();
     }
-    if (input_length.has_value()) {
+    if (input_length.has_value() &&
+        (*input_length > 0 || *input_length == kUnconstrained)) {
       result_annotation_map.SetAnnotation<VectorLengthAnnotation>(
           SimpleValue::Int64(*input_length));
     }
@@ -190,8 +246,9 @@ absl::Status VectorLengthAnnotation::CheckAndPropagateForCast(
 absl::Status VectorLengthAnnotation::CheckAndPropagateForFunctionCallBase(
     const ResolvedFunctionCallBase& function_call,
     AnnotationMap* result_annotation_map) {
-  GOOGLESQL_RETURN_IF_ERROR(DefaultAnnotationSpec::CheckAndPropagateForFunctionCallBase(
-      function_call, result_annotation_map));
+  if (result_annotation_map == nullptr) {
+    return absl::OkStatus();
+  }
 
   if (function_call.function()->IsGoogleSQLBuiltin(FN_ENCODE_VECTOR)) {
     std::optional<int64_t> target_length;
@@ -221,27 +278,41 @@ absl::Status VectorLengthAnnotation::CheckAndPropagateForFunctionCallBase(
           SimpleValue::Int64(*array_length));
       return absl::OkStatus();
     }
+    result_annotation_map->SetAnnotation<VectorLengthAnnotation>(
+        SimpleValue::Int64(kUnconstrained));
+    return absl::OkStatus();
   }
-  return absl::OkStatus();
+
+  return DefaultAnnotationSpec::CheckAndPropagateForFunctionCallBase(
+      function_call, result_annotation_map);
 }
 
 absl::Status VectorLengthAnnotation::ScalarMergeIfCompatible(
     const AnnotationMap* in, AnnotationMap& out) const {
-  // Get the input and output vector length if they exist.
   GOOGLESQL_ASSIGN_OR_RETURN(std::optional<int64_t> in_length,
                    GetVectorLengthFromAnnotationMap(in));
-  GOOGLESQL_ASSIGN_OR_RETURN(std::optional<int64_t> out_length,
-                   GetVectorLengthFromAnnotationMap(&out));
-  if (!in_length.has_value() || !out_length.has_value()) {
-    out.UnsetAnnotation(VectorLengthAnnotation::GetId());
+  // If `in` is unannotated (nullptr, e.g. untyped null / empty container),
+  // it acts as identity and does not modify `out`.
+  if (!in_length.has_value()) {
     return absl::OkStatus();
   }
-  // Now if the annotation does not match, raise an error.
-  if (in_length.value() != out_length.value()) {
-    return MakeSqlError() << VectorLengthAnnotation::Name()
-                          << " conflict: " << in_length.value() << " vs. "
-                          << out_length.value();
+
+  GOOGLESQL_ASSIGN_OR_RETURN(std::optional<int64_t> out_length,
+                   GetVectorLengthFromAnnotationMap(&out));
+  // If `out` was unannotated, adopt `in`.
+  if (!out_length.has_value()) {
+    out.SetAnnotation<VectorLengthAnnotation>(SimpleValue::Int64(*in_length));
+    return absl::OkStatus();
   }
+
+  // Both have values. If lengths differ (e.g. 10 vs 20), or if either is
+  // kUnconstrained (-1 vs 10), transition to kUnconstrained.
+  // Note: if both are already kUnconstrained (-1 == -1), out remains -1.
+  if (*in_length != *out_length) {
+    out.SetAnnotation<VectorLengthAnnotation>(
+        SimpleValue::Int64(kUnconstrained));
+  }
+
   return absl::OkStatus();
 }
 

@@ -3048,9 +3048,13 @@ BuildTimestampColumnExpression(const ResolvedTimestampColumnPath& path,
       current_expr = MakeResolvedGetStructField(
           step.type, std::move(current_expr), step.struct_field_index);
     } else if (step.kind == TypeFieldPathStep::PROTO_FIELD) {
+      const Type* step_type = nullptr;
+      GOOGLESQL_RETURN_IF_ERROR(fn_builder.type_factory().GetProtoFieldType(
+          step.proto_field_descriptor,
+          /*catalog_name_path=*/absl::Span<const std::string>(), &step_type));
       current_expr = MakeResolvedGetProtoField(
-          step.type, std::move(current_expr), step.proto_field_descriptor,
-          /*default_value=*/Value::Null(step.type),
+          step_type, std::move(current_expr), step.proto_field_descriptor,
+          /*default_value=*/Value::Null(step_type),
           /*get_has_bit=*/false,
           /*format=*/
           ProtoType::GetFormatAnnotation(step.proto_field_descriptor),

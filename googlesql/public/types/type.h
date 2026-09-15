@@ -329,6 +329,9 @@ class Type {
     if (IsColumnListSpec()) {
       return false;
     }
+    if (IsVariant()) {
+      return false;
+    }
     return true;
   }
 

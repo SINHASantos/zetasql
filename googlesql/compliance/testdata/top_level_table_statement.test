@@ -26,6 +26,22 @@ AS (
 );
 ==
 
+
+[prepare_database]
+CREATE TABLE value_table AS
+  SELECT AS VALUE STRUCT(1 AS a, 2 AS b);
+--
+
+ARRAY<STRUCT<a INT64, b INT64>>[{1, 2}]
+==
+
+[prepare_database]
+CREATE TABLE FUNCTION tvf_scalar(x INT64)
+AS (
+  SELECT x AS col1, x*2 AS col2
+);
+==
+
 [name=top_level_table_statement]
 TABLE t1;
 --
@@ -66,4 +82,32 @@ ARRAY<STRUCT<key INT64, value STRING>>[known order:
   {1, "Hello"},
   {2, "World"}
 ]
+==
 
+[required_features=TOP_LEVEL_TABLE_STATEMENTS]
+[name=top_level_table_statement_with_cte]
+WITH cte AS (SELECT 1 AS x, 2 AS y) TABLE cte;
+--
+ARRAY<STRUCT<x INT64, y INT64>>[{1, 2}]
+==
+
+[name=top_level_table_statement_value_table]
+TABLE value_table;
+--
+ARRAY<STRUCT<a INT64, b INT64>>[{1, 2}]
+==
+
+[required_features=TABLE_VALUED_FUNCTIONS,TOP_LEVEL_TABLE_STATEMENTS]
+[name=top_level_table_statement_tvf_scalar]
+TABLE tvf_scalar(5);
+--
+
+ARRAY<STRUCT<col1 INT64, col2 INT64>>[{5, 10}]
+==
+
+[required_features=TABLE_VALUED_FUNCTIONS,TOP_LEVEL_TABLE_STATEMENTS]
+[name=top_level_table_statement_tvf_cte_arg]
+WITH cte AS (SELECT 1 AS key, "Hello" AS value)
+TABLE tvf(TABLE cte);
+--
+ARRAY<STRUCT<key INT64, value STRING>>[{1, "Hello"}]

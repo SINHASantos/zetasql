@@ -121,7 +121,7 @@ message LanguageFeatureOptions {
 //
 // It's deprecated to use an enum ID which corresponds to a version. All new
 // enum names should use the next available ID starting from 0.
-// Next ID: 185
+// Next ID: 187
 enum LanguageFeature {
   reserved 3 to 4, 36 to 39, 44 to 46, 48, 54, 55, 74, 99, 107, 108, 110, 124,
       132, 134, 140, 163, 13003, 13046, 14001, 14012, 14022, 14024, 14040,
@@ -930,8 +930,7 @@ enum LanguageFeature {
 
   // Enable top-level TABLE statements.
   // See (broken link).
-  FEATURE_TOP_LEVEL_TABLE_STATEMENTS = 152
-      [(language_feature_options).in_development = true];
+  FEATURE_TOP_LEVEL_TABLE_STATEMENTS = 152;
 
   // Enable ALTER TABLE ADD COLUMN with expression generated columns.
   // See (broken link).
@@ -1589,6 +1588,15 @@ enum LanguageFeature {
     (language_feature_options).in_development = true
   ];
 
+  // Enables terminal DML DELETE on graph queries.
+  // See (broken link):dml-delete.
+  // REQUIRES: SQL_GRAPH feature to be enabled.
+  FEATURE_SQL_GRAPH_TERMINAL_DELETE = 186 [
+    (language_feature_options).language_version = VERSION_1_5,
+    // TODO: Remove in_development once implementation is complete.
+    (language_feature_options).in_development = true
+  ];
+
   // Enable support for remote models (e.g. CREATE MODEL ... REMOTE ...)
   // (broken link)
   FEATURE_REMOTE_MODEL = 14009
@@ -2157,10 +2165,8 @@ enum LanguageFeature {
 
   // Enable JAROWINKLER_SIMILARITY(STRING, STRING) and
   // JAROWINKLER_SIMILARITY(BYTES, BYTES) signatures.
-  FEATURE_ENABLE_JAROWINKLER_SIMILARITY = 14136 [
-    (language_feature_options).language_version = VERSION_1_5,
-    (language_feature_options).in_development = true
-  ];
+  FEATURE_ENABLE_JAROWINKLER_SIMILARITY = 14136
+      [(language_feature_options).language_version = VERSION_1_5];
 
   // Enables general quantified comparisons like =ANY, >ALL, etc.
   // See (broken link) for more details.
@@ -2247,6 +2253,15 @@ enum LanguageFeature {
 
   // Enables NULLIF(a, lambda) overload.
   FEATURE_NULLIF_WITH_LAMBDA = 182 [
+    (language_feature_options).language_version = VERSION_1_5,
+    (language_feature_options).in_development = true
+  ];
+
+  // Enables DELETE statement with USING clause (delete with join).
+  // See (broken link)
+  // TODO: b/542615303 - Remove in_development = true when the feature
+  // implementation is complete and fully tested across engines.
+  FEATURE_DML_DELETE_WITH_JOIN = 185 [
     (language_feature_options).language_version = VERSION_1_5,
     (language_feature_options).in_development = true
   ];

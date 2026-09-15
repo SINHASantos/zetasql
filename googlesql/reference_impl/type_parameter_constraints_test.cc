@@ -599,13 +599,14 @@ TEST(TypeParametersTest, NonVectorDeclarativeTypeWithParametersFails) {
           [](const TypeParameters&, ProductMode) -> absl::Status {
             return absl::OkStatus();
           }));
-  GOOGLESQL_ASSERT_OK_AND_ASSIGN(const Type* custom_type,
-                       type_factory.MakeDeclarativeType(
-                           DeclarativeTypeDescriptor()
-                               .set_type_id(TypeId{"test_ns", "MyCustomType"})
-                               .set_display_name("MyCustomType")
-                               .set_backing_type(type_factory.get_string())
-                               .set_type_params_strategy(handlers)));
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(
+      const Type* custom_type,
+      type_factory.MakeDeclarativeType(
+          DeclarativeTypeDescriptor()
+              .set_type_id(DeclarativeTypeId{"test_ns", "MyCustomType"})
+              .set_display_name("MyCustomType")
+              .set_backing_type(type_factory.get_string())
+              .set_type_params_strategy(handlers)));
   GOOGLESQL_ASSERT_OK_AND_ASSIGN(Value custom_val,
                        Value::Declarative(custom_type->AsDeclarativeType(),
                                           Value::String("foo")));

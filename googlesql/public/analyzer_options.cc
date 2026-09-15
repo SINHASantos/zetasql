@@ -768,7 +768,7 @@ ParserOptions AnalyzerOptions::GetParserOptions() const {
   return ParserOptions(id_string_pool(), arena(), data_->language_options,
                        error_message_options(),
                        parser::MacroExpansionMode::kNone,
-                       /*macro_catalog=*/nullptr);
+                       /*catalog=*/nullptr);
 }
 
 void AnalyzerOptions::enable_rewrite(ResolvedASTRewrite rewrite, bool enable) {

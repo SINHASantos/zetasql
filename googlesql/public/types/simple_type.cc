@@ -608,7 +608,7 @@ bool SimpleType::SupportsGroupingImpl(const LanguageOptions& language_options,
                                       const Type** no_grouping_type) const {
   const bool supports_grouping =
       !this->IsGeography() && !this->IsTokenList() &&
-      !this->IsColumnListSpec() &&
+      !this->IsColumnListSpec() && !this->IsVariant() &&
       !(this->IsJson() &&
         !language_options.LanguageFeatureEnabled(FEATURE_JSON_TYPE_COMPARISON));
   if (no_grouping_type != nullptr) {

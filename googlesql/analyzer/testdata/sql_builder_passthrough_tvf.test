@@ -178,7 +178,8 @@ FROM
             SELECT
               TableWithTimestampColumn.ts_col AS a_1
             FROM
-              TableWithTimestampColumn
+              (TABLE TableWithTimestampColumn
+              )
           ) AS tablewithtimestampcolumn_2
         |> AS tvfpassthroughalias_3
         |> CALL PASSTHROUGHDROPEXTENDTVF("a", "a")
@@ -197,7 +198,8 @@ FROM
             SELECT
               TableWithTimestampColumn.ts_col AS a_7
             FROM
-              TableWithTimestampColumn
+              (TABLE TableWithTimestampColumn
+              )
           ) AS tablewithtimestampcolumn_8
         |> AS tvfpassthroughalias_9
         |> CALL PASSTHROUGHTVF()

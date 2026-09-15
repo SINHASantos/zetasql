@@ -79,15 +79,26 @@ class DeclarativeTypeCallbacksRegistry {
       absl::StatusOr<std::optional<TypeParameterHandlers>> (*)(
           const DeclarativeTypeId&);
 
+  using GetEngineCustomFormattingCallback = absl::StatusOr<
+      std::optional<DeclarativeTypeDescriptor::FormattingCustom::Callback>> (*)(
+      const DeclarativeTypeId&);
+
   constexpr explicit DeclarativeTypeCallbacksRegistry(
-      GetEngineTypeParameterHandlers get_engine_handlers = nullptr)
-      : get_engine_handlers_(get_engine_handlers) {}
+      GetEngineTypeParameterHandlers get_engine_handlers = nullptr,
+      GetEngineCustomFormattingCallback get_engine_formatting = nullptr)
+      : get_engine_handlers_(get_engine_handlers),
+        get_engine_formatting_(get_engine_formatting) {}
 
   absl::StatusOr<std::optional<TypeParameterHandlers>> GetTypeParameterHandlers(
       const DeclarativeTypeId& type_id) const;
 
+  absl::StatusOr<
+      std::optional<DeclarativeTypeDescriptor::FormattingCustom::Callback>>
+  GetCustomFormattingCallback(const DeclarativeTypeId& type_id) const;
+
  private:
   GetEngineTypeParameterHandlers get_engine_handlers_;
+  GetEngineCustomFormattingCallback get_engine_formatting_;
 };
 
 // TypeDeserializer is responsible for deserialization of GoogleSQL built-in

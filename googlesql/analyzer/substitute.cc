@@ -279,6 +279,7 @@ class VariableReplacementInserter : public ResolvedASTDeepCopyVisitor {
       added_column_id_set.emplace(ref->column().column_id());
     }
 
+    std::vector<std::unique_ptr<const ResolvedColumnRef>> lambda_refs;
     for (const auto& id_and_column : column_refs_stack_.back()) {
       if (!added_column_id_set.insert(id_and_column.first).second) {
         continue;
@@ -288,7 +289,14 @@ class VariableReplacementInserter : public ResolvedASTDeepCopyVisitor {
       if (!InOutermostSubquery()) {
         copy->set_is_correlated(true);
       }
-      node->add_parameter_list(std::move(copy));
+      lambda_refs.push_back(std::move(copy));
+    }
+
+    // Sort lambda column references to ensure deterministic parameter list
+    // ordering.
+    SortUniqueColumnRefs(lambda_refs);
+    for (auto& ref : lambda_refs) {
+      node->add_parameter_list(std::move(ref));
     }
     return absl::OkStatus();
   }

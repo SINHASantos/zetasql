@@ -56,6 +56,7 @@
 #include "googlesql/public/evaluator_table_iterator.h"
 #include "googlesql/public/function_signature.h"
 #include "googlesql/public/functions/match_recognize/compiled_pattern.h"
+#include "googlesql/public/interval_value.h"
 #include "googlesql/public/json_value.h"
 #include "googlesql/public/property_graph.h"
 #include "googlesql/public/table_valued_function.h"
@@ -117,6 +118,35 @@ struct CollatorInfo {
 struct CollatorPtrInfo {
   const GoogleSqlCollator* collator = nullptr;
   const Type* collation_key_type = nullptr;
+};
+
+// When array values without known orders are used as grouping keys, we can't
+// know if two rows that have arrays with the same bag of values will group
+// together (by that key) or not. The query is non-deterministic. Tracking
+// collisions of bags of values is expensive. Tracking that within nested
+// values (structs with arrays etc) is super expensive. On the other end of the
+// spectrum, setting the non-determinism signal the first time we see an
+// unordered array as a group by key disqualifies a lot of useful queries.
+//
+// This data structure is helping us find an inexpensive -- somewhat arbitrary
+// -- middle ground. For each grouping key, we find all of the array values
+// in the nested value. If there is even a collision where an array without
+// known order co-exists in the same column as any other array (known or
+// unknown order) that has the same length, then we will set the
+// non-determinism signal.
+struct UnorderedArrayCollisionTracker {
+  struct PerArrayLengthData {
+    int total_examples_seen = 0;
+    bool unordered_example_seen = false;
+  };
+  using PerKeyData =
+      absl::flat_hash_map</*array_length*/ int, PerArrayLengthData>;
+  absl::flat_hash_map</*key_index*/ int, PerKeyData> tracking;
+
+  // Finds all the arrays nested in the value and records presence of those
+  // array lengths and whether they are associated with an unordered array.
+  absl::StatusOr<bool> CouldIndicateNondetermisticGrouping(int key_index,
+                                                           const Value& value);
 };
 
 // Abstract base class for operator arguments. The implementation is designed to
@@ -999,6 +1029,51 @@ class WithinBoundExprArg final : public AlgebraArg {
   absl::Status SetSchemasForEvaluation(
       absl::Span<const TupleSchema* const> params_schemas);
 
+  // Returns true if this bound is absolute (UNBOUNDED_PRECEDING,
+  // UNBOUNDED_FOLLOWING, or TIMESTAMP) and independent of an anchor timestamp.
+  bool IsAbsolute() const;
+
+  // Returns true if this bound is relative to an anchor timestamp
+  // (ANCHOR TIMESTAMP, INTERVAL PRECEDING/FOLLOWING, PERIOD
+  // PRECEDING/FOLLOWING).
+  bool IsRelative() const;
+
+  // Evaluates an absolute WITHIN boundary expression (UNBOUNDED_PRECEDING,
+  // UNBOUNDED_FOLLOWING, or TIMESTAMP) to an absolute timestamp without
+  // requiring an anchor timestamp or period. Returns an error if called on a
+  // relative bound kind.
+  absl::StatusOr<absl::Time> EvalAbsolute(
+      absl::Span<const TupleData* const> params,
+      EvaluationContext* context) const;
+
+  // Evaluates a relative WITHIN boundary expression (ANCHOR_TIMESTAMP,
+  // INTERVAL_PRECEDING/FOLLOWING, or PERIOD_PRECEDING/FOLLOWING) representing
+  // the offset relative to an anchor timestamp, returning a signed
+  // IntervalValue. Returns IntervalValue() (zero interval) for non-offset bound
+  // kinds.
+  absl::StatusOr<IntervalValue> EvalOffset(
+      const IntervalValue& period, absl::Span<const TupleData* const> params,
+      EvaluationContext* context) const;
+
+  // Evaluates a relative WITHIN boundary expression (ANCHOR_TIMESTAMP,
+  // INTERVAL_PRECEDING/FOLLOWING, or PERIOD_PRECEDING/FOLLOWING) relative to
+  // `anchor_timestamp`. For ANCHOR_TIMESTAMP, returns `anchor_timestamp`.
+  // For INTERVAL and PERIOD PRECEDING/FOLLOWING bounds, calls EvalOffset() and
+  // adds the resulting IntervalValue to `anchor_timestamp`. Returns an error if
+  // called on an absolute bound kind.
+  absl::StatusOr<absl::Time> EvalRelative(
+      absl::Time anchor_timestamp, const IntervalValue& period,
+      absl::Span<const TupleData* const> params,
+      EvaluationContext* context) const;
+
+  // Evaluates a WITHIN bound kind (absolute or relative) to an absl::Time,
+  // delegating to EvalAbsolute() for absolute bounds and EvalRelative() for
+  // relative bounds.
+  absl::StatusOr<absl::Time> Eval(absl::Time anchor_timestamp,
+                                  const IntervalValue& period,
+                                  absl::Span<const TupleData* const> params,
+                                  EvaluationContext* context) const;
+
  private:
   WithinBoundExprArg(ResolvedWithinBoundExpr::BoundKind bound_kind,
                      std::unique_ptr<ValueExpr> expr);
@@ -1037,7 +1112,7 @@ class WithinBoundsArg final : public AlgebraArg {
 // TODO: Use AggregateEstimatorArg here with EstimatorArg as the
 // base class.
 // Argument class representing an estimator function call in ALIGN operator,
-// e.g. `AVG(col) WITHIN (1 PERIOD PRECEDING)` . It wraps the aggregate argument
+// e.g. `AVG(col) WITHIN (1 PERIOD PRECEDING)`. It wraps the aggregate argument
 // and the bounds (WITHIN clause) that define the evaluation window.
 class EstimatorArg final : public ExprArg {
  public:
@@ -1052,7 +1127,8 @@ class EstimatorArg final : public ExprArg {
 
   absl::Status SetSchemasForEvaluation(
       const TupleSchema& input_schema,
-      absl::Span<const TupleSchema* const> params_schemas);
+      absl::Span<const TupleSchema* const> params_schemas,
+      const TupleSchema& aligned_timestamp_schema);
 
   std::string DebugInternal(const std::string& indent,
                             bool verbose) const override;

@@ -19,9 +19,12 @@
 
 #include <cstdint>
 #include <memory>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
+#include "googlesql/base/arena.h"
+#include "googlesql/base/arena_allocator.h"
 #include "googlesql/parser/tm_token.h"
 #include "googlesql/public/error_location.pb.h"
 #include "googlesql/public/parse_location.h"
@@ -123,36 +126,44 @@ struct StackFrame {
     return this->LocationRangeWithoutStartOffset().GetTextFrom(input_text);
   }
 
-  // A factory for creating stack frames.
-  // All stack frames allocation will be done through this factory.
-  // This will help in controlling the maximum number of stack frames that can
-  // be created.
+  // A factory for allocating stack frames on an `UnsafeArena` and enforcing
+  // the maximum number of stack frames that can be created.
   class StackFrameFactory {
    public:
-    StackFrameFactory() = default;
-    explicit StackFrameFactory(
-        int64_t max_number_of_stack_frames,
-        std::vector<std::unique_ptr<StackFrame>>& stack_frames)
-        : max_number_of_stack_frames_(max_number_of_stack_frames),
-          stack_frames_(stack_frames) {}
+    explicit StackFrameFactory(googlesql_base::UnsafeArena* /*absl_nonnull*/ arena)
+        : arena_(arena) {
+      static_assert(
+          std::is_trivially_destructible_v<StackFrame>,
+          "StackFrame must be trivially destructible to be allocated in arena "
+          "without calling its destructor.");
+    }
+
+    explicit StackFrameFactory(googlesql_base::UnsafeArena* /*absl_nonnull*/ arena,
+                               int64_t max_number_of_stack_frames)
+        : StackFrameFactory(arena) {
+      max_number_of_stack_frames_ = max_number_of_stack_frames;
+    }
 
     // StackFrameFactory is neither copyable nor movable.
     StackFrameFactory(const StackFrameFactory&) = delete;
     StackFrameFactory& operator=(const StackFrameFactory&) = delete;
 
+    googlesql_base::UnsafeArena* /*absl_nonnull*/ arena() const { return arena_; }
+
     absl::StatusOr<StackFrame* /*absl_nonnull*/> AllocateStackFrame() {
-      if (stack_frames_.size() >= max_number_of_stack_frames_) {
+      if (num_allocated_stack_frames_ >= max_number_of_stack_frames_) {
         return absl::InternalError(absl::StrCat(
             "Too many stack frames are created, probably due to an ",
             "exponential macro definition. Current size of stack frames in ",
-            "bytes: ", stack_frames_.size() * sizeof(StackFrame)));
+            "bytes: ", num_allocated_stack_frames_ * sizeof(StackFrame)));
       }
-      return stack_frames_.emplace_back(std::make_unique<StackFrame>()).get();
+      ++num_allocated_stack_frames_;
+      return googlesql_base::NewInArena<StackFrame>(arena_);
     }
 
-    // Creates and initializes a new `StackFrame` for given parameters on the
-    // stack_frames_ vector. Returns error if the maximum number of stack frames
-    // has been reached.
+    // Creates and initializes a new `StackFrame` for given parameters in the
+    // arena. Returns error if the maximum number of stack frames has been
+    // reached.
     absl::StatusOr<StackFrame* /*absl_nonnull*/> MakeStackFrame(
         absl::string_view frame_name, StackFrame::FrameType frame_type,
         ParseLocationRange location, absl::string_view input_text,
@@ -174,18 +185,17 @@ struct StackFrame {
     }
 
    private:
+    // Arena used to allocate stack frames.
+    googlesql_base::UnsafeArena* /*absl_nonnull*/ arena_;
+
     // The maximum number of stack frames allowed.
     // This is a safeguard for OOMs, which can occur if exponential stack
     // frames are created.
     int64_t max_number_of_stack_frames_ =
         (1024 * 1024 * 1024) / sizeof(StackFrame);
 
-    // Used to maintain the ownership of the allocated stack frames.
-    // All newly allocated stack frames owned by this vector. This will help to
-    // avoid memory leaks.
-    std::vector<std::unique_ptr<StackFrame>> owned_stack_frames_;
-    std::vector<std::unique_ptr<StackFrame>>& stack_frames_ =
-        owned_stack_frames_;
+    // Total number of stack frames allocated by this factory.
+    int64_t num_allocated_stack_frames_ = 0;
   };
 };
 

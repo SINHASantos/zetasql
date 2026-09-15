@@ -565,10 +565,570 @@ DeleteStmt
     +-Literal(type=INT64, value=1)
 ==
 
-# TODO: DELETE with USING clause is not supported yet in parser CL
-DELETE SimpleTypes USING KeyValue WHERE true
+# Basic DELETE with USING single table and show_sqlbuilder_output
+[show_sqlbuilder_output]
+[language_features={{MAXIMUM|MAXIMUM,+DML_DELETE_WITH_JOIN}}]
+DELETE SimpleTypes USING KeyValue WHERE SimpleTypes.int64 = KeyValue.Key
+--
+ALTERNATION GROUP: MAXIMUM
 --
 ERROR: DELETE with USING clause is not supported [at 1:20]
-DELETE SimpleTypes USING KeyValue WHERE true
+DELETE SimpleTypes USING KeyValue WHERE SimpleTypes.int64 = KeyValue.Key
                    ^
+--
+ALTERNATION GROUP: MAXIMUM,+DML_DELETE_WITH_JOIN
+--
+DeleteStmt
++-table_scan=
+| +-TableScan(column_list=[SimpleTypes.int64#2], table=SimpleTypes, column_index_list=[1])
++-column_access_list=READ
++-where_expr=
+| +-FunctionCall(GoogleSQL:$equal(INT64, INT64) -> BOOL)
+|   +-ColumnRef(type=INT64, column=SimpleTypes.int64#2)
+|   +-ColumnRef(type=INT64, column=KeyValue.Key#20)
++-using_scan=
+  +-TableScan(column_list=[KeyValue.Key#20], table=KeyValue, column_index_list=[0])
 
+[SQLBUILDER_TARGET_SYNTAX_MODE standard]
+[SQLBUILDER_OUTPUT]
+DELETE SimpleTypes AS simpletypes_1
+USING
+  KeyValue
+WHERE
+  (simpletypes_1.int64) = (KeyValue.Key);
+
+[SQLBUILDER_TARGET_SYNTAX_MODE pipe]
+[SQLBUILDER_OUTPUT]
+DELETE SimpleTypes AS simpletypes_1
+USING
+  (
+    FROM
+      KeyValue
+    |> SELECT
+         KeyValue.Key AS a_2
+    |> AS keyvalue_3
+  )
+WHERE
+  (simpletypes_1.int64) = (keyvalue_3.a_2);
+==
+
+# DELETE with USING with table aliases
+[language_features=MAXIMUM,+DML_DELETE_WITH_JOIN]
+[show_sqlbuilder_output]
+DELETE SimpleTypes AS target USING KeyValue AS source WHERE target.int64 = source.Key
+--
+DeleteStmt
++-table_scan=
+| +-TableScan(column_list=[SimpleTypes.int64#2], table=SimpleTypes, column_index_list=[1], alias="target")
++-column_access_list=READ
++-where_expr=
+| +-FunctionCall(GoogleSQL:$equal(INT64, INT64) -> BOOL)
+|   +-ColumnRef(type=INT64, column=SimpleTypes.int64#2)
+|   +-ColumnRef(type=INT64, column=KeyValue.Key#20)
++-using_scan=
+  +-TableScan(column_list=[KeyValue.Key#20], table=KeyValue, column_index_list=[0], alias="source")
+
+[SQLBUILDER_TARGET_SYNTAX_MODE standard]
+[SQLBUILDER_OUTPUT]
+DELETE SimpleTypes AS simpletypes_1
+USING
+  KeyValue
+WHERE
+  (simpletypes_1.int64) = (KeyValue.Key);
+
+[SQLBUILDER_TARGET_SYNTAX_MODE pipe]
+[SQLBUILDER_OUTPUT]
+DELETE SimpleTypes AS simpletypes_1
+USING
+  (
+    FROM
+      KeyValue
+    |> SELECT
+         KeyValue.Key AS a_2
+    |> AS keyvalue_3
+  )
+WHERE
+  (simpletypes_1.int64) = (keyvalue_3.a_2);
+==
+
+# DELETE with USING comma joins
+[language_features=MAXIMUM,+DML_DELETE_WITH_JOIN]
+[show_sqlbuilder_output]
+DELETE SimpleTypes USING KeyValue, ComplexTypes WHERE SimpleTypes.int64 = KeyValue.Key AND KeyValue.Key = ComplexTypes.key
+--
+DeleteStmt
++-table_scan=
+| +-TableScan(column_list=[SimpleTypes.int64#2], table=SimpleTypes, column_index_list=[1])
++-column_access_list=READ
++-where_expr=
+| +-FunctionCall(GoogleSQL:$and(BOOL, repeated(1) BOOL) -> BOOL)
+|   +-FunctionCall(GoogleSQL:$equal(INT64, INT64) -> BOOL)
+|   | +-ColumnRef(type=INT64, column=SimpleTypes.int64#2)
+|   | +-ColumnRef(type=INT64, column=KeyValue.Key#20)
+|   +-FunctionCall(GoogleSQL:$equal(INT64, INT64) -> BOOL)
+|     +-ColumnRef(type=INT64, column=KeyValue.Key#20)
+|     +-Cast(INT32 -> INT64)
+|       +-ColumnRef(type=INT32, column=ComplexTypes.key#22)
++-using_scan=
+  +-JoinScan
+    +-column_list=[KeyValue.Key#20, ComplexTypes.key#22]
+    +-left_scan=
+    | +-TableScan(column_list=[KeyValue.Key#20], table=KeyValue, column_index_list=[0])
+    +-right_scan=
+      +-TableScan(column_list=[ComplexTypes.key#22], table=ComplexTypes, column_index_list=[0])
+
+[SQLBUILDER_TARGET_SYNTAX_MODE standard]
+[SQLBUILDER_OUTPUT]
+DELETE SimpleTypes AS simpletypes_1
+USING
+  (
+    SELECT
+      KeyValue.Key AS a_2
+    FROM
+      KeyValue
+  ) AS keyvalue_3
+  CROSS JOIN
+  (
+    SELECT
+      ComplexTypes.key AS a_4
+    FROM
+      ComplexTypes
+  ) AS complextypes_5
+WHERE
+  ((simpletypes_1.int64) = (keyvalue_3.a_2)) AND ((keyvalue_3.a_2) = CAST(complextypes_5.a_4 AS INT64));
+
+[SQLBUILDER_TARGET_SYNTAX_MODE pipe]
+[SQLBUILDER_OUTPUT]
+DELETE SimpleTypes AS simpletypes_1
+USING
+  (
+    FROM
+      KeyValue
+    |> SELECT
+         KeyValue.Key AS a_2
+    |> AS keyvalue_3
+    |> CROSS JOIN
+       (
+         FROM
+           ComplexTypes
+         |> SELECT
+              ComplexTypes.key AS a_4
+         |> AS complextypes_5
+       )
+    |> SELECT
+         keyvalue_3.a_2 AS a_2,
+         complextypes_5.a_4 AS a_4
+    |> AS joinscan_6
+  )
+WHERE
+  ((simpletypes_1.int64) = (joinscan_6.a_2)) AND ((joinscan_6.a_2) = CAST(joinscan_6.a_4 AS INT64));
+==
+
+# DELETE with USING subquery
+[language_features=MAXIMUM,+DML_DELETE_WITH_JOIN]
+[show_sqlbuilder_output]
+DELETE SimpleTypes USING (SELECT 1 AS a) WHERE SimpleTypes.int64 = a
+--
+DeleteStmt
++-table_scan=
+| +-TableScan(column_list=[SimpleTypes.int64#2], table=SimpleTypes, column_index_list=[1])
++-column_access_list=READ
++-where_expr=
+| +-FunctionCall(GoogleSQL:$equal(INT64, INT64) -> BOOL)
+|   +-ColumnRef(type=INT64, column=SimpleTypes.int64#2)
+|   +-ColumnRef(type=INT64, column=$subquery1.a#20)
++-using_scan=
+  +-ProjectScan
+    +-column_list=[$subquery1.a#20]
+    +-expr_list=
+    | +-a#20 := Literal(type=INT64, value=1)
+    +-input_scan=
+      +-SingleRowScan
+
+[SQLBUILDER_TARGET_SYNTAX_MODE standard]
+[SQLBUILDER_OUTPUT]
+DELETE SimpleTypes AS simpletypes_1
+USING
+  (
+    SELECT
+      1 AS a_2
+  ) AS projectscan_3
+WHERE
+  (simpletypes_1.int64) = (projectscan_3.a_2);
+
+[SQLBUILDER_TARGET_SYNTAX_MODE pipe]
+[SQLBUILDER_OUTPUT]
+DELETE SimpleTypes AS simpletypes_1
+USING
+  (
+    SELECT
+      1 AS a_2
+    |> AS projectscan_3
+  )
+WHERE
+  (simpletypes_1.int64) = (projectscan_3.a_2);
+==
+
+# DELETE with USING JOIN ON and USING
+[language_features=MAXIMUM,+DML_DELETE_WITH_JOIN]
+DELETE SimpleTypes USING KeyValue JOIN ComplexTypes {{ON KeyValue.Key = ComplexTypes.key|USING (key)}} WHERE SimpleTypes.int64 = key
+--
+ALTERNATION GROUP: ON KeyValue.Key = ComplexTypes.key
+--
+ERROR: Column name key is ambiguous [at 1:114]
+...Key = ComplexTypes.key WHERE SimpleTypes.int64 = key
+                                                    ^
+--
+ALTERNATION GROUP: USING (key)
+--
+DeleteStmt
++-table_scan=
+| +-TableScan(column_list=[SimpleTypes.int64#2], table=SimpleTypes, column_index_list=[1])
++-column_access_list=READ
++-where_expr=
+| +-FunctionCall(GoogleSQL:$equal(INT64, INT64) -> BOOL)
+|   +-ColumnRef(type=INT64, column=SimpleTypes.int64#2)
+|   +-ColumnRef(type=INT64, column=KeyValue.Key#20)
++-using_scan=
+  +-JoinScan
+    +-column_list=[KeyValue.Key#20, ComplexTypes.key#22]
+    +-left_scan=
+    | +-TableScan(column_list=[KeyValue.Key#20], table=KeyValue, column_index_list=[0])
+    +-right_scan=
+    | +-TableScan(column_list=[ComplexTypes.key#22], table=ComplexTypes, column_index_list=[0])
+    +-join_expr=
+    | +-FunctionCall(GoogleSQL:$equal(INT64, INT64) -> BOOL)
+    |   +-ColumnRef(type=INT64, column=KeyValue.Key#20)
+    |   +-Cast(INT32 -> INT64)
+    |     +-ColumnRef(type=INT32, column=ComplexTypes.key#22)
+    +-has_using=TRUE
+==
+
+# DELETE with USING self-join
+[language_features=MAXIMUM,+DML_DELETE_WITH_JOIN]
+DELETE SimpleTypes AS t1 USING SimpleTypes AS t2 WHERE t1.int64 = t2.int64 AND t1.int32 < t2.int32
+--
+DeleteStmt
++-table_scan=
+| +-TableScan(column_list=SimpleTypes.[int32#1, int64#2], table=SimpleTypes, column_index_list=[0, 1], alias="t1")
++-column_access_list=READ,READ
++-where_expr=
+| +-FunctionCall(GoogleSQL:$and(BOOL, repeated(1) BOOL) -> BOOL)
+|   +-FunctionCall(GoogleSQL:$equal(INT64, INT64) -> BOOL)
+|   | +-ColumnRef(type=INT64, column=SimpleTypes.int64#2)
+|   | +-ColumnRef(type=INT64, column=SimpleTypes.int64#21)
+|   +-FunctionCall(GoogleSQL:$less(INT32, INT32) -> BOOL)
+|     +-ColumnRef(type=INT32, column=SimpleTypes.int32#1)
+|     +-ColumnRef(type=INT32, column=SimpleTypes.int32#20)
++-using_scan=
+  +-TableScan(column_list=SimpleTypes.[int32#20, int64#21], table=SimpleTypes, column_index_list=[0, 1], alias="t2")
+==
+
+# Error: Reusing target alias in USING clause
+[language_features=MAXIMUM,+DML_DELETE_WITH_JOIN]
+DELETE SimpleTypes AS t USING KeyValue AS t WHERE t.int64 = 1
+--
+ERROR: Alias t in the DELETE target cannot be used again in the USING clause [at 1:25]
+DELETE SimpleTypes AS t USING KeyValue AS t WHERE t.int64 = 1
+                        ^
+==
+
+# Error: Target table name without alias reused in USING
+[language_features=MAXIMUM,+DML_DELETE_WITH_JOIN]
+DELETE SimpleTypes USING SimpleTypes WHERE SimpleTypes.int64 = 1
+--
+ERROR: Alias SimpleTypes in the DELETE target cannot be used again in the USING clause [at 1:20]
+DELETE SimpleTypes USING SimpleTypes WHERE SimpleTypes.int64 = 1
+                   ^
+==
+
+# Error: Lateral access from USING to target table columns
+[language_features=MAXIMUM,+DML_DELETE_WITH_JOIN]
+DELETE SimpleTypes USING (SELECT int64) WHERE true
+--
+ERROR: Unrecognized name: int64 [at 1:34]
+DELETE SimpleTypes USING (SELECT int64) WHERE true
+                                 ^
+==
+
+# Error: RETURNING referencing USING clause columns
+[language_features=MAXIMUM,+DML_DELETE_WITH_JOIN,+DML_RETURNING]
+DELETE SimpleTypes USING KeyValue WHERE SimpleTypes.int64 = KeyValue.Key THEN RETURN KeyValue.Value
+--
+ERROR: Unrecognized name: KeyValue [at 1:86]
+...WHERE SimpleTypes.int64 = KeyValue.Key THEN RETURN KeyValue.Value
+                                                      ^
+==
+
+# Error: Ambiguous column name without qualification
+[language_features=MAXIMUM,+DML_DELETE_WITH_JOIN]
+DELETE KeyValue USING KeyValue2 WHERE Key = 1
+--
+ERROR: Column name Key is ambiguous [at 1:39]
+DELETE KeyValue USING KeyValue2 WHERE Key = 1
+                                      ^
+==
+
+# DELETE with USING and THEN RETURN
+[language_features=MAXIMUM,+DML_DELETE_WITH_JOIN,+DML_RETURNING]
+[show_sqlbuilder_output]
+DELETE SimpleTypes USING KeyValue WHERE SimpleTypes.int64 = KeyValue.Key THEN RETURN SimpleTypes.int64
+--
+DeleteStmt
++-table_scan=
+| +-TableScan(column_list=[SimpleTypes.int64#2], table=SimpleTypes, column_index_list=[1])
++-returning=
+| +-ReturningClause
+|   +-output_column_list=
+|     +-SimpleTypes.int64#2 AS int64 [INT64]
++-column_access_list=READ
++-where_expr=
+| +-FunctionCall(GoogleSQL:$equal(INT64, INT64) -> BOOL)
+|   +-ColumnRef(type=INT64, column=SimpleTypes.int64#2)
+|   +-ColumnRef(type=INT64, column=KeyValue.Key#20)
++-using_scan=
+  +-TableScan(column_list=[KeyValue.Key#20], table=KeyValue, column_index_list=[0])
+
+[SQLBUILDER_TARGET_SYNTAX_MODE standard]
+[SQLBUILDER_OUTPUT]
+DELETE SimpleTypes AS simpletypes_1
+USING
+  KeyValue
+WHERE
+  (simpletypes_1.int64) = (KeyValue.Key)
+THEN RETURN
+  simpletypes_1.int64 AS int64;
+
+[SQLBUILDER_TARGET_SYNTAX_MODE pipe]
+[SQLBUILDER_OUTPUT]
+DELETE SimpleTypes AS simpletypes_1
+USING
+  (
+    FROM
+      KeyValue
+    |> SELECT
+         KeyValue.Key AS a_2
+    |> AS keyvalue_3
+  )
+WHERE
+  (simpletypes_1.int64) = (keyvalue_3.a_2)
+THEN RETURN
+  simpletypes_1.int64 AS int64;
+==
+
+# DELETE with USING TVF
+[no_java]
+[language_features=MAXIMUM,+DML_DELETE_WITH_JOIN,+TABLE_VALUED_FUNCTIONS]
+[show_sqlbuilder_output]
+DELETE SimpleTypes USING tvf_key_value() AS tvf WHERE SimpleTypes.int64 = tvf.Key
+--
+DeleteStmt
++-table_scan=
+| +-TableScan(column_list=[SimpleTypes.int64#2], table=SimpleTypes, column_index_list=[1])
++-column_access_list=READ
++-where_expr=
+| +-FunctionCall(GoogleSQL:$equal(INT64, INT64) -> BOOL)
+|   +-ColumnRef(type=INT64, column=SimpleTypes.int64#2)
+|   +-ColumnRef(type=INT64, column=tvf_key_value.Key#20)
++-using_scan=
+  +-TVFScan(column_list=[tvf_key_value.Key#20], tvf=tvf_key_value, signature=() -> TABLE<Key INT64, Value STRING> (table: table_for_tvf_key_value), column_index_list=[0], alias="tvf", function_call_signature=() -> ANY TABLE)
+
+[SQLBUILDER_TARGET_SYNTAX_MODE standard]
+[SQLBUILDER_OUTPUT]
+DELETE SimpleTypes AS simpletypes_1
+USING
+  TVF_KEY_VALUE() AS tvfscan_2
+WHERE
+  (simpletypes_1.int64) = (tvfscan_2.Key);
+
+[SQLBUILDER_TARGET_SYNTAX_MODE pipe]
+[SQLBUILDER_OUTPUT]
+DELETE SimpleTypes AS simpletypes_1
+USING
+  (
+    FROM
+      TVF_KEY_VALUE() AS tvfscan_2
+    |> SELECT
+         tvfscan_2.Key AS a_3
+    |> AS tvfscan_2
+  )
+WHERE
+  (simpletypes_1.int64) = (tvfscan_2.a_3);
+==
+
+# DELETE with USING and ASSERT_ROWS_MODIFIED
+[language_features=MAXIMUM,+DML_DELETE_WITH_JOIN]
+[show_sqlbuilder_output]
+DELETE SimpleTypes USING KeyValue WHERE SimpleTypes.int64 = KeyValue.Key ASSERT_ROWS_MODIFIED 5
+--
+DeleteStmt
++-table_scan=
+| +-TableScan(column_list=[SimpleTypes.int64#2], table=SimpleTypes, column_index_list=[1])
++-assert_rows_modified=
+| +-AssertRowsModified
+|   +-rows=
+|     +-Literal(type=INT64, value=5)
++-column_access_list=READ
++-where_expr=
+| +-FunctionCall(GoogleSQL:$equal(INT64, INT64) -> BOOL)
+|   +-ColumnRef(type=INT64, column=SimpleTypes.int64#2)
+|   +-ColumnRef(type=INT64, column=KeyValue.Key#20)
++-using_scan=
+  +-TableScan(column_list=[KeyValue.Key#20], table=KeyValue, column_index_list=[0])
+
+[SQLBUILDER_TARGET_SYNTAX_MODE standard]
+[SQLBUILDER_OUTPUT]
+DELETE SimpleTypes AS simpletypes_1
+USING
+  KeyValue
+WHERE
+  (simpletypes_1.int64) = (KeyValue.Key)
+ASSERT_ROWS_MODIFIED 5;
+
+[SQLBUILDER_TARGET_SYNTAX_MODE pipe]
+[SQLBUILDER_OUTPUT]
+DELETE SimpleTypes AS simpletypes_1
+USING
+  (
+    FROM
+      KeyValue
+    |> SELECT
+         KeyValue.Key AS a_2
+    |> AS keyvalue_3
+  )
+WHERE
+  (simpletypes_1.int64) = (keyvalue_3.a_2)
+ASSERT_ROWS_MODIFIED 5;
+==
+
+# DELETE with correlated subquery in WHERE referencing USING columns
+[language_features=MAXIMUM,+DML_DELETE_WITH_JOIN]
+[show_sqlbuilder_output]
+DELETE SimpleTypes AS target USING KeyValue AS source
+WHERE target.int64 = source.Key AND EXISTS (
+  SELECT 1 FROM KeyValue WHERE KeyValue.Key = source.Key
+)
+--
+DeleteStmt
++-table_scan=
+| +-TableScan(column_list=[SimpleTypes.int64#2], table=SimpleTypes, column_index_list=[1], alias="target")
++-column_access_list=READ
++-where_expr=
+| +-FunctionCall(GoogleSQL:$and(BOOL, repeated(1) BOOL) -> BOOL)
+|   +-FunctionCall(GoogleSQL:$equal(INT64, INT64) -> BOOL)
+|   | +-ColumnRef(type=INT64, column=SimpleTypes.int64#2)
+|   | +-ColumnRef(type=INT64, column=KeyValue.Key#20)
+|   +-SubqueryExpr
+|     +-type=BOOL
+|     +-subquery_type=EXISTS
+|     +-parameter_list=
+|     | +-ColumnRef(type=INT64, column=KeyValue.Key#20)
+|     +-subquery=
+|       +-ProjectScan
+|         +-column_list=[$expr_subquery.$col1#24]
+|         +-expr_list=
+|         | +-$col1#24 := Literal(type=INT64, value=1)
+|         +-input_scan=
+|           +-FilterScan
+|             +-column_list=[KeyValue.Key#22]
+|             +-input_scan=
+|             | +-TableScan(column_list=[KeyValue.Key#22], table=KeyValue, column_index_list=[0])
+|             +-filter_expr=
+|               +-FunctionCall(GoogleSQL:$equal(INT64, INT64) -> BOOL)
+|                 +-ColumnRef(type=INT64, column=KeyValue.Key#22)
+|                 +-ColumnRef(type=INT64, column=KeyValue.Key#20, is_correlated=TRUE)
++-using_scan=
+  +-TableScan(column_list=[KeyValue.Key#20], table=KeyValue, column_index_list=[0], alias="source")
+
+[SQLBUILDER_TARGET_SYNTAX_MODE standard]
+[SQLBUILDER_OUTPUT]
+DELETE SimpleTypes AS simpletypes_1
+USING
+  KeyValue
+WHERE
+  ((simpletypes_1.int64) = (KeyValue.Key)) AND EXISTS(
+    SELECT
+      1 AS a_4
+    FROM
+      KeyValue
+    WHERE
+      (KeyValue.Key) = (KeyValue.Key)
+  );
+
+[SQLBUILDER_TARGET_SYNTAX_MODE pipe]
+[SQLBUILDER_OUTPUT]
+DELETE SimpleTypes AS simpletypes_1
+USING
+  (
+    FROM
+      KeyValue
+    |> SELECT
+         KeyValue.Key AS a_2
+    |> AS keyvalue_3
+  )
+WHERE
+  ((simpletypes_1.int64) = (keyvalue_3.a_2)) AND EXISTS(
+    FROM
+      KeyValue
+    |> WHERE
+         (KeyValue.Key) = (keyvalue_3.a_2)
+    |> SELECT
+         1 AS a_5
+  );
+==
+
+# Error: Lateral reference in USING join ON condition referencing target table
+[language_features=MAXIMUM,+DML_DELETE_WITH_JOIN]
+DELETE KeyValue AS t USING SimpleTypes AS s1 JOIN SimpleTypes AS s2 ON s1.int32 = t.Key
+WHERE t.Key = s1.int64
+--
+ERROR: Unrecognized name: t [at 1:83]
+...AS s1 JOIN SimpleTypes AS s2 ON s1.int32 = t.Key
+                                              ^
+==
+
+# DELETE with query parameter in USING
+[language_features=MAXIMUM,+DML_DELETE_WITH_JOIN]
+[show_sqlbuilder_output]
+DELETE SimpleTypes USING (SELECT @test_param_int32 AS p) AS param_subquery
+WHERE SimpleTypes.int32 = param_subquery.p
+
+--
+DeleteStmt
++-table_scan=
+| +-TableScan(column_list=[SimpleTypes.int32#1], table=SimpleTypes, column_index_list=[0])
++-column_access_list=READ
++-where_expr=
+| +-FunctionCall(GoogleSQL:$equal(INT32, INT32) -> BOOL)
+|   +-ColumnRef(type=INT32, column=SimpleTypes.int32#1)
+|   +-ColumnRef(type=INT32, column=param_subquery.p#20)
++-using_scan=
+  +-ProjectScan
+    +-column_list=[param_subquery.p#20]
+    +-expr_list=
+    | +-p#20 := Parameter(type=INT32, name="test_param_int32")
+    +-input_scan=
+      +-SingleRowScan
+
+[SQLBUILDER_TARGET_SYNTAX_MODE standard]
+[SQLBUILDER_OUTPUT]
+DELETE SimpleTypes AS simpletypes_1
+USING
+  (
+    SELECT
+      @test_param_int32 AS a_2
+  ) AS projectscan_3
+WHERE
+  (simpletypes_1.int32) = (projectscan_3.a_2);
+
+[SQLBUILDER_TARGET_SYNTAX_MODE pipe]
+[SQLBUILDER_OUTPUT]
+DELETE SimpleTypes AS simpletypes_1
+USING
+  (
+    SELECT
+      @test_param_int32 AS a_2
+    |> AS projectscan_3
+  )
+WHERE
+  (simpletypes_1.int32) = (projectscan_3.a_2);

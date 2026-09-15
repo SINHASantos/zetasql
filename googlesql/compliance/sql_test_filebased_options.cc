@@ -59,6 +59,7 @@ constexpr absl::string_view kParameters = "parameters";
 constexpr absl::string_view kPrepareDatabase = "prepare_database";
 constexpr absl::string_view kReserveMatchRecognize = "reserve_match_recognize";
 constexpr absl::string_view kReserveGraphTable = "reserve_graph_table";
+constexpr absl::string_view kReserveAlign = "reserve_align";
 constexpr absl::string_view kFloatMarginUlpBits = "float_margin_ulp_bits";
 
 constexpr absl::string_view kExtractLabels = "extract_labels";  // boolean flag
@@ -281,6 +282,7 @@ FilebasedSQLTestFileOptions::ProcessTestCase(absl::string_view test_case,
   case_opts->prepare_database_ = options_->GetBool(kPrepareDatabase);
   case_opts->reserve_match_recognize_ =
       options_->GetBool(kReserveMatchRecognize);
+  case_opts->reserve_align_ = options_->GetBool(kReserveAlign);
 
   case_opts->extract_labels_ = options_->GetBool(kExtractLabels);
   case_opts->skip_required_feature_integrity_check_ =
@@ -354,6 +356,7 @@ FilebasedSQLTestFileOptions::FilebasedSQLTestFileOptions(
   options_->RegisterBool(kPrepareDatabase, false);
   options_->RegisterBool(kReserveMatchRecognize, false);
   options_->RegisterBool(kReserveGraphTable, false);
+  options_->RegisterBool(kReserveAlign, false);
   options_->RegisterBool(kExtractLabels, false);
   options_->RegisterBool(kSkipRequiredFeatureIntegrityCheck, false);
   options_->RegisterString(kRequiredFeatures, "");

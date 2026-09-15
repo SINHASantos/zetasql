@@ -782,8 +782,6 @@ CreateFunctionStmt
 
 Function registered.
 ==
-
-==
 # Script that creates a function and then calls it in the next statement.
 [mode={{analyze|execute}}]
 CREATE FUNCTION f(x INT64) AS (sqrt(x)*2);
@@ -4544,3 +4542,93 @@ QueryStmt
     └─input_scan=
       └─SingleRowScan
 \
+
+==
+
+# The following tests demonstrate that target syntax hints are cleanly preserved
+# and plumbed into the AST unanalyzer by execute_query_tool (e.g. VALUE { ... }, GROUP BY ALL).
+[mode={{analyze|unanalyze}}]
+[catalog=sample]
+[enabled_ast_rewrites=NONE]
+SELECT NEW MAP<STRING, INT64>{(VALUE { GRAPH aml RETURN "a" AS a}) : 1};
+--
+ALTERNATION GROUP: analyze
+--
+QueryStmt
+├─output_column_list=
+│ └─$query.$col1#2 AS `$col1` [MAP<STRING, INT64>]
+└─query=
+  └─ProjectScan
+    ├─column_list=[$query.$col1#2]
+    ├─expr_list=
+    │ └─$col1#2 :=
+    │   └─MakeMap
+    │     ├─type=MAP<STRING, INT64>
+    │     └─entry_list=
+    │       └─MakeMapEntry
+    │         ├─key=
+    │         │ └─SubqueryExpr
+    │         │   ├─type=STRING
+    │         │   ├─subquery_type=SCALAR
+    │         │   └─subquery=
+    │         │     └─GraphTableScan
+    │         │       ├─column_list=[$graph_table.a#1]
+    │         │       ├─property_graph=aml
+    │         │       └─input_scan=
+    │         │         └─GraphLinearScan
+    │         │           ├─column_list=[$graph_table.a#1]
+    │         │           └─scan_list=
+    │         │             └─GraphLinearScan
+    │         │               ├─column_list=[$graph_table.a#1]
+    │         │               └─scan_list=
+    │         │                 └─ProjectScan
+    │         │                   ├─column_list=[$graph_table.a#1]
+    │         │                   ├─expr_list=
+    │         │                   │ └─a#1 := Literal(type=STRING, value="a")
+    │         │                   └─input_scan=
+    │         │                     └─SingleRowScan
+    │         └─value=
+    │           └─Literal(type=INT64, value=1)
+    └─input_scan=
+      └─SingleRowScan
+\
+--
+ALTERNATION GROUP: unanalyze
+--
+SELECT
+  NEW MAP < STRING, INT64 > { VALUE { GRAPH aml RETURN "a" AS a_2}: 1 } AS a_1
+\
+
+==
+
+[mode={{analyze|unanalyze}}]
+[catalog=sample]
+[enabled_ast_rewrites=NONE]
+SELECT 1 AS key, COUNT(*) AS count FROM KeyValue GROUP BY ALL;
+--
+ALTERNATION GROUP: analyze
+--
+QueryStmt
+├─output_column_list=
+│ ├─$query.key#4 AS key [INT64]
+│ └─$aggregate.count#3 AS count [INT64]
+└─query=
+  └─ProjectScan
+    ├─column_list=[$query.key#4, $aggregate.count#3]
+    ├─expr_list=
+    │ └─key#4 := Literal(type=INT64, value=1)
+    └─input_scan=
+      └─AggregateScan
+        ├─column_list=[$aggregate.count#3]
+        ├─input_scan=
+        │ └─TableScan(table=KeyValue)
+        └─aggregate_list=
+          └─count#3 := AggregateFunctionCall(GoogleSQL:$count_star() -> INT64)
+\
+--
+ALTERNATION GROUP: unanalyze
+--
+SELECT 1 AS key, aggregatescan_2.a_1 AS count
+FROM (SELECT COUNT(*) AS a_1 FROM KeyValue GROUP BY ALL) AS aggregatescan_2
+\
+

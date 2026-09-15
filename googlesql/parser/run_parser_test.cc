@@ -274,7 +274,7 @@ class RunParserTest : public ::testing::Test {
     const ASTNodeKind guessed_statement_kind = ParseStatementKind(
         test_case, guess_parser_options.language_options(),
         guess_parser_options.macro_expansion_mode(),
-        guess_parser_options.macro_catalog(), &next_statement_is_ctas);
+        guess_parser_options.catalog(), &next_statement_is_ctas);
 
     // Ensure that fetching all properties does not fail.
     parser::ASTStatementProperties ast_statement_properties;
@@ -324,7 +324,7 @@ class RunParserTest : public ::testing::Test {
       const ASTNodeKind guessed_statement_kind = ParseNextStatementKind(
           location, ctas_guess_parser_options.language_options(),
           ctas_guess_parser_options.macro_expansion_mode(),
-          ctas_guess_parser_options.macro_catalog(), &next_statement_is_ctas);
+          ctas_guess_parser_options.catalog(), &next_statement_is_ctas);
 
       // Ensure that fetching all properties does not fail.
       parser::ASTStatementProperties ast_statement_properties;

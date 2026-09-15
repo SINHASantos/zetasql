@@ -1,0 +1,362 @@
+[default language_features=MAXIMUM,+COLUMN_LIST_SPEC]
+[default show_sqlbuilder_output]
+[default sql_builder_target_syntax_mode=pipe]
+
+FROM KeyValue |> EXTEND **COLUMNS(['Key'])
+--
+QueryStmt
++-output_column_list=
+| +-KeyValue.Key#1 AS Key [INT64]
+| +-KeyValue.Value#2 AS Value [STRING]
+| +-KeyValue.Key#1 AS Key [INT64]
++-query=
+  +-TableScan(column_list=KeyValue.[Key#1, Value#2], table=KeyValue, column_index_list=[0, 1])
+
+[SQLBUILDER_OUTPUT]
+FROM
+  KeyValue
+|> SELECT
+     KeyValue.Key AS a_1,
+     KeyValue.Value AS a_2
+|> AS keyvalue_3
+|> SELECT
+     keyvalue_3.a_1 AS Key,
+     keyvalue_3.a_2 AS Value,
+     keyvalue_3.a_1 AS Key;
+==
+
+FROM KeyValue |> EXTEND **COLUMNS(ARRAY['Key'])
+--
+QueryStmt
++-output_column_list=
+| +-KeyValue.Key#1 AS Key [INT64]
+| +-KeyValue.Value#2 AS Value [STRING]
+| +-KeyValue.Key#1 AS Key [INT64]
++-query=
+  +-TableScan(column_list=KeyValue.[Key#1, Value#2], table=KeyValue, column_index_list=[0, 1])
+
+[SQLBUILDER_OUTPUT]
+FROM
+  KeyValue
+|> SELECT
+     KeyValue.Key AS a_1,
+     KeyValue.Value AS a_2
+|> AS keyvalue_3
+|> SELECT
+     keyvalue_3.a_1 AS Key,
+     keyvalue_3.a_2 AS Value,
+     keyvalue_3.a_1 AS Key;
+==
+
+FROM KeyValue |> EXTEND **COLUMNS([])
+--
+QueryStmt
++-output_column_list=
+| +-KeyValue.Key#1 AS Key [INT64]
+| +-KeyValue.Value#2 AS Value [STRING]
++-query=
+  +-TableScan(column_list=KeyValue.[Key#1, Value#2], table=KeyValue, column_index_list=[0, 1])
+
+[SQLBUILDER_OUTPUT]
+FROM
+  KeyValue
+|> SELECT
+     KeyValue.Key AS Key,
+     KeyValue.Value AS Value;
+==
+
+FROM KeyValue |> EXTEND Key, **COLUMNS([])
+--
+QueryStmt
++-output_column_list=
+| +-KeyValue.Key#1 AS Key [INT64]
+| +-KeyValue.Value#2 AS Value [STRING]
+| +-KeyValue.Key#1 AS Key [INT64]
++-query=
+  +-TableScan(column_list=KeyValue.[Key#1, Value#2], table=KeyValue, column_index_list=[0, 1])
+
+[SQLBUILDER_OUTPUT]
+FROM
+  KeyValue
+|> SELECT
+     KeyValue.Key AS a_1,
+     KeyValue.Value AS a_2
+|> AS keyvalue_3
+|> SELECT
+     keyvalue_3.a_1 AS Key,
+     keyvalue_3.a_2 AS Value,
+     keyvalue_3.a_1 AS Key;
+==
+
+FROM KeyValue |> EXTEND Key + 1, **COLUMNS(['Value'])
+
+--
+QueryStmt
++-output_column_list=
+| +-KeyValue.Key#1 AS Key [INT64]
+| +-KeyValue.Value#2 AS Value [STRING]
+| +-$pipe_extend.$col1#3 AS `$col1` [INT64]
+| +-KeyValue.Value#2 AS Value [STRING]
++-query=
+  +-ProjectScan
+    +-column_list=[KeyValue.Key#1, KeyValue.Value#2, $pipe_extend.$col1#3, KeyValue.Value#2]
+    +-expr_list=
+    | +-$col1#3 :=
+    |   +-FunctionCall(GoogleSQL:$add(INT64, INT64) -> INT64)
+    |     +-ColumnRef(type=INT64, column=KeyValue.Key#1)
+    |     +-Literal(type=INT64, value=1)
+    +-input_scan=
+      +-TableScan(column_list=KeyValue.[Key#1, Value#2], table=KeyValue, column_index_list=[0, 1])
+
+[SQLBUILDER_OUTPUT]
+FROM
+  KeyValue
+|> SELECT
+     KeyValue.Key AS a_1,
+     KeyValue.Value AS a_2
+|> AS keyvalue_3
+|> SELECT
+     keyvalue_3.a_1 AS Key,
+     keyvalue_3.a_2 AS Value,
+     (keyvalue_3.a_1) + 1 AS a_4,
+     keyvalue_3.a_2 AS Value;
+==
+
+FROM (select Key as a, Value as b, Key as c from KeyValue) |> EXTEND **COLUMNS(['a', 'b'])
+--
+QueryStmt
++-output_column_list=
+| +-KeyValue.Key#1 AS a [INT64]
+| +-KeyValue.Value#2 AS b [STRING]
+| +-KeyValue.Key#1 AS c [INT64]
+| +-KeyValue.Key#1 AS a [INT64]
+| +-KeyValue.Value#2 AS b [STRING]
++-query=
+  +-ProjectScan
+    +-column_list=KeyValue.[Key#1, Value#2, Key#1]
+    +-input_scan=
+      +-TableScan(column_list=KeyValue.[Key#1, Value#2], table=KeyValue, column_index_list=[0, 1])
+
+[SQLBUILDER_OUTPUT]
+FROM
+  KeyValue
+|> SELECT
+     KeyValue.Key AS a_1,
+     KeyValue.Value AS a_2
+|> AS keyvalue_3
+|> SELECT
+     keyvalue_3.a_1 AS a_1,
+     keyvalue_3.a_2 AS a_2,
+     keyvalue_3.a_1 AS a_4
+|> AS projectscan_5
+|> SELECT
+     projectscan_5.a_1 AS a,
+     projectscan_5.a_2 AS b,
+     projectscan_5.a_1 AS c,
+     projectscan_5.a_1 AS a,
+     projectscan_5.a_2 AS b;
+==
+
+# Duplicate column names
+FROM KeyValue |> EXTEND **COLUMNS(['Key', 'Key'])
+--
+QueryStmt
++-output_column_list=
+| +-KeyValue.Key#1 AS Key [INT64]
+| +-KeyValue.Value#2 AS Value [STRING]
+| +-KeyValue.Key#1 AS Key [INT64]
+| +-KeyValue.Key#1 AS Key [INT64]
++-query=
+  +-TableScan(column_list=KeyValue.[Key#1, Value#2], table=KeyValue, column_index_list=[0, 1])
+
+[SQLBUILDER_OUTPUT]
+FROM
+  KeyValue
+|> SELECT
+     KeyValue.Key AS a_1,
+     KeyValue.Value AS a_2
+|> AS keyvalue_3
+|> SELECT
+     keyvalue_3.a_1 AS Key,
+     keyvalue_3.a_2 AS Value,
+     keyvalue_3.a_1 AS Key,
+     keyvalue_3.a_1 AS Key;
+==
+
+# Unpack in Subquery
+SELECT * FROM (FROM KeyValue |> EXTEND **COLUMNS(['Key']))
+--
+QueryStmt
++-output_column_list=
+| +-KeyValue.Key#1 AS Key [INT64]
+| +-KeyValue.Value#2 AS Value [STRING]
+| +-KeyValue.Key#1 AS Key [INT64]
++-query=
+  +-ProjectScan
+    +-column_list=KeyValue.[Key#1, Value#2, Key#1]
+    +-input_scan=
+      +-TableScan(column_list=KeyValue.[Key#1, Value#2], table=KeyValue, column_index_list=[0, 1])
+
+[SQLBUILDER_OUTPUT]
+FROM
+  KeyValue
+|> SELECT
+     KeyValue.Key AS a_1,
+     KeyValue.Value AS a_2
+|> AS keyvalue_3
+|> SELECT
+     keyvalue_3.a_1 AS Key,
+     keyvalue_3.a_2 AS Value,
+     keyvalue_3.a_1 AS Key;
+==
+
+# Case Sensitivity
+FROM KeyValue |> EXTEND **COLUMNS(['key'])
+--
+QueryStmt
++-output_column_list=
+| +-KeyValue.Key#1 AS Key [INT64]
+| +-KeyValue.Value#2 AS Value [STRING]
+| +-KeyValue.Key#1 AS key [INT64]
++-query=
+  +-TableScan(column_list=KeyValue.[Key#1, Value#2], table=KeyValue, column_index_list=[0, 1])
+
+[SQLBUILDER_OUTPUT]
+FROM
+  KeyValue
+|> SELECT
+     KeyValue.Key AS a_1,
+     KeyValue.Value AS a_2
+|> AS keyvalue_3
+|> SELECT
+     keyvalue_3.a_1 AS Key,
+     keyvalue_3.a_2 AS Value,
+     keyvalue_3.a_1 AS key;
+==
+
+SELECT * EXCEPT (Key) FROM KeyValue |> EXTEND **COLUMNS(['Key'])
+
+--
+ERROR: Name Key not found in the current scope [at 1:49]
+SELECT * EXCEPT (Key) FROM KeyValue |> EXTEND **COLUMNS(['Key'])
+                                                ^
+==
+
+# Null in column list
+FROM KeyValue |> EXTEND **COLUMNS(['Key', NULL])
+--
+ERROR: Column name in Column list spec cannot be NULL [at 1:35]
+FROM KeyValue |> EXTEND **COLUMNS(['Key', NULL])
+                                  ^
+==
+
+# Value Table Tests
+
+# Unpack fields
+FROM TestStructValueTable |> EXTEND **COLUMNS(['a'])
+--
+QueryStmt
++-output_column_list=
+| +-TestStructValueTable.value#1 AS TestStructValueTable [STRUCT<a INT32, b STRING>]
+| +-TestStructValueTable.value#1 AS a [STRUCT<a INT32, b STRING>]
++-query=
+  +-TableScan(column_list=[TestStructValueTable.value#1], table=TestStructValueTable, column_index_list=[0])
+
+[SQLBUILDER_OUTPUT]
+FROM
+  TestStructValueTable
+|> SELECT
+     TestStructValueTable AS a_1
+|> AS teststructvaluetable_2
+|> SELECT
+     teststructvaluetable_2.a_1 AS TestStructValueTable,
+     teststructvaluetable_2.a_1 AS a;
+==
+
+# Unpack fields - alias needed
+FROM TestStructValueTable v |> EXTEND **COLUMNS(['a'])
+--
+QueryStmt
++-output_column_list=
+| +-TestStructValueTable.value#1 AS v [STRUCT<a INT32, b STRING>]
+| +-TestStructValueTable.value#1 AS a [STRUCT<a INT32, b STRING>]
++-query=
+  +-TableScan(column_list=[TestStructValueTable.value#1], table=TestStructValueTable, column_index_list=[0], alias="v")
+
+[SQLBUILDER_OUTPUT]
+FROM
+  TestStructValueTable
+|> SELECT
+     TestStructValueTable AS a_1
+|> AS teststructvaluetable_2
+|> SELECT
+     teststructvaluetable_2.a_1 AS v,
+     teststructvaluetable_2.a_1 AS a;
+==
+
+FROM TestStructValueTable |> EXTEND **COLUMNS(['c'])
+
+--
+ERROR: Name c not found in the current scope [at 1:39]
+FROM TestStructValueTable |> EXTEND **COLUMNS(['c'])
+                                      ^
+==
+
+# Unpack the value column itself
+FROM TestStructValueTable v |> EXTEND **COLUMNS(['v'])
+--
+ERROR: Name v provided to ** does not refer to a column or field [at 1:41]
+FROM TestStructValueTable v |> EXTEND **COLUMNS(['v'])
+                                        ^
+==
+
+# Unpack a field from the proto value column
+FROM TestBcPBValueProtoTable v |> EXTEND **COLUMNS(['value'])
+--
+QueryStmt
++-output_column_list=
+| +-TestBcPBValueProtoTable.value#1 AS value [PROTO<googlesql_test.TestBcPB>]
+| +-TestBcPBValueProtoTable.Filename#2 AS Filename [STRING]
+| +-TestBcPBValueProtoTable.RowId#3 AS RowId [INT64]
+| +-TestBcPBValueProtoTable.value#1 AS value [PROTO<googlesql_test.TestBcPB>]
++-query=
+  +-TableScan(column_list=TestBcPBValueProtoTable.[value#1, Filename#2, RowId#3], table=TestBcPBValueProtoTable, column_index_list=[0, 1, 2], alias="v")
+
+[SQLBUILDER_OUTPUT]
+FROM
+  TestBcPBValueProtoTable
+|> SELECT
+     TestBcPBValueProtoTable.value AS a_1,
+     TestBcPBValueProtoTable.Filename AS a_2,
+     TestBcPBValueProtoTable.RowId AS a_3
+|> AS testbcpbvalueprototable_4
+|> SELECT
+     testbcpbvalueprototable_4.a_1 AS value,
+     testbcpbvalueprototable_4.a_2 AS Filename,
+     testbcpbvalueprototable_4.a_3 AS RowId,
+     testbcpbvalueprototable_4.a_1 AS value;
+
+==
+
+# Unpack a nested field from the proto value column
+FROM TestBcPBValueProtoTable v |> EXTEND **COLUMNS(['value.b'])
+--
+ERROR: Name value.b not found in the current scope [at 1:44]
+FROM TestBcPBValueProtoTable v |> EXTEND **COLUMNS(['value.b'])
+                                           ^
+==
+
+# Column not found
+FROM KeyValue |> EXTEND **COLUMNS(['NonExistent'])
+--
+ERROR: Name NonExistent not found in the current scope [at 1:27]
+FROM KeyValue |> EXTEND **COLUMNS(['NonExistent'])
+                          ^
+==
+
+# Name is not a column or field (using table alias)
+FROM KeyValue |> EXTEND **COLUMNS(['KeyValue'])
+--
+ERROR: Name KeyValue provided to ** does not refer to a column or field [at 1:27]
+FROM KeyValue |> EXTEND **COLUMNS(['KeyValue'])
+                          ^

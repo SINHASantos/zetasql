@@ -464,7 +464,7 @@ absl::Status GetNextStatementProperties(
         resume_location.input(), resume_location.byte_position(),
         parser_options.id_string_pool().get(), parser_options.arena().get(),
         parser_options.language_options(),
-        parser_options.macro_expansion_mode(), parser_options.macro_catalog(),
+        parser_options.macro_expansion_mode(), parser_options.catalog(),
         &output, *runtime_info, warning_sink, &allocated_ast_nodes,
         &ast_statement_properties,
         /*statement_end_byte_offset=*/nullptr);
@@ -592,7 +592,8 @@ absl::StatusOr<std::vector<absl::string_view>> ListSelectExpressions(
       const ASTNode* node = select_column->child(i);
       if (node->Is<ASTDotStar>() || node->Is<ASTStar>() ||
           node->Is<ASTStarWithModifiers>() ||
-          node->Is<ASTDotStarWithModifiers>()) {
+          node->Is<ASTDotStarWithModifiers>() ||
+          node->Is<ASTUnpackExpression>()) {
         return absl::UnimplementedError(
             "SQL queries with '*' operations are not supported yet by "
             "ListSelectColumnExpressionsFromFinalSelectClause API");

@@ -56,9 +56,9 @@ struct RawLowestCommonAncestor
     : public absl::disjunction<
           try_root<T1>, try_root<T2>, try_convert<T1, T2>, try_convert<T2, T1>,
           RawLowestCommonAncestor<typename T1::SUPER, T2>> {
-  static_assert(std::is_convertible<T1*, ResolvedNode*>::value,
+  static_assert(std::is_convertible_v<T1*, ResolvedNode*>,
                 "MakeNodeVector members must be convertible to ResolvedNode");
-  static_assert(std::is_convertible<T2*, ResolvedNode*>::value,
+  static_assert(std::is_convertible_v<T2*, ResolvedNode*>,
                 "MakeNodeVector members must be convertible to ResolvedNode");
 };
 
@@ -68,18 +68,17 @@ struct RawLowestCommonAncestor
 template <class T1, class T2>
 struct LowestCommonAncestorImpl {
   constexpr static bool kShouldAddConst =
-      std::is_const<T1>::value || std::is_const<T2>::value;
+      std::is_const_v<T1> || std::is_const_v<T2>;
 
   // Strip const-ness and determine the lowest common ancestor of the
   // the two types.
   using DecayedLowestCommonAncestor =
-      typename RawLowestCommonAncestor<typename std::decay<T1>::type,
-                                       typename std::decay<T2>::type>::type;
+      typename RawLowestCommonAncestor<std::decay_t<T1>,
+                                       std::decay_t<T2>>::type;
   // If either was const, the result is const.
-  using type = typename std::conditional<
-      kShouldAddConst,
-      typename std::add_const<DecayedLowestCommonAncestor>::type,
-      DecayedLowestCommonAncestor>::type;
+  using type = std::conditional_t<kShouldAddConst,
+                                  std::add_const_t<DecayedLowestCommonAncestor>,
+                                  DecayedLowestCommonAncestor>;
 };
 
 template <class... T>

@@ -39,14 +39,19 @@ absl::StatusOr<const Type*> MakeVectorType(TypeFactory* type_factory) {
   std::optional<TypeParameterHandlers> type_parameter_handlers =
       GetBuiltinTypeParameterHandlers(kVectorTypeName);
   GOOGLESQL_RET_CHECK(type_parameter_handlers.has_value());
+  std::optional<DeclarativeTypeDescriptor::FormattingCustom::Callback>
+      formatting_callback = GetBuiltinCustomFormattingCallback(kVectorTypeName);
+  GOOGLESQL_RET_CHECK(formatting_callback.has_value());
   return type_factory->MakeDeclarativeType(
       DeclarativeTypeDescriptor()
-          .set_type_id({std::string(TypeId::kGoogleSqlNamespace),
+          .set_type_id({std::string(DeclarativeTypeId::kGoogleSqlNamespace),
                         std::string(kVectorTypeName)})
           .set_display_name(kVectorTypeName)
           .set_backing_type(type_factory->get_bytes())
           .set_returning_strategy(
               DeclarativeTypeDescriptor::ReturningDelegated{})
+          .set_formatting_strategy(
+              DeclarativeTypeDescriptor::FormattingCustom(*formatting_callback))
           .set_type_params_strategy(std::move(*type_parameter_handlers))
           .set_additional_required_language_features({FEATURE_VECTOR_TYPE}));
 }

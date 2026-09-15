@@ -493,3 +493,129 @@ QueryStmt
         | +-a#1 := Literal(type=INT64, value=1)
         +-input_scan=
           +-SingleRowScan
+==
+
+# Test ARRAY_TRANSFORM with multiple captured outer variables.
+# When inlined via substitute.cc, multiple captured variables are collected
+# into the subquery parameter_list.
+[enabled_ast_rewrites=ALL]
+SELECT ARRAY_TRANSFORM([1, 2], x -> x + a + b + c)
+FROM (SELECT 1 AS a, 2 AS b, 3 AS c);
+--
+
+QueryStmt
++-output_column_list=
+| +-$query.$col1#5 AS `$col1` [ARRAY<INT64>]
++-query=
+  +-ProjectScan
+    +-column_list=[$query.$col1#5]
+    +-expr_list=
+    | +-$col1#5 :=
+    |   +-FunctionCall(GoogleSQL:array_transform(ARRAY<INT64> array_to_transform, FUNCTION<INT64->INT64> transformation) -> ARRAY<INT64>)
+    |     +-FunctionArgument
+    |     | +-expr=
+    |     |   +-Literal(type=ARRAY<INT64>, value=[1, 2])
+    |     +-FunctionArgument
+    |       +-inline_lambda=
+    |         +-InlineLambda
+    |           +-argument_list=[$lambda_arg.x#4]
+    |           +-parameter_list=
+    |           | +-ColumnRef(type=INT64, column=$subquery1.a#1)
+    |           | +-ColumnRef(type=INT64, column=$subquery1.b#2)
+    |           | +-ColumnRef(type=INT64, column=$subquery1.c#3)
+    |           +-body=
+    |             +-FunctionCall(GoogleSQL:$add(INT64, INT64) -> INT64)
+    |               +-FunctionCall(GoogleSQL:$add(INT64, INT64) -> INT64)
+    |               | +-FunctionCall(GoogleSQL:$add(INT64, INT64) -> INT64)
+    |               | | +-ColumnRef(type=INT64, column=$lambda_arg.x#4)
+    |               | | +-ColumnRef(type=INT64, column=$subquery1.a#1, is_correlated=TRUE)
+    |               | +-ColumnRef(type=INT64, column=$subquery1.b#2, is_correlated=TRUE)
+    |               +-ColumnRef(type=INT64, column=$subquery1.c#3, is_correlated=TRUE)
+    +-input_scan=
+      +-ProjectScan
+        +-column_list=$subquery1.[a#1, b#2, c#3]
+        +-expr_list=
+        | +-a#1 := Literal(type=INT64, value=1)
+        | +-b#2 := Literal(type=INT64, value=2)
+        | +-c#3 := Literal(type=INT64, value=3)
+        +-input_scan=
+          +-SingleRowScan
+
+[REWRITTEN AST]
+QueryStmt
++-output_column_list=
+| +-$query.$col1#5 AS `$col1` [ARRAY<INT64>]
++-query=
+  +-ProjectScan
+    +-column_list=[$query.$col1#5]
+    +-expr_list=
+    | +-$col1#5 :=
+    |   +-SubqueryExpr
+    |     +-type=ARRAY<INT64>
+    |     +-subquery_type=SCALAR
+    |     +-parameter_list=
+    |     | +-ColumnRef(type=INT64, column=$subquery1.a#1)
+    |     | +-ColumnRef(type=INT64, column=$subquery1.b#2)
+    |     | +-ColumnRef(type=INT64, column=$subquery1.c#3)
+    |     +-subquery=
+    |       +-ProjectScan
+    |         +-column_list=[$expr_subquery.$col1#10]
+    |         +-expr_list=
+    |         | +-$col1#10 :=
+    |         |   +-FunctionCall(GoogleSQL:if(BOOL, ARRAY<INT64>, ARRAY<INT64>) -> ARRAY<INT64>)
+    |         |     +-FunctionCall(GoogleSQL:$is_null(ARRAY<INT64>) -> BOOL)
+    |         |     | +-ColumnRef(type=ARRAY<INT64>, column=$subquery1.array_to_transform#6)
+    |         |     +-Literal(type=ARRAY<INT64>, value=NULL)
+    |         |     +-SubqueryExpr
+    |         |       +-type=ARRAY<INT64>
+    |         |       +-subquery_type=ARRAY
+    |         |       +-parameter_list=
+    |         |       | +-ColumnRef(type=ARRAY<INT64>, column=$subquery1.array_to_transform#6)
+    |         |       | +-ColumnRef(type=INT64, column=$subquery1.a#1, is_correlated=TRUE)
+    |         |       | +-ColumnRef(type=INT64, column=$subquery1.b#2, is_correlated=TRUE)
+    |         |       | +-ColumnRef(type=INT64, column=$subquery1.c#3, is_correlated=TRUE)
+    |         |       +-subquery=
+    |         |         +-OrderByScan
+    |         |           +-column_list=[$expr_subquery.$col1#9]
+    |         |           +-is_ordered=TRUE
+    |         |           +-input_scan=
+    |         |           | +-ProjectScan
+    |         |           |   +-column_list=[$array.element#7, $array_offset.off#8, $expr_subquery.$col1#9]
+    |         |           |   +-expr_list=
+    |         |           |   | +-$col1#9 :=
+    |         |           |   |   +-FunctionCall(GoogleSQL:$add(INT64, INT64) -> INT64)
+    |         |           |   |     +-FunctionCall(GoogleSQL:$add(INT64, INT64) -> INT64)
+    |         |           |   |     | +-FunctionCall(GoogleSQL:$add(INT64, INT64) -> INT64)
+    |         |           |   |     | | +-ColumnRef(type=INT64, column=$array.element#7)
+    |         |           |   |     | | +-ColumnRef(type=INT64, column=$subquery1.a#1, is_correlated=TRUE)
+    |         |           |   |     | +-ColumnRef(type=INT64, column=$subquery1.b#2, is_correlated=TRUE)
+    |         |           |   |     +-ColumnRef(type=INT64, column=$subquery1.c#3, is_correlated=TRUE)
+    |         |           |   +-input_scan=
+    |         |           |     +-ArrayScan
+    |         |           |       +-column_list=[$array.element#7, $array_offset.off#8]
+    |         |           |       +-array_expr_list=
+    |         |           |       | +-ColumnRef(type=ARRAY<INT64>, column=$subquery1.array_to_transform#6, is_correlated=TRUE)
+    |         |           |       +-element_column_list=[$array.element#7]
+    |         |           |       +-array_offset_column=
+    |         |           |         +-ColumnHolder(column=$array_offset.off#8)
+    |         |           +-order_by_item_list=
+    |         |             +-OrderByItem
+    |         |               +-column_ref=
+    |         |                 +-ColumnRef(type=INT64, column=$array_offset.off#8)
+    |         +-input_scan=
+    |           +-ProjectScan
+    |             +-column_list=[$subquery1.array_to_transform#6]
+    |             +-expr_list=
+    |             | +-array_to_transform#6 := Literal(type=ARRAY<INT64>, value=[1, 2])
+    |             +-input_scan=
+    |               +-SingleRowScan
+    +-input_scan=
+      +-ProjectScan
+        +-column_list=$subquery1.[a#1, b#2, c#3]
+        +-expr_list=
+        | +-a#1 := Literal(type=INT64, value=1)
+        | +-b#2 := Literal(type=INT64, value=2)
+        | +-c#3 := Literal(type=INT64, value=3)
+        +-input_scan=
+          +-SingleRowScan
+

@@ -1025,7 +1025,7 @@ static absl::Status RunFileBasedTestImpl(
   test_case_options.RegisterInt64("max_statements_to_execute", -1);
   test_case_options.RegisterBool("use_box_glyphs", true);
   test_case_options.RegisterBool("linear_resolved_ast", false);
-
+  test_case_options.RegisterString("enabled_ast_rewrites", "");
   std::string test_case = std::string(test_case_input);
   GOOGLESQL_RETURN_IF_ERROR(test_case_options.ParseTestCaseOptions(&test_case));
 
@@ -1043,6 +1043,14 @@ static absl::Status RunFileBasedTestImpl(
     std::string error;
     EXPECT_TRUE(flag->ParseFrom(
         test_case_options.GetString("enabled_language_features"), &error))
+        << error;
+  }
+  if (!test_case_options.GetString("enabled_ast_rewrites").empty()) {
+    absl::CommandLineFlag* flag =
+        absl::FindCommandLineFlag("enabled_ast_rewrites");
+    std::string error;
+    EXPECT_TRUE(flag->ParseFrom(
+        test_case_options.GetString("enabled_ast_rewrites"), &error))
         << error;
   }
 

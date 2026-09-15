@@ -23,7 +23,7 @@
 namespace googlesql {
 
 // Returns true if the given parsed AST contains any Graph DML operator
-// (e.g. `ASTGqlInsert`).
+// (`ASTGqlInsert`, `ASTGqlSet`, `ASTGqlRemove`, or `ASTGqlDelete`).
 absl::StatusOr<bool> HasGraphDml(const ASTNode* root);
 
 }  // namespace googlesql

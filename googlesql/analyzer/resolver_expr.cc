@@ -40,6 +40,7 @@
 #include "google/protobuf/descriptor.pb.h"
 #include "googlesql/analyzer/analytic_function_resolver.h"
 #include "googlesql/analyzer/column_cycle_detector.h"
+#include "googlesql/analyzer/column_list_spec.h"
 #include "googlesql/analyzer/conflicting_field_paths_validator.h"
 #include "googlesql/analyzer/constant_resolver_helper.h"
 #include "googlesql/analyzer/expr_matching_helpers.h"
@@ -1436,11 +1437,11 @@ absl::Status Resolver::ResolveExpr(
       return MakeSqlErrorAt(extended_expr->braced_constructor())
              << "Syntax error: Unexpected braced constructor";
     }
+
     default:
-      return MakeSqlErrorAt(ast_expr)
-             << "Unhandled select-list expression for node kind "
-             << ast_expr->GetNodeKindString() << ":\n"
-             << ast_expr->DebugString();
+      return MakeSqlErrorAt(ast_expr) << "Unhandled expression for node kind "
+                                      << ast_expr->GetNodeKindString() << ":\n"
+                                      << ast_expr->DebugString();
   }
 
   if (*resolved_expr_out == nullptr) {
@@ -3035,6 +3036,103 @@ absl::Status Resolver::ResolveGraphIsLabeledPredicate(
           .Build());
   *resolved_expr_out = std::move(output);
   return absl::OkStatus();
+}
+
+absl::Status Resolver::ResolveColumnListSpec(
+    const ASTColumnListSpec* column_list_spec,
+    ExprResolutionInfo* expr_resolution_info,
+    std::unique_ptr<const ColumnListSpec>* column_list_spec_out) {
+  if (!language().LanguageFeatureEnabled(FEATURE_COLUMN_LIST_SPEC)) {
+    return MakeSqlErrorAt(column_list_spec)
+           << "Column list spec is not supported";
+  }
+
+  GOOGLESQL_RET_CHECK_NE(column_list_spec, nullptr);
+  GOOGLESQL_RET_CHECK_NE(expr_resolution_info, nullptr);
+  GOOGLESQL_RET_CHECK_NE(column_list_spec_out, nullptr);
+
+  const ASTExpression* columns = column_list_spec->column_names();
+  if (columns == nullptr) {
+    return MakeSqlErrorAt(column_list_spec)
+           << "Column list spec must not be NULL";
+  }
+
+  std::unique_ptr<const ResolvedExpr> columns_expr;
+  GOOGLESQL_RETURN_IF_ERROR(ResolveExpr(columns, expr_resolution_info, &columns_expr,
+                              types::StringArrayType()));
+
+  GOOGLESQL_ASSIGN_OR_RETURN(
+      std::vector<IdString> column_names,
+      ValidateAndExtractColumnListSpecColumnNames(*columns, *columns_expr));
+
+  *column_list_spec_out =
+      std::make_unique<ColumnListSpec>(std::move(column_names));
+  return absl::OkStatus();
+}
+
+namespace {
+static absl::Status ValidateColumnListSpecElement(
+    const Value& element_value, const ASTExpression& columns_expr) {
+  if (element_value.is_null()) {
+    return MakeSqlErrorAt(&columns_expr)
+           << "Column name in Column list spec cannot be NULL";
+  }
+  if (!element_value.type()->IsString()) {
+    return MakeSqlErrorAt(&columns_expr)
+           << "Column list spec array element must be string";
+  }
+  if (element_value.string_value().empty()) {
+    return MakeSqlErrorAt(&columns_expr)
+           << "Column name in Column list spec cannot be empty string";
+  }
+  return absl::OkStatus();
+}
+}  // namespace
+
+absl::StatusOr<std::vector<IdString>>
+Resolver::ValidateAndExtractColumnListSpecColumnNames(
+    const ASTExpression& columns_expr,
+    const ResolvedExpr& columns_resolved_expr) {
+  // check types
+  if (!columns_resolved_expr.type()->IsArray()) {
+    return MakeSqlErrorAt(columns_expr) << "Column list spec must be an array";
+  }
+
+  Value array_value;
+  if (columns_resolved_expr.Is<ResolvedLiteral>() ||
+      columns_resolved_expr.Is<ResolvedConstant>()) {
+    GOOGLESQL_ASSIGN_OR_RETURN(array_value,
+                     GetConstantValue(&columns_expr, &columns_resolved_expr,
+                                      "Column list spec"));
+  } else {
+    GOOGLESQL_RET_CHECK(analyzer_options_.constant_evaluator() != nullptr)
+        << "FEATURE_COLUMN_LIST_SPEC requires a constant evaluator "
+           "to be provided in AnalyzerOptions";
+
+    if (!IsAnalysisConstant(&columns_resolved_expr)) {
+      return MakeSqlErrorAt(columns_expr)
+             << "Column list spec must be an analysis constant";
+    }
+
+    GOOGLESQL_ASSIGN_OR_RETURN(
+        array_value,
+        analyzer_options_.constant_evaluator()->EvaluateAnalysisConstant(
+            columns_resolved_expr));
+  }
+
+  if (array_value.is_null()) {
+    return MakeSqlErrorAt(columns_expr) << "Column list spec must not be null";
+  }
+
+  std::vector<IdString> column_names;
+  column_names.reserve(array_value.num_elements());
+  for (int i = 0; i < array_value.num_elements(); ++i) {
+    const Value& element = array_value.element(i);
+    GOOGLESQL_RETURN_IF_ERROR(ValidateColumnListSpecElement(element, columns_expr));
+    column_names.push_back(MakeIdString(element.string_value()));
+  }
+
+  return column_names;
 }
 
 absl::Status Resolver::ResolveFieldAccess(
@@ -8763,17 +8861,21 @@ Resolver::ResolveBracedConstructorField(
     auto path_expr = braced_constructor_lhs->key_expr()
                          ->GetAsOrNull<ASTGeneralizedPathExpression>();
     GOOGLESQL_RET_CHECK(path_expr != nullptr);
+    ResolvedColumn update_element_column =
+        ResolvedColumn(AllocateColumnId(), MakeIdString("$update_constructor"),
+                       MakeIdString("update_element_column"),
+                       AnnotatedType(lhs_type, /*annotation_map=*/nullptr));
     std::unique_ptr<const ResolvedExpr> proto_expr;
     if (braced_constructor_lhs->operation() ==
         ASTBracedConstructorLhs::UPDATE_MANY) {
       // For repeated field updates (the `*:` operator), the update applies to
-      // each individual element of the repeated field. We use a placeholder
-      // (ResolvedFlattenedArg) representing the repeated field's element type
-      // so that nested path accesses check against the element type rather than
-      // the container type. E.g. in `arr *: { field: x }` where `arr`
-      // is a repeated field of protos, the nested `{ field: x }` resolves
-      // against the repeated field's element type.
-      proto_expr = MakeResolvedFlattenedArg(lhs_type);
+      // each individual element of the repeated field. We use a ColumnRef
+      // representing the repeated field's element type so that nested path
+      // accesses check against the element type rather than the container type.
+      // E.g. in `arr *: { field: x }` where `arr` is a repeated field of
+      // protos, the nested `{ field: x }` resolves against the repeated field's
+      // element type.
+      proto_expr = MakeColumnRef(update_element_column);
     } else {
       // For standard updates (the `:` operator), which can apply to all
       // field types (replacing the value as a whole), we resolve the field path
@@ -8788,7 +8890,7 @@ Resolver::ResolveBracedConstructorField(
                                *field_value, std::move(proto_expr),
                                /*alias=*/"",
                                *field_value->GetAsOrDie<ASTBracedConstructor>(),
-                               expr_resolution_info));
+                               update_element_column, expr_resolution_info));
   } else {
     GOOGLESQL_RETURN_IF_ERROR(
         ResolveExpr(field_value, expr_resolution_info, &expr, lhs_type));
@@ -9213,6 +9315,10 @@ absl::Status Resolver::ResolveMapBracedConstructor(
   // 6. Build the MakeMap resolved AST node and propagate type annotations.
   auto make_map = MakeResolvedMakeMap(map_type, std::move(entries));
   GOOGLESQL_RETURN_IF_ERROR(CheckAndPropagateAnnotations(ast_location, make_map.get()));
+  if (CollationAnnotation::ExistsIn(make_map->type_annotation_map())) {
+    return MakeSqlErrorAt(ast_location)
+           << "Collation is not supported on MAP or its key and value types";
+  }
 
   // 7. Compile-time fold literal maps if all elements resolved as literals.
   if (all_literals) {
@@ -9326,6 +9432,7 @@ absl::StatusOr<std::unique_ptr<const ResolvedExpr>>
 Resolver::ResolveBracedConstructorInUpdateContext(
     const ASTNode& location, std::unique_ptr<const ResolvedExpr> expr_to_modify,
     std::string alias, const ASTBracedConstructor& ast_braced_constructor,
+    const ResolvedColumn& update_element_column,
     ExprResolutionInfo* expr_resolution_info) {
   RETURN_ERROR_IF_OUT_OF_STACK_SPACE();
 
@@ -9424,9 +9531,9 @@ Resolver::ResolveBracedConstructorInUpdateContext(
         std::move(arg.expr), arg.field_descriptor_path, operation));
   }
 
-  return MakeResolvedUpdateConstructor(proto_type, std::move(expr_to_modify),
-                                       alias,
-                                       std::move(resolved_update_field_items));
+  return MakeResolvedUpdateConstructor(
+      proto_type, std::move(expr_to_modify), alias,
+      std::move(resolved_update_field_items), update_element_column);
 }
 
 // TODO: The noinline attribute is to prevent the stack usage
@@ -9451,11 +9558,15 @@ absl::Status Resolver::ResolveUpdateConstructor(
       ast_update_constructor, expr_resolution_info, alias, expr_to_modify));
 
   GOOGLESQL_RET_CHECK(ast_update_constructor.braced_constructor());
+  ResolvedColumn update_element_column = ResolvedColumn(
+      AllocateColumnId(), MakeIdString("$update_constructor"),
+      MakeIdString("update_element_column"), expr_to_modify->annotated_type());
   GOOGLESQL_ASSIGN_OR_RETURN(
       *resolved_expr_out,
       ResolveBracedConstructorInUpdateContext(
           ast_update_constructor, std::move(expr_to_modify), std::move(alias),
-          *ast_update_constructor.braced_constructor(), expr_resolution_info));
+          *ast_update_constructor.braced_constructor(), update_element_column,
+          expr_resolution_info));
   return absl::OkStatus();
 }
 

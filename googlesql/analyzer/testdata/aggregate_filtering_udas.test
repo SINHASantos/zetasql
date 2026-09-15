@@ -953,14 +953,16 @@ FROM
           SimpleTypes.json AS a_18,
           SimpleTypes.uuid AS a_19
         FROM
-          SimpleTypes
+          (TABLE SimpleTypes
+          )
       ) AS simpletypes_20
   )) AS tvfscan_21;
 
 [SQLBUILDER_TARGET_SYNTAX_MODE pipe]
 [SQLBUILDER_OUTPUT]
 FROM
-  SimpleTypes
+  (TABLE SimpleTypes
+  )
 |> SELECT
      SimpleTypes.int32 AS a_1,
      SimpleTypes.int64 AS a_2,
@@ -1066,7 +1068,8 @@ WITH
       SimpleTypes.json AS a_18,
       SimpleTypes.uuid AS a_19
     FROM
-      SimpleTypes
+      (TABLE SimpleTypes
+      )
   )
 SELECT
   COUNT(*
@@ -1080,7 +1083,8 @@ FROM
 WITH
   unused AS (
     FROM
-      SimpleTypes
+      (TABLE SimpleTypes
+      )
     |> SELECT
          SimpleTypes.int32 AS a_1,
          SimpleTypes.int64 AS a_2,

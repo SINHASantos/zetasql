@@ -898,6 +898,7 @@ absl::Status Validator::ValidateResolvedExpr(
                                      expr->GetAs<ResolvedFlatten>());
     case RESOLVED_FLATTENED_ARG:
       return ValidateResolvedFlattenedArg(expr->GetAs<ResolvedFlattenedArg>());
+
     case RESOLVED_GET_PROTO_ONEOF:
       return ValidateResolvedGetProtoOneof(
           visible_columns, visible_parameters,
@@ -7131,7 +7132,7 @@ absl::Status Validator::ValidateResolvedDMLStmt(
     // Nested DML.
     VALIDATOR_RET_CHECK(stmt->table_scan() == nullptr);
     // The array element is not visible in nested INSERTs.
-    if (!std::is_same<STMT, ResolvedInsertStmt>::value) {
+    if (!std::is_same_v<STMT, ResolvedInsertStmt>) {
       visible_columns->insert(*array_element_column);
     }
   }
@@ -7342,12 +7343,12 @@ absl::Status Validator::ValidateResolvedDeleteStmt(
     const std::set<ResolvedColumn>* outer_visible_columns,
     const ResolvedColumn* array_element_column) {
   PushErrorContext push(this, stmt);
-  std::set<ResolvedColumn> visible_columns;
-  GOOGLESQL_RETURN_IF_ERROR(
-      ValidateResolvedDMLStmt(stmt, array_element_column, &visible_columns));
+  std::set<ResolvedColumn> target_visible_columns;
+  GOOGLESQL_RETURN_IF_ERROR(ValidateResolvedDMLStmt(stmt, array_element_column,
+                                          &target_visible_columns));
   if (outer_visible_columns != nullptr) {
-    visible_columns.insert(outer_visible_columns->begin(),
-                           outer_visible_columns->end());
+    target_visible_columns.insert(outer_visible_columns->begin(),
+                                  outer_visible_columns->end());
   }
 
   if (array_element_column == nullptr) {
@@ -7358,28 +7359,37 @@ absl::Status Validator::ValidateResolvedDeleteStmt(
   } else {
     // Nested DELETE.
     VALIDATOR_RET_CHECK(stmt->table_scan() == nullptr);
+    VALIDATOR_RET_CHECK(stmt->using_scan() == nullptr);
     VALIDATOR_RET_CHECK_EQ(stmt->column_access_list().size(), 0);
   }
 
   if (stmt->timestamp_version_column() != nullptr) {
-    visible_columns.insert(stmt->timestamp_version_column()->column());
+    target_visible_columns.insert(stmt->timestamp_version_column()->column());
   }
 
   if (stmt->array_offset_column() != nullptr) {
-    visible_columns.insert(stmt->array_offset_column()->column());
+    target_visible_columns.insert(stmt->array_offset_column()->column());
+  }
+
+  std::set<ResolvedColumn> all_visible_columns(target_visible_columns);
+  if (stmt->using_scan() != nullptr) {
+    GOOGLESQL_RETURN_IF_ERROR(
+        ValidateResolvedScan(stmt->using_scan(), /*visible_parameters=*/{}));
+    GOOGLESQL_RETURN_IF_ERROR(
+        AddColumnList(stmt->using_scan()->column_list(), &all_visible_columns));
   }
 
   VALIDATOR_RET_CHECK(stmt->where_expr() != nullptr);
   GOOGLESQL_RETURN_IF_ERROR(ValidateResolvedExpr(
-      visible_columns, /*visible_parameters=*/{}, stmt->where_expr()));
+      all_visible_columns, /*visible_parameters=*/{}, stmt->where_expr()));
   VALIDATOR_RET_CHECK(stmt->where_expr()->type()->IsBool())
       << "DeleteStmt has WHERE expression with non-BOOL type: "
       << stmt->where_expr()->type()->DebugString();
   if (stmt->returning() != nullptr) {
     // Returning clause is only valid on top-level DELETE.
     VALIDATOR_RET_CHECK_EQ(array_element_column, nullptr);
-    GOOGLESQL_RETURN_IF_ERROR(
-        ValidateResolvedReturningClause(stmt->returning(), visible_columns));
+    GOOGLESQL_RETURN_IF_ERROR(ValidateResolvedReturningClause(stmt->returning(),
+                                                    target_visible_columns));
   }
   return absl::OkStatus();
 }
@@ -11035,13 +11045,28 @@ absl::Status Validator::ValidateResolvedUpdateConstructor(
     const ResolvedUpdateConstructor* update_constructor) {
   RETURN_ERROR_IF_OUT_OF_STACK_SPACE();
   PushErrorContext push(this, update_constructor);
-  GOOGLESQL_RETURN_IF_ERROR(ValidateResolvedExpr(visible_columns, visible_parameters,
-                                       update_constructor->expr()));
+  std::set<ResolvedColumn> update_visible_columns = visible_columns;
+  if (update_constructor->update_element_column().IsInitialized()) {
+    VALIDATOR_RET_CHECK(
+        update_constructor->update_element_column().type()->Equals(
+            update_constructor->expr()->type()));
+    GOOGLESQL_RETURN_IF_ERROR(
+        CheckUniqueColumnId(update_constructor->update_element_column()));
+    VALIDATOR_RET_CHECK(update_visible_columns
+                            .insert(update_constructor->update_element_column())
+                            .second);
+  }
+
+  GOOGLESQL_RETURN_IF_ERROR(ValidateResolvedExpr(
+      update_visible_columns, visible_parameters, update_constructor->expr()));
+  VALIDATOR_RET_CHECK(update_constructor->expr()->type()->IsProto());
+  VALIDATOR_RET_CHECK(
+      update_constructor->type()->Equals(update_constructor->expr()->type()));
 
   for (const std::unique_ptr<const ResolvedUpdateFieldItem>& update_field_item :
        update_constructor->update_field_item_list()) {
-    GOOGLESQL_RETURN_IF_ERROR(ValidateResolvedExpr(visible_columns, visible_parameters,
-                                         update_field_item->expr()));
+    GOOGLESQL_RETURN_IF_ERROR(ValidateResolvedExpr(
+        update_visible_columns, visible_parameters, update_field_item->expr()));
     VALIDATOR_RET_CHECK(!update_field_item->proto_field_path().empty());
     const absl::string_view base_proto_name = update_constructor->expr()
                                                   ->type()

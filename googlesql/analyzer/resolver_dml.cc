@@ -228,16 +228,43 @@ absl::Status Resolver::ResolveDeleteStatement(
     return MakeSqlErrorAt(ast_statement->offset())
            << "Non-nested DELETE statement does not support WITH OFFSET";
   }
+
+  std::unique_ptr<const ResolvedScan> resolved_using_scan;
+  const NameList* delete_name_list = name_list.get();
+  std::shared_ptr<const NameList> merged_delete_name_list;
   if (ast_statement->using_clause() != nullptr) {
-    return MakeSqlErrorAt(ast_statement->using_clause())
-           << "DELETE with USING clause is not supported";
+    if (!language().LanguageFeatureEnabled(FEATURE_DML_DELETE_WITH_JOIN)) {
+      return MakeSqlErrorAt(ast_statement->using_clause())
+             << "DELETE with USING clause is not supported";
+    }
+    std::shared_ptr<const NameList> from_name_list;
+    GOOGLESQL_RETURN_IF_ERROR(ResolveTableExpression(
+        ast_statement->using_clause()->table_expression(),
+        /*external_scope=*/empty_name_scope_.get(),
+        /*local_scope=*/empty_name_scope_.get(),
+        /*is_leftmost=*/true, /*on_rhs_of_right_or_full_join=*/false,
+        &resolved_using_scan, &from_name_list));
+    GOOGLESQL_ASSIGN_OR_RETURN(bool has_range_variable,
+                     from_name_list->HasRangeVariable(target_alias));
+    if (has_range_variable) {
+      return MakeSqlErrorAt(ast_statement->using_clause())
+             << "Alias " << ToIdentifierLiteral(target_alias)
+             << " in the DELETE target cannot be used again in the USING "
+                "clause";
+    }
+    auto new_delete_name_list = std::make_unique<NameList>();
+    GOOGLESQL_RETURN_IF_ERROR(new_delete_name_list->MergeFrom(
+        *from_name_list, ast_statement->using_clause()));
+    GOOGLESQL_RETURN_IF_ERROR(new_delete_name_list->MergeFrom(*name_list, target_path));
+    merged_delete_name_list = std::move(new_delete_name_list);
+    delete_name_list = merged_delete_name_list.get();
   }
 
   const std::unique_ptr<const NameScope> delete_scope(
-      new NameScope(*name_list));
-  return ResolveDeleteStatementImpl(ast_statement, target_alias, name_list,
-                                    delete_scope.get(),
-                                    std::move(resolved_table_scan), output);
+      new NameScope(*delete_name_list));
+  return ResolveDeleteStatementImpl(
+      ast_statement, target_alias, name_list, delete_scope.get(),
+      std::move(resolved_table_scan), std::move(resolved_using_scan), output);
 }
 
 absl::Status Resolver::ResolveDeleteStatementImpl(
@@ -245,6 +272,7 @@ absl::Status Resolver::ResolveDeleteStatementImpl(
     const std::shared_ptr<const NameList>& target_name_list,
     const NameScope* scope,
     std::unique_ptr<const ResolvedTableScan> resolved_table_scan,
+    std::unique_ptr<const ResolvedScan> resolved_using_scan,
     std::unique_ptr<ResolvedDeleteStmt>* output) {
   if (ast_statement->temporal_at() != nullptr) {
     return MakeSqlErrorAt(ast_statement->temporal_at())
@@ -376,7 +404,8 @@ absl::Status Resolver::ResolveDeleteStatementImpl(
       std::move(resolved_table_scan), std::move(resolved_assert_rows_modified),
       std::move(resolved_returning_clause),
       std::move(resolved_array_offset_column), std::move(resolved_where_expr),
-      std::move(resolved_timestamp_version_column));
+      std::move(resolved_timestamp_version_column),
+      std::move(resolved_using_scan));
   MaybeRecordResolvedNodeOperatorKeywordLocation(ast_statement, output->get());
   return absl::OkStatus();
 }
@@ -2617,7 +2646,8 @@ absl::Status Resolver::MergeWithUpdateItem(
       GOOGLESQL_RETURN_IF_ERROR(ResolveDeleteStatementImpl(
           ast_input_update_item->delete_statement(), target_alias,
           nested_target_name_list, nested_dml_scope,
-          /*table_scan=*/nullptr, &resolved_stmt));
+          /*resolved_table_scan=*/nullptr, /*resolved_using_scan=*/nullptr,
+          &resolved_stmt));
       resolved_update_item.add_delete_list(std::move(resolved_stmt));
     } else if (is_nested_update) {
       // Nested DML ordering is checked by ShouldMergeWithUpdateItem().

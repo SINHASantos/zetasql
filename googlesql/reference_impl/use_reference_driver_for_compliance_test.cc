@@ -39,6 +39,7 @@ TestDriver* GetComplianceTestDriver() {
   // enabled by default.
   options.EnableLanguageFeature(FEATURE_DECLARATIVE_TYPE_FRAMEWORK);
   options.EnableLanguageFeature(FEATURE_VECTOR_TYPE);
+  options.EnableLanguageFeature(FEATURE_SINGLE_HYBRID_VECTOR_SEARCH_TVF);
 
   options.AddSupportedStatementKind(RESOLVED_GENERALIZED_QUERY_STMT);
   options.AddSupportedStatementKind(RESOLVED_GENERALIZED_QUERY_SUBPIPELINE);

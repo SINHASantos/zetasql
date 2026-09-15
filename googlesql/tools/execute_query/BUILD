@@ -401,6 +401,7 @@ cc_library(
         "//googlesql/base:status",
         "//googlesql/base:strings",
         "//googlesql/common:internal_analyzer_options",
+        "//googlesql/common:internal_analyzer_output_properties",
         "//googlesql/common:options_utils",
         "//googlesql/parser:parse_tree",
         "//googlesql/parser:parse_tree_serializer",

@@ -162,7 +162,7 @@ class HopRewriteVisitor : public ResolvedASTRewriteVisitor {
     const TVFRelation& input_relation =
         node->signature()->argument(0).relation();
     absl::StatusOr<ResolvedTimestampColumnPath> timestamp_column =
-        ResolveTimestampColumnPath(input_relation, ts_col_name, &type_factory_);
+        ResolveTimestampColumnPath(input_relation, ts_col_name);
     if (!timestamp_column.ok()) {
       GOOGLESQL_RET_CHECK_EQ(timestamp_column.status().code(),
                    absl::StatusCode::kInvalidArgument)

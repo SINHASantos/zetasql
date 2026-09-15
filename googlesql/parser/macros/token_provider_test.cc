@@ -40,8 +40,8 @@ using ::testing::FieldsAre;
 using ::absl_testing::IsOk;
 
 // Template specialization to print tokens in failed test messages.
-static void ABSL_ATTRIBUTE_UNUSED PrintTo(const TokenWithLocation& token,
-                                          std::ostream* os) {
+[[maybe_unused]] static void PrintTo(const TokenWithLocation& token,
+                                     std::ostream* os) {
   *os << absl::StrFormat(
       "(kind: %i, location: %s, topmost_invocation_location:%s, text: '%s', "
       "prev_spaces: '%s')",

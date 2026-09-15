@@ -2627,6 +2627,9 @@ SQLTestBase::TestResults SQLTestBase::RunTestWithFeaturesEnabled(
   if (test_case_options_->reserve_graph_table()) {
     GOOGLESQL_CHECK_OK(language_options.EnableReservableKeyword("GRAPH_TABLE"));
   }
+  if (test_case_options_->reserve_align()) {
+    GOOGLESQL_CHECK_OK(language_options.EnableReservableKeyword("ALIGN"));
+  }
   AutoLanguageOptions auto_options(reference_driver());
   reference_driver()->SetLanguageOptions(language_options);
   return ExecuteTestCase();

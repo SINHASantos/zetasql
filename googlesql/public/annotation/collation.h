@@ -58,10 +58,6 @@ class CollationAnnotation : public DefaultAnnotationSpec {
       const ResolvedFunctionCallBase& function_call,
       AnnotationMap* result_annotation_map) override;
 
-  absl::Status CheckAndPropagateForMakeMap(
-      const ResolvedMakeMap& make_map,
-      StructAnnotationMap* result_annotation_map) override;
-
   // Returns false when <map> is nullptr or CollationAnnotation is not
   // present in <map> or any of its nested AnnotationMaps.
   static bool ExistsIn(const AnnotationMap* map) {

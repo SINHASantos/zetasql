@@ -43,22 +43,21 @@ class TypeParameters;
 class TypeParameterValue;
 
 // Uniquely identifies a declaratively-defined type.
-// Any two instances with the same TypeId are identical and Type::Equals() must
-// return true, and their behaviors must be identical.
+// Any two instances with the same DeclarativeTypeId are identical and
+// Type::Equals() must return true, and their behaviors must be identical.
 //
-// TypeFactory currently caches DeclarativeTypes based on TypeId, and any
-// repeated calls to MakeDeclarativeType() with the same TypeId return the same
-// Type* and GOOGLESQL_RET_CHECK that the descriptors are identical.
-//
-// TODO: Rename to `DeclarativeTypeId`.
-struct TypeId {
+// TypeFactory currently caches DeclarativeTypes based on DeclarativeTypeId,
+// and any repeated calls to MakeDeclarativeType() with the same
+// DeclarativeTypeId return the same Type* and GOOGLESQL_RET_CHECK that the descriptors
+// are identical.
+struct DeclarativeTypeId {
   static constexpr absl::string_view kGoogleSqlNamespace = "GoogleSQL";
 
   // For GoogleSQL built-in types, the namespace is kGoogleSqlNamespace.
   std::string name_space;
   // An ID that uniquely identifies the type within the namespace.
-  // *DO NOT* use this alone for identity checks. The whole TypeId needs to be
-  // considered.
+  // *DO NOT* use this alone for identity checks. The whole
+  // DeclarativeTypeId needs to be considered.
   std::string local_id;
   // An optional version ID.
   // This can be used by systems managing user-defined types (UDTs) to
@@ -67,7 +66,7 @@ struct TypeId {
   // For GoogleSQL built-in types, this should always be empty.
   std::string version_id;
 
-  bool operator==(const TypeId& other) const {
+  bool operator==(const DeclarativeTypeId& other) const {
     return name_space == other.name_space && local_id == other.local_id &&
            version_id == other.version_id;
   }
@@ -75,13 +74,11 @@ struct TypeId {
   bool IsGoogleSQLBuiltin() const { return name_space == kGoogleSqlNamespace; }
 
   template <typename H>
-  friend H AbslHashValue(H h, const TypeId& type_id) {
+  friend H AbslHashValue(H h, const DeclarativeTypeId& type_id) {
     return H::combine(std::move(h), type_id.name_space, type_id.local_id,
                       type_id.version_id);
   }
 };
-
-using DeclarativeTypeId = TypeId;
 
 // Holds the callbacks for resolution and validation of type parameters for
 // types defined through the declarative type framework.
@@ -95,8 +92,8 @@ using DeclarativeTypeId = TypeId;
 // Why stateless function pointers (`(*)(...)`) instead of `std::function`:
 // 1. Native Equality: Function pointers can be compared directly (`==`). This
 //    allows `DeclarativeTypeDescriptor::IsIdenticalTo` to verify that two
-//    descriptors with the same TypeId use identical parameter callbacks,
-//    ensuring `TypeFactory` safely deduplicates registrations.
+//    descriptors with the same DeclarativeTypeId use identical parameter
+//    callbacks, ensuring `TypeFactory` safely deduplicates registrations.
 // 2. Zero State/Lifetime Overhead: Captures are prohibited, ensuring static
 //    lifetime. Stateless C++ lambdas (`+[](...) -> ...`) decay automatically to
 //    function pointers at registration call sites.
@@ -157,8 +154,8 @@ static_assert(sizeof(TypeParameterHandlers) == sizeof(void*) * 2,
 
 // This contains all the information to fully specify a DeclarativeType. It
 // describes the type's properties, traits, and full behavior. It also
-// specifies its identity through the TypeId, which uniquely identifies the
-// type.
+// specifies its identity through the DeclarativeTypeId, which uniquely
+// identifies the type.
 //
 // Unlike primitive types where the analyzer code sometimes hard-codes some
 // behaviors, everything about a DeclarativeType's behavior is localized to its
@@ -170,9 +167,9 @@ static_assert(sizeof(TypeParameterHandlers) == sizeof(void*) * 2,
 // just its behavior.
 //
 // Notes:
-// * `TypeId` is always required. It uniquely identifies the type.
-//   If multiple instances are created with the same TypeId, they must be
-//   identical: they are the same type, and Type::Equals() returns true.
+// * `DeclarativeTypeId` is always required. It uniquely identifies the type.
+//   If multiple instances are created with the same DeclarativeTypeId, they
+//   must be identical: they are the same type, and Type::Equals() returns true.
 //
 // * `backing_type` is always required. It is used primarily for value
 //    representation. For example:
@@ -218,8 +215,45 @@ class DeclarativeTypeDescriptor final {
   using TypeParamsStrategy =
       std::variant<TypeParamsDisallowed, TypeParamsCustom>;
 
-  const TypeId& type_id() const { return data_->type_id; }
-  DeclarativeTypeDescriptor& set_type_id(const TypeId& type_id) {
+  struct FormattingDisallowed {
+    bool operator==(const FormattingDisallowed&) const = default;
+  };
+  struct FormattingCustom {
+    // Callback to format the ValueContent of a DeclarativeType into a string
+    // according to the given FormatValueContentOptions.
+    //
+    // Those opaque callbacks are not serialized into TypeProto, and therefore
+    // should only be used for built-in types known to the engine or GoogleSQL.
+    //
+    // Stateless function pointers (`(*)(...)`) are used so they can be
+    // natively compared via `operator==`, ensuring safe deduplication in
+    // `TypeFactory`.
+    // In the future, we will consider which parts here can replace parts of
+    // the internal Type::FormatValueContentOptions.
+    struct FormatOptions {
+      enum class Mode {
+        kDebug,       // "%t", human debug logs and error messages (Readability)
+        kSQLLiteral,  // "%T", SQL literal
+        kSQLExpression,  // Called by code to generate SQL, e.g. SqlBuilder.
+      };
+      Mode mode;
+    };
+    using Callback = std::string (*)(const ValueContent&, const FormatOptions&);
+
+    explicit FormattingCustom(Callback callback) : callback(callback) {}
+
+    Callback callback = nullptr;
+
+    bool operator==(const FormattingCustom& other) const {
+      return callback == other.callback;
+    }
+  };
+
+  using FormattingStrategy =
+      std::variant<FormattingDisallowed, FormattingCustom>;
+
+  const DeclarativeTypeId& type_id() const { return data_->type_id; }
+  DeclarativeTypeDescriptor& set_type_id(const DeclarativeTypeId& type_id) {
     data_->type_id = type_id;
     return *this;
   }
@@ -272,6 +306,15 @@ class DeclarativeTypeDescriptor final {
     return *this;
   }
 
+  const FormattingStrategy& formatting_strategy() const {
+    return data_->formatting_strategy;
+  }
+  DeclarativeTypeDescriptor& set_formatting_strategy(
+      FormattingStrategy formatting_strategy) {
+    data_->formatting_strategy = std::move(formatting_strategy);
+    return *this;
+  }
+
   const LanguageOptions::LanguageFeatureSet&
   additional_required_language_features() const {
     return data_->additional_required_language_features;
@@ -313,7 +356,7 @@ class DeclarativeTypeDescriptor final {
   struct Data {
     // Internal ID which uniquely identifies this type.
     // Type identity (Equals()) is determined through this ID.
-    TypeId type_id;
+    DeclarativeTypeId type_id;
 
     // Not used for type identity, but is still user-visible, e.g. in the result
     // of TYPEOF(), displaying function signatures, or in error messages.
@@ -335,6 +378,9 @@ class DeclarativeTypeDescriptor final {
 
     // The equality strategy for this declarative type.
     EqualityStrategy equality_strategy = EqualityDisallowed{};
+
+    // The formatting strategy for this declarative type.
+    FormattingStrategy formatting_strategy = FormattingDisallowed{};
 
     // *Additional* required features for this type. Does not include other
     // features which are required for the backing type.
@@ -379,7 +425,7 @@ class DeclarativeType final : public Type {
   std::string TypeName(ProductMode mode) const override;
 
   const DeclarativeTypeDescriptor& descriptor() const { return data_; }
-  const TypeId& id() const { return data_.type_id(); }
+  const DeclarativeTypeId& id() const { return data_.type_id(); }
 
   // Returns true if this is a GoogleSQL built-in type.
   bool IsGoogleSQLBuiltin() const { return id().IsGoogleSQLBuiltin(); }
@@ -388,6 +434,15 @@ class DeclarativeType final : public Type {
   bool IsGoogleSQLBuiltin(absl::string_view local_id) const {
     return IsGoogleSQLBuiltin() && id().local_id == local_id;
   }
+
+  const DeclarativeTypeDescriptor::FormattingStrategy& formatting_strategy()
+      const {
+    return data_.formatting_strategy();
+  }
+
+  // Returns true if this type supports formatting (e.g. via the FORMAT
+  // function).
+  bool SupportsFormatting() const;
 
   absl::StatusOr<std::string> TypeNameWithModifiers(
       const TypeModifiers& type_modifiers, ProductMode mode) const override;

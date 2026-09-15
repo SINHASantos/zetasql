@@ -43,6 +43,7 @@
 #include "googlesql/base/status_macros.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
+#include "absl/strings/string_view.h"
 #include "absl/types/span.h"
 #include "googlesql/base/ret_check.h"
 
@@ -380,7 +381,7 @@ class ScanClosureExprVisitor : public MeasureGraphVisitor<ClosureExprResult> {
   // Builds the closure expression result for a measure node, and stores the
   // generated computed column in `computed_columns_`.
   absl::StatusOr<ClosureExprResult> BuildClosureExpr(
-      AnnotatedType closure_annotated_type, const std::string& measure_name,
+      AnnotatedType closure_annotated_type, absl::string_view measure_name,
       const CaseInsensitiveMap<const ClosureExprResult*>&
           computed_dependencies);
 
@@ -448,7 +449,7 @@ absl::Status ScanClosureExprVisitor::Init(const MeasureGraph& graph) {
 }
 
 absl::StatusOr<ClosureExprResult> ScanClosureExprVisitor::BuildClosureExpr(
-    AnnotatedType closure_annotated_type, const std::string& measure_name,
+    AnnotatedType closure_annotated_type, absl::string_view measure_name,
     const CaseInsensitiveMap<const ClosureExprResult*>& computed_dependencies) {
   const StructType* closure_type = closure_annotated_type.type->AsStruct();
   GOOGLESQL_RET_CHECK(closure_type != nullptr);

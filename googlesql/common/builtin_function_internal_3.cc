@@ -912,7 +912,7 @@ static FunctionSignatureOnHeap ZeroIfNullSig(const Type* type,
 
 static absl::Status CheckNullIfArguments(
     const FunctionSignature& signature,
-    const std::vector<InputArgumentType>& arguments,
+    absl::Span<const InputArgumentType> arguments,
     const LanguageOptions& language_options) {
   if (signature.context_id() == FN_NULLIF_WITH_LAMBDA) {
     // This validation runs post-resolution. Therefore, if we get here, the

@@ -17,11 +17,13 @@
 #include "googlesql/analyzer/rewriters/measure_reference_rewrite_util.h"
 
 #include <memory>
+#include <optional>
 #include <utility>
 #include <vector>
 
 #include "googlesql/analyzer/annotation_propagator.h"
 #include "googlesql/analyzer/rewriters/measure_collector.h"
+#include "googlesql/analyzer/rewriters/measure_dependency_graph.h"
 #include "googlesql/analyzer/rewriters/measure_type_rewriter_util.h"
 #include "googlesql/common/type_visitors.h"
 #include "googlesql/public/catalog.h"

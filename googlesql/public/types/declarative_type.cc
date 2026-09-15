@@ -165,6 +165,12 @@ bool DeclarativeType::CanCoerceFrom(const Type* from_type,
                                       is_explicit);
 }
 
+bool DeclarativeType::SupportsFormatting() const {
+  return !std::holds_alternative<
+      DeclarativeTypeDescriptor::FormattingDisallowed>(
+      data_.formatting_strategy());
+}
+
 bool DeclarativeType::SupportsEquality() const {
   return std::visit(
       absl::Overload(
@@ -354,6 +360,12 @@ absl::Status DeclarativeType::SerializeToProtoAndDistinctFileDescriptorsImpl(
              data_.equality_strategy());
   declarative_type_proto->set_equality_strategy(equality_strategy);
 
+  // Serialize the type parameters strategy.
+  // If the type has an opaque C++ callback, obviously we cannot serialize the
+  // callback itself, so we indicate that the strategy is TYPE_PARAMS_CUSTOM.
+  //
+  // It is the deserializer's responsibility to ensure that the correct
+  // callback is set.
   DeclarativeTypeProto::TypeParamsStrategy type_params_strategy;
   std::visit(
       absl::Overload(
@@ -365,6 +377,24 @@ absl::Status DeclarativeType::SerializeToProtoAndDistinctFileDescriptorsImpl(
           }),
       data_.type_params_strategy());
   declarative_type_proto->set_type_params_strategy(type_params_strategy);
+
+  // Serialize the formatting strategy.
+  // If the type has an opaque C++ callback, obviously we cannot serialize the
+  // callback itself, but we indicate that the strategy is FORMATTING_CUSTOM.
+  //
+  // It is the deserializer's responsibility to ensure that the correct callback
+  // is set.
+  DeclarativeTypeProto::FormattingStrategy formatting_strategy;
+  std::visit(
+      absl::Overload(
+          [&](DeclarativeTypeDescriptor::FormattingDisallowed) {
+            formatting_strategy = DeclarativeTypeProto::FORMATTING_DISALLOWED;
+          },
+          [&](const DeclarativeTypeDescriptor::FormattingCustom&) {
+            formatting_strategy = DeclarativeTypeProto::FORMATTING_CUSTOM;
+          }),
+      data_.formatting_strategy());
+  declarative_type_proto->set_formatting_strategy(formatting_strategy);
 
   // Serialize the backing type
   GOOGLESQL_RETURN_IF_ERROR(
@@ -396,12 +426,6 @@ static bool AreSame(
   return equality_strategy1.index() == equality_strategy2.index();
 }
 
-static bool AreSame(
-    const DeclarativeTypeDescriptor::TypeParamsStrategy& type_params_strategy1,
-    const DeclarativeTypeDescriptor::TypeParamsStrategy&
-        type_params_strategy2) {
-  return type_params_strategy1 == type_params_strategy2;
-}
 
 bool DeclarativeType::IsIdenticalTo(const DeclarativeType* other) const {
   if (other == nullptr) {
@@ -419,9 +443,10 @@ bool DeclarativeTypeDescriptor::IsIdenticalTo(
          coercion_to_backing_type() == other.coercion_to_backing_type() &&
          AreSame(returning_strategy(), other.returning_strategy()) &&
          AreSame(equality_strategy(), other.equality_strategy()) &&
+         formatting_strategy() == other.formatting_strategy() &&
+         type_params_strategy() == other.type_params_strategy() &&
          additional_required_language_features() ==
-             other.additional_required_language_features() &&
-         AreSame(type_params_strategy(), other.type_params_strategy());
+             other.additional_required_language_features();
 }
 
 bool DeclarativeType::EqualsForSameKind(const Type* that,
@@ -490,40 +515,51 @@ absl::HashState DeclarativeType::HashValueContentIgnoringFloat(
 
 absl::HashState DeclarativeType::HashTypeParameter(
     absl::HashState state) const {
-  // Combine the type's unique TypeId into the hash state so that declarative
-  // values with identical backing content but distinct declarative types
-  // produce distinct hash codes.
+  // Combine the type's unique DeclarativeTypeId into the hash state so that
+  // declarative values with identical backing content but distinct declarative
+  // types produce distinct hash codes.
   ABSL_DCHECK(ComponentTypes().empty());
   return absl::HashState::combine(std::move(state), id());
 }
 
+using FormatOptions =
+    DeclarativeTypeDescriptor::FormattingCustom::FormatOptions;
+
 std::string DeclarativeType::FormatValueContent(
     const ValueContent& value, const FormatValueContentOptions& options) const {
-  // TODO: Support FormatValueContent for declarative types with
-  // the callback approach.
-  if (IsGoogleSQLBuiltin("VECTOR")) {
-    ValueProto value_proto;
-    if (SerializeValueContent(value, &value_proto).ok()) {
-      ValueProto inner_proto;
-      if (inner_proto.ParseFromString(value_proto.bytes_value()) &&
-          inner_proto.has_array_value()) {
-        std::string result = "VECTOR([";
-        for (int i = 0; i < inner_proto.array_value().element_size(); ++i) {
-          if (i > 0) {
-            absl::StrAppend(&result, ", ");
-          }
-          const ValueProto& elem = inner_proto.array_value().element(i);
-          if (elem.has_float_value()) {
-            absl::StrAppend(&result,
-                            RoundTripFloatToString(elem.float_value()));
-          }
-        }
-        absl::StrAppend(&result, "])");
-        return result;
-      }
-    }
-  }
-  return "ERROR('Unimplemented')";
+  // The formatting strategy dictates the logic.
+  return std::visit(
+      absl::Overload(
+          // `FormattingDisallowed` means the type doesn't support formatting
+          // in the first place. We should never hit this code path.
+          [](DeclarativeTypeDescriptor::FormattingDisallowed) -> std::string {
+            return "ERROR('Unimplemented')";
+          },
+          // Opaque callback: call the specified custom callback.
+          [&](const DeclarativeTypeDescriptor::FormattingCustom& custom)
+              -> std::string {
+            ABSL_DCHECK(custom.callback != nullptr);
+            if (custom.callback == nullptr) {
+              // This should never happen. With this strategy, the callback must
+              // always be set.
+              return "<ERROR>";
+            }
+
+            FormatOptions opts;
+            switch (options.mode) {
+              case FormatValueContentOptions::Mode::kDebug:
+                opts.mode = FormatOptions::Mode::kDebug;
+                break;
+              case FormatValueContentOptions::Mode::kSQLLiteral:
+                opts.mode = FormatOptions::Mode::kSQLLiteral;
+                break;
+              case FormatValueContentOptions::Mode::kSQLExpression:
+                opts.mode = FormatOptions::Mode::kSQLExpression;
+                break;
+            }
+            return custom.callback(GetBackingContent(value), opts);
+          }),
+      data_.formatting_strategy());
 }
 
 absl::Status DeclarativeType::SerializeValueContent(

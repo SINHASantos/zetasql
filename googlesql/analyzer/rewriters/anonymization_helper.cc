@@ -28,7 +28,6 @@
 #include <utility>
 #include <vector>
 
-
 #include "googlesql/analyzer/expr_matching_helpers.h"
 #include "googlesql/analyzer/named_argument_info.h"
 #include "googlesql/analyzer/query_resolver_helper.h"
@@ -75,6 +74,7 @@
 #include "googlesql/resolved_ast/resolved_node_kind.pb.h"
 #include "googlesql/resolved_ast/rewrite_utils.h"
 #include "absl/algorithm/container.h"
+#include "absl/base/casts.h"
 #include "absl/container/flat_hash_map.h"
 #include "absl/container/flat_hash_set.h"
 #include "googlesql/base/check.h"

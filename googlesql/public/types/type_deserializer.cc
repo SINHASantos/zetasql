@@ -94,6 +94,18 @@ DeclarativeTypeCallbacksRegistry::GetTypeParameterHandlers(
   return std::nullopt;
 }
 
+absl::StatusOr<
+    std::optional<DeclarativeTypeDescriptor::FormattingCustom::Callback>>
+DeclarativeTypeCallbacksRegistry::GetCustomFormattingCallback(
+    const DeclarativeTypeId& type_id) const {
+  if (type_id.IsGoogleSQLBuiltin()) {
+    return GetBuiltinCustomFormattingCallback(type_id.local_id);
+  }
+  if (get_engine_formatting_ != nullptr) {
+    return get_engine_formatting_(type_id);
+  }
+  return std::nullopt;
+}
 absl::StatusOr<const GraphElementType*>
 TypeDeserializer::DeserializeGraphElementType(
     const GraphElementTypeProto& graph_element_type_proto) const {
@@ -247,6 +259,32 @@ TypeDeserializer::DeserializeDeclarativeTypeDescriptor(
                             << type_proto.type_params_strategy();
   }
 
+  // FormattingStrategy
+  DeclarativeTypeDescriptor::FormattingStrategy formatting_strategy;
+  switch (type_proto.formatting_strategy()) {
+    case DeclarativeTypeProto::FORMATTING_DISALLOWED:
+      formatting_strategy = DeclarativeTypeDescriptor::FormattingDisallowed{};
+      break;
+    case DeclarativeTypeProto::FORMATTING_CUSTOM: {
+      GOOGLESQL_ASSIGN_OR_RETURN(
+          auto fmt_callback,
+          decl_type_opaque_callback_registry_.GetCustomFormattingCallback(
+              type_id));
+      GOOGLESQL_RET_CHECK(fmt_callback.has_value())
+          << "Declarative type with id (name_space: " << type_id.name_space
+          << ", local_id: " << type_id.local_id
+          << ", version_id: " << type_id.version_id
+          << ") specifies a custom formatting callback, but none found in the "
+             "registry";
+      formatting_strategy =
+          DeclarativeTypeDescriptor::FormattingCustom(*fmt_callback);
+      break;
+    }
+    case DeclarativeTypeProto::FORMATTING_UNSPECIFIED:
+      return MakeSqlError() << "Invalid FormattingStrategy: "
+                            << type_proto.formatting_strategy();
+  }
+
   return DeclarativeTypeDescriptor()
       .set_type_id(type_id)
       .set_display_name(type_proto.display_name())
@@ -256,6 +294,7 @@ TypeDeserializer::DeserializeDeclarativeTypeDescriptor(
       .set_returning_strategy(std::move(returning_strategy))
       .set_equality_strategy(std::move(equality_strategy))
       .set_type_params_strategy(std::move(type_params_strategy))
+      .set_formatting_strategy(std::move(formatting_strategy))
       .set_additional_required_language_features(
           std::move(required_language_features));
 }

@@ -3643,6 +3643,110 @@ QueryStmt
           +-TableScan(column_list=[CollatedTableLazy.array_with_string_ci#4<{Collation:"und:ci"}>], table=CollatedTableLazy, table_column_list=[CollatedTable.array_with_string_ci])
 ==
 
+# Multiple collated types from RowType, selected with * expansion.
+# TODO: Enable SQL Builder when it supports STRUCTs+annotations.
+[no_run_sqlbuilder]
+[language_features=MAXIMUM,+ROW_TYPE,+ANNOTATION_FRAMEWORK,+COLLATION_SUPPORT]
+FROM CollatedTableLazy
+|> SELECT *
+--
+QueryStmt
++-output_column_list=
+| +-$pipe_select.string_ci#2{Collation:"und:ci"} AS string_ci [STRING]
+| +-$pipe_select.string_binary#3{Collation:"binary"} AS string_binary [STRING]
+| +-$pipe_select.struct_with_string_ci#4<_,{Collation:"und:ci"}> AS struct_with_string_ci [STRUCT<a INT32, b STRING>]
+| +-$pipe_select.array_with_string_ci#5<{Collation:"und:ci"}> AS array_with_string_ci [ARRAY<STRING>]
++-query=
+  +-ProjectScan
+    +-column_list=$pipe_select.[string_ci#2, string_binary#3, struct_with_string_ci#4, array_with_string_ci#5]
+    +-expr_list=
+    | +-string_ci#2 :=
+    | | +-GetRowField
+    | |   +-type=STRING
+    | |   +-type_annotation_map={Collation:"und:ci"}
+    | |   +-expr=
+    | |   | +-ColumnRef(type=ROW<CollatedTableLazy>, column=CollatedTableLazy.$row#1)
+    | |   +-column=CollatedTable.string_ci
+    | +-string_binary#3 :=
+    | | +-GetRowField
+    | |   +-type=STRING
+    | |   +-type_annotation_map={Collation:"binary"}
+    | |   +-expr=
+    | |   | +-ColumnRef(type=ROW<CollatedTableLazy>, column=CollatedTableLazy.$row#1)
+    | |   +-column=CollatedTable.string_binary
+    | +-struct_with_string_ci#4 :=
+    | | +-GetRowField
+    | |   +-type=STRUCT<a INT32, b STRING>
+    | |   +-type_annotation_map=<_,{Collation:"und:ci"}>
+    | |   +-expr=
+    | |   | +-ColumnRef(type=ROW<CollatedTableLazy>, column=CollatedTableLazy.$row#1)
+    | |   +-column=CollatedTable.struct_with_string_ci
+    | +-array_with_string_ci#5 :=
+    |   +-GetRowField
+    |     +-type=ARRAY<STRING>
+    |     +-type_annotation_map=<{Collation:"und:ci"}>
+    |     +-expr=
+    |     | +-ColumnRef(type=ROW<CollatedTableLazy>, column=CollatedTableLazy.$row#1)
+    |     +-column=CollatedTable.array_with_string_ci
+    +-input_scan=
+      +-TableScan(column_list=[CollatedTableLazy.$row#1], table=CollatedTableLazy, read_as_row_type=TRUE)
+
+[REWRITTEN AST]
+QueryStmt
++-output_column_list=
+| +-$pipe_select.string_ci#2{Collation:"und:ci"} AS string_ci [STRING]
+| +-$pipe_select.string_binary#3{Collation:"binary"} AS string_binary [STRING]
+| +-$pipe_select.struct_with_string_ci#4<_,{Collation:"und:ci"}> AS struct_with_string_ci [STRUCT<a INT32, b STRING>]
+| +-$pipe_select.array_with_string_ci#5<{Collation:"und:ci"}> AS array_with_string_ci [ARRAY<STRING>]
++-query=
+  +-ProjectScan
+    +-column_list=$pipe_select.[string_ci#2, string_binary#3, struct_with_string_ci#4, array_with_string_ci#5]
+    +-expr_list=
+    | +-string_ci#2 :=
+    | | +-GetStructField
+    | |   +-type=STRING
+    | |   +-type_annotation_map={Collation:"und:ci"}
+    | |   +-expr=
+    | |   | +-ColumnRef(type=STRUCT<string_ci STRING, string_binary STRING, struct_with_string_ci STRUCT<a INT32, b STRING>, array_with_string_ci ARRAY<STRING>>, type_annotation_map=<{Collation:"und:ci"},{Collation:"binary"},<_,{Collation:"und:ci"}>,<{Collation:"und:ci"}>>, column=CollatedTableLazy.$row$scanrow#6<{Collation:"und:ci"},{Collation:"binary"},<_,{Collation:"und:ci"}>,<{Collation:"und:ci"}>>)
+    | |   +-field_idx=0
+    | +-string_binary#3 :=
+    | | +-GetStructField
+    | |   +-type=STRING
+    | |   +-type_annotation_map={Collation:"binary"}
+    | |   +-expr=
+    | |   | +-ColumnRef(type=STRUCT<string_ci STRING, string_binary STRING, struct_with_string_ci STRUCT<a INT32, b STRING>, array_with_string_ci ARRAY<STRING>>, type_annotation_map=<{Collation:"und:ci"},{Collation:"binary"},<_,{Collation:"und:ci"}>,<{Collation:"und:ci"}>>, column=CollatedTableLazy.$row$scanrow#6<{Collation:"und:ci"},{Collation:"binary"},<_,{Collation:"und:ci"}>,<{Collation:"und:ci"}>>)
+    | |   +-field_idx=1
+    | +-struct_with_string_ci#4 :=
+    | | +-GetStructField
+    | |   +-type=STRUCT<a INT32, b STRING>
+    | |   +-type_annotation_map=<_,{Collation:"und:ci"}>
+    | |   +-expr=
+    | |   | +-ColumnRef(type=STRUCT<string_ci STRING, string_binary STRING, struct_with_string_ci STRUCT<a INT32, b STRING>, array_with_string_ci ARRAY<STRING>>, type_annotation_map=<{Collation:"und:ci"},{Collation:"binary"},<_,{Collation:"und:ci"}>,<{Collation:"und:ci"}>>, column=CollatedTableLazy.$row$scanrow#6<{Collation:"und:ci"},{Collation:"binary"},<_,{Collation:"und:ci"}>,<{Collation:"und:ci"}>>)
+    | |   +-field_idx=2
+    | +-array_with_string_ci#5 :=
+    |   +-GetStructField
+    |     +-type=ARRAY<STRING>
+    |     +-type_annotation_map=<{Collation:"und:ci"}>
+    |     +-expr=
+    |     | +-ColumnRef(type=STRUCT<string_ci STRING, string_binary STRING, struct_with_string_ci STRUCT<a INT32, b STRING>, array_with_string_ci ARRAY<STRING>>, type_annotation_map=<{Collation:"und:ci"},{Collation:"binary"},<_,{Collation:"und:ci"}>,<{Collation:"und:ci"}>>, column=CollatedTableLazy.$row$scanrow#6<{Collation:"und:ci"},{Collation:"binary"},<_,{Collation:"und:ci"}>,<{Collation:"und:ci"}>>)
+    |     +-field_idx=3
+    +-input_scan=
+      +-ProjectScan
+        +-column_list=[CollatedTableLazy.$row$scanrow#6<{Collation:"und:ci"},{Collation:"binary"},<_,{Collation:"und:ci"}>,<{Collation:"und:ci"}>>]
+        +-expr_list=
+        | +-$row$scanrow#6 :=
+        |   +-MakeStruct
+        |     +-type=STRUCT<string_ci STRING, string_binary STRING, struct_with_string_ci STRUCT<a INT32, b STRING>, array_with_string_ci ARRAY<STRING>>
+        |     +-type_annotation_map=<{Collation:"und:ci"},{Collation:"binary"},<_,{Collation:"und:ci"}>,<{Collation:"und:ci"}>>
+        |     +-field_list=
+        |       +-ColumnRef(type=STRING, type_annotation_map={Collation:"und:ci"}, column=CollatedTableLazy.string_ci#7{Collation:"und:ci"})
+        |       +-ColumnRef(type=STRING, type_annotation_map={Collation:"binary"}, column=CollatedTableLazy.string_binary#8{Collation:"binary"})
+        |       +-ColumnRef(type=STRUCT<a INT32, b STRING>, type_annotation_map=<_,{Collation:"und:ci"}>, column=CollatedTableLazy.struct_with_string_ci#9<_,{Collation:"und:ci"}>)
+        |       +-ColumnRef(type=ARRAY<STRING>, type_annotation_map=<{Collation:"und:ci"}>, column=CollatedTableLazy.array_with_string_ci#10<{Collation:"und:ci"}>)
+        +-input_scan=
+          +-TableScan(column_list=CollatedTableLazy.[string_ci#7, string_binary#8, struct_with_string_ci#9, array_with_string_ci#10], table=CollatedTableLazy, table_column_list=[CollatedTable.string_ci,CollatedTable.string_binary,CollatedTable.struct_with_string_ci,CollatedTable.array_with_string_ci])
+==
+
 # Annotation propagated through CTE/WithRefScan.
 # TODO: Enable SQL Builder when it supports STRUCTs+annotations.
 [no_run_sqlbuilder]

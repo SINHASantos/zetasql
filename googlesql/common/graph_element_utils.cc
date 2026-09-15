@@ -36,25 +36,12 @@
 namespace googlesql {
 
 bool TypeIsOrContainsGraphElement(const Type* type) {
-  if (type->IsGraphElement() || type->IsGraphPath()) {
+  if (type->IsGraphElement()) {
     return true;
   }
-  if (type->IsArray() &&
-      TypeIsOrContainsGraphElement(type->AsArray()->element_type())) {
-    return true;
-  }
-  if (type->IsStruct()) {
-    for (const StructType::StructField& field : type->AsStruct()->fields()) {
-      if (TypeIsOrContainsGraphElement(field.type)) {
-        return true;
-      }
-    }
-  }
-  if (type->IsMap()) {
-    if (TypeIsOrContainsGraphElement(type->AsMap()->key_type())) {
-      return true;
-    }
-    if (TypeIsOrContainsGraphElement(type->AsMap()->value_type())) {
+
+  for (const Type* component_type : type->ComponentTypes()) {
+    if (TypeIsOrContainsGraphElement(component_type)) {
       return true;
     }
   }

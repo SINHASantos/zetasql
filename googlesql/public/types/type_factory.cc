@@ -486,7 +486,7 @@ absl::StatusOr<const Type*> TypeFactory::MakeDeclarativeType(
 
   AddDependency(descriptor.backing_type());
 
-  TypeId type_id = descriptor.type_id();
+  DeclarativeTypeId type_id = descriptor.type_id();
 
   auto declarative_type =
       absl::WrapUnique(new DeclarativeType(*this, std::move(descriptor)));

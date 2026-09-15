@@ -563,26 +563,37 @@ TEST_P(GraphDmlStatementPropertiesTest, CheckCategory) {
 
 INSTANTIATE_TEST_SUITE_P(
     GraphDmlTests, GraphDmlStatementPropertiesTest,
-    Values(GraphDmlTestCase{"GRAPH Fin MATCH (a) INSERT (a)-[:Edge]->(:Node)",
-                            StatementProperties::DML},
-           GraphDmlTestCase{
-               "GRAPH Fin MATCH (a) INSERT (a)-[:Edge]->(:Node) RETURN a.id",
-               StatementProperties::DML},
-           GraphDmlTestCase{"GRAPH Fin MATCH (a) SET a.prop = 1",
-                            StatementProperties::SELECT},
-           GraphDmlTestCase{"GRAPH Fin MATCH (a) REMOVE a.prop",
-                            StatementProperties::SELECT},
-           GraphDmlTestCase{"GRAPH Fin MATCH (a) DELETE a",
-                            StatementProperties::SELECT},
-           GraphDmlTestCase{"GRAPH Fin MATCH (a) RETURN a",
-                            StatementProperties::SELECT},
-           // GQL with syntax errors are classified as SELECT, regardless of
-           // whether they have an INSERT operator or not.
-           GraphDmlTestCase{
-               "GRAPH Fin INSERT (a:Node)-[:Edge]->(b:Node) MATCH (a) RETURN a",
-               StatementProperties::SELECT},
-           GraphDmlTestCase{"GRAPH Fin MATCH (a) RETURN a |> WHERE true",
-                            StatementProperties::SELECT}));
+    Values(
+        GraphDmlTestCase{"GRAPH Fin MATCH (a) INSERT (a)-[:Edge]->(:Node)",
+                         StatementProperties::DML},
+        GraphDmlTestCase{
+            "GRAPH Fin MATCH (a) INSERT (a)-[:Edge]->(:Node) RETURN a.id",
+            StatementProperties::DML},
+        GraphDmlTestCase{"GRAPH Fin MATCH (a) SET a.prop = 1",
+                         StatementProperties::DML},
+        GraphDmlTestCase{"GRAPH Fin MATCH (a) REMOVE a.prop",
+                         StatementProperties::DML},
+        GraphDmlTestCase{"GRAPH Fin MATCH (a) DELETE a",
+                         StatementProperties::DML},
+        GraphDmlTestCase{"GRAPH Fin MATCH (a) NODETACH DELETE a",
+                         StatementProperties::DML},
+        GraphDmlTestCase{"GRAPH Fin MATCH (a) DETACH DELETE a",
+                         StatementProperties::DML},
+        GraphDmlTestCase{"GRAPH Fin MATCH (a) RETURN a",
+                         StatementProperties::SELECT},
+        // GQL with syntax errors are classified as SELECT, regardless of
+        // whether they have an INSERT, SET, REMOVE, or DELETE operator or not.
+        GraphDmlTestCase{
+            "GRAPH Fin INSERT (a:Node)-[:Edge]->(b:Node) MATCH (a) RETURN a",
+            StatementProperties::SELECT},
+        GraphDmlTestCase{"GRAPH Fin MATCH (a) RETURN a |> WHERE true",
+                         StatementProperties::SELECT},
+        GraphDmlTestCase{"GRAPH Fin MATCH (a) SET age = 30",
+                         StatementProperties::SELECT},
+        GraphDmlTestCase{"GRAPH Fin MATCH (a) REMOVE 1",
+                         StatementProperties::SELECT},
+        GraphDmlTestCase{"GRAPH Fin MATCH (a) DELETE 1",
+                         StatementProperties::SELECT}));
 
 struct GetTopLevelTableNameFromDDLStatementTestCase {
   // The SQL string to test

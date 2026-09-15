@@ -54,6 +54,7 @@
 #include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
+#include "absl/types/span.h"
 #include "googlesql/base/map_util.h"
 #include "googlesql/base/ret_check.h"
 
@@ -126,7 +127,7 @@ static absl::StatusOr<bool> TableArgHasEqualAnnotationsToDefinition(
 }
 
 static absl::StatusOr<bool> ArgsHaveSameAnnotationsAsDefinition(
-    const std::vector<TVFInputArgumentType>& actual_arguments,
+    absl::Span<const TVFInputArgumentType> actual_arguments,
     const ResolvedCreateTableFunctionStmt& create_tvf_statement) {
   GOOGLESQL_RET_CHECK_EQ(actual_arguments.size(),
                create_tvf_statement.signature().arguments().size());

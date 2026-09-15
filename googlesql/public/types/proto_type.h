@@ -517,7 +517,8 @@ absl::Status ProtoType::ValidateTypeAnnotations(
             field_format != FieldFormat::RANGE_TIMESTAMPS_ENCODED &&
             field_format != FieldFormat::INTERVAL &&
             field_format != FieldFormat::UUID &&
-            field_format != FieldFormat::TIMESTAMP) {
+            field_format != FieldFormat::TIMESTAMP &&
+            field_format != FieldFormat::VARIANT) {
           return MakeSqlError()
                  << "Proto " << field->containing_type()->full_name()
                  << " has invalid googlesql.format for BYTES field: "

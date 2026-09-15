@@ -5463,5 +5463,148 @@ TEST(BarrierScanTest, WrappedBarrierScanOp) {
                           IsTupleSlotWith(String("string"), IsNull()), _));
 }
 
+// Tests PivotOp behavior when grouping by array columns.
+// In SQL, this reflects the failing query pattern discovered during random
+// query generator (RQG) fuzzing:
+//
+//   SELECT *
+//   FROM (
+//     SELECT
+//       ARRAY(SELECT val FROM InnerTable) AS unordered_array_key,
+//       pivot_col,
+//       agg_val
+//     FROM InputTable
+//   )
+//   PIVOT(SUM(agg_val) FOR pivot_col IN ('Q1'))
+//
+// Even if InputTable is completely deterministic, constructing an array from a
+// table or subquery without an explicit ORDER BY clause (such as `ARRAY(SELECT
+// ...)` or `ARRAY_AGG(...)`) produces an array value with uncertain element
+// order (OrderPreservationKind::kIgnoresOrder).
+//
+// Because the element order is non-deterministic, different rows in InputTable
+// can end up with different element permutations of the exact same bag of
+// values (e.g. Row 1 gets `[1, 2]` while Row 2 gets `[2, 1]`).
+//
+// When PivotOp implicitly groups rows by unordered_array_key:
+// - Exact positional comparison splits `[1, 2]` and `[2, 1]` into separate
+// groups.
+// - An engine or rewriter grouping bags/sets may collapse them into one group.
+//
+// PivotOp must detect collisions of unordered array keys and call
+// EvaluationContext::SetNonDeterministicOutput() so compliance testing skips
+// strict row-equality checks for such non-deterministic queries.
+TEST_F(CreateIteratorTest, PivotOpUnorderedArrayGrouping) {
+  VariableId k("k"), q("q"), v("v"), agg_q1("agg_q1");
+  const ArrayType* array_type = Int64ArrayType();
+
+  // Helper lambda that runs PivotOp with two rows having the given array keys
+  // and returns whether the execution was marked deterministic.
+  auto run_pivot_with_array_keys =
+      [&](Value array_key1, Value array_key2) -> absl::StatusOr<bool> {
+    std::vector<TupleData> tuples;
+    TupleData row1(/*num_slots=*/3);
+    row1.mutable_slot(0)->SetValue(std::move(array_key1));
+    row1.mutable_slot(1)->SetValue(String("Q1"));
+    row1.mutable_slot(2)->SetValue(Int64(100));
+    tuples.push_back(std::move(row1));
+
+    TupleData row2(/*num_slots=*/3);
+    row2.mutable_slot(0)->SetValue(std::move(array_key2));
+    row2.mutable_slot(1)->SetValue(String("Q1"));
+    row2.mutable_slot(2)->SetValue(Int64(200));
+    tuples.push_back(std::move(row2));
+
+    auto input_op = std::make_unique<TestRelationalOp>(
+        std::vector<VariableId>{k, q, v}, std::move(tuples),
+        /*preserves_order=*/true);
+
+    GOOGLESQL_ASSIGN_OR_RETURN(auto deref_k, DerefExpr::Create(k, array_type));
+    std::vector<std::unique_ptr<KeyArg>> keys;
+    keys.push_back(std::make_unique<KeyArg>(k, std::move(deref_k)));
+
+    GOOGLESQL_ASSIGN_OR_RETURN(auto deref_q, DerefExpr::Create(q, StringType()));
+
+    std::vector<std::unique_ptr<ExprArg>> pivot_values;
+    GOOGLESQL_ASSIGN_OR_RETURN(auto pv_q1, ConstExpr::Create(String("Q1")));
+    pivot_values.push_back(std::make_unique<ExprArg>(std::move(pv_q1)));
+
+    std::vector<std::unique_ptr<AggregateArg>> aggregators;
+    GOOGLESQL_ASSIGN_OR_RETURN(auto deref_v, DerefExpr::Create(v, Int64Type()));
+    std::vector<std::unique_ptr<ValueExpr>> agg_args;
+    agg_args.push_back(std::move(deref_v));
+    GOOGLESQL_ASSIGN_OR_RETURN(
+        auto agg_arg,
+        AggregateArg::Create(agg_q1,
+                             std::make_unique<BuiltinAggregateFunction>(
+                                 FunctionKind::kSum, Int64Type(),
+                                 /*num_input_fields=*/1, Int64Type()),
+                             std::move(agg_args)));
+    aggregators.push_back(std::move(agg_arg));
+
+    GOOGLESQL_ASSIGN_OR_RETURN(
+        auto pivot_op,
+        PivotOp::Create(std::move(keys), std::move(deref_q),
+                        std::move(pivot_values), std::move(aggregators),
+                        std::move(input_op)));
+    GOOGLESQL_RETURN_IF_ERROR(pivot_op->SetSchemasForEvaluation(EmptyParamsSchemas()));
+
+    EvaluationContext context((EvaluationOptions()));
+    GOOGLESQL_ASSIGN_OR_RETURN(std::unique_ptr<TupleIterator> iter,
+                     pivot_op->CreateIterator(EmptyParams(),
+                                              /*num_extra_slots=*/0, &context));
+    GOOGLESQL_RETURN_IF_ERROR(ReadFromTupleIterator(iter.get()).status());
+    return context.IsDeterministicOutput();
+  };
+
+  // Case 1: Unordered array keys (kIgnoresOrder) with different permutations
+  // must trigger non-deterministic output detection.
+  EXPECT_THAT(
+      run_pivot_with_array_keys(Array({Int64(1), Int64(2)}, kIgnoresOrder),
+                                Array({Int64(2), Int64(1)}, kIgnoresOrder)),
+      IsOkAndHolds(false));
+
+  // Case 2: Ordered array keys (kPreservesOrder) must remain deterministic.
+  EXPECT_THAT(
+      run_pivot_with_array_keys(Array({Int64(1), Int64(2)}, kPreservesOrder),
+                                Array({Int64(1), Int64(2)}, kPreservesOrder)),
+      IsOkAndHolds(true));
+}
+
+TEST(UnorderedArrayCollisionTrackerTest, ContainerTypes) {
+  UnorderedArrayCollisionTracker tracker;
+
+  // MAP is not supported for grouping and must fail the GOOGLESQL_RET_CHECK.
+  Value map_value = Map({{Int64(1), String("a")}});
+  EXPECT_THAT(tracker.CouldIndicateNondetermisticGrouping(0, map_value),
+              StatusIs(absl::StatusCode::kInternal));
+
+  // Struct containing MAP also fails the GOOGLESQL_RET_CHECK.
+  Value struct_with_map = Struct({{"map_field", map_value}});
+  EXPECT_THAT(tracker.CouldIndicateNondetermisticGrouping(0, struct_with_map),
+              StatusIs(absl::StatusCode::kInternal));
+
+  // Array of MAP also fails the GOOGLESQL_RET_CHECK.
+  const ArrayType* array_of_map_type = MakeArrayType(map_value.type());
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(Value array_of_map_value,
+                       Value::MakeArray(array_of_map_type, {}));
+  EXPECT_THAT(
+      tracker.CouldIndicateNondetermisticGrouping(0, array_of_map_value),
+      StatusIs(absl::StatusCode::kInternal));
+
+  // GraphElement is groupable based on element ID and is treated as
+  // deterministic.
+  GOOGLESQL_ASSERT_OK_AND_ASSIGN(Value graph_node,
+                       GraphNode({"graph"}, "node_1", {}, {}, ""));
+  EXPECT_THAT(tracker.CouldIndicateNondetermisticGrouping(0, graph_node),
+              IsOkAndHolds(false));
+
+  // Struct containing GraphElement is also treated as deterministic.
+  Value struct_with_graph_node = Struct({{"node_field", graph_node}});
+  EXPECT_THAT(
+      tracker.CouldIndicateNondetermisticGrouping(0, struct_with_graph_node),
+      IsOkAndHolds(false));
+}
+
 }  // namespace
 }  // namespace googlesql

@@ -18,10 +18,8 @@
 #define GOOGLESQL_ANALYZER_REWRITERS_MEASURE_TYPE_REWRITER_UTIL_H_
 
 #include <memory>
-#include <string>
 #include <vector>
 
-#include "googlesql/analyzer/rewriters/measure_dependency_graph.h"
 #include "googlesql/public/catalog.h"
 #include "googlesql/public/language_options.h"
 #include "googlesql/public/types/annotation.h"
@@ -31,8 +29,6 @@
 #include "googlesql/resolved_ast/resolved_column.h"
 #include "googlesql/resolved_ast/resolved_node.h"
 #include "googlesql/resolved_ast/rewrite_utils.h"
-#include "googlesql/base/case.h"
-#include "absl/container/btree_set.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 

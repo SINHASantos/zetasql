@@ -70,16 +70,16 @@ class DefaultAnnotationSpec : public AnnotationSpec {
       AnnotationMap* result_annotation_map) override;
   absl::Status CheckAndPropagateForGetStructField(
       const ResolvedGetStructField& get_struct_field,
-      AnnotationMap* result_annotation_map) override;
+      AnnotationMap* result_annotation_map) final;
   absl::Status CheckAndPropagateForGetRowField(
       const ResolvedGetRowField& get_row_field,
-      AnnotationMap* result_annotation_map) override;
+      AnnotationMap* result_annotation_map) final;
   absl::Status CheckAndPropagateForMakeStruct(
       const ResolvedMakeStruct& make_struct,
-      StructAnnotationMap* result_annotation_map) override;
+      StructAnnotationMap* result_annotation_map) final;
   absl::Status CheckAndPropagateForMakeMap(
       const ResolvedMakeMap& make_map,
-      StructAnnotationMap* result_annotation_map) override;
+      StructAnnotationMap* result_annotation_map) final;
 
   // Drops all annotations as we are casting to a new type. Subclasses can
   // override this behavior if they want to annotate the output.
@@ -91,19 +91,19 @@ class DefaultAnnotationSpec : public AnnotationSpec {
   // map of the subquery's column to <result_annotation_map>.
   absl::Status CheckAndPropagateForSubqueryExpr(
       const ResolvedSubqueryExpr& subquery_expr,
-      AnnotationMap* result_annotation_map) override;
+      AnnotationMap* result_annotation_map) final;
 
   // Merges the AnnotationMaps for each column in the scan by successively
   // calling ScalarMergeIfCompatible on their components.
   absl::Status CheckAndPropagateForSetOperationScan(
       const ResolvedSetOperationScan& set_operation_scan,
-      const std::vector<AnnotationMap*>& result_annotation_maps) override;
+      const std::vector<AnnotationMap*>& result_annotation_maps) final;
 
   // Merges the AnnotationMaps for each column in the recursive scan by
   // successively calling ScalarMergeIfCompatible on their components.
   absl::Status CheckAndPropagateForRecursiveScan(
       const ResolvedRecursiveScan& recursive_scan,
-      const std::vector<AnnotationMap*>& result_annotation_maps) override;
+      const std::vector<AnnotationMap*>& result_annotation_maps) final;
 
  protected:
   // Merges two scalar annotations, placing the result in 'out'.

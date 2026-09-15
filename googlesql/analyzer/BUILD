@@ -230,6 +230,7 @@ cc_library(
     hdrs = [
         "analytic_function_resolver.h",
         "column_cycle_detector.h",
+        "column_list_spec.h",
         "conflicting_field_paths_validator.h",
         "estimator_function_resolver.h",
         "expr_resolver_helper.h",

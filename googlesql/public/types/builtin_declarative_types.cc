@@ -23,14 +23,21 @@
 #include <vector>
 
 #include "googlesql/common/errors.h"
+#include "googlesql/common/string_util.h"
 #include "googlesql/public/proto/vector_encoding_id.pb.h"
 #include "googlesql/public/types/declarative_type.h"
+#include "googlesql/public/types/type.h"
 #include "googlesql/public/types/type_parameters.h"
+#include "googlesql/public/types/value_representations.h"
+#include "googlesql/public/types/vector_type_util.h"
+#include "googlesql/public/value.pb.h"
 #include "absl/base/no_destructor.h"
 #include "absl/container/flat_hash_map.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/ascii.h"
+#include "absl/strings/str_cat.h"
+#include "absl/strings/str_join.h"
 #include "absl/strings/string_view.h"
 #include "googlesql/base/ret_check.h"
 
@@ -90,31 +97,89 @@ static absl::Status ValidateVectorTypeParameters(
       *type_parameters.vector_type_parameters());
 }
 
-static absl::flat_hash_map<absl::string_view, TypeParameterHandlers>
+using FormatOptions =
+    DeclarativeTypeDescriptor::FormattingCustom::FormatOptions;
+
+static std::string FormatVectorValue(const ValueContent& value,
+                                     const FormatOptions& opts) {
+  absl::string_view bytes = value.GetAs<internal::StringRef*>()->value();
+  ValueProto inner_proto;
+
+  static constexpr char kErrorString[] = "ERROR: Invalid VECTOR value";
+
+  if (!inner_proto.ParseFromString(bytes) || !inner_proto.has_array_value()) {
+    return kErrorString;
+  }
+
+  std::string float_array_str = absl::StrJoin(
+      inner_proto.array_value().element(), ", ",
+      [](std::string* out, const ValueProto& elem) {
+        if (elem.has_float_value()) {
+          absl::StrAppend(out, RoundTripFloatToString(elem.float_value()));
+        } else {
+          absl::StrAppend(out, "<InvalidElement>");
+        }
+      });
+
+  switch (opts.mode) {
+    case FormatOptions::Mode::kDebug:
+      return absl::StrCat("VECTOR([", std::move(float_array_str), "])");
+    case FormatOptions::Mode::kSQLLiteral:
+    case FormatOptions::Mode::kSQLExpression:
+      return absl::StrCat("ENCODE_VECTOR([", std::move(float_array_str), "])");
+  }
+}
+
+// Static initialization of opaque callback registries
+template <typename T>
+using BuiltinOpaqueCallbackMap = absl::flat_hash_map<
+    /*local_type_id=*/absl::string_view, T>;
+
+static BuiltinOpaqueCallbackMap<TypeParameterHandlers>
 InitBuiltinTypeParameterHandlers() {
-  absl::flat_hash_map<absl::string_view, TypeParameterHandlers> handlers_map;
+  BuiltinOpaqueCallbackMap<TypeParameterHandlers> handlers_map;
+
+  // Add type parameter handlers for built-in types.
   absl::StatusOr<TypeParameterHandlers> vector_handlers =
       TypeParameterHandlers::Create(&ResolveVectorTypeParameters,
                                     &ValidateVectorTypeParameters);
   if (vector_handlers.ok()) {
-    handlers_map.emplace("VECTOR", *std::move(vector_handlers));
+    handlers_map.emplace(kVectorTypeName, *std::move(vector_handlers));
   }
   return handlers_map;
 }
 
-static const absl::flat_hash_map<absl::string_view, TypeParameterHandlers>&
-GetBuiltinTypeParameterHandlersMap() {
-  static const absl::NoDestructor<
-      absl::flat_hash_map<absl::string_view, TypeParameterHandlers>>
-      kBuiltinTypeParameterHandlers(InitBuiltinTypeParameterHandlers());
-  return *kBuiltinTypeParameterHandlers;
+using FormattingCallback =
+    DeclarativeTypeDescriptor::FormattingCustom::Callback;
+
+static BuiltinOpaqueCallbackMap<FormattingCallback>
+InitBuiltinCustomFormattingCallbacks() {
+  BuiltinOpaqueCallbackMap<FormattingCallback> formatting_callbacks_map;
+
+  // Add custom formatting callbacks for built-in types.
+  formatting_callbacks_map.emplace(kVectorTypeName, &FormatVectorValue);
+
+  return formatting_callbacks_map;
 }
 
 std::optional<TypeParameterHandlers> GetBuiltinTypeParameterHandlers(
     absl::string_view type_id) {
-  const auto& handlers_map = GetBuiltinTypeParameterHandlersMap();
-  auto it = handlers_map.find(type_id);
-  if (it == handlers_map.end()) {
+  static const absl::NoDestructor<
+      BuiltinOpaqueCallbackMap<TypeParameterHandlers>>
+      kHandlers(InitBuiltinTypeParameterHandlers());
+  auto it = kHandlers->find(type_id);
+  if (it == kHandlers->end()) {
+    return std::nullopt;
+  }
+  return it->second;
+}
+
+std::optional<FormattingCallback> GetBuiltinCustomFormattingCallback(
+    absl::string_view type_id) {
+  static const absl::NoDestructor<BuiltinOpaqueCallbackMap<FormattingCallback>>
+      kCallbacks(InitBuiltinCustomFormattingCallbacks());
+  auto it = kCallbacks->find(type_id);
+  if (it == kCallbacks->end()) {
     return std::nullopt;
   }
   return it->second;

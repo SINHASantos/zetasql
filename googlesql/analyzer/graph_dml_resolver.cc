@@ -46,6 +46,7 @@
 #include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
+#include "absl/types/span.h"
 #include "googlesql/base/ret_check.h"
 
 namespace googlesql {
@@ -339,7 +340,7 @@ absl::StatusOr<std::optional<ResolvedColumn>> ResolveExistingVariableIfExists(
 // being inserted in the current statement, or nullptr otherwise.
 const GraphNodeTable* GetInsertedNodeTable(
     const ResolvedColumn& node_col,
-    const std::vector<std::unique_ptr<const ResolvedComputedColumnBase>>&
+    absl::Span<const std::unique_ptr<const ResolvedComputedColumnBase>>
         insert_node_list) {
   for (const auto& computed_col_base : insert_node_list) {
     if (computed_col_base->column() == node_col) {
